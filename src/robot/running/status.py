@@ -28,6 +28,7 @@ class Failure(object):
         self.setup_skipped = None
         self.test_skipped = None
         self.teardown_skipped = None
+        self.unknown = None # cuongnht - add unknown state
 
     def __bool__(self):
         return bool(
@@ -119,12 +120,21 @@ class _ExecutionStatus(object):
 
     @property
     def failed(self):
-        return bool(self.parent and self.parent.failed or self.failure or self.exit)
+        return bool(self.parent and self.parent.failed or
+                    (self.failure and not self.failure.unknown) or self.exit)  # cuongnht - add unknown state
+
+    # cuongnht - add unknown state
+    @property
+    def unknown(self):
+        return bool(self.parent and self.parent.unknown or
+                    (self.failure and self.failure.unknown))
 
     @property
     def status(self):
         if self.skipped or (self.parent and self.parent.skipped):
             return 'SKIP'
+        if self.unknown:
+            return 'UNKNOWN' #nhtcuong
         if self.failed:
             return 'FAIL'
         return 'PASS'
@@ -183,6 +193,7 @@ class TestStatus(_ExecutionStatus):
             self.failure.test = msg
             self.skipped = True
         else:
+            self.failure.unknown = failure.unknown
             self.failure.test = unic(failure)
             self.exit.failure_occurred(failure)
 

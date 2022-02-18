@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 from robot.errors import (ExecutionFailed, ExecutionStatus, DataError,
-                          HandlerExecutionFailed, KeywordError, VariableError)
+                          HandlerExecutionFailed, KeywordError, VariableError, UnknownAssertionError)
 from robot.utils import ErrorDetails, get_timestamp
 
 from .modelcombiner import ModelCombiner
@@ -80,6 +80,9 @@ class StatusReporter(object):
             context.timeout_occurred = True
         if failure.skip:
             context.skip(failure.full_message)
+        # cuongnht - add unknown state 
+        elif failure.unknown:
+            context.unknown(failure.full_message)
         else:
             context.fail(failure.full_message)
         if failure.traceback:

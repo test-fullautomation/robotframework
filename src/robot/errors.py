@@ -98,6 +98,19 @@ class TimeoutError(RobotError):
         return not self.test_timeout
 
 
+# cuongnht - add unknown state
+class UnknownAssertionError(AssertionError):
+    ROBOT_SUPPRESS_NAME = True
+
+    def __init__(self, msg):
+        self.msg = msg
+        AssertionError.__init__(self, self._get_message())
+
+    def _get_message(self):
+        msg = "Unknown exception occurs. Details: %s." % self.msg
+        return msg
+
+
 class Information(RobotError):
     """Used by argument parser with --help or --version."""
 
@@ -107,7 +120,7 @@ class ExecutionStatus(RobotError):
 
     def __init__(self, message, test_timeout=False, keyword_timeout=False,
                  syntax=False, exit=False, continue_on_failure=False,
-                 skip=False, return_value=None):
+                 skip=False, return_value=None, unknown=False):
         if '\r\n' in message:
             message = message.replace('\r\n', '\n')
         from robot.utils import cut_long_message
@@ -118,6 +131,7 @@ class ExecutionStatus(RobotError):
         self.exit = exit
         self._continue_on_failure = continue_on_failure
         self.skip = skip
+        self.unknown = unknown
         self.return_value = return_value
 
     @property
@@ -159,7 +173,7 @@ class ExecutionStatus(RobotError):
 
     @property
     def status(self):
-        return 'FAIL' if not self.skip else 'SKIP'
+        return ('FAIL' if not self.unknown else 'UNKNOWN') if not self.skip else 'SKIP' #nhtcuong
 
 
 class ExecutionFailed(ExecutionStatus):
@@ -171,6 +185,7 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutError)
+        unknown = isinstance(error, UnknownAssertionError)
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = (isinstance(error, DataError)
@@ -180,7 +195,7 @@ class HandlerExecutionFailed(ExecutionFailed):
         skip = self._get(error, 'SKIP_EXECUTION')
         ExecutionFailed.__init__(self, details.message, test_timeout,
                                  keyword_timeout, syntax, exit_on_failure,
-                                 continue_on_failure, skip)
+                                 continue_on_failure, skip, unknown=unknown)
         self.full_message = details.message
         self.traceback = details.traceback
 
@@ -231,7 +246,8 @@ class ExecutionFailures(ExecutionFailed):
             'syntax': any(e.syntax for e in errors),
             'exit': any(e.exit for e in errors),
             'continue_on_failure': all(e.continue_on_failure for e in errors),
-            'skip': any(e.skip for e in errors)
+            'skip': any(e.skip for e in errors),
+            'unknown': any(e.unknown for e in errors) #nhtcuong
         }
 
     def get_errors(self):
