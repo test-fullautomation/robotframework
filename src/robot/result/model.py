@@ -85,6 +85,7 @@ class StatusMixin(object):
     PASS = 'PASS'
     FAIL = 'FAIL'
     SKIP = 'SKIP'
+    UNKNOWN = "UNKNOWN"  # cuongnht - add unknown state
     NOT_RUN = 'NOT RUN'
     NOT_SET = 'NOT SET'
 
@@ -110,6 +111,16 @@ class StatusMixin(object):
     @failed.setter
     def failed(self, failed):
         self.status = self.FAIL if failed else self.PASS
+
+    # cuongnht - add unknown state
+    @property
+    def unknown(self):
+        """``True`` when :attr:`status` is 'UNKNOWN', ``False`` otherwise."""
+        return self.status == self.UNKNOWN
+
+    @unknown.setter
+    def unknown(self, unknown):
+        self.status = self.UNKNOWN if unknown else self.PASS
 
     @property
     def skipped(self):

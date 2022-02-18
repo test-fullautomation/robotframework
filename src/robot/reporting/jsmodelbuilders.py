@@ -21,7 +21,7 @@ from .jsexecutionresult import JsExecutionResult
 
 
 IF_ELSE_ROOT = BodyItem.IF_ELSE_ROOT
-STATUSES = {'FAIL': 0, 'PASS': 1, 'SKIP': 2, 'NOT RUN': 3}
+STATUSES = {'FAIL': 0, 'PASS': 1, 'SKIP': 2, 'NOT RUN': 3, 'UNKNOWN': 4} #nhtcuong
 KEYWORD_TYPES = {'KEYWORD': 0, 'SETUP': 1, 'TEARDOWN': 2,
                  'FOR': 3, 'FOR ITERATION': 4,
                  'IF': 5, 'ELSE IF': 6, 'ELSE': 7}
@@ -119,7 +119,7 @@ class SuiteBuilder(_Builder):
 
     def _get_statistics(self, suite):
         stats = suite.statistics  # Access property only once
-        return (stats.total, stats.passed, stats.failed, stats.skipped)
+        return (stats.total, stats.passed, stats.failed, stats.skipped, stats.unknown) #nhtcuong
 
 
 class TestBuilder(_Builder):

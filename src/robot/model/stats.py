@@ -36,6 +36,8 @@ class Stat(Sortable):
         self.passed = 0
         #: Number of failed tests.
         self.failed = 0
+        #: nhtcuong Number of unknown tests.
+        self.unknown = 0
         #: Number of skipped tests.
         self.skipped = 0
         #: Number of milliseconds it took to execute.
@@ -45,7 +47,7 @@ class Stat(Sortable):
     def get_attributes(self, include_label=False, include_elapsed=False,
                        exclude_empty=True, values_as_strings=False,
                        html_escape=False):
-        attrs = {'pass': self.passed, 'fail': self.failed, 'skip': self.skipped}
+        attrs = {'pass': self.passed, 'fail': self.failed, 'skip': self.skipped, 'unknown': self.unknown} # nhtcuong Number of unknown tests.
         attrs.update(self._get_custom_attrs())
         if include_label:
             attrs['label'] = self.name
@@ -69,7 +71,7 @@ class Stat(Sortable):
 
     @property
     def total(self):
-        return self.passed + self.failed + self.skipped
+        return self.passed + self.failed + self.skipped + self.unknown
 
     def add_test(self, test):
         self._update_stats(test)
@@ -80,6 +82,8 @@ class Stat(Sortable):
             self.passed += 1
         elif test.skipped:
             self.skipped += 1
+        elif test.unknown: #: nhtcuong Number of unknown tests.
+            self.unknown += 1
         else:
             self.failed += 1
 
@@ -125,6 +129,7 @@ class SuiteStat(Stat):
         self.passed += other.passed
         self.failed += other.failed
         self.skipped += other.skipped
+        self.unknown += other.unknown
 
 
 class TagStat(Stat):

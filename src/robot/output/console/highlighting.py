@@ -100,6 +100,7 @@ class HighlightingStream(object):
         highlighter = self._highlighter
         start = {'PASS': highlighter.green,
                  'FAIL': highlighter.red,
+                 'UNKNOWN': highlighter.blue,
                  'ERROR': highlighter.red,
                  'WARN': highlighter.yellow,
                  'SKIP': highlighter.yellow}[status]
@@ -119,6 +120,7 @@ def Highlighter(stream):
 class AnsiHighlighter(object):
     _ANSI_GREEN = '\033[32m'
     _ANSI_RED = '\033[31m'
+    _ANSI_BLUE = '\033[34m' #nhtcuong
     _ANSI_YELLOW = '\033[33m'
     _ANSI_RESET = '\033[0m'
 
@@ -130,6 +132,10 @@ class AnsiHighlighter(object):
 
     def red(self):
         self._set_color(self._ANSI_RED)
+
+    #nhtcuong
+    def blue(self):
+        self._set_color(self._ANSI_BLUE)
 
     def yellow(self):
         self._set_color(self._ANSI_YELLOW)
