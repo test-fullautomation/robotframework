@@ -98,7 +98,7 @@ h2 {
 .label.debug, .label.trace, .label.error, .label.keyword {
     letter-spacing: 0;
 }
-.label.pass, .label.fail, .label.error, .label.skip, .label.warn {
+.label.pass, .label.fail, .label.error, .label.skip, .label.warn, .label.unknown {
     font-weight: bold;
 }
 .label.pass {
@@ -107,6 +107,11 @@ h2 {
 }
 .label.fail, .label.error {
     background-color: #ce3e01;
+    color: #fff !important;
+}
+
+.label.unknown {
+    background-color: #0080fe;
     color: #fff !important;
 }
 .label.skip, .label.warn {
