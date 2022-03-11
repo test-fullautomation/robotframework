@@ -154,6 +154,7 @@ class NoHighlighting(AnsiHighlighter):
 
 
 class DosHighlighter(object):
+    _FOREGROUND_BLUE = 0x1
     _FOREGROUND_GREEN = 0x2
     _FOREGROUND_RED = 0x4
     _FOREGROUND_YELLOW = 0x6
@@ -170,6 +171,9 @@ class DosHighlighter(object):
 
     def green(self):
         self._set_foreground_colors(self._FOREGROUND_GREEN)
+
+    def blue(self):
+        self._set_foreground_colors(self._FOREGROUND_BLUE)
 
     def red(self):
         self._set_foreground_colors(self._FOREGROUND_RED)
