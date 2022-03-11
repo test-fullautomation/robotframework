@@ -49,6 +49,7 @@ class SuiteStructure(object):
 class SuiteStructureBuilder(object):
     ignored_prefixes = ('_', '.')
     ignored_dirs = ('CVS',)
+    data_sources = []
 
     def __init__(self, included_extensions=('robot',), included_suites=None):
         self.included_extensions = included_extensions
@@ -56,6 +57,7 @@ class SuiteStructureBuilder(object):
 
     def build(self, paths):
         paths = list(self._normalize_paths(paths))
+        SuiteStructureBuilder.data_sources = paths
         if len(paths) == 1:
             return self._build(paths[0], self.included_suites)
         children = [self._build(p, self.included_suites) for p in paths]
