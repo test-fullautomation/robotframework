@@ -405,6 +405,9 @@ class TestSuite(model.TestSuite, StatusMixin):
           the case when all tests have been skipped and when there are no tests.
         """
         stats = self.statistics  # Local variable avoids recreating stats.
+        # cuongnht: add unknown state
+        if stats.unknown:
+            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:
