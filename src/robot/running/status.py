@@ -89,6 +89,8 @@ class _ExecutionStatus(object):
                 self.failure.test = msg
                 self.skipped = True
             else:
+                if hasattr(failure, 'unknown'):
+                    self.failure.unknown = failure.unknown
                 self.failure.setup = unic(failure)
                 self.exit.failure_occurred(failure)
 
@@ -105,6 +107,8 @@ class _ExecutionStatus(object):
                 self.failure.test = msg
                 self.skipped = True
             else:
+                if hasattr(failure, 'unknown'):
+                    self.failure.unknown = failure.unknown
                 self.failure.teardown = unic(failure)
                 self.exit.failure_occurred(failure)
 
@@ -193,7 +197,8 @@ class TestStatus(_ExecutionStatus):
             self.failure.test = msg
             self.skipped = True
         else:
-            self.failure.unknown = failure.unknown
+            if hasattr(failure, 'unknown'):
+                self.failure.unknown = failure.unknown
             self.failure.test = unic(failure)
             self.exit.failure_occurred(failure)
 
