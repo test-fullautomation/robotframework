@@ -102,12 +102,12 @@ class TimeoutError(RobotError):
 class UnknownAssertionError(AssertionError):
     ROBOT_SUPPRESS_NAME = True
 
-    def __init__(self, msg):
+    def __init__(self, msg=None):
         self.msg = msg
         AssertionError.__init__(self, self._get_message())
 
     def _get_message(self):
-        msg = "Unknown exception occurs. Details: %s." % self.msg
+        msg = "Unknown exception occurs. Details: %s" % self.msg
         return msg
 
 
