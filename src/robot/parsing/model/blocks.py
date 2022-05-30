@@ -207,6 +207,31 @@ class For(Block):
             self.errors += ('FOR loop has no closing END.',)
 
 
+# cuongnht add thread
+class Thread(Block):
+    _fields = ('header', 'body', 'end')
+
+    def __init__(self, header, body=None, end=None, errors=()):
+        self.header = header
+        self.body = body or []
+        self.end = end
+        self.errors = errors
+
+    @property
+    def name(self):
+        return self.header.name
+
+    @property
+    def daemon(self):
+        return self.header.daemon
+
+    def validate(self):
+        if not self.body:
+            self.errors += ('THREAD has empty body.',)
+        if not self.end:
+            self.errors += ('THREAD has no closing END.',)
+
+
 class ModelWriter(ModelVisitor):
 
     def __init__(self, output):

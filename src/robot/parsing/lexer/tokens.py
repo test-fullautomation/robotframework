@@ -82,6 +82,10 @@ class Token(object):
     IF = 'IF'
     ELSE_IF = 'ELSE IF'
     ELSE = 'ELSE'
+    # cuongnht add thread
+    THREAD = 'THREAD'
+    THREAD_NAME = 'THREAD NAME'
+    THREAD_DAEMON = 'THREAD DAEMON'
 
     SEPARATOR = 'SEPARATOR'
     COMMENT = 'COMMENT'

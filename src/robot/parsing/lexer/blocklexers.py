@@ -25,7 +25,7 @@ from .statementlexers import (Lexer,
                               KeywordCallLexer,
                               ForHeaderLexer,
                               IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
-                              EndLexer)
+                              EndLexer, ThreadHeaderLexer)   # cuongnht add thread
 
 
 class BlockLexer(Lexer):
@@ -173,7 +173,7 @@ class TestOrKeywordLexer(BlockLexer):
                 statement.pop(0).type = None    # These tokens will be ignored
 
     def lexer_classes(self):
-        return (TestOrKeywordSettingLexer, ForLexer, IfLexer, KeywordCallLexer)
+        return (TestOrKeywordSettingLexer, ForLexer, ThreadLexer, IfLexer, KeywordCallLexer)   # cuongnht add thread
 
 
 class TestCaseLexer(TestOrKeywordLexer):
@@ -205,7 +205,7 @@ class NestedBlockLexer(BlockLexer):
 
     def input(self, statement):
         lexer = BlockLexer.input(self, statement)
-        if isinstance(lexer, (IfHeaderLexer, ForHeaderLexer)):
+        if isinstance(lexer, (IfHeaderLexer, ForHeaderLexer, ThreadHeaderLexer)):   # cuongnht add thread
             self._block_level += 1
         if isinstance(lexer, EndLexer):
             self._block_level -= 1
@@ -228,3 +228,13 @@ class IfLexer(NestedBlockLexer):
     def lexer_classes(self):
         return (IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
                 ForLexer, EndLexer, KeywordCallLexer)
+
+
+# cuongnht add thread
+class ThreadLexer(NestedBlockLexer):
+
+    def handles(self, statement):
+        return ThreadHeaderLexer(self.ctx).handles(statement)
+
+    def lexer_classes(self):
+        return ThreadHeaderLexer, IfLexer, EndLexer, KeywordCallLexer

@@ -116,3 +116,37 @@ class IfBranch(BodyItem):
 
     def visit(self, visitor):
         visitor.visit_if_branch(self)
+
+
+# cuongnht add thread
+@Body.register
+class Thread(BodyItem):
+    type = BodyItem.THREAD
+    body_class = Body
+    repr_args = ('name', 'daemon')
+    __slots__ = ['name', 'daemon']
+
+    def __init__(self, name='ROBOT_THREAD2', daemon=True, parent=None):
+        self.name = name
+        self.daemon = daemon
+        self.parent = parent
+        self.body = None
+
+    @setter
+    def body(self, body):
+        return self.body_class(self, body)
+
+    @property
+    def keywords(self):
+        """Deprecated since Robot Framework 4.0. Use :attr:`body` instead."""
+        return Keywords(self, self.body)
+
+    @keywords.setter
+    def keywords(self, keywords):
+        Keywords.raise_deprecation_error()
+
+    def visit(self, visitor):
+        visitor.visit_thread(self)
+
+    def __str__(self):
+        return u'THREAD    name=%s    daemon=%s' % (self.name, self.daemon)

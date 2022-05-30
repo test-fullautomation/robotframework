@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 from ..lexer import Token
-from ..model import TestCase, Keyword, For, If
+from ..model import TestCase, Keyword, For, If, Thread  # cuongnht add thread
 
 
 class Parser(object):
@@ -36,7 +36,7 @@ class BlockParser(Parser):
 
     def __init__(self, model):
         Parser.__init__(self, model)
-        self.nested_parsers = {Token.FOR: ForParser, Token.IF: IfParser}
+        self.nested_parsers = {Token.FOR: ForParser, Token.IF: IfParser, Token.THREAD: ThreadParser}  # cuongnht add thread
 
     def handles(self, statement):
         return statement.type not in self.unhandled_tokens
@@ -79,6 +79,13 @@ class ForParser(NestedBlockParser):
 
     def __init__(self, header):
         NestedBlockParser.__init__(self, For(header))
+
+
+# cuongnht add thread
+class ThreadParser(NestedBlockParser):
+
+    def __init__(self, header):
+        NestedBlockParser.__init__(self, Thread(header))
 
 
 class IfParser(NestedBlockParser):

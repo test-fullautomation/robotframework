@@ -41,7 +41,7 @@ from robot.model import Keywords, BodyItem
 from robot.output import LOGGER, Output, pyloggingconf
 from robot.utils import seq2str, setter
 
-from .bodyrunner import ForRunner, IfRunner, KeywordRunner
+from .bodyrunner import ForRunner, IfRunner, KeywordRunner, ThreadRunner  # cuongnht add thread
 from .randomizer import Randomizer
 
 
@@ -94,6 +94,25 @@ class For(model.For):
 
     def run(self, context, run=True, templated=False):
         return ForRunner(context, self.flavor, run, templated).run(self)
+
+
+# cuongnht add thread
+@Body.register
+class Thread(model.Thread):
+    __slots__ = ['lineno', 'error']
+    body_class = Body
+
+    def __init__(self, name, daemon, parent=None, lineno=None, error=None):
+        model.Thread.__init__(self, name, daemon, parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        return ThreadRunner(context, run, templated).run(self)
 
 
 @Body.register
