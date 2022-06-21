@@ -5,8 +5,8 @@ window.testdata = function () {
     var _statistics = null;
     var LEVELS = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FAIL', 'SKIP', 'UNKNOWN'];
     var STATUSES = ['FAIL', 'PASS', 'SKIP', 'NOT RUN', 'UNKNOWN'];
-    var KEYWORD_TYPES = ['KEYWORD', 'SETUP', 'TEARDOWN', 'FOR', 'VAR', 'IF', 'ELSE IF', 'ELSE'];
-    var MESSAGE_TYPE = 8;
+    var KEYWORD_TYPES = ['KEYWORD', 'SETUP', 'TEARDOWN', 'FOR', 'VAR', 'IF', 'ELSE IF', 'ELSE', 'THREAD'];
+    var MESSAGE_TYPE = 9;
 
     function addElement(elem) {
         if (!elem.id)

@@ -14,6 +14,6 @@
 #  limitations under the License.
 
 from .blocks import (File, SettingSection, VariableSection, TestCaseSection,
-                     KeywordSection, CommentSection, TestCase, Keyword, For, If)
+                     KeywordSection, CommentSection, TestCase, Keyword, For, If, Thread)  # cuongnht add thread
 from .statements import Statement
 from .visitor import ModelTransformer, ModelVisitor

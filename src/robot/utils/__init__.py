@@ -75,6 +75,8 @@ from .text import (cut_assign_value, cut_long_message, format_assign_message,
                    get_console_length, getdoc, getshortdoc, pad_console_length,
                    rstrip, split_tags_from_doc, split_args_from_name_or_path)
 from .unic import prepr, unic
+from .threadsafedict import ThreadSafeDict   # cuongnht add thread
+from .priorityqueue import PriorityQueue  # cuongnht add thread
 
 
 def read_rest_data(rstfile):

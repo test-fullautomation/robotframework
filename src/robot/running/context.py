@@ -16,7 +16,7 @@
 from contextlib import contextmanager
 
 from robot.errors import DataError
-from robot.utils import unic
+from robot.utils import unic, ThreadSafeDict, PriorityQueue   # cuongnht add thread
 
 
 class ExecutionContexts(object):
@@ -68,6 +68,9 @@ class _ExecutionContext(object):
         self._started_keywords = 0
         self.timeout_occurred = False
         self.user_keywords = []
+        # cuongnht add thread
+        self.thread_message_queue_dict = ThreadSafeDict() 
+        self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
 
     @contextmanager
     def suite_teardown(self):

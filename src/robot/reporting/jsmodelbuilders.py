@@ -24,8 +24,8 @@ IF_ELSE_ROOT = BodyItem.IF_ELSE_ROOT
 STATUSES = {'FAIL': 0, 'PASS': 1, 'SKIP': 2, 'NOT RUN': 3, 'UNKNOWN': 4} #nhtcuong
 KEYWORD_TYPES = {'KEYWORD': 0, 'SETUP': 1, 'TEARDOWN': 2,
                  'FOR': 3, 'FOR ITERATION': 4,
-                 'IF': 5, 'ELSE IF': 6, 'ELSE': 7}
-MESSAGE_TYPE = 8
+                 'IF': 5, 'ELSE IF': 6, 'ELSE': 7, 'THREAD': 8}  # cuongnht add thread
+MESSAGE_TYPE = 9
 
 
 class JsModelBuilder(object):

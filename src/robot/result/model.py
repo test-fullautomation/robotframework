@@ -201,6 +201,27 @@ class For(model.For, StatusMixin, DeprecatedAttributesMixin):
                                  ' | '.join(self.values))
 
 
+# cuongnht add thread
+@Body.register
+class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
+    body_class = ForIterations
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, name='ROBOT_THREAD1',  daemon=True, status='PASS',
+                 starttime=None, endtime=None, doc='', parent=None):
+        model.Thread.__init__(self, name, daemon, parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+    # @property
+    # @deprecated
+    # def name(self):
+    #     return '%s %s [ %s ]' % (' | '.join(self.variables), self.flavor,
+    #                              ' | '.join(self.values))
+
+
 @Body.register
 class If(model.If, StatusMixin, DeprecatedAttributesMixin):
     body_class = IfBranches

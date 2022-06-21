@@ -18,14 +18,15 @@ from contextlib import contextmanager
 
 from robot.errors import (ExecutionFailed, ExecutionFailures, ExecutionPassed,
                           ExecutionStatus, ExitForLoop, ContinueForLoop, DataError)
-from robot.result import For as ForResult, If as IfResult, IfBranch as IfBranchResult
+from robot.result import For as ForResult, If as IfResult, IfBranch as IfBranchResult, Thread as ThreadResult  # cuongnht add thread
 from robot.output import librarylogger as logger
 from robot.utils import (cut_assign_value, frange, get_error_message,
                          is_list_like, is_number, is_unicode, plural_or_not as s,
-                         split_from_equals, type_name)
+                         split_from_equals, type_name, PriorityQueue)   # cuongnht add thread
 from robot.variables import is_dict_variable, evaluate_expression
 
 from .statusreporter import StatusReporter
+import threading  # cuongnht add thread
 
 
 class BodyRunner(object):
@@ -127,6 +128,29 @@ class IfRunner(object):
         if is_unicode(condition):
             return evaluate_expression(condition, self._context.variables.current.store)
         return bool(condition)
+
+
+# cuongnht add thread
+class ThreadRunner(object):
+    _dry_run_stack = []
+
+    def __init__(self, context, run=True, templated=False):
+        self._context = context
+        self._run = run
+        self._templated = templated
+
+    def run(self, data):
+        thread_worker = threading.Thread(target=self.run_worker, args=(data,))
+        thread_worker.name = data.name
+        thread_worker.setDaemon(data.daemon)
+        self._context.thread_message_queue_dict[thread_worker.name] = PriorityQueue(queue_type='FIFO')
+        thread_worker.start()
+
+    def run_worker(self, data):
+        runner = BodyRunner(self._context, self._run, self._templated)
+        thread_result = ThreadResult(data.name, data.daemon)
+        with StatusReporter(data, thread_result, self._context, self._run):
+            runner.run(data.body)
 
 
 def ForRunner(context, flavor='IN', run=True, templated=False):
