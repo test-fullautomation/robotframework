@@ -123,6 +123,7 @@ class SuiteRunner(SuiteVisitor):
                             self._settings.critical_tags,
                             self._settings.rpa)
         if status.exit:
+            status.failure.unknown = True
             self._add_exit_combine()
             result.tags.add('robot:exit')
         if self._skipped_tags.match(test.tags):
