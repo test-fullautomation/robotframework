@@ -21,7 +21,6 @@ import re
 import time
 # cuongnht add thread
 import threading, queue
-from pywin.mfc import thread
 
 from robot.api import logger, SkipExecution
 from robot.api.deco import keyword
