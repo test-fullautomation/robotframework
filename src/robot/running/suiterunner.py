@@ -141,7 +141,7 @@ class SuiteRunner(SuiteVisitor):
                              self._settings.rpa))
         self._run_setup(test.setup, status, result)
         try:
-            if not status.failed:
+            if not status.failed and not status.unknown:
                 BodyRunner(self._context, templated=bool(test.template)).run(test.body)
             else:
                 if status.skipped:

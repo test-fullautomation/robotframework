@@ -156,7 +156,7 @@ class _ExecutionStatus(object):
     def message(self):
         if self.failure or self.exit:
             return self._my_message()
-        if self.parent and self.parent.failed:
+        if self.parent and (self.parent.failed or (hasattr(self.parent, "unknown") and self.parent.unknown)):
             return self._parent_message()
         return ''
 
@@ -228,6 +228,7 @@ class TestStatus(_ExecutionStatus):
 
 class _Message(object):
     setup_message = NotImplemented
+    setup_message_unknown = NotImplemented
     setup_skipped_message = NotImplemented
     teardown_skipped_message = NotImplemented
     teardown_message = NotImplemented
@@ -247,8 +248,12 @@ class _Message(object):
             return self._format_setup_or_teardown_message(
                 self.setup_skipped_message, self.failure.setup_skipped)
         if self.failure.setup:
+            setup_msg = self.setup_message
+            if hasattr(self.failure, 'unknown'):
+                if self.failure.unknown is True:
+                    setup_msg = self.setup_message_unknown
             return self._format_setup_or_teardown_message(
-                self.setup_message, self.failure.setup)
+                setup_msg, self.failure.setup)
         return self.failure.test_skipped or self.failure.test or ''
 
     def _format_setup_or_teardown_message(self, prefix, message):
@@ -283,6 +288,7 @@ class _Message(object):
 
 class TestMessage(_Message):
     setup_message = 'Setup failed:\n%s'
+    setup_message_unknown = 'Setup unknown:\n%s'
     teardown_message = 'Teardown failed:\n%s'
     setup_skipped_message = '%s'
     teardown_skipped_message = '%s'
@@ -313,6 +319,7 @@ class TestMessage(_Message):
 
 class SuiteMessage(_Message):
     setup_message = 'Suite setup failed:\n%s'
+    setup_message_unknown = 'Suite setup unknown:\n%s'
     setup_skipped_message = 'Skipped in suite setup:\n%s'
     teardown_skipped_message = 'Skipped in suite teardown:\n%s'
     teardown_message = 'Suite teardown failed:\n%s'
@@ -322,6 +329,7 @@ class SuiteMessage(_Message):
 
 class ParentMessage(SuiteMessage):
     setup_message = 'Parent suite setup failed:\n%s'
+    setup_message_unknown = 'Parent suite setup unknown:\n%s'
     setup_skipped_message = 'Skipped in parent suite setup:\n%s'
     teardown_skipped_message = 'Skipped in parent suite teardown:\n%s'
     teardown_message = 'Parent suite teardown failed:\n%s'
