@@ -99,7 +99,7 @@ class TimeoutError(RobotError):
 
 
 # cuongnht - add unknown state
-class UnknownAssertionError(AssertionError):
+class UnknownAssertionError(RobotError):
     ROBOT_SUPPRESS_NAME = True
 
     def __init__(self, msg=None, details=''):
