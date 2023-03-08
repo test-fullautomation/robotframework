@@ -99,15 +99,22 @@ class TimeoutError(RobotError):
 
 
 # cuongnht - add unknown state
-class UnknownAssertionError(AssertionError):
+class UnknownAssertionError(RobotError):
     ROBOT_SUPPRESS_NAME = True
 
-    def __init__(self, msg=None):
+    def __init__(self, msg=None, details=''):
         self.msg = msg
-        AssertionError.__init__(self, self._get_message())
+        self.details = details
+        RobotError.__init__(self, self._get_message(), self.msg)
 
     def _get_message(self):
-        msg = "Unknown exception occurs. Details: %s" % self.msg
+        msg = "Unknown exception occurs. "
+        if self.msg:
+            msg = msg + self.msg
+        if self.details:
+            if msg[-1] != '.' and msg[-2:] != ". ":
+                msg += '. '
+            msg += "Details: %s" % self.details
         return msg
 
 
@@ -185,7 +192,7 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutError)
-        unknown = isinstance(error, UnknownAssertionError)
+        unknown = isinstance(error, UnknownAssertionError) or type(error) == Exception
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = (isinstance(error, DataError)
