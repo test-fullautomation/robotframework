@@ -57,7 +57,27 @@ class FrameworkError(RobotError):
     """
 
 
-class DataError(RobotError):
+# cuongnht - add unknown state
+class UnknownAssertionError(RobotError):
+    ROBOT_SUPPRESS_NAME = True
+
+    def __init__(self, msg=None, details=''):
+        self.msg = msg
+        self.details = details
+        RobotError.__init__(self, self._get_message(), self.msg)
+
+    def _get_message(self):
+        list_msg = []
+        if (not self.msg) and (not self.details):
+            list_msg.append("Exception occurred.")
+        if self.msg:
+            list_msg.append(f"{self.msg}")
+        if self.details:
+            list_msg.append(f"Details: {self.details}")
+        return "\n".join(list_msg)
+
+
+class DataError(UnknownAssertionError):
     """Used when the provided test data is invalid.
 
     DataErrors are not caught by keywords that run other keywords
@@ -98,17 +118,7 @@ class TimeoutError(RobotError):
         return not self.test_timeout
 
 
-# cuongnht - add unknown state
-class UnknownAssertionError(AssertionError):
-    ROBOT_SUPPRESS_NAME = True
 
-    def __init__(self, msg=None):
-        self.msg = msg
-        AssertionError.__init__(self, self._get_message())
-
-    def _get_message(self):
-        msg = "Unknown exception occurs. Details: %s" % self.msg
-        return msg
 
 
 class Information(RobotError):
@@ -185,7 +195,7 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutError)
-        unknown = isinstance(error, UnknownAssertionError)
+        unknown = isinstance(error, UnknownAssertionError) or type(error) == Exception
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = (isinstance(error, DataError)

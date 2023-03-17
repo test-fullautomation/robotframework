@@ -63,7 +63,7 @@ class VerboseOutput(object):
             self._writer.keyword_marker(kw.status)
 
     def message(self, msg):
-        if msg.level in ('WARN', 'ERROR'):
+        if msg.level in ('WARN', 'ERROR', 'UNKNOWN'):
             self._writer.error(msg.message, msg.level, clear=self._running_test)
 
     def output_file(self, name, path):

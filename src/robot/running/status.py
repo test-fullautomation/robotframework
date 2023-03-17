@@ -33,7 +33,7 @@ class Failure(object):
     def __bool__(self):
         return bool(
             self.setup or self.test or self.teardown or
-            self.setup_skipped or self.test_skipped or self.teardown_skipped
+            self.setup_skipped or self.test_skipped or self.teardown_skipped or self.unknown
         )
 
 

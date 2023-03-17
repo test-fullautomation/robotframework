@@ -69,8 +69,11 @@ class SuiteRunner(SuiteVisitor):
                                        self._settings.dry_run)
         self._context.set_suite_variables(result)
         if not self._suite_status.failed:
-            ns.handle_imports()
+            ret_import = ns.handle_imports()
             ns.variables.resolve_delayed()
+            if ret_import != 0:
+                self._suite_status.failure.unknown = True
+
         result.doc = self._resolve_setting(result.doc)
         result.metadata = [(self._resolve_setting(n), self._resolve_setting(v))
                            for n, v in result.metadata.items()]
@@ -141,7 +144,7 @@ class SuiteRunner(SuiteVisitor):
                              self._settings.rpa))
         self._run_setup(test.setup, status, result)
         try:
-            if not status.failed:
+            if not status.failed and not status.unknown:
                 BodyRunner(self._context, templated=bool(test.template)).run(test.body)
             else:
                 if status.skipped:
@@ -184,7 +187,7 @@ class SuiteRunner(SuiteVisitor):
         return TestTimeout(test.timeout, self._variables, rpa=test.parent.rpa)
 
     def _run_setup(self, setup, status, result=None):
-        if not status.failed:
+        if not status.failed and not status.unknown:
             exception = self._run_setup_or_teardown(setup)
             status.setup_executed(exception)
             if result and isinstance(exception, PassExecution):
