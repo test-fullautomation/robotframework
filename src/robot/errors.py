@@ -118,9 +118,6 @@ class TimeoutError(RobotError):
         return not self.test_timeout
 
 
-
-
-
 class Information(RobotError):
     """Used by argument parser with --help or --version."""
 
