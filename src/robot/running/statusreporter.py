@@ -71,9 +71,9 @@ class StatusReporter(object):
             return exc_value
         if isinstance(exc_value, DataError):
             msg = exc_value.message
-            context.fail(msg)
+            context.unknown(msg)
             syntax = not isinstance(exc_value, (KeywordError, VariableError))
-            return ExecutionFailed(msg, syntax=syntax)
+            return ExecutionFailed(msg, syntax=syntax, unknown=True)
         exc_info = (exc_type, exc_value, exc_tb)
         failure = HandlerExecutionFailed(ErrorDetails(exc_info))
         if failure.timeout:

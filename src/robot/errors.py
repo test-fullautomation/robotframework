@@ -57,7 +57,27 @@ class FrameworkError(RobotError):
     """
 
 
-class DataError(RobotError):
+# cuongnht - add unknown state
+class UnknownAssertionError(RobotError):
+    ROBOT_SUPPRESS_NAME = True
+
+    def __init__(self, msg=None, details=''):
+        self.msg = msg
+        self.details = details
+        RobotError.__init__(self, self._get_message(), self.msg)
+
+    def _get_message(self):
+        list_msg = []
+        if (not self.msg) and (not self.details):
+            list_msg.append("Exception occurred.")
+        if self.msg:
+            list_msg.append(f"{self.msg}")
+        if self.details:
+            list_msg.append(f"Details: {self.details}")
+        return "\n".join(list_msg)
+
+
+class DataError(UnknownAssertionError):
     """Used when the provided test data is invalid.
 
     DataErrors are not caught by keywords that run other keywords
@@ -96,26 +116,6 @@ class TimeoutError(RobotError):
     @property
     def keyword_timeout(self):
         return not self.test_timeout
-
-
-# cuongnht - add unknown state
-class UnknownAssertionError(RobotError):
-    ROBOT_SUPPRESS_NAME = True
-
-    def __init__(self, msg=None, details=''):
-        self.msg = msg
-        self.details = details
-        RobotError.__init__(self, self._get_message(), self.msg)
-
-    def _get_message(self):
-        msg = "Unknown exception occurs. "
-        if self.msg:
-            msg = msg + self.msg
-        if self.details:
-            if msg[-1] != '.' and msg[-2:] != ". ":
-                msg += '. '
-            msg += "Details: %s" % self.details
-        return msg
 
 
 class Information(RobotError):
