@@ -54,21 +54,30 @@ class Namespace:
         return self._kw_store.libraries.values()
 
     def handle_imports(self):
-        self._import_default_libraries()
-        self._handle_imports(self._imports)
+        ret_default = self._import_default_libraries()
+        ret_import = self._handle_imports(self._imports)
+        return ret_default | ret_import
 
     def _import_default_libraries(self):
+        ret = 0
         for name in self._default_libraries:
-            self.import_library(name, notify=name == 'BuiltIn')
+            try:
+                self.import_library(name, notify=name == 'BuiltIn')
+            except DataError as _err:
+                ret = 1
+        return ret
 
     def _handle_imports(self, import_settings):
+        ret = 0
         for item in import_settings:
             try:
                 if not item.name:
                     raise DataError(f'{item.type} setting requires value.')
                 self._import(item)
             except DataError as err:
-                item.report_invalid_syntax(err.message)
+                item.report_invalid_syntax(err.message, level='UNKNOWN')
+                ret = 1
+        return ret
 
     def _import(self, import_setting):
         action = {'Library': self._import_library,
