@@ -27,7 +27,7 @@ from .blockparsers import Parser, TestCaseParser, KeywordParser
 class FileParser(Parser):
 
     def __init__(self, source=None):
-        Parser.__init__(self, File(source=self._get_path(source)))
+        super().__init__(File(source=self._get_path(source)))
 
     def _get_path(self, source):
         if not source:
@@ -46,8 +46,10 @@ class FileParser(Parser):
             Token.SETTING_HEADER: SettingSectionParser,
             Token.VARIABLE_HEADER: VariableSectionParser,
             Token.TESTCASE_HEADER: TestCaseSectionParser,
+            Token.TASK_HEADER: TestCaseSectionParser,
             Token.KEYWORD_HEADER: KeywordSectionParser,
             Token.COMMENT_HEADER: CommentSectionParser,
+            Token.CONFIG: ImplicitCommentSectionParser,
             Token.COMMENT: ImplicitCommentSectionParser,
             Token.ERROR: ImplicitCommentSectionParser,
             Token.EOL: ImplicitCommentSectionParser
@@ -61,7 +63,7 @@ class SectionParser(Parser):
     model_class = None
 
     def __init__(self, header):
-        Parser.__init__(self, self.model_class(header))
+        super().__init__(self.model_class(header))
 
     def handles(self, statement):
         return statement.type not in Token.HEADER_TOKENS

@@ -12,9 +12,7 @@ the project root.
 Examples:
     ./rundevel.py --name Example tests.robot          # Run with default Python
     ./rundevel.py run --name Example tests.robot      # Same as the above
-    jython rundevel.py --name Example tests.robot     # Run with Jython
-    ./rundevel.py rebot --name Example out.robot      # Rebot with Jython
-    ipy rundevel.py rebot --name Example out.robot    # Rebot with IronPython
+    ./rundevel.py rebot --name Example out.robot      # Rebot
 """
 
 from os.path import abspath, dirname, exists, join
@@ -35,7 +33,8 @@ if not exists(tmp2):
     os.mkdir(tmp2)
 
 os.environ['ROBOT_SYSLOG_FILE'] = join(tmp, 'syslog.txt')
-os.environ['ROBOT_INTERNAL_TRACES'] = 'yes'
+if 'ROBOT_INTERNAL_TRACES' not in os.environ:
+    os.environ['ROBOT_INTERNAL_TRACES'] = 'true'
 os.environ['TEMPDIR'] = tmp2          # Used by tests under atest/testdata
 if 'PYTHONPATH' not in os.environ:    # Allow executed scripts to import robot
     os.environ['PYTHONPATH'] = src

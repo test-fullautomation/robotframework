@@ -62,8 +62,6 @@ function setBackground(topsuite) {
     var color;
     if (topsuite.fail)
         color = window.settings.background.fail;
-    else if (topsuite.unknow)
-        color = window.settings.background.unknown;
     else if (topsuite.pass)
         color = window.settings.background.pass;
     else
@@ -92,7 +90,7 @@ function addCustomSortersForDetails() {
             return false;  // do not auto-detect
         },
         format: function(s) {
-            return {'UNKNOW': -2, 'FAIL': -1, 'SKIP': 0, 'PASS': 1}[s];
+            return {'FAIL': -1, 'SKIP': 0, 'PASS': 1}[s];
         }
     });
     $.tablesorter.addParser({
@@ -297,7 +295,7 @@ function renderTestDetailsHeader() {
 function sortByStatus(t1, t2) {
     if (t1.status == t2.status)
         return t1.fullName < t2.fullName ? -1 : 1;
-    statuses = {'UNKNOW': -2, 'FAIL': -1, 'SKIP': 0, 'PASS': 1};
+    statuses = {'FAIL': -1, 'SKIP': 0, 'PASS': 1};
     return statuses[t1.status] < statuses[t2.status] ? -1 : 1;
 }
 
@@ -319,15 +317,10 @@ function calculateStats(tests) {
     var failed = util.filter(tests, function (test) {
         return test.status == 'FAIL';
     });
-    var unknown = util.filter(tests, function (test) {
-        return test.status == 'UNKNOWN';
-    });
-
     return {
       total: tests.length,
       pass: passed.length,
       fail: failed.length,
-      unknow: unknown.length,
       skip: tests.length - passed.length - failed.length
     };
 }
@@ -397,9 +390,6 @@ function hideHiddenDetailsColumns(elem) {
       {{if fail}}
       <td><a href="#totals" onclick="totalDetailSelected()"
              class="fail">${fail} {{= testOrTask('{test}')}}{{if fail != 1}}s{{/if}} failed</a></td>
-      {{else unknow}}
-      <td><a href="#totals" onclick="totalDetailSelected()"
-             class="unknown">${unknow} {{= testOrTask('{test}')}}{{if unknow != 1}}s{{/if}} unknown</a></td>
       {{else pass && skip}}
       <td><a href="#totals" onclick="totalDetailSelected()"
              class="pass">${pass} {{= testOrTask('{test}')}}{{if pass != 1}}s{{/if}} passed,

@@ -13,24 +13,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
-
 import os
 import re
 from fnmatch import fnmatchcase
 from random import randint
 from string import ascii_lowercase, ascii_uppercase, digits
 
-
 from robot.api import logger
 from robot.api.deco import keyword
-from robot.utils import (is_bytes, is_string, is_truthy, is_unicode, lower,
-                         unic, FileReader, PY2, PY3)
+from robot.utils import (FileReader, is_bytes, is_string, is_truthy,
+                         parse_re_flags, safe_str, type_name)
 from robot.version import get_version
 
 
-class String(object):
-    """A test library for string manipulation and verification.
+class String:
+    """A library for string manipulation and verification.
 
     ``String`` is Robot Framework's standard library for manipulating
     strings (e.g. `Replace String Using Regexp`, `Split To Lines`) and
@@ -66,9 +63,7 @@ class String(object):
         | Should Be Equal | ${str1} | abc |
         | Should Be Equal | ${str2} | 1a2c3d |
         """
-        # Custom `lower` needed due to IronPython bug. See its code and
-        # comments for more details.
-        return lower(string)
+        return string.lower()
 
     def convert_to_upper_case(self, string):
         """Converts string to upper case.
@@ -107,7 +102,7 @@ class String(object):
         "example" on it own and also if followed by ".", "!" or "?".
         See `BuiltIn.Should Match Regexp` for more information about Python
         regular expression syntax in general and how to use it in Robot
-        Framework test data in particular.
+        Framework data in particular.
 
         Examples:
         | ${str1} = | Convert To Title Case | hello, world!     |
@@ -126,7 +121,7 @@ class String(object):
 
         New in Robot Framework 3.2.
         """
-        if not is_unicode(string):
+        if not is_string(string):
             raise TypeError('This keyword works only with Unicode strings.')
         if is_string(exclude):
             exclude = [e.strip() for e in exclude.split(',')]
@@ -188,8 +183,8 @@ class String(object):
         byte strings, and `Convert To String` in ``BuiltIn`` if you need to
         convert arbitrary objects to Unicode strings.
         """
-        if PY3 and is_unicode(bytes):
-            raise TypeError('Can not decode strings on Python 3.')
+        if is_string(bytes):
+            raise TypeError('Cannot decode strings.')
         return bytes.decode(encoding, errors)
 
     def format_string(self, template, *positional, **named):
@@ -340,14 +335,14 @@ class String(object):
             matches = lambda line: fnmatchcase(line, pattern)
         return self._get_matching_lines(string, matches)
 
-    def get_lines_matching_regexp(self, string, pattern, partial_match=False):
+    def get_lines_matching_regexp(self, string, pattern, partial_match=False, flags=None):
         """Returns lines of the given ``string`` that match the regexp ``pattern``.
 
         See `BuiltIn.Should Match Regexp` for more information about
         Python regular expression syntax in general and how to use it
-        in Robot Framework test data in particular.
+        in Robot Framework data in particular.
 
-        By default lines match only if they match the pattern fully, but
+        Lines match only if they match the pattern fully by default, but
         partial matching can be enabled by giving the ``partial_match``
         argument a true value. The value is considered true
         if it is a non-empty string that is not equal to ``false``, ``none`` or
@@ -357,8 +352,10 @@ class String(object):
         If the pattern is empty, it matches only empty lines by default.
         When partial matching is enabled, empty pattern matches all lines.
 
-        Notice that to make the match case-insensitive, you need to prefix
-        the pattern with case-insensitive flag ``(?i)``.
+        Possible flags altering how the expression is parsed (e.g. ``re.IGNORECASE``,
+        ``re.VERBOSE``) can be given using the ``flags`` argument (e.g.
+        ``flags=IGNORECASE | VERBOSE``) or embedded to the pattern (e.g.
+        ``(?ix)pattern``).
 
         Lines are returned as one string concatenated back together with
         newlines. Possible trailing newline is never returned. The
@@ -368,14 +365,18 @@ class String(object):
         | ${lines} = | Get Lines Matching Regexp | ${result} | Reg\\\\w{3} example |
         | ${lines} = | Get Lines Matching Regexp | ${result} | Reg\\\\w{3} example | partial_match=true |
         | ${ret} =   | Get Lines Matching Regexp | ${ret}    | (?i)FAIL: .* |
+        | ${ret} =   | Get Lines Matching Regexp | ${ret}    | FAIL: .* | flags=IGNORECASE |
 
-        See `Get Lines Matching Pattern` and `Get Lines Containing
-        String` if you do not need full regular expression powers (and
-        complexity).
+        See `Get Lines Matching Pattern` and `Get Lines Containing String` if you
+        do not need the full regular expression powers (and complexity).
+
+        The ``flags`` argument is new in Robot Framework 6.0.
         """
-        if not is_truthy(partial_match):
-            pattern = '^%s$' % pattern
-        return self._get_matching_lines(string, re.compile(pattern).search)
+        if is_truthy(partial_match):
+            match = re.compile(pattern, flags=parse_re_flags(flags)).search
+        else:
+            match = re.compile(pattern + '$', flags=parse_re_flags(flags)).match
+        return self._get_matching_lines(string, match)
 
     def _get_matching_lines(self, string, matches):
         lines = string.splitlines()
@@ -383,13 +384,13 @@ class String(object):
         logger.info('%d out of %d lines matched' % (len(matching), len(lines)))
         return '\n'.join(matching)
 
-    def get_regexp_matches(self, string, pattern, *groups):
+    def get_regexp_matches(self, string, pattern, *groups, flags=None):
         """Returns a list of all non-overlapping matches in the given string.
 
         ``string`` is the string to find matches from and ``pattern`` is the
         regular expression. See `BuiltIn.Should Match Regexp` for more
         information about Python regular expression syntax in general and how
-        to use it in Robot Framework test data in particular.
+        to use it in Robot Framework data in particular.
 
         If no groups are used, the returned list contains full matches. If one
         group is used, the list contains only contents of that group. If
@@ -397,9 +398,15 @@ class String(object):
         individual group contents. All groups can be given as indexes (starting
         from 1) and named groups also as names.
 
+        Possible flags altering how the expression is parsed (e.g. ``re.IGNORECASE``,
+        ``re.MULTILINE``) can be given using the ``flags`` argument (e.g.
+        ``flags=IGNORECASE | MULTILINE``) or embedded to the pattern (e.g.
+        ``(?im)pattern``).
+
         Examples:
         | ${no match} =    | Get Regexp Matches | the string | xxx     |
         | ${matches} =     | Get Regexp Matches | the string | t..     |
+        | ${matches} =     | Get Regexp Matches | the string | T..     | flags=IGNORECASE |
         | ${one group} =   | Get Regexp Matches | the string | t(..)   | 1 |
         | ${named group} = | Get Regexp Matches | the string | t(?P<name>..) | name |
         | ${two groups} =  | Get Regexp Matches | the string | t(.)(.) | 1 | 2 |
@@ -409,8 +416,10 @@ class String(object):
         | ${one group} = ['he', 'ri']
         | ${named group} = ['he', 'ri']
         | ${two groups} = [('h', 'e'), ('r', 'i')]
+
+        The ``flags`` argument is new in Robot Framework 6.0.
         """
-        regexp = re.compile(pattern)
+        regexp = re.compile(pattern, flags=parse_re_flags(flags))
         groups = [self._parse_group(g) for g in groups]
         return [m.group(*groups) for m in regexp.finditer(string)]
 
@@ -444,26 +453,33 @@ class String(object):
         count = self._convert_to_integer(count, 'count')
         return string.replace(search_for, replace_with, count)
 
-    def replace_string_using_regexp(self, string, pattern, replace_with, count=-1):
+    def replace_string_using_regexp(self, string, pattern, replace_with, count=-1, flags=None):
         """Replaces ``pattern`` in the given ``string`` with ``replace_with``.
 
         This keyword is otherwise identical to `Replace String`, but
         the ``pattern`` to search for is considered to be a regular
         expression.  See `BuiltIn.Should Match Regexp` for more
         information about Python regular expression syntax in general
-        and how to use it in Robot Framework test data in particular.
+        and how to use it in Robot Framework data in particular.
+
+        Possible flags altering how the expression is parsed (e.g. ``re.IGNORECASE``,
+        ``re.MULTILINE``) can be given using the ``flags`` argument (e.g.
+        ``flags=IGNORECASE | MULTILINE``) or embedded to the pattern (e.g.
+        ``(?im)pattern``).
 
         If you need to just remove a string see `Remove String Using Regexp`.
 
         Examples:
         | ${str} = | Replace String Using Regexp | ${str} | 20\\\\d\\\\d-\\\\d\\\\d-\\\\d\\\\d | <DATE> |
         | ${str} = | Replace String Using Regexp | ${str} | (Hello|Hi) | ${EMPTY} | count=1 |
+
+        The ``flags`` argument is new in Robot Framework 6.0.
         """
         count = self._convert_to_integer(count, 'count')
         # re.sub handles 0 and negative counts differently than string.replace
         if count == 0:
             return string
-        return re.sub(pattern, replace_with, string, max(count, 0))
+        return re.sub(pattern, replace_with, string, max(count, 0), flags=parse_re_flags(flags))
 
     def remove_string(self, string, *removables):
         """Removes all ``removables`` from the given ``string``.
@@ -489,7 +505,7 @@ class String(object):
             string = self.replace_string(string, removable, '')
         return string
 
-    def remove_string_using_regexp(self, string, *patterns):
+    def remove_string_using_regexp(self, string, *patterns, flags=None):
         """Removes ``patterns`` from the given ``string``.
 
         This keyword is otherwise identical to `Remove String`, but
@@ -498,9 +514,16 @@ class String(object):
         about the regular expression syntax. That keyword can also be
         used if there is a need to remove only a certain number of
         occurrences.
+
+        Possible flags altering how the expression is parsed (e.g. ``re.IGNORECASE``,
+        ``re.MULTILINE``) can be given using the ``flags`` argument (e.g.
+        ``flags=IGNORECASE | MULTILINE``) or embedded to the pattern (e.g.
+        ``(?im)pattern``).
+
+        The ``flags`` argument is new in Robot Framework 6.0.
         """
         for pattern in patterns:
-            string = self.replace_string_using_regexp(string, pattern, '')
+            string = self.replace_string_using_regexp(string, pattern, '', flags=flags)
         return string
 
     @keyword(types=None)
@@ -576,6 +599,10 @@ class String(object):
     def generate_random_string(self, length=8, chars='[LETTERS][NUMBERS]'):
         """Generates a string with a desired ``length`` from the given ``chars``.
 
+        ``length`` can be given as a number, a string representation of a number,
+        or as a range of numbers, such as ``5-10``. When a range of values is given
+        the range will be selected by random within the range.
+
         The population sequence ``chars`` contains the characters to use
         when generating the random string. It can contain any
         characters, and it is possible to use special markers
@@ -592,10 +619,18 @@ class String(object):
         | ${low} = | Generate Random String | 12 | [LOWER]         |
         | ${bin} = | Generate Random String | 8  | 01              |
         | ${hex} = | Generate Random String | 4  | [NUMBERS]abcdef |
+        | ${rnd} = | Generate Random String | 5-10 | # Generates a string 5 to 10 characters long |
+
+        Giving ``length`` as a range of values is new in Robot Framework 5.0.
         """
         if length == '':
             length = 8
-        length = self._convert_to_integer(length, 'length')
+        if isinstance(length, str) and re.match(r'^\d+-\d+$', length):
+            min_length, max_length = length.split('-')
+            length = randint(self._convert_to_integer(min_length, "length"),
+                             self._convert_to_integer(max_length, "length"))
+        else:
+            length = self._convert_to_integer(length, 'length')
         for name, value in [('[LOWER]', ascii_lowercase),
                             ('[UPPER]', ascii_uppercase),
                             ('[LETTERS]', ascii_lowercase + ascii_uppercase),
@@ -656,32 +691,15 @@ class String(object):
     def should_be_string(self, item, msg=None):
         """Fails if the given ``item`` is not a string.
 
-        With Python 2, except with IronPython, this keyword passes regardless
-        is the ``item`` a Unicode string or a byte string. Use `Should Be
-        Unicode String` or `Should Be Byte String` if you want to restrict
-        the string type. Notice that with Python 2, except with IronPython,
-        ``'string'`` creates a byte string and ``u'unicode'`` must be used to
-        create a Unicode string.
-
-        With Python 3 and IronPython, this keyword passes if the string is
-        a Unicode string but fails if it is bytes. Notice that with both
-        Python 3 and IronPython, ``'string'`` creates a Unicode string, and
-        ``b'bytes'`` must be used to create a byte string.
-
-        The default error message can be overridden with the optional
-        ``msg`` argument.
+        The default error message can be overridden with the optional ``msg`` argument.
         """
         if not is_string(item):
-            self._fail(msg, "'%s' is not a string.", item)
+            self._fail(msg, "'%s' is %s, not a string.", item, type_name(item))
 
     def should_not_be_string(self, item, msg=None):
         """Fails if the given ``item`` is a string.
 
-        See `Should Be String` for more details about Unicode strings and byte
-        strings.
-
-        The default error message can be overridden with the optional
-        ``msg`` argument.
+        The default error message can be overridden with the optional ``msg`` argument.
         """
         if is_string(item):
             self._fail(msg, "'%s' is a string.", item)
@@ -689,27 +707,18 @@ class String(object):
     def should_be_unicode_string(self, item, msg=None):
         """Fails if the given ``item`` is not a Unicode string.
 
-        Use `Should Be Byte String` if you want to verify the ``item`` is a
-        byte string, or `Should Be String` if both Unicode and byte strings
-        are fine. See `Should Be String` for more details about Unicode
-        strings and byte strings.
-
-        The default error message can be overridden with the optional
-        ``msg`` argument.
+        On Python 3 this keyword behaves exactly the same way `Should Be String`.
+        That keyword should be used instead and this keyword will be deprecated.
         """
-        if not is_unicode(item):
+        if not is_string(item):
             self._fail(msg, "'%s' is not a Unicode string.", item)
 
     def should_be_byte_string(self, item, msg=None):
         """Fails if the given ``item`` is not a byte string.
 
-        Use `Should Be Unicode String` if you want to verify the ``item`` is a
-        Unicode string, or `Should Be String` if both Unicode and byte strings
-        are fine. See `Should Be String` for more details about Unicode strings
-        and byte strings.
+        Use `Should Be String` if you want to verify the ``item`` is a string.
 
-        The default error message can be overridden with the optional
-        ``msg`` argument.
+        The default error message can be overridden with the optional ``msg`` argument.
         """
         if not is_bytes(item):
             self._fail(msg, "'%s' is not a byte string.", item)
@@ -768,16 +777,10 @@ class String(object):
         "example" on it own and also if followed by ".", "!" or "?".
         See `BuiltIn.Should Match Regexp` for more information about Python
         regular expression syntax in general and how to use it in Robot
-        Framework test data in particular.
+        Framework data in particular.
 
         See also `Should Be Upper Case` and `Should Be Lower Case`.
         """
-        if PY2 and is_bytes(string):
-            try:
-                string = string.decode('ASCII')
-            except UnicodeError:
-                raise TypeError('This keyword works only with Unicode strings '
-                                'and non-ASCII bytes.')
         if string != self.convert_to_title_case(string, exclude):
             self._fail(msg, "'%s' is not title case.", string)
 
@@ -797,5 +800,5 @@ class String(object):
 
     def _fail(self, message, default_template, *items):
         if not message:
-            message = default_template % tuple(unic(item) for item in items)
+            message = default_template % tuple(safe_str(item) for item in items)
         raise AssertionError(message)

@@ -15,26 +15,18 @@
 
 import os
 import sys
+import importlib
 import inspect
 
 from robot.errors import DataError
 
-from .encoding import system_decode, system_encode
 from .error import get_error_details
-from .platform import JYTHON, IRONPYTHON, PY2, PY3, PYPY
 from .robotpath import abspath, normpath
-from .robotinspect import is_java_init, is_init
-from .robottypes import type_name, is_unicode
-
-if PY3:
-    from importlib import invalidate_caches as invalidate_import_caches
-else:
-    invalidate_import_caches = lambda: None
-if JYTHON:
-    from java.lang.System import getProperty
+from .robotinspect import is_init
+from .robottypes import type_name
 
 
-class Importer(object):
+class Importer:
     """Utility that can import modules and classes based on names and paths.
 
     Imported classes can optionally be instantiated automatically.
@@ -58,7 +50,7 @@ class Importer(object):
 
     def import_class_or_module(self, name_or_path, instantiate_with_args=None,
                                return_source=False):
-        """Imports Python class/module or Java class based on the given name or path.
+        """Imports Python class or module based on the given name or path.
 
         :param name_or_path:
             Name or path of the module or class to import.
@@ -67,7 +59,7 @@ class Importer(object):
             using them.
         :param return_source:
             When true, returns a tuple containing the imported module or class
-            and a path to it. By default returns only the imported module or class.
+            and a path to it. By default, returns only the imported module or class.
 
         The class or module to import can be specified either as a name, in which
         case it must be in the module search path, or as a path to the file or
@@ -88,9 +80,11 @@ class Importer(object):
         the name or path like ``Example:arg1:arg2``, separate
         :func:`~robot.utils.text.split_args_from_name_or_path` function can be
         used to split them before calling this method.
+
+        Use :meth:`import_module` if only a module needs to be imported.
         """
         try:
-            imported, source = self._import_class_or_module(name_or_path)
+            imported, source = self._import(name_or_path)
             self._log_import_succeeded(imported, name_or_path, source)
             imported = self._instantiate_if_needed(imported, instantiate_with_args)
         except DataError as err:
@@ -98,10 +92,34 @@ class Importer(object):
         else:
             return self._handle_return_values(imported, source, return_source)
 
-    def _import_class_or_module(self, name):
+    def import_module(self, name_or_path):
+        """Imports Python module based on the given name or path.
+
+        :param name_or_path:
+            Name or path of the module to import.
+
+        The module to import can be specified either as a name, in which
+        case it must be in the module search path, or as a path to the file or
+        directory implementing the module. See :meth:`import_class_or_module_by_path`
+        for more information about importing modules by path.
+
+        Use :meth:`import_class_or_module` if it is desired to get a class
+        from the imported module automatically.
+
+        New in Robot Framework 6.0.
+        """
+        try:
+            imported, source = self._import(name_or_path, get_class=False)
+            self._log_import_succeeded(imported, name_or_path, source)
+        except DataError as err:
+            self._raise_import_failed(name_or_path, err)
+        else:
+            return imported
+
+    def _import(self, name, get_class=True):
         for importer in self._importers:
             if importer.handles(name):
-                return importer.import_(name)
+                return importer.import_(name, get_class)
 
     def _handle_return_values(self, imported, source, return_source=False):
         if not return_source:
@@ -116,16 +134,12 @@ class Importer(object):
             candidate = os.path.join(source, '__init__.py')
         elif source.endswith('.pyc'):
             candidate = source[:-4] + '.py'
-        elif source.endswith('$py.class'):
-            candidate = source[:-9] + '.py'
-        elif source.endswith('.class'):
-            candidate = source[:-6] + '.java'
         else:
             return source
         return candidate if os.path.exists(candidate) else source
 
     def import_class_or_module_by_path(self, path, instantiate_with_args=None):
-        """Import a Python module or Java class using a file system path.
+        """Import a Python module or class using a file system path.
 
         :param path:
             Path to the module or class to import.
@@ -134,9 +148,7 @@ class Importer(object):
             using them.
 
         When importing a Python file, the path must end with :file:`.py` and the
-        actual file must also exist. When importing Java classes, the path must
-        end with :file:`.java` or :file:`.class`. The Java class file must exist
-        in both cases and in the former case also the source file must exist.
+        actual file must also exist.
 
         Use :meth:`import_class_or_module` to support importing also using name,
         not only path. See the documentation of that function for more information
@@ -157,23 +169,8 @@ class Importer(object):
                           % (import_type, item_type, name, location))
 
     def _raise_import_failed(self, name, error):
-        import_type = '%s ' % self._type.lower() if self._type else ''
-        msg = "Importing %s'%s' failed: %s" % (import_type, name, error.message)
-        if not error.details:
-            raise DataError(msg)
-        msg = [msg, error.details]
-        msg.extend(self._get_items_in('PYTHONPATH', sys.path))
-        if JYTHON:
-            classpath = getProperty('java.class.path').split(os.path.pathsep)
-            msg.extend(self._get_items_in('CLASSPATH', classpath))
-        raise DataError('\n'.join(msg))
-
-    def _get_items_in(self, type, items):
-        yield '%s:' % type
-        for item in items:
-            if item:
-                yield '  %s' % (item if is_unicode(item)
-                                else system_decode(item))
+        prefix = f'Importing {self._type.lower()}' if self._type else 'Importing'
+        raise DataError(f"{prefix} '{name}' failed: {error.message}")
 
     def _instantiate_if_needed(self, imported, args):
         if args is None:
@@ -203,44 +200,30 @@ class Importer(object):
         name = imported.__name__
         if not is_init(init):
             return ArgumentSpec(name, self._type)
-        if is_java_init(init):
-            return ArgumentSpec(name, self._type, var_positional='varargs')
         return PythonArgumentParser(self._type).parse(init, name)
 
 
-class _Importer(object):
+class _Importer:
 
     def __init__(self, logger):
         self._logger = logger
 
-    def _import(self, name, fromlist=None, retry=True):
+    def _import(self, name, fromlist=None):
         if name in sys.builtin_module_names:
             raise DataError('Cannot import custom module with same name as '
                             'Python built-in module.')
-        invalidate_import_caches()
+        importlib.invalidate_caches()
         try:
-            try:
-                return __import__(name, fromlist=fromlist)
-            except ImportError:
-                # Hack to support standalone Jython. For more information, see:
-                # https://github.com/robotframework/robotframework/issues/515
-                # http://bugs.jython.org/issue1778514
-                if JYTHON and fromlist and retry:
-                    __import__('%s.%s' % (name, fromlist[0]))
-                    return self._import(name, fromlist, retry=False)
-                # IronPython loses traceback when using plain raise.
-                # https://github.com/IronLanguages/main/issues/989
-                if IRONPYTHON:
-                    exec('raise sys.exc_type, sys.exc_value, sys.exc_traceback')
-                raise
+            return __import__(name, fromlist=fromlist)
         except:
-            raise DataError(*get_error_details())
+            message, traceback = get_error_details(full_traceback=False)
+            path = '\n'.join(f'  {p}' for p in sys.path)
+            raise DataError(f'{message}\n{traceback}\nPYTHONPATH:\n{path}')
 
     def _verify_type(self, imported):
         if inspect.isclass(imported) or inspect.ismodule(imported):
             return imported
-        raise DataError('Expected class or module, got %s.'
-                        % type_name(imported))
+        raise DataError('Expected class or module, got %s.' % type_name(imported))
 
     def _get_class_from_module(self, module, name=None):
         klass = getattr(module, name or module.__name__, None)
@@ -255,16 +238,17 @@ class _Importer(object):
 
 
 class ByPathImporter(_Importer):
-    _valid_import_extensions = ('.py', '.java', '.class', '')
+    _valid_import_extensions = ('.py', '')
 
     def handles(self, path):
         return os.path.isabs(path)
 
-    def import_(self, path):
+    def import_(self, path, get_class=True):
         self._verify_import_path(path)
         self._remove_wrong_module_from_sys_modules(path)
-        module = self._import_by_path(path)
-        imported = self._get_class_from_module(module) or module
+        imported = self._import_by_path(path)
+        if get_class:
+            imported = self._get_class_from_module(imported) or imported
         return self._verify_type(imported), path
 
     def _verify_import_path(self, path):
@@ -286,15 +270,13 @@ class ByPathImporter(_Importer):
     def _split_path_to_module(self, path):
         module_dir, module_file = os.path.split(abspath(path))
         module_name = os.path.splitext(module_file)[0]
-        if module_name.endswith('$py'):
-            module_name = module_name[:-3]
         return module_dir, module_name
 
     def _wrong_module_imported(self, name, importing_from, importing_package):
         if name not in sys.modules:
             return False
         source = getattr(sys.modules[name], '__file__', None)
-        if not source:  # play safe (occurs at least with java based modules)
+        if not source:  # play safe
             return True
         imported_from, imported_package = self._get_import_information(source)
         return (normpath(importing_from, case_normalize=True) !=
@@ -310,10 +292,6 @@ class ByPathImporter(_Importer):
 
     def _import_by_path(self, path):
         module_dir, module_name = self._split_path_to_module(path)
-        # Other interpreters work also with Unicode paths.
-        # https://bitbucket.org/pypy/pypy/issues/3112
-        if PYPY and PY2:
-            module_dir = system_encode(module_dir)
         sys.path.insert(0, module_dir)
         try:
             return self._import(module_name)
@@ -326,9 +304,10 @@ class NonDottedImporter(_Importer):
     def handles(self, name):
         return '.' not in name
 
-    def import_(self, name):
-        module = self._import(name)
-        imported = self._get_class_from_module(module) or module
+    def import_(self, name, get_class=True):
+        imported = self._import(name)
+        if get_class:
+            imported = self._get_class_from_module(imported) or imported
         return self._verify_type(imported), self._get_source(imported)
 
 
@@ -337,7 +316,7 @@ class DottedImporter(_Importer):
     def handles(self, name):
         return '.' in name
 
-    def import_(self, name):
+    def import_(self, name, get_class=True):
         parent_name, lib_name = name.rsplit('.', 1)
         parent = self._import(parent_name, fromlist=[str(lib_name)])
         try:
@@ -345,9 +324,10 @@ class DottedImporter(_Importer):
         except AttributeError:
             raise DataError("Module '%s' does not contain '%s'."
                             % (parent_name, lib_name))
-        imported = self._get_class_from_module(imported, lib_name) or imported
+        if get_class:
+            imported = self._get_class_from_module(imported, lib_name) or imported
         return self._verify_type(imported), self._get_source(imported)
 
 
-class NoLogger(object):
+class NoLogger:
     error = warn = info = debug = trace = lambda self, *args, **kws: None

@@ -22,7 +22,7 @@ from robot.utils import (get_console_length, getshortdoc, isatty,
 from .highlighting import HighlightingStream
 
 
-class VerboseOutput(object):
+class VerboseOutput:
 
     def __init__(self, width=78, colors='AUTO', markers='AUTO', stdout=None,
                  stderr=None):
@@ -63,14 +63,14 @@ class VerboseOutput(object):
             self._writer.keyword_marker(kw.status)
 
     def message(self, msg):
-        if msg.level in ('WARN', 'ERROR', 'UNKNOWN'):
+        if msg.level in ('WARN', 'ERROR'):
             self._writer.error(msg.message, msg.level, clear=self._running_test)
 
     def output_file(self, name, path):
         self._writer.output(name, path)
 
 
-class VerboseWriter(object):
+class VerboseWriter:
     _status_length = len('| PASS |')
 
     def __init__(self, width=78, colors='AUTO', markers='AUTO', stdout=None,
@@ -150,7 +150,7 @@ class VerboseWriter(object):
         self._stdout.write('%-8s %s\n' % (name+':', path))
 
 
-class KeywordMarker(object):
+class KeywordMarker:
 
     def __init__(self, highlighter, markers):
         self._highlighter = highlighter

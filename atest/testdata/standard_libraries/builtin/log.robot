@@ -15,7 +15,6 @@ Log
     Log    ${OBJ}
 
 Log with different levels
-    [Documentation]    FAIL Invalid log level 'INVALID'.
     [Setup]    Set Log Level    TRACE
     Log    Log says: Hello from tests!
     Log    Trace level    TRACE
@@ -23,7 +22,11 @@ Log with different levels
     Log    Info level    Info
     Log    Warn level    wArN
     Log    Error level    ERROR
-    Log    Invalid level    INVALID
+
+Invalid log level failure is catchable
+    Run Keyword And Expect Error
+    ...   Invalid log level 'INVALID'.
+    ...   Log    Invalid level    INVALID
 
 HTML is escaped by default
     Log    <b>not bold</b>
@@ -45,65 +48,81 @@ FAIL is not valid log level
 
 Log also to console
     [Setup]    Set Log Level    DEBUG
-    Log    Hello, console!    console=yepyep    repr=no    html=false
+    Log    Hello, console!    console=yepyep    html=false
     Log    ${HTML}    debug    enable both html    and console
 
 repr=True
     [Setup]    Set Log Level    DEBUG
-    Log    Nothing special here    repr=yes
+    Log    Nothing special here    repr=false
     Log    Hyvää yötä \u2603!    repr=True
-    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    ${TRUE}
-    ${bytes} =    Evaluate    b'\\x00abc\\xff (repr=True)'
-    Log    ${bytes}    repr=${42}    console=True
-    ${nfd} =    Evaluate    u'hyva\u0308'
-    Log    ${nfd}    repr=Y
 
 formatter=repr
     [Setup]    Set Log Level    DEBUG
     Log    Nothing special here    formatter=repr
     Log    Hyvää yötä \u2603!    formatter=repr
-    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    ${TRUE}
+    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    DEPRECATED    repr
     ${bytes} =    Evaluate    b'\\x00abc\\xff (formatter=repr)'
     Log    ${bytes}    formatter=REPR    console=True
-    ${nfd} =    Evaluate    u'hyva\u0308'
+    ${nfd} =    Evaluate    'hyva\u0308'
     Log    ${nfd}    formatter=Repr
 
 formatter=ascii
     [Setup]    Set Log Level    DEBUG
     Log    Nothing special here    formatter=ascii
     Log    Hyvää yötä \u2603!    formatter=ascii
-    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    ${TRUE}
+    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    DEPRECATED    ascii
     ${bytes} =    Evaluate    b'\\x00abc\\xff (formatter=ascii)'
     Log    ${bytes}    formatter=ASCII    console=True
-    ${nfd} =    Evaluate    u'hyva\u0308'
+    ${nfd} =    Evaluate    'hyva\u0308'
     Log    ${nfd}    formatter=Ascii
 
 formatter=str
     [Setup]    Set Log Level    DEBUG
     Log    Nothing special here    formatter=str
     Log    Hyvää yötä \u2603!    formatter=STR
-    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    ${TRUE}
+    Log    ${42}    DEBUG    ${FALSE}    ${FALSE}    DEPRECATED    sTr
     ${bytes} =    Evaluate    b'\\x00abc\\xff (formatter=str)'
     Log    ${bytes}    formatter=str    console=True
-    ${nfd} =    Evaluate    u'hyva\u0308'
+    ${nfd} =    Evaluate    'hyva\u0308'
     Log    ${nfd}    formatter=str
 
 formatter=repr pretty prints
-    ${long string} =    Evaluate    ' '.join([u'Robot Framework'] * 1000)
-    Log    ${long string}    repr=True
-    ${small dict} =    Evaluate    {u'small': u'dict', 3: b'items', u'a': u'sorted'}
+    ${long string} =    Evaluate    ' '.join(['Robot Framework'] * 1000)
+    Log    ${long string}    formatter=repr
+    ${small dict} =    Evaluate    {'small': 'dict', 3: b'items', 'a': 'sorted'}
     Log    ${small dict}    formatter=repr    console=TRUE
-    ${big dict} =    Evaluate    {u'big': u'dict', u'long': u'${long string}', u'nested': ${small dict}, u'list': [1, 2, 3]}
+    ${big dict} =    Evaluate    {'big': 'dict', 'long': '${long string}', 'nested': ${small dict}, 'list': [1, 2, 3]}
     Log    ${big dict}    html=NO    formatter=repr
-    ${small list} =    Evaluate    [u'small', b'list', u'not sorted', 4]
+    ${small list} =    Evaluate    ['small', b'list', 'not sorted', 4]
     Log    ${small list}    console=gyl    formatter=repr
-    ${big list} =    Evaluate    [u'big', u'list', u'${long string}', b'${long string}', [u'nested', (u'tuple', 2)], ${small dict}]
+    ${big list} =    Evaluate    ['big', 'list', '${long string}', b'${long string}', ['nested', ('tuple', 2)], ${small dict}]
     Log    ${big list}    formatter=repr
-    ${non ascii} =    Evaluate    [u'hyv\\xe4', b'hyv\\xe4', {u'\\u2603': b'\\x00\\xff'}]
+    ${non ascii} =    Evaluate    ['hyv\\xe4', b'hyv\\xe4', {'\\u2603': b'\\x00\\xff'}]
     Log    ${non ascii}    formatter=repr
 
+formatter=len
+    [Documentation]    FAIL STARTS: TypeError:
+    [Setup]    Set Log Level    DEBUG
+    Log    Nothing special here    formatter=len
+    Log    Hyvää yötä \u2603!    DEBUG    formatter=LEN
+    ${bytes} =    Evaluate    b'\\x00abc\\xff (formatter=len)'
+    Log    ${bytes}    formatter=len    console=True
+    ${nfd} =    Evaluate    'hyva\u0308'
+    Log    ${nfd}    formatter=len
+    Log    ${42}    formatter=len
+
+formatter=type
+    [Setup]    Set Log Level    DEBUG
+    Log    Nothing special here    formatter=type
+    Log    Hyvää yötä \u2603!    formatter=TYPE
+    Log    ${42}    DEBUG    formatter=type
+    ${bytes} =    Evaluate    b'\\x00abc\\xff (formatter=type)'
+    Log    ${bytes}    formatter=type    console=True
+    ${now} =    Evaluate    datetime.datetime.now()
+    Log    ${now}    formatter=type
+
 formatter=invalid
-    [Documentation]    FAIL ValueError: Invalid formatter 'invalid'. Available 'str', 'repr' and 'ascii'.
+    [Documentation]    FAIL ValueError: Invalid formatter 'invalid'. Available 'str', 'repr', 'ascii', 'len', and 'type'.
     Log    x    formatter=invalid
 
 Log callable
@@ -147,3 +166,11 @@ Log To Console
     Log To Console    stderr äö w/ newline    stdERR
     Log To Console    ...line äö   stdout    continue without newlines
     Log To Console    ${42}
+
+Log To Console With Formatting
+    Log to console    test right align with hash padding    format=#>60
+    Log to console    test middle align with star padding    format=*^60
+    Log To Console    test-with-spacepad-and-weird-characters+%?,_\>~}./asdf    format=>60
+    Log To Console    message starts here,    format=>44    no_newline=true
+    Log To Console    this sentence should be on the same sentence as "message starts here"
+    Log to console    test log to stderr    format=>44  stream=stdERR

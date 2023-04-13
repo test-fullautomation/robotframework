@@ -36,7 +36,7 @@ Modules are imported automatically
     Should Be Equal    ${sep}    ${/}
     Should Be Equal    ${+}    \\+
     ${version} =    Evaluate    robot.__version__.split('.')[0]
-    Should Be True    ${version} in (3, 4, 5)
+    Should Be True    ${version} in (6, 7, 8, 9)
 
 Importing non-existing module fails with NameError
     [Documentation]    FAIL
@@ -64,8 +64,6 @@ Automatic module imports are case-sensitive
     os.sep + OS.sep
 
 Automatic modules don't override builtins
-    ${result} =    Evaluate    repr(42)     # `repr` module exists in Python 2
-    Should Be Equal    ${result}    42
     ${result} =    Evaluate    len('foo')   # `len.py` exists in this directory
     Should Be Equal    ${result}    ${3}
 
@@ -104,6 +102,14 @@ Explicit modules can override builtins
 Explicit modules used in lambda
     ${result} =    Evaluate    ''.join(filter(lambda s: re.match('^He',s), $HELLO))    modules=re
     Should Be Equal    ${result}    Hello
+
+Evaluation namespace is mutable
+    [Documentation]    FAIL
+    ...    Evaluating expression 'locals().__setitem__('var', 1) or locals().__delitem__('var') or var' failed: \
+    ...    NameError: name 'var' is not defined nor importable as module
+    ${variable} =    Evaluate    locals().__setitem__('variable', 'value') or variable
+    Should Be Equal    ${variable}    value
+    Evaluate    locals().__setitem__('var', 1) or locals().__delitem__('var') or var
 
 Custom namespace
     ${ns} =    Create Dictionary    a=x    b=${2}    c=2

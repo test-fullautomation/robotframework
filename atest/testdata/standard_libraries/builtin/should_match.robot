@@ -21,16 +21,10 @@ Should Match case-insensitive
     Hello!    heLLo!    ignore_case=True
     Hillo?    h?ll*     ignore_case=yes
 
-Should Match with bytes containing non-ascii characters
-    [Documentation]    FAIL    '${BYTES WITH NON ASCII}' does not match 'hyva'
-    [Template]    Should Match
-    ${BYTES WITH NON ASCII}    ${BYTES WITH NON ASCII}
-    ${BYTES WITH NON ASCII}    ${BYTES WITHOUT NON ASCII}
-
-Should Match does not work with bytes on Python 3
+Should Match does not work with bytes
     [Documentation]    FAIL    GLOB: Several failures occurred:\n\n
     ...    1) TypeError: *\n\n
-    ...    2) TypeError: Matching bytes is not supported on Python 3.
+    ...    2) TypeError: *
     [Template]    Should Match
     ${BYTES WITHOUT NON ASCII}    pattern
     text                          ${BYTES WITHOUT NON ASCII}
@@ -50,17 +44,13 @@ Should Not Match case-insensitive
     Hello!    heLLo    ignore_case=True
     Hillo?    h?ll*    ignore_case=yes    msg=Fails
 
-Should Not Match with bytes containing non-ascii characters
-    [Documentation]    FAIL    '${BYTES WITH NON ASCII}' matches '${BYTES WITH NON ASCII}'
-    [Template]    Should Not Match
-    ${BYTES WITH NON ASCII}    ${BYTES WITHOUT NON ASCII}
-    ${BYTES WITH NON ASCII}    ${BYTES WITH NON ASCII}
-
 Should Match Regexp
     [Documentation]    FAIL    Something failed
     [Template]    Should Match Regexp
     Foo: 42        \\w+: \\d{2}
     IGNORE CASE    (?i)case
+    IGNORE CASE    case    flags=IGNORECASE
+    abc\nDEFG      ab.*fg  flags=IGNORECASE|DOTALL
     ${EMPTY}       whatever    Something failed    No values
 
 Should Match Regexp returns match and groups
@@ -71,6 +61,9 @@ Should Match Regexp returns match and groups
     ${match}    @{groups} =    Should Match Regexp    Foo: 42 (xxx)    ^(Fo+)([:.;]) (\\d+?)
     Should Be Equal    ${match}    Foo: 4
     Should Be True    @{groups} == ['Foo', ':', '4']
+    ${match}    @{groups} =    Should Match Regexp    FOO: 42 (xxx)    ^(fo+)([:.;]) (\\d+?)    flags=I
+    Should Be Equal    ${match}    FOO: 4
+    Should Be True    @{groups} == ['FOO', ':', '4']
     ${match}    ${group1}    ${group2} =    Should Match Regexp    Hello, (my) World!!!!!    (?ix)^hel+o,\\s # Comment \n\\((my|your)\\)\\ WORLD(!*)$
     Should Be Equal    ${match}    Hello, (my) World!!!!!
     Should Be Equal    ${group1}    my
@@ -86,3 +79,4 @@ Should Not Match Regexp
     [Template]    Should Not Match Regexp
     this string does not    match this pattern
     James Bond 007          ^J\\w{4}\\sB[donkey]+ \\d*$
+    this string does not    match this pattern    flags=DOTALL

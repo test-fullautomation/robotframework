@@ -8,7 +8,7 @@ import re
 from os.path import basename, dirname, exists, join, normpath
 
 from robot.errors import DataError
-from robot.utils import abspath, JYTHON, WINDOWS, PY3, PY_VERSION, unicode
+from robot.utils import abspath, WINDOWS
 from robot.utils.importer import Importer, ByPathImporter
 from robot.utils.asserts import (assert_equal, assert_true, assert_raises,
                                  assert_raises_with_msg)
@@ -22,11 +22,9 @@ WINDOWS_PATH_IN_ERROR = re.compile(r"'\w:\\")
 
 
 def assert_prefix(error, expected):
-    message = unicode(error)
+    message = str(error)
     count = 3 if WINDOWS_PATH_IN_ERROR.search(message) else 2
     prefix = ':'.join(message.split(':')[:count]) + ':'
-    if 'ImportError:' in expected and sys.version_info >= (3, 6):
-        expected = expected.replace('ImportError:', 'ModuleNotFoundError:')
     assert_equal(prefix, expected)
 
 
@@ -44,7 +42,7 @@ def func():
     return path
 
 
-class LoggerStub(object):
+class LoggerStub:
 
     def __init__(self, remove_extension=False):
         self.messages = []
@@ -125,33 +123,6 @@ class test:
         path = create_temp_file('test.py', extra_content='invalid content')
         error = assert_raises(DataError, self._import_and_verify, path, remove='test')
         assert_prefix(error, "Importing '%s' failed: SyntaxError:" % path)
-
-    if JYTHON:
-
-        def test_java_class_with_java_extension(self):
-            path = join(CURDIR, 'ImportByPath.java')
-            self._import_and_verify(path, remove='ImportByPath')
-            self._assert_imported_message('ImportByPath', path, type='class')
-
-        def test_java_class_with_class_extension(self):
-            path = join(CURDIR, 'ImportByPath.class')
-            self._import_and_verify(path, remove='ImportByPath', name='java')
-            self._assert_imported_message('ImportByPath', path, type='java class')
-
-        def test_importing_java_package_fails(self):
-            path = join(LIBDIR, 'javapkg')
-            assert_raises_with_msg(DataError,
-                                   "Importing '%s' failed: Expected class or "
-                                   "module, got javapackage." % path,
-                                   self._import, path, remove='javapkg')
-
-        def test_removing_from_sys_modules_when_importing_multiple_times(self):
-            path = join(CURDIR, 'ImportByPath.java')
-            self._import(path, name='java', remove='ImportByPath')
-            self._assert_imported_message('ImportByPath', path, 'java class')
-            self._import(path)
-            self._assert_removed_message('ImportByPath')
-            self._assert_imported_message('ImportByPath', path, 'class', index=1)
 
     def _import_and_verify(self, path, attr=42, directory=TESTDIR,
                            name=None, remove=None):
@@ -236,7 +207,7 @@ class TestImportClassOrModule(unittest.TestCase):
 
     def test_import_non_existing(self):
         error = assert_raises(DataError, self._import, 'NonExisting')
-        assert_prefix(error, "Importing 'NonExisting' failed: ImportError:")
+        assert_prefix(error, "Importing 'NonExisting' failed: ModuleNotFoundError:")
 
     def test_import_sub_module(self):
         module = self._import_module('pythonmodule.library')
@@ -280,14 +251,14 @@ class TestImportClassOrModule(unittest.TestCase):
 
     def test_item_from_non_existing_module(self):
         error = assert_raises(DataError, self._import, 'nonex.item')
-        assert_prefix(error, "Importing 'nonex.item' failed: ImportError:")
+        assert_prefix(error, "Importing 'nonex.item' failed: ModuleNotFoundError:")
 
     def test_import_file_by_path(self):
         import module_library as expected
         module = self._import_module(join(LIBDIR, 'module_library.py'))
         assert_equal(module.__name__, expected.__name__)
         assert_equal(dirname(normpath(module.__file__)),
-                      dirname(normpath(expected.__file__)))
+                     dirname(normpath(expected.__file__)))
         assert_equal(dir(module), dir(expected))
 
     def test_import_class_from_file_by_path(self):
@@ -316,35 +287,6 @@ class TestImportClassOrModule(unittest.TestCase):
         logger.assert_message("Imported class 'ExampleLibrary' from '%s'."
                               % join(LIBDIR, 'ExampleLibrary'))
 
-    if JYTHON:
-
-        def test_import_java_class(self):
-            klass = self._import_class('ExampleJavaLibrary')
-            assert_equal(klass().getCount(), 1)
-
-        def test_import_java_class_in_package(self):
-            klass = self._import_class('javapkg.JavaPackageExample')
-            assert_equal(klass().returnValue('xmas'), 'xmas')
-
-        def test_import_java_file_by_path(self):
-            import ExampleJavaLibrary as expected
-            klass = self._import_class(join(LIBDIR, 'ExampleJavaLibrary.java'))
-            assert_equal(klass().getCount(), 1)
-            assert_equal(klass.__name__, expected.__name__)
-            assert_equal(dir(klass), dir(expected))
-
-        def test_importing_java_package_fails(self):
-            assert_raises_with_msg(DataError,
-                                   "Importing test library 'javapkg' failed: "
-                                   "Expected class or module, got javapackage.",
-                                   self._import, 'javapkg', 'test library')
-
-        def test_logging_when_importing_java_class(self):
-            logger = LoggerStub()
-            self._import_class('ExampleJavaLibrary', 'java', logger)
-            logger.assert_message("Imported java class 'ExampleJavaLibrary' "
-                                  "from unknown location.")
-
     def _import_module(self, name, type=None, logger=None):
         module = self._import(name, type, logger)
         assert_true(inspect.ismodule(module))
@@ -357,6 +299,19 @@ class TestImportClassOrModule(unittest.TestCase):
 
     def _import(self, name, type=None, logger=None):
         return Importer(type, logger or LoggerStub()).import_class_or_module(name)
+
+
+class TestImportModule(unittest.TestCase):
+
+    def test_import_module(self):
+        module = Importer().import_module('ExampleLibrary')
+        assert_equal(module.ExampleLibrary().return_string_from_library('xxx'), 'xxx')
+
+    def test_logging(self):
+        logger = LoggerStub(remove_extension=True)
+        Importer(logger=logger).import_module('ExampleLibrary')
+        logger.assert_message("Imported module 'ExampleLibrary' from '%s'."
+                              % join(LIBDIR, 'ExampleLibrary'))
 
 
 class TestErrorDetails(unittest.TestCase):
@@ -384,35 +339,21 @@ Traceback (most recent call last):
         for line in lines[1:]:
             assert_true(line.startswith('  '))
 
-    if not (JYTHON and PY_VERSION > (2, 7, 0)):
-
-        def test_non_ascii_bytes_in_pythonpath(self):
-            sys.path.append('hyv\xe4')
-            try:
-                error = self._failing_import('NoneExisting')
-            finally:
-                sys.path.pop()
-            last_line = self._get_pythonpath(error).splitlines()[-1].strip()
-            assert_true(last_line.startswith('hyv'))
-
-    if JYTHON:
-
-        def test_classpath(self):
+    def test_non_ascii_entry_in_pythonpath(self):
+        sys.path.append('hyv\xe4')
+        try:
             error = self._failing_import('NoneExisting')
-            lines = self._get_classpath(error).splitlines()
-            assert_equal(lines[0], 'CLASSPATH:')
-            for line in lines[1:]:
-                assert_true(line.startswith('  '))
+        finally:
+            sys.path.pop()
+        last_line = self._get_pythonpath(error).splitlines()[-1].strip()
+        assert_true(last_line.startswith('hyv'))
 
     def test_structure(self):
         error = self._failing_import('NoneExisting')
-        quote = "'" if PY3 else ''
-        type = 'Import' if sys.version_info < (3, 6) else 'ModuleNotFound'
-        message = ("Importing 'NoneExisting' failed: {type}Error: No module "
-                   "named {q}NoneExisting{q}".format(q=quote, type=type))
-        expected = (message, self._get_traceback(error),
-                    self._get_pythonpath(error), self._get_classpath(error))
-        assert_equal(unicode(error), '\n'.join(expected).strip())
+        message = ("Importing 'NoneExisting' failed: ModuleNotFoundError: "
+                   "No module named 'NoneExisting'")
+        expected = (message, self._get_traceback(error), self._get_pythonpath(error))
+        assert_equal(str(error), '\n'.join(expected))
 
     def _failing_import(self, name):
         importer = Importer().import_class_or_module
@@ -425,17 +366,14 @@ Traceback (most recent call last):
     def _get_pythonpath(self, error):
         return '\n'.join(self._block(error, 'PYTHONPATH:', 'CLASSPATH:'))
 
-    def _get_classpath(self, error):
-        return '\n'.join(self._block(error, 'CLASSPATH:'))
-
     def _block(self, error, start, end=None):
         include = False
-        for line in unicode(error).splitlines():
+        for line in str(error).splitlines():
             if line == end:
                 return
             if line == start:
                 include = True
-            if include:
+            if include and line.strip('^ '):
                 yield line
 
 
@@ -448,12 +386,7 @@ class TestSplitPathToModule(unittest.TestCase):
 
     def test_normal_file(self):
         self._verify('hello.py', 'hello')
-        self._verify('hello.class', 'hello')
-        self._verify('hello.world.java', 'hello.world')
-
-    def test_jython_class_file(self):
-        self._verify('hello$py.class', 'hello')
-        self._verify('__init__$py.class', '__init__')
+        self._verify('hello.world.pyc', 'hello.world')
 
     def test_directory(self):
         self._verify('hello', 'hello')
@@ -520,23 +453,22 @@ class args:
             Importer('XXX').import_class_or_module, 'ExampleLibrary', ['accepts', 'no', 'args']
         )
 
-    if PY3:
-        def test_argument_conversion(self):
-            path = create_temp_file('conversion.py', extra_content='''
+    def test_argument_conversion(self):
+        path = create_temp_file('conversion.py', extra_content='''
 class conversion:
     def __init__(self, arg: int):
         self.arg = arg
 ''')
-            lib = Importer().import_class_or_module_by_path(path, ['42'])
-            assert_true(not inspect.isclass(lib))
-            assert_equal(lib.__class__.__name__, 'conversion')
-            assert_equal(lib.arg, 42)
-            assert_raises_with_msg(
-                DataError,
-                "Importing xxx '%s' failed: "
-                "Argument 'arg' got value 'invalid' that cannot be converted to integer." % path,
-                Importer('XXX').import_class_or_module, path, ['invalid']
-            )
+        lib = Importer().import_class_or_module_by_path(path, ['42'])
+        assert_true(not inspect.isclass(lib))
+        assert_equal(lib.__class__.__name__, 'conversion')
+        assert_equal(lib.arg, 42)
+        assert_raises_with_msg(
+            DataError,
+            "Importing xxx '%s' failed: "
+            "Argument 'arg' got value 'invalid' that cannot be converted to integer." % path,
+            Importer('XXX').import_class_or_module, path, ['invalid']
+        )
 
     def test_modules_do_not_take_arguments(self):
         path = create_temp_file('no_args_allowed.py')

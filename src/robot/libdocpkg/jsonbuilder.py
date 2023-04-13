@@ -16,13 +16,14 @@
 import json
 import os.path
 
-from robot.running import ArgInfo, ArgumentSpec
+from robot.running import ArgInfo
 from robot.errors import DataError
 
+from .datatypes import EnumMember, TypedDictItem, TypeDoc
 from .model import LibraryDoc, KeywordDoc
 
 
-class JsonDocBuilder(object):
+class JsonDocBuilder:
 
     def build(self, path):
         spec = self._parse_spec_json(path)
@@ -37,30 +38,36 @@ class JsonDocBuilder(object):
                             doc_format=spec['docFormat'],
                             source=spec['source'],
                             lineno=int(spec.get('lineno', -1)))
-        libdoc.data_types.update(spec['dataTypes'].get('enums', []))
-        libdoc.data_types.update(spec['dataTypes'].get('typedDicts', []))
         libdoc.inits = [self._create_keyword(kw) for kw in spec['inits']]
         libdoc.keywords = [self._create_keyword(kw) for kw in spec['keywords']]
+        # RF >= 5 have 'typedocs', RF >= 4 have 'dataTypes', older/custom may have neither.
+        if 'typedocs' in spec:
+            libdoc.type_docs = self._parse_type_docs(spec['typedocs'])
+        elif 'dataTypes' in spec:
+            libdoc.type_docs = self._parse_data_types(spec['dataTypes'])
         return libdoc
 
     def _parse_spec_json(self, path):
         if not os.path.isfile(path):
-            raise DataError("Spec file '%s' does not exist." % path)
+            raise DataError(f"Spec file '{path}' does not exist.")
         with open(path) as json_source:
             libdoc_dict = json.load(json_source)
         return libdoc_dict
 
-    def _create_keyword(self, kw):
-        return KeywordDoc(name=kw.get('name'),
-                          args=self._create_arguments(kw['args']),
-                          doc=kw['doc'],
-                          shortdoc=kw['shortdoc'],
-                          tags=kw['tags'],
-                          source=kw['source'],
-                          lineno=int(kw.get('lineno', -1)))
+    def _create_keyword(self, data):
+        kw = KeywordDoc(name=data.get('name'),
+                        doc=data['doc'],
+                        shortdoc=data['shortdoc'],
+                        tags=data['tags'],
+                        private=data.get('private', False),
+                        deprecated=data.get('deprecated', False),
+                        source=data['source'],
+                        lineno=int(data.get('lineno', -1)))
+        self._create_arguments(data['args'], kw)
+        return kw
 
-    def _create_arguments(self, arguments):
-        spec = ArgumentSpec()
+    def _create_arguments(self, arguments, kw: KeywordDoc):
+        spec = kw.args
         setters = {
             ArgInfo.POSITIONAL_ONLY: spec.positional_only.append,
             ArgInfo.POSITIONAL_ONLY_MARKER: lambda value: None,
@@ -80,4 +87,34 @@ class JsonDocBuilder(object):
             if not spec.types:
                 spec.types = {}
             spec.types[name] = tuple(arg_types)
-        return spec
+            kw.type_docs[name] = arg.get('typedocs', {})
+
+    def _parse_type_docs(self, type_docs):
+        for data in type_docs:
+            doc = TypeDoc(data['type'], data['name'], data['doc'], data['accepts'],
+                          data['usages'])
+            if doc.type == TypeDoc.ENUM:
+                doc.members = [EnumMember(d['name'], d['value'])
+                               for d in data['members']]
+            if doc.type == TypeDoc.TYPED_DICT:
+                doc.items = [TypedDictItem(d['key'], d['type'], d['required'])
+                             for d in data['items']]
+            yield doc
+
+    # Code below used for parsing legacy 'dataTypes'.
+
+    def _parse_data_types(self, data_types):
+        for obj in data_types['enums']:
+            yield self._create_enum_doc(obj)
+        for obj in data_types['typedDicts']:
+            yield self._create_typed_dict_doc(obj)
+
+    def _create_enum_doc(self, data):
+        return TypeDoc(TypeDoc.ENUM, data['name'], data['doc'],
+                       members=[EnumMember(member['name'], member['value'])
+                                for member in data['members']])
+
+    def _create_typed_dict_doc(self, data):
+        return TypeDoc(TypeDoc.TYPED_DICT, data['name'], data['doc'],
+                       items=[TypedDictItem(item['key'], item['type'], item['required'])
+                              for item in data['items']])

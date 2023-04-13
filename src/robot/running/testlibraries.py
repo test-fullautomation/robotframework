@@ -13,17 +13,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from functools import partial
 import inspect
 import os
 
 from robot.errors import DataError
 from robot.libraries import STDLIBS
 from robot.output import LOGGER
-from robot.utils import (getdoc, get_error_details, Importer, is_init,
-                         is_java_method, JYTHON, normalize, seq2str2, unic,
-                         is_list_like, py3to2, type_name)
+from robot.utils import (getdoc, get_error_details, Importer, is_dict_like, is_init,
+                         is_list_like, normalize, seq2str2, type_name)
 
-from .arguments import EmbeddedArguments
+from .arguments import EmbeddedArguments, CustomArgumentConverters
 from .context import EXECUTION_CONTEXTS
 from .dynamicmethods import (GetKeywordArguments, GetKeywordDocumentation,
                              GetKeywordNames, GetKeywordTags, RunKeyword)
@@ -33,14 +33,7 @@ from .libraryscopes import LibraryScope
 from .outputcapture import OutputCapturer
 
 
-if JYTHON:
-    from java.lang import Object
-else:
-    Object = None
-
-
-def TestLibrary(name, args=None, variables=None, create_handlers=True,
-                logger=LOGGER):
+def TestLibrary(name, args=None, variables=None, create_handlers=True, logger=LOGGER):
     if name in STDLIBS:
         import_name = 'robot.libraries.' + name
     else:
@@ -67,19 +60,21 @@ def _get_lib_class(libcode):
     return _ClassLibrary
 
 
-@py3to2
-class _BaseTestLibrary(object):
+class _BaseTestLibrary:
     get_handler_error_level = 'INFO'
 
     def __init__(self, libcode, name, args, source, logger, variables):
         if os.path.exists(name):
             name = os.path.splitext(os.path.basename(os.path.abspath(name)))[0]
+        self._libcode = libcode
+        self._libinst = None
         self.version = self._get_version(libcode)
         self.name = name
         self.orig_name = name  # Stores original name when importing WITH NAME
         self.source = source
         self.logger = logger
-        self.handlers = HandlerStore(self.name, HandlerStore.TEST_LIBRARY_TYPE)
+        self.converters = self._get_converters(libcode)
+        self.handlers = HandlerStore()
         self.has_listener = None  # Set when first instance is created
         self._doc = None
         self.doc_format = self._get_doc_format(libcode)
@@ -87,8 +82,6 @@ class _BaseTestLibrary(object):
         self.init = self._create_init_handler(libcode)
         self.positional_args, self.named_args \
             = self.init.resolve_arguments(args, variables)
-        self._libcode = libcode
-        self._libinst = None
 
     def __len__(self):
         return len(self.handlers)
@@ -119,8 +112,11 @@ class _BaseTestLibrary(object):
         self._create_handlers(self.get_instance())
         self.reset_instance()
 
+    def handlers_for(self, name):
+        return self.handlers.get_handlers(name)
+
     def reload(self):
-        self.handlers = HandlerStore(self.name, HandlerStore.TEST_LIBRARY_TYPE)
+        self.handlers = HandlerStore()
         self._create_handlers(self.get_instance())
 
     def start_suite(self):
@@ -148,7 +144,7 @@ class _BaseTestLibrary(object):
             or self._get_attr(libcode, '__version__')
 
     def _get_attr(self, object, attr, default='', upper=False):
-        value = unic(getattr(object, attr, default))
+        value = str(getattr(object, attr, default))
         if upper:
             value = normalize(value, ignore='_').upper()
         return value
@@ -162,6 +158,16 @@ class _BaseTestLibrary(object):
     def _resolve_init_method(self, libcode):
         init = getattr(libcode, '__init__', None)
         return init if is_init(init) else None
+
+    def _get_converters(self, libcode):
+        converters = getattr(libcode, 'ROBOT_LIBRARY_CONVERTERS', None)
+        if not converters:
+            return None
+        if not is_dict_like(converters):
+            self.report_error(f'Argument converters must be given as a dictionary, '
+                              f'got {type_name(converters)}.')
+            return None
+        return CustomArgumentConverters.from_dict(converters, self.report_error)
 
     def reset_instance(self, instance=None):
         prev = self._libinst
@@ -222,7 +228,7 @@ class _BaseTestLibrary(object):
         try:
             if method:
                 method()
-        except:
+        except Exception:
             message, details = get_error_details()
             name = getattr(listener, '__name__', None) or type_name(listener)
             self.report_error("Calling method '%s' of listener '%s' failed: %s"
@@ -231,7 +237,7 @@ class _BaseTestLibrary(object):
     def _create_handlers(self, libcode):
         try:
             names = self._get_handler_names(libcode)
-        except:
+        except Exception:
             message, details = get_error_details()
             raise DataError("Getting keyword names from library '%s' failed: %s"
                             % (self.name, message), details)
@@ -280,17 +286,17 @@ class _BaseTestLibrary(object):
     def _get_handler_method(self, libcode, name):
         try:
             method = getattr(libcode, name)
-        except:
+        except Exception:
             message, details = get_error_details()
-            raise DataError('Getting handler method failed: %s' % message,
-                            details)
+            raise DataError(f'Getting handler method failed: {message}', details)
         self._validate_handler_method(method)
         return method
 
     def _validate_handler_method(self, method):
-        if not inspect.isroutine(method):
+        # isroutine returns false for partial objects. This may change in Python 3.11.
+        if not (inspect.isroutine(method) or isinstance(method, partial)):
             raise DataError('Not a method or function.')
-        if getattr(method, 'robot_not_keyword', False) is True:
+        if getattr(method, 'robot_not_keyword', False):
             raise DataError('Not exposed as a keyword.')
         return method
 
@@ -310,10 +316,10 @@ class _BaseTestLibrary(object):
         return Handler(self, handler_name, handler_method)
 
     def _get_possible_embedded_args_handler(self, handler):
-        embedded = EmbeddedArguments(handler.name)
+        embedded = EmbeddedArguments.from_name(handler.name)
         if embedded:
             self._validate_embedded_count(embedded, handler.arguments)
-            return EmbeddedArgumentsHandler(embedded.name, handler), True
+            return EmbeddedArgumentsHandler(embedded, handler), True
         return handler, False
 
     def _validate_embedded_count(self, embedded, arguments):
@@ -324,8 +330,7 @@ class _BaseTestLibrary(object):
     def _raise_creating_instance_failed(self):
         msg, details = get_error_details()
         if self.positional_args or self.named_args:
-            args = self.positional_args \
-                + ['%s=%s' % item for item in self.named_args]
+            args = self.positional_args + ['%s=%s' % item for item in self.named_args]
             args_text = 'arguments %s' % seq2str2(args)
         else:
             args_text = 'no arguments'
@@ -336,29 +341,14 @@ class _BaseTestLibrary(object):
 class _ClassLibrary(_BaseTestLibrary):
 
     def _get_handler_method(self, libinst, name):
-        # Type is checked before using getattr to avoid calling properties,
-        # most importantly bean properties generated by Jython (issue 188).
+        # Type is checked before using getattr to avoid calling properties.
         for item in (libinst,) + inspect.getmro(libinst.__class__):
-            if item in (object, Object):
+            if item is object:
                 continue
             if hasattr(item, '__dict__') and name in item.__dict__:
                 self._validate_handler_method(item.__dict__[name])
                 return getattr(libinst, name)
         raise DataError('No non-implicit implementation found.')
-
-    def _validate_handler_method(self, method):
-        _BaseTestLibrary._validate_handler_method(self, method)
-        if self._is_implicit_java_or_jython_method(method):
-            raise DataError('Implicit methods are ignored.')
-
-    def _is_implicit_java_or_jython_method(self, handler):
-        if not is_java_method(handler):
-            return False
-        for signature in handler.argslist[:handler.nargs]:
-            cls = signature.declaringClass
-            if not (cls is Object or cls.__module__ == 'org.python.proxies'):
-                return False
-        return True
 
 
 class _ModuleLibrary(_BaseTestLibrary):

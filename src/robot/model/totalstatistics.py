@@ -19,7 +19,7 @@ from .stats import TotalStat
 from .visitor import SuiteVisitor
 
 
-class TotalStatistics(object):
+class TotalStatistics:
     """Container for total statistics."""
 
     def __init__(self, rpa=False):
@@ -49,11 +49,6 @@ class TotalStatistics(object):
     def failed(self):
         return self._stat.failed
 
-    # nhtcuong
-    @property
-    def unknown(self):
-        return self._stat.unknown
-
     def add_test(self, test):
         self._stat.add_test(test)
 
@@ -66,16 +61,16 @@ class TotalStatistics(object):
         """
         # TODO: should this message be highlighted in console
         test_or_task = 'test' if not self._rpa else 'task'
-        total, end, passed, failed, skipped, unknown = self._get_counts()
-        template = '%d %s%s, %d passed, %d failed, %d unknown' #nhtcuong
+        total, end, passed, failed, skipped = self._get_counts()
+        template = '%d %s%s, %d passed, %d failed'
         if skipped:
             return ((template + ', %d skipped')
-                    % (total, test_or_task, end, passed, failed, unknown, skipped))#nhtcuong
-        return template % (total, test_or_task, end, passed, failed, unknown)#nhtcuong
+                    % (total, test_or_task, end, passed, failed, skipped))
+        return template % (total, test_or_task, end, passed, failed)
 
     def _get_counts(self):
         ending = 's' if self.total != 1 else ''
-        return self.total, ending, self.passed, self.failed, self.skipped, self.unknown #nhtcuong
+        return self.total, ending, self.passed, self.failed, self.skipped
 
 
 class TotalStatisticsBuilder(SuiteVisitor):

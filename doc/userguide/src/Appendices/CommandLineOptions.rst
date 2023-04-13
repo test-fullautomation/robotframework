@@ -1,5 +1,5 @@
-All command line options
-========================
+Command line options
+====================
 
 This appendix lists all the command line options that are available
 when `executing test cases`_  and when `post-processing outputs`_.
@@ -14,6 +14,9 @@ Command line options for test execution
 ---------------------------------------
 
   --rpa                   Turn on `generic automation`_ mode.
+  --language <lang>       Activate localization_. `lang` can be a name or a code
+                          of a `built-in language <Translations_>`__, or a path
+                          or a module name of a custom language file.
   -F, --extension <value>  `Parse only these files`_ when executing a directory.
   -N, --name <name>       `Sets the name`_ of the top-level test suite.
   -D, --doc <document>    `Sets the documentation`_ of the top-level test suite.
@@ -29,11 +32,7 @@ Command line options for test execution
   -i, --include <tag>     `Selects the test cases`_ by tag.
   -e, --exclude <tag>     `Selects the test cases`_ by tag.
   --skip <tag>            Tests having given tag will be `skipped`_. Tag can be a pattern.
-                          New in RF 4.0.
   --skiponfailure <tag>   Tests having given tag will be `skipped`_ if they fail.
-                          New in RF 4.0.
-  -c, --critical <tag>    Opposite of --noncritical. Deprecated since RF 4.0.
-  -n, --noncritical <tag>  Alias for --skiponfailure. Deprecated since RF 4.0.
   -v, --variable <name:value>   Sets `individual variables`_.
   -V, --variablefile <path:args>  Sets variables using `variable files`_.
   -d, --outputdir <dir>   Defines where to `create output files`_.
@@ -41,15 +40,16 @@ Command line options for test execution
   -l, --log <file>        Sets the path to the generated `log file`_.
   -r, --report <file>     Sets the path to the generated `report file`_.
   -x, --xunit <file>      Sets the path to the generated `xUnit compatible result file`_.
-  --xunitskipnoncritical  Deprecated since RF 4.0 and has no effect anymore.
   -b, --debugfile <file>  A `debug file`_ that is written during execution.
-  -T, --timestampoutputs  `Adds a timestamp`_ to all output files.
+  -T, --timestampoutputs  `Adds a timestamp`_ to `output files`_ listed above.
   --splitlog              `Split log file`_ into smaller pieces that open in
                           browser transparently.
   --logtitle <title>      `Sets a title`_ for the generated test log.
   --reporttitle <title>   `Sets a title`_ for the generated test report.
   --reportbackground <colors>  `Sets background colors`_ of the generated report.
-  --maxerrorlines <lines>  Sets the number of `error lines`_ shown in reports when tests fail.
+  --maxerrorlines <lines>  Sets the number of `error lines`_ shown in report when tests fail.
+  --maxassignlength <characters>  Sets the number of characters shown in log when
+                           `variables are assigned <Automatically logging assigned variable value_>`__.
   -L, --loglevel <level>  `Sets the threshold level`_ for logging. Optionally
                           the default `visible log level`_ can be given
                           separated with a colon (:).
@@ -62,9 +62,9 @@ Command line options for test execution
   --tagstatlink <pattern:link:title>  Adds `external links`_ to the *Statistics by Tag* table.
   --expandkeywords <name:pattern|tag:pattern>  Automatically `expand keywords`_
                           in the generated log file.
-  --removekeywords <all|passed|name:pattern|tag:pattern|for|wuks>  `Removes keyword data`_
+  --removekeywords <all|passed|name:pattern|tag:pattern|for|while|wuks>  `Removes keyword data`_
                           from the generated log file.
-  --flattenkeywords <for|foritem|name:pattern|tag:pattern>  `Flattens keywords`_
+  --flattenkeywords <for|while|iteration|name:pattern|tag:pattern>  `Flattens keywords`_
                           in the generated log file.
   --listener <name:args>  `Sets a listener`_ for monitoring test execution.
   --nostatusrc            Sets the `return code`_ to zero regardless of failures
@@ -74,7 +74,7 @@ Command line options for test execution
                           keywords originating from test libraries. Useful for
                           validating test data syntax.
   -X, --exitonfailure     `Stops test execution <Stopping when first test case fails_>`__
-                          if any critical test fails.
+                          if any test fails.
   --exitonerror           `Stops test execution <Stopping on parsing or execution error_>`__
                           if any error occurs when parsing test data, importing libraries, and so on.
   --skipteardownonexit    `Skips teardowns`_ if test execution is prematurely stopped.
@@ -107,15 +107,12 @@ Command line options for post-processing outputs
   -s, --suite <name>      `Selects the test suites`_ by name.
   -i, --include <tag>     `Selects the test cases`_ by tag.
   -e, --exclude <tag>     `Selects the test cases`_ by tag.
-  -c, --critical <tag>    Deprecated since RF 4.0 and has no effect anymore.
-  -n, --noncritical <tag>  Deprecated since RF 4.0 and has no effect anymore.
   -d, --outputdir <dir>   Defines where to `create output files`_.
   -o, --output <file>     Sets the path to the generated `output file`_.
   -l, --log <file>        Sets the path to the generated `log file`_.
   -r, --report <file>     Sets the path to the generated `report file`_.
   -x, --xunit <file>      Sets the path to the generated `xUnit compatible result file`_.
-  --xunitskipnoncritical  Deprecated since RF 4.0 and has no effect anymore.
-  -T, --timestampoutputs  `Adds a timestamp`_ to all output files.
+  -T, --timestampoutputs  `Adds a timestamp`_ to `output files`_ listed above.
   --splitlog              `Split log file`_ into smaller pieces that open in
                           browser transparently.
   --logtitle <title>      `Sets a title`_ for the generated test log.

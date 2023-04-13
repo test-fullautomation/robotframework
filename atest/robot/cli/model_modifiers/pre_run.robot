@@ -20,10 +20,9 @@ Modifier with arguments separated with ';'
 
 Non-existing modifier
     Run Tests    --prerunmodifier NobodyHere -l ${LOG}   ${TEST DATA}
-    ${quote} =    Set Variable If    ${INTERPRETER.is_py3}    '    ${EMPTY}
     Stderr Should Match
     ...    ? ERROR ? Importing model modifier 'NobodyHere' failed: *Error:
-    ...    No module named ${quote}NobodyHere${quote}\nTraceback (most recent call last):\n*
+    ...    No module named 'NobodyHere'\nTraceback (most recent call last):\n*
     Output and log should not be modified
 
 Invalid modifier
@@ -50,7 +49,7 @@ Modifiers are used before normal configuration
     ...    --include added --prerun ${CURDIR}/ModelModifier.py:CREATE:name=Created:tags=added    ${TEST DATA}
     Stderr Should Be Empty
     Length Should Be    ${SUITE.tests}    1
-    ${tc} =    Check test case    Created    FAIL    Test case contains no keywords.
+    ${tc} =    Check test case    Created    FAIL    Test contains no keywords.
     Lists should be equal    ${tc.tags}    ${{['added']}}
 
 Modify FOR and IF

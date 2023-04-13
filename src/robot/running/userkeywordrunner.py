@@ -15,12 +15,11 @@
 
 from itertools import chain
 
-from robot.errors import (ExecutionFailed, ExecutionPassed, ExecutionStatus,
-                          ExitForLoop, ContinueForLoop, DataError,
-                          PassExecution, ReturnFromKeyword,
-                          UserKeywordExecutionFailed, VariableError)
+from robot.errors import (BreakLoop, ContinueLoop, DataError, ExecutionFailed,
+                          ExecutionPassed, ExecutionStatus, PassExecution,
+                          ReturnFromKeyword, UserKeywordExecutionFailed, VariableError)
 from robot.result import Keyword as KeywordResult
-from robot.utils import getshortdoc, DotDict, prepr, split_tags_from_doc
+from robot.utils import DotDict, getshortdoc, prepr, split_tags_from_doc
 from robot.variables import is_list_variable, VariableAssignment
 
 from .arguments import DefaultValue
@@ -29,20 +28,29 @@ from .statusreporter import StatusReporter
 from .timeouts import KeywordTimeout
 
 
-class UserKeywordRunner(object):
+class UserKeywordRunner:
 
     def __init__(self, handler, name=None):
         self._handler = handler
         self.name = name or handler.name
+        self.pre_run_messages = ()
 
     @property
     def longname(self):
         libname = self._handler.libname
-        return '%s.%s' % (libname, self.name) if libname else self.name
+        return f'{libname}.{self.name}' if libname else self.name
 
     @property
     def libname(self):
         return self._handler.libname
+
+    @property
+    def tags(self):
+        return self._handler.tags
+
+    @property
+    def source(self):
+        return self._handler.source
 
     @property
     def arguments(self):
@@ -53,6 +61,8 @@ class UserKeywordRunner(object):
         assignment = VariableAssignment(kw.assign)
         result = self._get_result(kw, assignment, context.variables)
         with StatusReporter(kw, result, context, run):
+            if self._handler.private:
+                context.warn_on_invalid_private_call(self._handler)
             with assignment.assigner(context) as assigner:
                 if run:
                     return_value = self._run(context, kw.args, result)
@@ -73,6 +83,9 @@ class UserKeywordRunner(object):
                              type=kw.type)
 
     def _run(self, context, args, result):
+        if self.pre_run_messages:
+            for message in self.pre_run_messages:
+                context.output.message(message)
         variables = context.variables
         args = self._resolve_arguments(args, variables)
         with context.user_keyword(self._handler):
@@ -148,7 +161,7 @@ class UserKeywordRunner(object):
         handler = self._handler
         if not (handler.body or handler.return_value):
             raise DataError("User keyword '%s' contains no keywords." % self.name)
-        if context.dry_run and 'robot:no-dry-run' in handler.tags:
+        if context.dry_run and handler.tags.robot('no-dry-run'):
             return None, None
         error = return_ = pass_ = None
         try:
@@ -156,7 +169,7 @@ class UserKeywordRunner(object):
         except ReturnFromKeyword as exception:
             return_ = exception
             error = exception.earlier_failures
-        except (ExitForLoop, ContinueForLoop) as exception:
+        except (BreakLoop, ContinueLoop) as exception:
             pass_ = exception
         except ExecutionPassed as exception:
             pass_ = exception
@@ -212,6 +225,9 @@ class UserKeywordRunner(object):
             self._dry_run(context, kw.args, result)
 
     def _dry_run(self, context, args, result):
+        if self.pre_run_messages:
+            for message in self.pre_run_messages:
+                context.output.message(message)
         self._resolve_arguments(args)
         with context.user_keyword(self._handler):
             timeout = self._get_timeout()
@@ -225,18 +241,16 @@ class UserKeywordRunner(object):
 class EmbeddedArgumentsRunner(UserKeywordRunner):
 
     def __init__(self, handler, name):
-        UserKeywordRunner.__init__(self, handler, name)
-        match = handler.embedded_name.match(name)
-        if not match:
-            raise ValueError('Does not match given name')
-        self.embedded_args = list(zip(handler.embedded_args, match.groups()))
+        super().__init__(handler, name)
+        self.embedded_args = handler.embedded.match(name).groups()
 
     def _resolve_arguments(self, args, variables=None):
         # Validates that no arguments given.
         self.arguments.resolve(args, variables)
         if not variables:
             return []
-        return [(n, variables.replace_scalar(v)) for n, v in self.embedded_args]
+        embedded = [variables.replace_scalar(e) for e in self.embedded_args]
+        return self._handler.embedded.map(embedded)
 
     def _set_arguments(self, embedded_args, context):
         variables = context.variables
@@ -245,7 +259,7 @@ class EmbeddedArgumentsRunner(UserKeywordRunner):
         context.output.trace(lambda: self._trace_log_args_message(variables))
 
     def _trace_log_args_message(self, variables):
-        args = ['${%s}' % arg for arg, _ in self.embedded_args]
+        args = [f'${{{arg}}}' for arg in self._handler.embedded.args]
         return self._format_trace_log_args_message(args, variables)
 
     def _get_result(self, kw, assignment, variables):

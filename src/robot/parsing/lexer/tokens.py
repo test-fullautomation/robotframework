@@ -13,12 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from robot.utils import py3to2
 from robot.variables import VariableIterator
 
 
-@py3to2
-class Token(object):
+class Token:
     """Token representing piece of Robot Framework data.
 
     Each token has type, value, line number, column offset and end column
@@ -43,6 +41,7 @@ class Token(object):
     SETTING_HEADER = 'SETTING HEADER'
     VARIABLE_HEADER = 'VARIABLE HEADER'
     TESTCASE_HEADER = 'TESTCASE HEADER'
+    TASK_HEADER = 'TASK HEADER'
     KEYWORD_HEADER = 'KEYWORD HEADER'
     COMMENT_HEADER = 'COMMENT HEADER'
 
@@ -59,6 +58,7 @@ class Token(object):
     TEST_TIMEOUT = 'TEST TIMEOUT'
     FORCE_TAGS = 'FORCE TAGS'
     DEFAULT_TAGS = 'DEFAULT TAGS'
+    KEYWORD_TAGS = 'KEYWORD TAGS'
     LIBRARY = 'LIBRARY'
     RESOURCE = 'RESOURCE'
     VARIABLES = 'VARIABLES'
@@ -68,7 +68,10 @@ class Token(object):
     TIMEOUT = 'TIMEOUT'
     TAGS = 'TAGS'
     ARGUMENTS = 'ARGUMENTS'
+    # Use ´RETURN_SETTING` type instead of `RETURN`. `[Return]` is deprecated and
+    # `RETURN` type will be used with `RETURN` statement in the future.
     RETURN = 'RETURN'
+    RETURN_SETTING = RETURN
 
     NAME = 'NAME'
     VARIABLE = 'VARIABLE'
@@ -80,16 +83,23 @@ class Token(object):
     FOR_SEPARATOR = 'FOR SEPARATOR'
     END = 'END'
     IF = 'IF'
+    INLINE_IF = 'INLINE IF'
     ELSE_IF = 'ELSE IF'
     ELSE = 'ELSE'
-    # cuongnht add thread
-    THREAD = 'THREAD'
-    THREAD_NAME = 'THREAD NAME'
-    THREAD_DAEMON = 'THREAD DAEMON'
+    TRY = 'TRY'
+    EXCEPT = 'EXCEPT'
+    FINALLY = 'FINALLY'
+    AS = 'AS'
+    WHILE = 'WHILE'
+    RETURN_STATEMENT = 'RETURN STATEMENT'
+    CONTINUE = 'CONTINUE'
+    BREAK = 'BREAK'
+    OPTION = 'OPTION'
 
     SEPARATOR = 'SEPARATOR'
     COMMENT = 'COMMENT'
     CONTINUATION = 'CONTINUATION'
+    CONFIG = 'CONFIG'
     EOL = 'EOL'
     EOS = 'EOS'
 
@@ -114,6 +124,7 @@ class Token(object):
         TEST_TIMEOUT,
         FORCE_TAGS,
         DEFAULT_TAGS,
+        KEYWORD_TAGS,
         LIBRARY,
         RESOURCE,
         VARIABLES,
@@ -129,6 +140,7 @@ class Token(object):
         SETTING_HEADER,
         VARIABLE_HEADER,
         TESTCASE_HEADER,
+        TASK_HEADER,
         KEYWORD_HEADER,
         COMMENT_HEADER
     ))
@@ -139,20 +151,27 @@ class Token(object):
         KEYWORD_NAME
     ))
 
-    __slots__ = ['type', 'value', 'lineno', 'col_offset', 'error']
+    __slots__ = ['type', 'value', 'lineno', 'col_offset', 'error',
+                 '_add_eos_before', '_add_eos_after']
 
     def __init__(self, type=None, value=None, lineno=-1, col_offset=-1, error=None):
         self.type = type
         if value is None:
             value = {
-                Token.IF: 'IF', Token.ELSE_IF: 'ELSE IF', Token.ELSE: 'ELSE',
-                Token.FOR: 'FOR', Token.END: 'END', Token.CONTINUATION: '...',
-                Token.EOL: '\n', Token.WITH_NAME: 'WITH NAME'
+                Token.IF: 'IF', Token.INLINE_IF: 'IF', Token.ELSE_IF: 'ELSE IF',
+                Token.ELSE: 'ELSE', Token.FOR: 'FOR', Token.WHILE: 'WHILE',
+                Token.TRY: 'TRY', Token.EXCEPT: 'EXCEPT', Token.FINALLY: 'FINALLY',
+                Token.END: 'END', Token.CONTINUE: 'CONTINUE', Token.BREAK: 'BREAK',
+                Token.RETURN_STATEMENT: 'RETURN', Token.CONTINUATION: '...',
+                Token.EOL: '\n', Token.WITH_NAME: 'WITH NAME', Token.AS: 'AS'
             }.get(type, '')
         self.value = value
         self.lineno = lineno
         self.col_offset = col_offset
         self.error = error
+        # Used internally be lexer to indicate that EOS is needed before/after.
+        self._add_eos_before = False
+        self._add_eos_after = False
 
     @property
     def end_col_offset(self):
@@ -213,9 +232,6 @@ class Token(object):
                 and self.col_offset == other.col_offset
                 and self.error == other.error)
 
-    def __ne__(self, other):
-        return not self == other
-
 
 class EOS(Token):
     """Token representing end of a statement."""
@@ -225,5 +241,23 @@ class EOS(Token):
         Token.__init__(self, Token.EOS, '', lineno, col_offset)
 
     @classmethod
-    def from_token(cls, token):
-        return EOS(lineno=token.lineno, col_offset=token.end_col_offset)
+    def from_token(cls, token, before=False):
+        col_offset = token.col_offset if before else token.end_col_offset
+        return EOS(token.lineno, col_offset)
+
+
+class END(Token):
+    """Token representing END token used to signify block ending.
+
+    Virtual END tokens have '' as their value, with "real" END tokens the
+    value is 'END'.
+    """
+    __slots__ = []
+
+    def __init__(self, lineno=-1, col_offset=-1, virtual=False):
+        value = 'END' if not virtual else ''
+        Token.__init__(self, Token.END, value, lineno, col_offset)
+
+    @classmethod
+    def from_token(cls, token, virtual=False):
+        return END(token.lineno, token.end_col_offset, virtual)

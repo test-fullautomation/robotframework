@@ -42,14 +42,14 @@ Dryrun fail inside of ELSE
     This is validated
 
 Dryrun fail invalid IF in non executed branch
-    [Documentation]    FAIL    IF has more than one condition.
+    [Documentation]    FAIL    IF must have a condition.
     IF  1 > 2
        Keyword with invalid if
     END
     This is validated
 
 Dryrun fail invalid ELSE in non executed branch
-    [Documentation]    FAIL    ELSE has condition.
+    [Documentation]    FAIL    ELSE does not accept arguments, got '\${False}'.
     IF  1 > 0
        No operation
     ELSE
@@ -58,14 +58,14 @@ Dryrun fail invalid ELSE in non executed branch
     This is validated
 
 Dryrun fail invalid ELSE IF in non executed branch
-    [Documentation]    FAIL    ELSE IF has no condition.
+    [Documentation]    FAIL    ELSE IF must have a condition.
     IF  'fortran' == 'cobol'
        Keyword with invalid else if
     END
     This is validated
 
-Dryrun fail empty if in non executed branch
-    [Documentation]    FAIL    IF has empty body.
+Dryrun fail empty IF in non executed branch
+    [Documentation]    FAIL    IF branch cannot be empty.
     IF  ${True}
        Log  hello
     ELSE IF  ${True}
@@ -75,7 +75,7 @@ Dryrun fail empty if in non executed branch
 
 *** Keywords ***
 Keyword with invalid if
-    IF  1 == 1  2 == 2
+    IF
        Log  invalid
     END
 

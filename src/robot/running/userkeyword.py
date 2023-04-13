@@ -17,7 +17,7 @@ import os
 
 from robot.errors import DataError
 from robot.output import LOGGER
-from robot.utils import getshortdoc, unic
+from robot.utils import getshortdoc
 
 from .arguments import EmbeddedArguments, UserKeywordArgumentParser
 from .handlerstore import HandlerStore
@@ -25,24 +25,20 @@ from .userkeywordrunner import UserKeywordRunner, EmbeddedArgumentsRunner
 from .usererrorhandler import UserErrorHandler
 
 
-class UserLibrary(object):
-    TEST_CASE_FILE_TYPE = HandlerStore.TEST_CASE_FILE_TYPE
-    RESOURCE_FILE_TYPE = HandlerStore.RESOURCE_FILE_TYPE
+class UserLibrary:
 
-    def __init__(self, resource, source_type=RESOURCE_FILE_TYPE):
+    def __init__(self, resource, resource_file=True):
         source = resource.source
         basename = os.path.basename(source) if source else None
-        self.name = os.path.splitext(basename)[0] \
-            if source_type == self.RESOURCE_FILE_TYPE else None
+        self.name = os.path.splitext(basename)[0] if resource_file else None
         self.doc = resource.doc
-        self.handlers = HandlerStore(basename, source_type)
+        self.handlers = HandlerStore()
         self.source = source
-        self.source_type = source_type
         for kw in resource.keywords:
             try:
                 handler = self._create_handler(kw)
             except DataError as error:
-                handler = UserErrorHandler(error, kw.name, self.name)
+                handler = UserErrorHandler(error, kw.name, self.name, source, kw.lineno)
                 self._log_creating_failed(handler, error)
             embedded = isinstance(handler, EmbeddedArgumentsHandler)
             try:
@@ -53,7 +49,7 @@ class UserLibrary(object):
     def _create_handler(self, kw):
         if kw.error:
             raise DataError(kw.error)
-        embedded = EmbeddedArguments(kw.name)
+        embedded = EmbeddedArguments.from_name(kw.name)
         if not embedded:
             return UserKeywordHandler(kw, self.name)
         if kw.args:
@@ -61,25 +57,27 @@ class UserLibrary(object):
         return EmbeddedArgumentsHandler(kw, self.name, embedded)
 
     def _log_creating_failed(self, handler, error):
-        LOGGER.error("Error in %s '%s': Creating keyword '%s' failed: %s"
-                     % (self.source_type.lower(), self.source,
-                        handler.name, error.message))
+        LOGGER.error(f"Error in file '{self.source}' on line {handler.lineno}: "
+                     f"Creating keyword '{handler.name}' failed: {error.message}")
+
+    def handlers_for(self, name):
+        return self.handlers.get_handlers(name)
 
 
 # TODO: Should be merged with running.model.UserKeyword
 
-class UserKeywordHandler(object):
+class UserKeywordHandler:
+    supports_embedded_args = False
 
     def __init__(self, keyword, libname):
         self.name = keyword.name
         self.libname = libname
-        self.doc = unic(keyword.doc)
+        self.doc = keyword.doc
         self.source = keyword.source
         self.lineno = keyword.lineno
         self.tags = keyword.tags
         self.arguments = UserKeywordArgumentParser().parse(tuple(keyword.args),
                                                            self.longname)
-        self._kw = keyword
         self.timeout = keyword.timeout
         self.body = keyword.body
         self.return_value = tuple(keyword.return_)
@@ -93,20 +91,23 @@ class UserKeywordHandler(object):
     def shortdoc(self):
         return getshortdoc(self.doc)
 
-    def create_runner(self, name):
+    @property
+    def private(self):
+        return bool(self.tags and self.tags.robot('private'))
+
+    def create_runner(self, name, languages=None):
         return UserKeywordRunner(self)
 
 
 class EmbeddedArgumentsHandler(UserKeywordHandler):
+    supports_embedded_args = True
 
     def __init__(self, keyword, libname, embedded):
-        UserKeywordHandler.__init__(self, keyword, libname)
-        self.keyword = keyword
-        self.embedded_name = embedded.name
-        self.embedded_args = embedded.args
+        super().__init__(keyword, libname)
+        self.embedded = embedded
 
     def matches(self, name):
-        return self.embedded_name.match(name) is not None
+        return self.embedded.match(name) is not None
 
-    def create_runner(self, name):
+    def create_runner(self, name, languages=None):
         return EmbeddedArgumentsRunner(self, name)

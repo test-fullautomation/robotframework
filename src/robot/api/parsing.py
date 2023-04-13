@@ -192,8 +192,10 @@ Blocks:
 - :class:`~robot.parsing.model.blocks.CommentSection`
 - :class:`~robot.parsing.model.blocks.TestCase`
 - :class:`~robot.parsing.model.blocks.Keyword`
-- :class:`~robot.parsing.model.blocks.For`
 - :class:`~robot.parsing.model.blocks.If`
+- :class:`~robot.parsing.model.blocks.Try`
+- :class:`~robot.parsing.model.blocks.For`
+- :class:`~robot.parsing.model.blocks.While`
 
 Statements:
 
@@ -223,12 +225,21 @@ Statements:
 - :class:`~robot.parsing.model.statements.Return`
 - :class:`~robot.parsing.model.statements.KeywordCall`
 - :class:`~robot.parsing.model.statements.TemplateArguments`
-- :class:`~robot.parsing.model.statements.ForHeader`
 - :class:`~robot.parsing.model.statements.IfHeader`
+- :class:`~robot.parsing.model.statements.InlineIfHeader`
 - :class:`~robot.parsing.model.statements.ElseIfHeader`
 - :class:`~robot.parsing.model.statements.ElseHeader`
+- :class:`~robot.parsing.model.statements.TryHeader`
+- :class:`~robot.parsing.model.statements.ExceptHeader`
+- :class:`~robot.parsing.model.statements.FinallyHeader`
+- :class:`~robot.parsing.model.statements.ForHeader`
+- :class:`~robot.parsing.model.statements.WhileHeader`
 - :class:`~robot.parsing.model.statements.End`
+- :class:`~robot.parsing.model.statements.ReturnStatement`
+- :class:`~robot.parsing.model.statements.Break`
+- :class:`~robot.parsing.model.statements.Continue`
 - :class:`~robot.parsing.model.statements.Comment`
+- :class:`~robot.parsing.model.statements.Config` (new in 6.0)
 - :class:`~robot.parsing.model.statements.Error`
 - :class:`~robot.parsing.model.statements.EmptyLine`
 
@@ -247,7 +258,7 @@ case file contains::
     class TestNamePrinter(ModelVisitor):
 
         def visit_File(self, node):
-            print(f"File '{node.source}' has following tests:")
+            print(f"File '{node.source}' has the following tests:")
             # Call `generic_visit` to visit also child nodes.
             self.generic_visit(node)
 
@@ -262,7 +273,7 @@ case file contains::
 When the above code is run using the earlier :file:`example.robot`, the
 output is this::
 
-    File 'example.robot' has following tests:
+    File 'example.robot' has the following tests:
     - Example (on line 2)
     - Second example (on line 5)
 
@@ -487,8 +498,10 @@ from robot.parsing.model.blocks import (
     CommentSection,
     TestCase,
     Keyword,
+    If,
+    Try,
     For,
-    If
+    While
 )
 from robot.parsing.model.statements import (
     SectionHeader,
@@ -497,14 +510,15 @@ from robot.parsing.model.statements import (
     VariablesImport,
     Documentation,
     Metadata,
-    ForceTags,
-    DefaultTags,
     SuiteSetup,
     SuiteTeardown,
     TestSetup,
     TestTeardown,
     TestTemplate,
     TestTimeout,
+    ForceTags,
+    DefaultTags,
+    KeywordTags,
     Variable,
     TestCaseName,
     KeywordName,
@@ -517,12 +531,21 @@ from robot.parsing.model.statements import (
     Return,
     KeywordCall,
     TemplateArguments,
-    ForHeader,
     IfHeader,
+    InlineIfHeader,
     ElseIfHeader,
     ElseHeader,
+    TryHeader,
+    ExceptHeader,
+    FinallyHeader,
+    ForHeader,
+    WhileHeader,
     End,
+    ReturnStatement,
+    Continue,
+    Break,
     Comment,
+    Config,
     Error,
     EmptyLine
 )

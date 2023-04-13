@@ -13,37 +13,45 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from robot.utils import (is_string, normalize, NormalizedDict, Matcher, py3to2,
-                         unic, unicode)
+from robot.utils import is_string, normalize, NormalizedDict, Matcher
 
 
-@py3to2
-class Tags(object):
-    __slots__ = ['_tags']
+class Tags:
+    __slots__ = ['_tags', '_reserved']
 
     def __init__(self, tags=None):
-        self._tags = self._init_tags(tags)
+        self._tags, self._reserved = self._init_tags(tags)
+
+    def robot(self, name):
+        """Check do tags contain a special tag in format `robot:<name>`.
+
+        This is same as `'robot:<name>' in tags` but considerably faster.
+        """
+        return name in self._reserved
 
     def _init_tags(self, tags):
         if not tags:
-            return ()
+            return (), ()
         if is_string(tags):
             tags = (tags,)
         return self._normalize(tags)
 
     def _normalize(self, tags):
-        normalized = NormalizedDict([(unic(t), None) for t in tags], ignore='_')
-        for remove in '', 'NONE':
-            if remove in normalized:
-                normalized.pop(remove)
-        return tuple(normalized)
+        normalized = NormalizedDict([(str(t), None) for t in tags], ignore='_')
+        if '' in normalized:
+            del normalized['']
+        if 'NONE' in normalized:
+            del normalized['NONE']
+        reserved = tuple(tag.split(':')[1] for tag in normalized._keys
+                         if tag[:6] == 'robot:')
+        return tuple(normalized), reserved
 
     def add(self, tags):
-        self._tags = self._normalize(tuple(self) + tuple(Tags(tags)))
+        self.__init__(tuple(self) + tuple(Tags(tags)))
 
     def remove(self, tags):
         tags = TagPatterns(tags)
-        self._tags = tuple([t for t in self if not tags.match(t)])
+        self.__init__([t for t in self if not tags.match(t)])
 
     def match(self, tags):
         return TagPatterns(tags).match(self)
@@ -58,20 +66,17 @@ class Tags(object):
         return iter(self._tags)
 
     def __str__(self):
-        return u'[%s]' % ', '.join(self)
+        return '[%s]' % ', '.join(self)
 
     def __repr__(self):
         return repr(list(self))
 
     def __eq__(self, other):
         if not isinstance(other, Tags):
-            return False
+            other = Tags(other)
         self_normalized = [normalize(tag, ignore='_') for tag in self]
         other_normalized = [normalize(tag, ignore='_') for tag in other]
         return sorted(self_normalized) == sorted(other_normalized)
-
-    def __ne__(self, other):
-        return not self == other
 
     def __getitem__(self, index):
         item = self._tags[index]
@@ -81,13 +86,14 @@ class Tags(object):
         return Tags(tuple(self) + tuple(Tags(other)))
 
 
-@py3to2
-class TagPatterns(object):
+class TagPatterns:
 
     def __init__(self, patterns):
         self._patterns = tuple(TagPattern(p) for p in Tags(patterns))
 
     def match(self, tags):
+        if not self._patterns:
+            return False
         tags = tags if isinstance(tags, Tags) else Tags(tags)
         return any(p.match(tags) for p in self._patterns)
 
@@ -104,7 +110,7 @@ class TagPatterns(object):
         return self._patterns[index]
 
     def __str__(self):
-        return u'[%s]' % u', '.join(unicode(pattern) for pattern in self)
+        return '[%s]' % ', '.join(str(pattern) for pattern in self)
 
 
 def TagPattern(pattern):
@@ -118,8 +124,7 @@ def TagPattern(pattern):
     return SingleTagPattern(pattern)
 
 
-@py3to2
-class SingleTagPattern(object):
+class SingleTagPattern:
 
     def __init__(self, pattern):
         self._matcher = Matcher(pattern, ignore='_')
@@ -137,8 +142,7 @@ class SingleTagPattern(object):
         return bool(self._matcher)
 
 
-@py3to2
-class AndTagPattern(object):
+class AndTagPattern:
 
     def __init__(self, patterns):
         self._patterns = tuple(TagPattern(p) for p in patterns)
@@ -150,11 +154,10 @@ class AndTagPattern(object):
         return iter(self._patterns)
 
     def __str__(self):
-        return ' AND '.join(unicode(pattern) for pattern in self)
+        return ' AND '.join(str(pattern) for pattern in self)
 
 
-@py3to2
-class OrTagPattern(object):
+class OrTagPattern:
 
     def __init__(self, patterns):
         self._patterns = tuple(TagPattern(p) for p in patterns)
@@ -166,11 +169,10 @@ class OrTagPattern(object):
         return iter(self._patterns)
 
     def __str__(self):
-        return ' OR '.join(unicode(pattern) for pattern in self)
+        return ' OR '.join(str(pattern) for pattern in self)
 
 
-@py3to2
-class NotTagPattern(object):
+class NotTagPattern:
 
     def __init__(self, must_match, *must_not_match):
         self._first = TagPattern(must_match)
@@ -187,4 +189,4 @@ class NotTagPattern(object):
             yield pattern
 
     def __str__(self):
-        return ' NOT '.join(unicode(pattern) for pattern in self).lstrip()
+        return ' NOT '.join(str(pattern) for pattern in self).lstrip()

@@ -17,14 +17,14 @@ from robot.errors import DataError, VariableError
 from robot.utils import DotDict, is_dict_like, is_list_like, NormalizedDict, type_name
 
 from .notfound import variable_not_found
+from .resolvable import GlobalVariableValue, Resolvable
 from .search import is_assign
-from .tablesetter import VariableTableValueBase
 
 
 NOT_SET = object()
 
 
-class VariableStore(object):
+class VariableStore:
 
     def __init__(self, variables):
         self.data = NormalizedDict(ignore='_')
@@ -53,8 +53,8 @@ class VariableStore(object):
         return self.data[name]
 
     def _is_resolvable(self, value):
-        try: # isinstance can throw an exception in ironpython and jython
-            return isinstance(value, VariableTableValueBase)
+        try:
+            return isinstance(value, Resolvable)
         except Exception:
             return False
 
@@ -82,7 +82,9 @@ class VariableStore(object):
     def add(self, name, value, overwrite=True, decorated=True):
         if decorated:
             name, value = self._undecorate_and_validate(name, value)
-        if overwrite or name not in self.data:
+        if (overwrite
+                or name not in self.data
+                or isinstance(self.data[name], GlobalVariableValue)):
             self.data[name] = value
 
     def _undecorate(self, name):

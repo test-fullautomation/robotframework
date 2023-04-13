@@ -3,10 +3,8 @@ Configuring execution
 
 This section explains different command line options that can be used
 for configuring the `test execution`_ or `post-processing
-outputs`_. Options related to generated output files are discussed in
-the `next section`__.
-
-__ `Created outputs`_
+outputs`_. Options related to generated `output files`_ are discussed in
+the next section.
 
 .. contents::
    :depth: 2
@@ -130,6 +128,17 @@ combining individual tags or patterns together::
    --exclude xxORyyORzz
    --include fooNOTbar
 
+Starting from RF 5.0, it is also possible to use the reserved
+tag `robot:exclude` to achieve
+the same effect as with using the `--exclude` option:
+
+.. sourcecode:: robotframework
+
+   *** Test Cases ***
+   Example
+      [Tags]    robot:exclude
+      Fail      This is not executed
+
 Selecting test cases by tags is a very flexible mechanism and allows
 many interesting possibilities:
 
@@ -160,18 +169,20 @@ iteratively fix failing test cases.
   robot --rerunfailed output.xml tests    # then re-execute failing
 
 Behind the scenes this option selects the failed tests as they would have been
-selected individually with the :option:`--test` option. It is possible to further
+selected individually using the :option:`--test` option. It is possible to further
 fine-tune the list of selected tests by using :option:`--test`, :option:`--suite`,
 :option:`--include` and :option:`--exclude` options.
 
+It is an error if the output contains no failed tests, but this behavior can be
+changed by using the :option:`--runemptysuite` option `discussed below`__.
 Using an output not originating from executing the same tests that are run
-now causes undefined results. Additionally, it is an error if the output
-contains no failed tests. Using a special value `NONE` as the output
-is same as not specifying this option at all.
+now causes undefined results. Using a special value `NONE` as the output is
+same as not specifying this option at all.
 
 .. tip:: Re-execution results and original results can be `merged together`__
          using the :option:`--merge` command line option.
 
+__ `When no tests match selection`_
 __ `Merging outputs`_
 
 Re-executing failed test suites
@@ -199,10 +210,11 @@ with an error like::
 
 Because no outputs are generated, this behavior can be problematic if tests
 are executed and results processed automatically. Luckily a command line
-option :option:`--RunEmptySuite` can be used to force the suite to be executed
-also in this case. As a result normal outputs are created but show zero
-executed tests. The same option can be used also to alter the behavior when
-an empty directory or a test case file containing no tests is executed.
+option :option:`--RunEmptySuite` (case-insensitive) can be used to force
+the suite to be executed also in this case. As a result normal outputs are
+created but show zero executed tests. The same option can be used also to
+alter the behavior when an empty directory or a test case file containing
+no tests is executed.
 
 Similar situation can occur also when processing output files with Rebot_.
 It is possible that no test match the used filtering criteria or that
@@ -211,6 +223,10 @@ Rebot fails in these cases, but it has a separate
 :option:`--ProcessEmptySuite` option that can be used to alter the behavior.
 In practice this option works the same way as :option:`--RunEmptySuite` when
 running tests.
+
+.. note:: Using :option:`--RunEmptySuite` with :option:`--ReRunFailed`
+          or :option:`--ReRunFailedSuites` requires Robot Framework 5.0.1
+          or newer.
 
 Setting metadata
 ----------------
@@ -300,8 +316,6 @@ Python based extension, it uses the Python interpreter to import the module
 containing the extension from the system. The list of locations where modules
 are looked for is called *the module search path*, and its contents can be
 configured using different approaches explained in this section.
-When importing Java based libraries or other extensions on Jython, Java
-classpath is used in addition to the normal module search path.
 
 Robot Framework uses Python's module search path also when importing `resource
 and variable files`_ if the specified path does not match any file directly.
@@ -325,14 +339,13 @@ any additional configuration.
 
 __ `Packaging libraries`_
 
-``PYTHONPATH``, ``JYTHONPATH`` and ``IRONPYTHONPATH``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+``PYTHONPATH``
+~~~~~~~~~~~~~~
 
-Python, Jython and IronPython read additional locations to be added to
-the module search path from ``PYTHONPATH``, ``JYTHONPATH`` and
-``IRONPYTHONPATH`` environment variables, respectively. If you want to
-specify more than one location in any of them, you need to separate
-the locations with a colon on UNIX-like machines (e.g.
+Python reads additional locations to be added to
+the module search path from ``PYTHONPATH`` environment variables.
+If you want to specify more than one location in any of them, you
+need to separate the locations with a colon on UNIX-like machines (e.g.
 `/opt/libs:$HOME/testlibs`) and with a semicolon on Windows (e.g.
 `D:\libs;%HOMEPATH%\testlibs`).
 
@@ -345,19 +358,26 @@ Using `--pythonpath` option
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Robot Framework has a separate command line option :option:`--pythonpath (-P)`
-for adding locations to the module search path. Although the option name has
-the word Python in it, it works also on Jython and IronPython.
+for adding locations to the module search path.
 
-Multiple locations can be given by separating them with a colon, regardless
-the operating system, or by using this option several times. The given path
-can also be a glob pattern matching multiple paths, but then it typically
-needs to be escaped when used on the console.
+Multiple locations can be given by separating them with a colon (`:`) or
+a semicolon (`;`) or by using this option multiple times. If the value
+contains both colons and semicolons, it is split from semicolons. Paths
+can also be `glob patterns`__ matching multiple paths, but they typically
+need to be escaped when used on the console.
 
 Examples::
 
    --pythonpath libs
    --pythonpath /opt/testlibs:mylibs.zip:yourlibs
-   --pythonpath mylib.jar --pythonpath lib/\*.jar    # '*' is escaped
+   --pythonpath /opt/testlibs --pythonpath mylibs.zip --pythonpath yourlibs
+   --pythonpath c:\temp;d:\resources
+   --pythonpath  lib/\*.zip    # '*' is escaped
+
+.. note:: Both colon and semicolon work regardless the operating system.
+          Using semicolon is new in Robot Framework 5.0.
+
+__ https://en.wikipedia.org/wiki/Glob_(programming)
 
 Configuring `sys.path` programmatically
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,27 +389,6 @@ are taken into account next time when something is imported.
 
 __ http://docs.python.org/library/sys.html#sys.path
 
-Java classpath
-~~~~~~~~~~~~~~
-
-When libraries implemented in Java are imported with Jython, they can be
-either in Jython's normal module search path or in `Java classpath`__. The most
-common way to alter classpath is setting the ``CLASSPATH`` environment variable
-similarly as ``PYTHONPATH``, ``JYTHONPATH`` or ``IRONPYTHONPATH``.
-Alternatively it is possible to use Java's :option:`-cp` command line option.
-This option is not exposed to the ``robot`` `runner script`_, but it is
-possible to use it with Jython by adding :option:`-J` prefix like
-`jython -J-cp example.jar -m robot.run tests.robot`.
-
-When using the standalone JAR distribution, the classpath has to be set a
-bit differently, due to the fact that `java -jar` command does support
-the ``CLASSPATH`` environment variable nor the :option:`-cp` option. There are
-two different ways to configure the classpath::
-
-  java -cp lib/testlibrary.jar:lib/app.jar:robotframework-3.1.jar org.robotframework.RobotFramework tests.robot
-  java -Xbootclasspath/a:lib/testlibrary.jar:lib/app.jar -jar robotframework-3.1.jar tests.robot
-
-__ https://docs.oracle.com/javase/8/docs/technotes/tools/findingclasses.html
 
 Setting variables
 -----------------
@@ -656,8 +655,7 @@ Console colors
 The :option:`--consolecolors (-C)` option is used to control whether
 colors should be used in the console output. Colors are implemented
 using `ANSI colors`__ except on Windows where, by default, Windows
-APIs are used instead. Accessing these APIs from Jython is not possible,
-and as a result colors do not work with Jython on Windows.
+APIs are used instead.
 
 This option supports the following case-insensitive values:
 

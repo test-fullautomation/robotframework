@@ -13,38 +13,38 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import glob
 import os
 import random
+import string
 import sys
 import time
+import warnings
+from pathlib import Path
 
 from robot.errors import DataError, FrameworkError
 from robot.output import LOGGER, loggerhelper
 from robot.result.keywordremover import KeywordRemover
 from robot.result.flattenkeywordmatcher import validate_flatten_keyword
-from robot.utils import (abspath, create_destination_directory, escape,
-                         format_time, get_link_path, html_escape, is_list_like,
-                         py3to2, split_args_from_name_or_path)
+from robot.utils import (abspath, create_destination_directory, escape, format_time,
+                         get_link_path, html_escape, is_list_like, plural_or_not as s,
+                         seq2str, split_args_from_name_or_path)
 
 from .gatherfailed import gather_failed_tests, gather_failed_suites
+from .languages import Languages
 
 
-@py3to2
-class _BaseSettings(object):
+class _BaseSettings:
     _cli_opts = {'RPA'              : ('rpa', None),
                  'Name'             : ('name', None),
                  'Doc'              : ('doc', None),
                  'Metadata'         : ('metadata', []),
                  'TestNames'        : ('test', []),
                  'TaskNames'        : ('task', []),
-                 'ReRunFailed'      : ('rerunfailed', 'NONE'),
-                 'ReRunFailedSuites': ('rerunfailedsuites', 'NONE'),
                  'SuiteNames'       : ('suite', []),
                  'SetTag'           : ('settag', []),
                  'Include'          : ('include', []),
                  'Exclude'          : ('exclude', []),
-                 'Critical'         : ('critical', []),
-                 'NonCritical'      : ('noncritical', []),
                  'OutputDir'        : ('outputdir', abspath('.')),
                  'Log'              : ('log', 'log.html'),
                  'Report'           : ('report', 'report.html'),
@@ -54,7 +54,7 @@ class _BaseSettings(object):
                  'LogTitle'         : ('logtitle', None),
                  'ReportTitle'      : ('reporttitle', None),
                  'ReportBackground' : ('reportbackground',
-                                       ('#9e9', '#f66', '#fed84f', '#66c7ff')), #nhtcuong
+                                       ('#9e9', '#f66', '#fed84f')),
                  'SuiteStatLevel'   : ('suitestatlevel', -1),
                  'TagStatInclude'   : ('tagstatinclude', []),
                  'TagStatExclude'   : ('tagstatexclude', []),
@@ -67,9 +67,9 @@ class _BaseSettings(object):
                  'PreRebotModifiers': ('prerebotmodifier', []),
                  'StatusRC'         : ('statusrc', True),
                  'ConsoleColors'    : ('consolecolors', 'AUTO'),
+                 'PythonPath'       : ('pythonpath', []),
                  'StdOut'           : ('stdout', None),
-                 'StdErr'           : ('stderr', None),
-                 'XUnitSkipNonCritical' : ('xunitskipnoncritical', False)}
+                 'StdErr'           : ('stderr', None)}
     _output_opts = ['Output', 'Log', 'Report', 'XUnit', 'DebugFile']
 
     def __init__(self, options=None, **extra_options):
@@ -81,24 +81,20 @@ class _BaseSettings(object):
 
     def _process_cli_opts(self, opts):
         for name, (cli_name, default) in self._cli_opts.items():
-            value = opts[cli_name] if cli_name in opts else default
+            value = opts.pop(cli_name) if cli_name in opts else default
             if isinstance(default, list):
                 # Copy mutable values and support list values as scalars.
                 value = list(value) if is_list_like(value) else [value]
             self[name] = self._process_value(name, value)
-        self['TestNames'] += self['ReRunFailed'] + self['TaskNames']
-        self['SuiteNames'] += self['ReRunFailedSuites']
+        if opts:
+            raise DataError(f'Invalid option{s(opts)} {seq2str(opts)}.')
 
     def __setitem__(self, name, value):
         if name not in self._cli_opts:
-            raise KeyError("Non-existing option '%s'." % name)
+            raise KeyError(f"Non-existing option '{name}'.")
         self._opts[name] = value
 
     def _process_value(self, name, value):
-        if name == 'ReRunFailed':
-            return gather_failed_tests(value)
-        if name == 'ReRunFailedSuites':
-            return gather_failed_suites(value)
         if name == 'LogLevel':
             return self._process_log_level(value)
         if value == self._get_default_value(name):
@@ -111,8 +107,10 @@ class _BaseSettings(object):
             return [self._process_tagdoc(v) for v in value]
         if name in ['Include', 'Exclude']:
             return [self._format_tag_patterns(v) for v in value]
-        if name in self._output_opts and (not value or value.upper() == 'NONE'):
-            return None
+        if name in self._output_opts or name in ['ReRunFailed', 'ReRunFailedSuites']:
+            if isinstance(value, Path):
+                return str(value)
+            return value if value and value.upper() != 'NONE' else None
         if name == 'OutputDir':
             return abspath(value)
         if name in ['SuiteStatLevel', 'ConsoleWidth']:
@@ -129,6 +127,10 @@ class _BaseSettings(object):
             return self._process_randomize_value(value)
         if name == 'MaxErrorLines':
             return self._process_max_error_lines(value)
+        if name == 'MaxAssignLength':
+            return self._process_max_assign_length(value)
+        if name == 'PythonPath':
+            return self._process_pythonpath(value)
         if name == 'RemoveKeywords':
             self._validate_remove_keywords(value)
         if name == 'FlattenKeywords':
@@ -140,13 +142,13 @@ class _BaseSettings(object):
         return value
 
     def _process_doc(self, value):
-        if os.path.exists(value) and value.strip() == value:
+        if isinstance(value, Path) or (os.path.isfile(value) and value.strip() == value):
             try:
                 with open(value) as f:
                     value = f.read()
             except (OSError, IOError) as err:
-                raise DataError('Reading documentation from an external file failed: %s'
-                                % err)
+                self._raise_invalid('Doc', f"Reading documentation from '{value}' "
+                                           f"failed: {err}")
         return self._escape_doc(value).strip()
 
     def _escape_doc(self, value):
@@ -159,53 +161,51 @@ class _BaseSettings(object):
 
     def _split_log_level(self, level):
         if ':' in level:
-            level, visible_level = level.split(':', 1)
+            log_level, visible_level = level.split(':', 1)
         else:
-            visible_level = level
-        self._validate_log_level_and_default(level, visible_level)
-        return level, visible_level
-
-    def _validate_log_level_and_default(self, log_level, default):
-        if log_level not in loggerhelper.LEVELS:
-            raise DataError("Invalid log level '%s'" % log_level)
-        if default not in loggerhelper.LEVELS:
-            raise DataError("Invalid log level '%s'" % default)
-        if not loggerhelper.IsLogged(log_level)(default):
-            raise DataError("Default visible log level '%s' is lower than "
-                            "log level '%s'" % (default, log_level))
+            log_level = visible_level = level
+        for level in log_level, visible_level:
+            if level not in loggerhelper.LEVELS:
+                self._raise_invalid('LogLevel', f"Invalid level '{level}'.")
+        if not loggerhelper.IsLogged(log_level)(visible_level):
+            self._raise_invalid('LogLevel', f"Level in log '{visible_level}' is lower "
+                                            f"than execution level '{log_level}'.")
+        return log_level, visible_level
 
     def _process_max_error_lines(self, value):
         if not value or value.upper() == 'NONE':
             return None
-        value = self._convert_to_integer('maxerrorlines', value)
+        value = self._convert_to_integer('MaxErrorLines', value)
         if value < 10:
-            raise DataError("Option '--maxerrorlines' expected an integer "
-                            "value greater that 10 but got '%s'." % value)
+            self._raise_invalid('MaxErrorLines',
+                                f"Expected integer greater than 10, got {value}.")
         return value
 
+    def _process_max_assign_length(self, value):
+        value = self._convert_to_integer('MaxAssignLength', value)
+        return max(value, 0)
+
     def _process_randomize_value(self, original):
-        value = original.lower()
+        value = original.upper()
         if ':' in value:
             value, seed = value.split(':', 1)
         else:
             seed = random.randint(0, sys.maxsize)
-        if value in ('test', 'suite'):
-            value += 's'
-        if value not in ('tests', 'suites', 'none', 'all'):
-            self._raise_invalid_option_value('--randomize', original)
+        if value in ('TEST', 'SUITE'):
+            value += 'S'
+        valid = ('TESTS', 'SUITES', 'ALL', 'NONE')
+        if value not in valid:
+            valid = seq2str(valid, lastsep=' or ')
+            self._raise_invalid('Randomize', f"Expected {valid}, got '{value}'.")
         try:
             seed = int(seed)
         except ValueError:
-            self._raise_invalid_option_value('--randomize', original)
+            self._raise_invalid('Randomize', f"Seed should be integer, got '{seed}'.")
         return value, seed
-
-    def _raise_invalid_option_value(self, option_name, given_value):
-        raise DataError("Option '%s' does not support value '%s'."
-                        % (option_name, given_value))
 
     def __getitem__(self, name):
         if name not in self._opts:
-            raise KeyError("Non-existing option '%s'." % name)
+            raise KeyError(f"Non-existing option '{name}'.")
         if name in self._output_opts:
             return self._get_output_file(name)
         return self._opts[name]
@@ -220,30 +220,30 @@ class _BaseSettings(object):
             return None
         if option == 'Log' and self._output_disabled():
             self['Log'] = None
-            LOGGER.error('Log file is not created if output.xml is disabled.')
+            LOGGER.error('Log file cannot be created if output.xml is disabled.')
             return None
         name = self._process_output_name(option, name)
         path = abspath(os.path.join(self['OutputDir'], name))
-        create_destination_directory(path, '%s file' % option.lower())
+        create_destination_directory(path, f'{option.lower()} file')
         return path
 
     def _process_output_name(self, option, name):
         base, ext = os.path.splitext(name)
         if self['TimestampOutputs']:
-            base = '%s-%s' % (base, self.start_timestamp)
+            base = f'{base}-{self.start_timestamp}'
         ext = self._get_output_extension(ext, option)
         return base + ext
 
-    def _get_output_extension(self, ext, type_):
-        if ext != '':
-            return ext
-        if type_ in ['Output', 'XUnit']:
+    def _get_output_extension(self, extension, file_type):
+        if extension:
+            return extension
+        if file_type in ['Output', 'XUnit']:
             return '.xml'
-        if type_ in ['Log', 'Report']:
+        if file_type in ['Log', 'Report']:
             return '.html'
-        if type_ == 'DebugFile':
+        if file_type == 'DebugFile':
             return '.txt'
-        raise FrameworkError("Invalid output file type: %s" % type_)
+        raise FrameworkError(f"Invalid output file type '{file_type}'.")
 
     def _process_metadata(self, value):
         name, value = self._split_from_colon(value)
@@ -259,7 +259,8 @@ class _BaseSettings(object):
 
     def _process_report_background(self, colors):
         if colors.count(':') not in [1, 2]:
-            raise DataError("Invalid report background colors '%s'." % colors)
+            self._raise_invalid('ReportBackground', f"Expected format 'pass:fail:skip' "
+                                                    f"or 'pass:fail', got '{colors}'.")
         colors = colors.split(':')
         if len(colors) == 2:
             return colors[0], colors[1], '#fed84f'
@@ -287,8 +288,8 @@ class _BaseSettings(object):
         tokens = value.split(':')
         if len(tokens) >= 3:
             return tokens[0], ':'.join(tokens[1:-1]), tokens[-1]
-        raise DataError("Invalid format for option '--tagstatlink'. "
-                        "Expected 'tag:link:title' but got '%s'." % value)
+        self._raise_invalid('TagStatLink',
+                            f"Expected format 'tag:link:title', got '{value}'.")
 
     def _convert_to_positive_integer_or_default(self, name, value):
         value = self._convert_to_integer(name, value)
@@ -298,38 +299,67 @@ class _BaseSettings(object):
         try:
             return int(value)
         except ValueError:
-            raise DataError("Option '--%s' expected integer value but got '%s'."
-                            % (name.lower(), value))
+            self._raise_invalid(name, f"Expected integer, got '{value}'.")
 
     def _get_default_value(self, name):
         return self._cli_opts[name][1]
+
+    def _process_pythonpath(self, paths):
+        return [os.path.abspath(globbed)
+                for path in paths
+                for split in self._split_pythonpath(path)
+                for globbed in glob.glob(split) or [split]]
+
+    def _split_pythonpath(self, path):
+        path = path.replace('/', os.sep)
+        if ';' in path:
+            yield from path.split(';')
+        elif os.sep == '/':
+            yield from path.split(':')
+        else:
+            drive = ''
+            for item in path.split(':'):
+                if drive:
+                    if item.startswith('\\'):
+                        yield f'{drive}:{item}'
+                        drive = ''
+                        continue
+                    yield drive
+                    drive = ''
+                if len(item) == 1 and item in string.ascii_letters:
+                    drive = item
+                else:
+                    yield item
+            if drive:
+                yield drive
 
     def _validate_remove_keywords(self, values):
         for value in values:
             try:
                 KeywordRemover(value)
             except DataError as err:
-                raise DataError("Invalid value for option '--removekeywords'. %s" % err)
+                self._raise_invalid('RemoveKeywords', err)
 
     def _validate_flatten_keywords(self, values):
         try:
             validate_flatten_keyword(values)
         except DataError as err:
-            raise DataError("Invalid value for option '--flattenkeywords'. %s" % err)
+            self._raise_invalid('FlattenKeywords', err)
 
     def _validate_expandkeywords(self, values):
         for opt in values:
             if not opt.lower().startswith(('name:', 'tag:')):
-                raise DataError("Invalid value for option '--expandkeywords'. "
-                                "Expected 'TAG:<pattern>', or "
-                                "'NAME:<pattern>' but got '%s'." % opt)
+                self._raise_invalid('ExpandKeywords', f"Expected 'TAG:<pattern>' or "
+                                                      f"'NAME:<pattern>', got '{opt}'.")
+
+    def _raise_invalid(self, option, error):
+        raise DataError(f"Invalid value for option '--{option.lower()}': {error}")
 
     def __contains__(self, setting):
-        return setting in self._cli_opts
+        return setting in self._opts
 
     def __str__(self):
-        return '\n'.join('%s: %s' % (name, self._opts[name])
-                         for name in sorted(self._opts))
+        return '\n'.join(f'{name}: {self._opts[name]}' for name in sorted(self._opts))
 
     @property
     def output_directory(self):
@@ -360,6 +390,29 @@ class _BaseSettings(object):
         return self['SplitLog']
 
     @property
+    def suite_names(self):
+        return self._filter_empty(self['SuiteNames'])
+
+    def _filter_empty(self, items):
+        return [i for i in items if i] or None
+
+    @property
+    def test_names(self):
+        return self._filter_empty(self['TestNames'] + self['TaskNames'])
+
+    @property
+    def include(self):
+        return self._filter_empty(self['Include'])
+
+    @property
+    def exclude(self):
+        return self._filter_empty(self['Exclude'])
+
+    @property
+    def pythonpath(self):
+        return self['PythonPath']
+
+    @property
     def status_rc(self):
         return self['StatusRC']
 
@@ -373,10 +426,6 @@ class _BaseSettings(object):
             'tag_stat_link': self['TagStatLink'],
             'tag_doc': self['TagDoc'],
         }
-
-    @property
-    def critical_tags(self):
-        return self['Critical']
 
     @property
     def remove_keywords(self):
@@ -408,12 +457,15 @@ class RobotSettings(_BaseSettings):
                        'Output'             : ('output', 'output.xml'),
                        'LogLevel'           : ('loglevel', 'INFO'),
                        'MaxErrorLines'      : ('maxerrorlines', 40),
+                       'MaxAssignLength'    : ('maxassignlength', 200),
                        'DryRun'             : ('dryrun', False),
                        'ExitOnFailure'      : ('exitonfailure', False),
                        'ExitOnError'        : ('exitonerror', False),
                        'Skip'               : ('skip', []),
                        'SkipOnFailure'      : ('skiponfailure', []),
                        'SkipTeardownOnExit' : ('skipteardownonexit', False),
+                       'ReRunFailed'        : ('rerunfailed', None),
+                       'ReRunFailedSuites'  : ('rerunfailedsuites', None),
                        'Randomize'          : ('randomize', 'NONE'),
                        'RunEmptySuite'      : ('runemptysuite', False),
                        'Variables'          : ('variable', []),
@@ -425,22 +477,19 @@ class RobotSettings(_BaseSettings):
                        'ConsoleTypeQuiet'   : ('quiet', False),
                        'ConsoleWidth'       : ('consolewidth', 78),
                        'ConsoleMarkers'     : ('consolemarkers', 'AUTO'),
-                       'DebugFile'          : ('debugfile', None)}
+                       'DebugFile'          : ('debugfile', None),
+                       'Language'           : ('language', [])}
+    _languages = None
 
     def get_rebot_settings(self):
         settings = RebotSettings()
         settings.start_timestamp = self.start_timestamp
-        settings._opts.update(self._opts)
-        for name in ['Variables', 'VariableFiles', 'Listeners']:
-            del(settings._opts[name])
-        for name in ['Include', 'Exclude', 'TestNames', 'SuiteNames', 'Metadata']:
-            settings._opts[name] = []
-        for name in ['Name', 'Doc']:
-            settings._opts[name] = None
-        settings._opts['Output'] = None
-        settings._opts['LogLevel'] = 'TRACE'
+        not_copied = {'Include', 'Exclude', 'TestNames', 'SuiteNames', 'Name', 'Doc',
+                      'Metadata', 'SetTag', 'Output', 'LogLevel', 'TimestampOutputs'}
+        for opt in settings._opts:
+            if opt in self and opt not in not_copied:
+                settings._opts[opt] = self[opt]
         settings._opts['ProcessEmptySuite'] = self['RunEmptySuite']
-        settings._opts['ExpandKeywords'] = self['ExpandKeywords']
         return settings
 
     def _output_disabled(self):
@@ -458,16 +507,25 @@ class RobotSettings(_BaseSettings):
         return self['DebugFile']
 
     @property
+    def languages(self):
+        if self._languages is None:
+            try:
+                self._languages = Languages(self['Language'])
+            except DataError as err:
+                self._raise_invalid('Language', err)
+        return self._languages
+
+    @property
     def suite_config(self):
         return {
             'name': self['Name'],
             'doc': self['Doc'],
             'metadata': dict(self['Metadata']),
             'set_tags': self['SetTag'],
-            'include_tags': self['Include'],
-            'exclude_tags': self['Exclude'],
-            'include_suites': self['SuiteNames'],
-            'include_tests': self['TestNames'],
+            'include_tags': self.include,
+            'exclude_tags': self.exclude,
+            'include_suites': self.suite_names,
+            'include_tests': self.test_names,
             'empty_suite_ok': self.run_empty_suite,
             'randomize_suites': self.randomize_suites,
             'randomize_tests': self.randomize_tests,
@@ -475,16 +533,37 @@ class RobotSettings(_BaseSettings):
         }
 
     @property
+    def suite_names(self):
+        return self._names_and_rerun()
+
+    @property
+    def test_names(self):
+        return self._names_and_rerun(for_test=True)
+
+    def _names_and_rerun(self, for_test=False):
+        if for_test:
+            names = self['TestNames'] + self['TaskNames']
+            rerun = gather_failed_tests(self['ReRunFailed'], self['RunEmptySuite'])
+        else:
+            names = self['SuiteNames']
+            rerun = gather_failed_suites(self['ReRunFailedSuites'], self['RunEmptySuite'])
+        # `rerun` is None if `--rerunfailed(suites)` wasn't used and a list otherwise.
+        # The list is empty all tests passed and running empty suite is allowed.
+        if rerun:
+            return names + rerun
+        return names or rerun
+
+    @property
     def randomize_seed(self):
         return self['Randomize'][1]
 
     @property
     def randomize_suites(self):
-        return self['Randomize'][0] in ('suites', 'all')
+        return self['Randomize'][0] in ('SUITES', 'ALL')
 
     @property
     def randomize_tests(self):
-        return self['Randomize'][0] in ('tests', 'all')
+        return self['Randomize'][0] in ('TESTS', 'ALL')
 
     @property
     def dry_run(self):
@@ -499,12 +578,17 @@ class RobotSettings(_BaseSettings):
         return self['ExitOnError']
 
     @property
-    def skipped_tags(self):
+    def skip(self):
         return self['Skip']
 
     @property
+    def skipped_tags(self):
+        warnings.warn("'RobotSettings.skipped_tags' is deprecated. Use 'skip' instead.")
+        return self.skip
+
+    @property
     def skip_on_failure(self):
-        return (self['SkipOnFailure'] or []) + (self['NonCritical'] or [])
+        return self['SkipOnFailure']
 
     @property
     def skip_teardown_on_exit(self):
@@ -540,6 +624,10 @@ class RobotSettings(_BaseSettings):
     @property
     def max_error_lines(self):
         return self['MaxErrorLines']
+
+    @property
+    def max_assign_length(self):
+        return self['MaxAssignLength']
 
     @property
     def pre_run_modifiers(self):
@@ -580,10 +668,10 @@ class RebotSettings(_BaseSettings):
             'doc': self['Doc'],
             'metadata': dict(self['Metadata']),
             'set_tags': self['SetTag'],
-            'include_tags': self['Include'],
-            'exclude_tags': self['Exclude'],
-            'include_suites': self['SuiteNames'],
-            'include_tests': self['TestNames'],
+            'include_tags': self.include,
+            'exclude_tags': self.exclude,
+            'include_suites': self.suite_names,
+            'include_tests': self.test_names,
             'empty_suite_ok': self.process_empty_suite,
             'remove_keywords': self.remove_keywords,
             'log_level': self['LogLevel'],
@@ -621,7 +709,7 @@ class RebotSettings(_BaseSettings):
 
     def _resolve_background_colors(self):
         colors = self['ReportBackground']
-        return {'pass': colors[0], 'fail': colors[1], 'skip': colors[2], 'unknown': colors[3]} #nhtcuong
+        return {'pass': colors[0], 'fail': colors[1], 'skip': colors[2]}
 
     @property
     def merge(self):

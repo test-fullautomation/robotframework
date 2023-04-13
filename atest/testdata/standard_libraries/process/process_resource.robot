@@ -2,7 +2,6 @@
 Library           Process
 Library           Collections
 Library           OperatingSystem
-Library           PlatformLib.py
 
 *** Variables ***
 ${SCRIPT}         ${CURDIR}${/}files${/}script.py
@@ -12,6 +11,7 @@ ${TEMPFILE}       %{TEMPDIR}${/}terminate-process-temp.txt
 ${STARTED}        %{TEMPDIR}${/}some-process-started.txt
 ${STDOUT}         %{TEMPDIR}/process-stdout-file.txt
 ${STDERR}         %{TEMPDIR}/process-stderr-file.txt
+${STDIN}          %{TEMPDIR}/process-stdin-file.txt
 ${CWD}            %{TEMPDIR}/process-cwd
 
 *** Keywords ***
@@ -78,7 +78,6 @@ Run Python Process
 
 Safe Remove File
     [Documentation]    Ignore errors caused by process being locked.
-    ...                That happens at least with IronPython.
     [Arguments]    @{paths}
     Run Keyword And Ignore Error    Remove Files    @{paths}
 
@@ -88,14 +87,7 @@ Safe Remove Directory
 
 Check Precondition
     [Arguments]    ${precondition}
-    ${ok} =    Evaluate    ${precondition}    modules=sys,os,signal
-    Run Keyword If    not ${ok}
-    ...    Fail    Precondition '${precondition}' was not true.    precondition-fail
-
-Precondition not OSX
-    ${platform} =     Get os platform
-    Run Keyword If    $platform in ('darwin', 'mac os x')
-    ...    Fail    Platform is OSX, where this test wont work.    precondition-fail
+    Should Be True    ${precondition}    Precondition '${precondition}' was not true.
 
 Wait until countdown started
     Wait Until Created    ${TEMPFILE}

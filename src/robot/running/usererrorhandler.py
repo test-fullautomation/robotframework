@@ -15,30 +15,34 @@
 
 from robot.model import Tags
 from robot.result import Keyword as KeywordResult
+from robot.variables import VariableAssignment
 
 from .arguments import ArgumentSpec
 from .statusreporter import StatusReporter
 
 
-class UserErrorHandler(object):
+class UserErrorHandler:
     """Created if creating handlers fail -- running raises DataError.
 
     The idea is not to raise DataError at processing time and prevent all
     tests in affected test case file from executing. Instead UserErrorHandler
     is created and if it is ever run DataError is raised then.
     """
+    supports_embedded_arguments = False
 
-    def __init__(self, error, name, libname=None):
+    def __init__(self, error, name, libname=None, source=None, lineno=None):
         """
         :param robot.errors.DataError error: Occurred error.
         :param str name: Name of the affected keyword.
         :param str libname: Name of the affected library or resource.
+        :param str source: Path to the source file.
+        :param int lineno: Line number of the failing keyword.
         """
+        self.error = error
         self.name = name
         self.libname = libname
-        self.error = error
-        self.source = None
-        self.lineno = -1
+        self.source = source
+        self.lineno = lineno
         self.arguments = ArgumentSpec()
         self.timeout = None
         self.tags = Tags()
@@ -55,14 +59,14 @@ class UserErrorHandler(object):
     def shortdoc(self):
         return self.doc.splitlines()[0]
 
-    def create_runner(self, name):
+    def create_runner(self, name, languages=None):
         return self
 
     def run(self, kw, context, run=True):
         result = KeywordResult(kwname=self.name,
                                libname=self.libname,
                                args=kw.args,
-                               assign=kw.assign,
+                               assign=tuple(VariableAssignment(kw.assign)),
                                type=kw.type)
         with StatusReporter(kw, result, context, run):
             if run:

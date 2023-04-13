@@ -13,35 +13,31 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from tokenize import generate_tokens, untokenize
+import builtins
 import token
+from collections.abc import MutableMapping
+from io import StringIO
+from tokenize import generate_tokens, untokenize
 
 from robot.errors import DataError
-from robot.utils import (get_error_message, is_string, MutableMapping, PY2,
-                         StringIO, type_name)
+from robot.utils import get_error_message, type_name
 
 from .notfound import variable_not_found
 
 
-if PY2:
-    import __builtin__ as builtins
-else:
-    import builtins
 PYTHON_BUILTINS = set(builtins.__dict__)
 
 
-def evaluate_expression(expression, variable_store, modules=None,
-                        namespace=None):
+def evaluate_expression(expression, variable_store, modules=None, namespace=None):
     try:
-        if not is_string(expression):
-            raise TypeError("Expression must be string, got %s."
-                            % type_name(expression))
+        if not isinstance(expression, str):
+            raise TypeError(f'Expression must be string, got {type_name(expression)}.')
         if not expression:
-            raise ValueError("Expression cannot be empty.")
+            raise ValueError('Expression cannot be empty.')
         return _evaluate(expression, variable_store, modules, namespace)
-    except:
-        raise DataError("Evaluating expression '%s' failed: %s"
-                        % (expression, get_error_message()))
+    except Exception:
+        raise DataError(f"Evaluating expression '{expression}' failed: "
+                        f"{get_error_message()}")
 
 
 def _evaluate(expression, variable_store, modules=None, namespace=None):
@@ -95,9 +91,6 @@ def _import_modules(module_names):
     return modules
 
 
-# TODO: In Python 3 this could probably be just Mapping, not MutableMapping.
-# With Python 2 at least list comprehensions need to mutate the evaluation
-# namespace. Using just Mapping would allow removing __set/delitem__.
 class EvaluationNamespace(MutableMapping):
 
     def __init__(self, variable_store, namespace):
@@ -111,32 +104,23 @@ class EvaluationNamespace(MutableMapping):
             return self.namespace[key]
         return self._import_module(key)
 
+    def __setitem__(self, key, value):
+        self.namespace[key] = value
+
+    def __delitem__(self, key):
+        self.namespace.pop(key)
+
     def _import_module(self, name):
         if name in PYTHON_BUILTINS:
             raise KeyError
         try:
             return __import__(name)
         except ImportError:
-            raise NameError("name '%s' is not defined nor importable as module"
-                            % name)
-
-    def __setitem__(self, key, value):
-        if key.startswith('RF_VAR_'):
-            self.variables[key[7:]] = value
-        else:
-            self.namespace[key] = value
-
-    def __delitem__(self, key):
-        if key.startswith('RF_VAR_'):
-            del self.variables[key[7:]]
-        else:
-            del self.namespace[key]
+            raise NameError(f"name '{name}' is not defined nor importable as module")
 
     def __iter__(self):
-        for key in self.variables:
-            yield key
-        for key in self.namespace:
-            yield key
+        yield from self.variables
+        yield from self.namespace
 
     def __len__(self):
         return len(self.variables) + len(self.namespace)

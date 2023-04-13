@@ -36,7 +36,7 @@ Embedded Arguments with BDD Prefixes
 
 Argument Namespaces with Embedded Arguments
     Check Test Case    ${TEST NAME}
-    File Should Contain    ${OUTFILE}    name="My embedded warrior" 
+    File Should Contain    ${OUTFILE}    name="My embedded warrior"
     File Should Contain    ${OUTFILE}    sourcename="My embedded \${var}"
     File Should Not Contain    ${OUTFILE}    sourcename="Log"
 
@@ -54,9 +54,19 @@ Embedded Arguments as Variables
     ...    sourcename="User \${user} Selects \${item} From Webshop"
     File Should Not Contain    ${OUTFILE}    sourcename="Log">
 
+Embedded Arguments as List And Dict Variables
+    ${tc} =    Check Test Case    ${TEST NAME}
+    Check Keyword Data    ${tc.kws[1]}    User \@{i1} Selects \&{i2} From Webshop    \${o1}, \${o2}
+
 Non-Existing Variable in Embedded Arguments
     ${tc} =    Check Test Case    ${TEST NAME}
     Check Keyword Data    ${tc.kws[0]}    User \${non existing} Selects \${variables} From Webshop    status=FAIL
+
+Invalid List Variable as Embedded Argument
+    Check Test Case    ${TEST NAME}
+
+Invalid Dict Variable as Embedded Argument
+    Check Test Case    ${TEST NAME}
 
 Non-Existing Variable in Embedded Arguments and Positional Arguments
     Check Test Case    ${TEST NAME}
@@ -79,21 +89,26 @@ Grouping Custom Regexp
 Custom Regexp Matching Variables
     Check Test Case    ${TEST NAME}
 
-Custom Regexp Matching Variables When Regexp Does No Match Them
+Non Matching Variable Is Accepted With Custom Regexp (But Not For Long)
+    Check Test Case    ${TEST NAME}
+
+Partially Matching Variable Is Accepted With Custom Regexp (But Not For Long)
+    Check Test Case    ${TEST NAME}
+
+Non String Variable Is Accepted With Custom Regexp
     Check Test Case    ${TEST NAME}
 
 Regexp Extensions Are Not Supported
     Check Test Case    ${TEST NAME}
-    Creating Keyword Failed    1
+    Creating Keyword Failed    1    291
     ...    Regexp extensions like \${x:(?x)re} are not supported
     ...    Regexp extensions are not allowed in embedded arguments.
 
 Invalid Custom Regexp
     Check Test Case    ${TEST NAME}
-    Creating Keyword Failed    2
+    Creating Keyword Failed    2    294
     ...    Invalid \${x:(} Regexp
     ...    Compiling embedded arguments regexp failed: *
-    ...    pattern=yes
 
 Escaping Values Given As Embedded Arguments
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -128,7 +143,7 @@ Keyword with embedded args cannot be used as "normal" keyword
     Check Test Case    ${TEST NAME}
 
 Creating keyword with both normal and embedded arguments fails
-    Creating Keyword Failed    0
+    Creating Keyword Failed    0    238
     ...    Keyword with \${embedded} and normal args is invalid
     ...    Keyword cannot have both normal and embedded arguments.
     Check Test Case    ${TEST NAME}
@@ -169,9 +184,6 @@ Match all allowed
 
 *** Keywords ***
 Creating Keyword Failed
-    [Arguments]    ${index}    ${name}    ${error}    ${pattern}=
-    ${source} =    Normalize Path    ${DATADIR}/keywords/embedded_arguments.robot
-    ${message} =    Catenate
-    ...    Error in test case file '${source}':
+    [Arguments]    ${index}    ${lineno}    ${name}    ${error}
+    Error In File    ${index}    keywords/embedded_arguments.robot    ${lineno}
     ...    Creating keyword '${name}' failed: ${error}
-    Check Log Message    ${ERRORS[${index}]}    ${message}    ERROR    pattern=${pattern}

@@ -16,7 +16,7 @@
 from robot.errors import DataError
 
 
-class XmlElementHandler(object):
+class XmlElementHandler:
 
     def __init__(self, execution_result, root_handler=None):
         self._stack = [(root_handler or RootHandler(), execution_result)]
@@ -24,15 +24,18 @@ class XmlElementHandler(object):
     def start(self, elem):
         handler, result = self._stack[-1]
         handler = handler.get_child_handler(elem.tag)
-        result = handler.start(elem, result)
+        # Previous `result` being `None` means child elements should be ignored.
+        if result is not None:
+            result = handler.start(elem, result)
         self._stack.append((handler, result))
 
     def end(self, elem):
         handler, result = self._stack.pop()
-        handler.end(elem, result)
+        if result is not None:
+            handler.end(elem, result)
 
 
-class ElementHandler(object):
+class ElementHandler:
     element_handlers = {}
     tag = None
     children = frozenset()
@@ -104,10 +107,13 @@ class TestHandler(ElementHandler):
     tag = 'test'
     # 'tags' is for RF < 4 compatibility.
     children = frozenset(('doc', 'tags', 'tag', 'timeout', 'status', 'kw', 'if', 'for',
-                          'msg', 'thread'))  # cuongnht add thread
+                          'try', 'while', 'return', 'break', 'continue', 'msg'))
 
     def start(self, elem, result):
-        return result.tests.create(name=elem.get('name', ''))
+        lineno = elem.get('line')
+        if lineno:
+            lineno = int(lineno)
+        return result.tests.create(name=elem.get('name', ''), lineno=lineno)
 
 
 @ElementHandler.register
@@ -115,7 +121,8 @@ class KeywordHandler(ElementHandler):
     tag = 'kw'
     # 'arguments', 'assign' and 'tags' are for RF < 4 compatibility.
     children = frozenset(('doc', 'arguments', 'arg', 'assign', 'var', 'tags', 'tag',
-                          'timeout', 'status', 'msg', 'kw', 'if', 'for', 'thread'))  # cuongnht add thread
+                          'timeout', 'status', 'msg', 'kw', 'if', 'for', 'try',
+                          'while', 'return', 'break', 'continue'))
 
     def start(self, elem, result):
         elem_type = elem.get('type')
@@ -160,33 +167,37 @@ class KeywordHandler(ElementHandler):
         return result.body.create_keyword(kwname=elem.get('name'), type='FOR')
 
     def _create_foritem(self, elem, result):
-        return result.body.create_keyword(kwname=elem.get('name'), type='FOR ITERATION')
+        return result.body.create_keyword(kwname=elem.get('name'), type='ITERATION')
 
-    _create_for_iteration = _create_foritem
-
-
-@ElementHandler.register
-class ThreadHandler(ElementHandler):
-    tag = 'thread'
-    children = frozenset(('var', 'value', 'doc', 'status', 'msg', 'kw'))
-
-    def start(self, elem, result):
-        return result.body.create_thread(elem.get('name'), elem.get('daemon'))
+    _create_iteration = _create_foritem
 
 
 @ElementHandler.register
 class ForHandler(ElementHandler):
     tag = 'for'
-    children = frozenset(('var', 'value', 'doc', 'status', 'iter', 'msg', 'kw'))
+    children = frozenset(('var', 'value', 'iter', 'status', 'doc', 'msg', 'kw'))
 
     def start(self, elem, result):
         return result.body.create_for(flavor=elem.get('flavor'))
 
 
 @ElementHandler.register
-class ForIterationHandler(ElementHandler):
+class WhileHandler(ElementHandler):
+    tag = 'while'
+    children = frozenset(('iter', 'status', 'doc', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_while(
+            condition=elem.get('condition'),
+            limit=elem.get('limit')
+        )
+
+
+@ElementHandler.register
+class IterationHandler(ElementHandler):
     tag = 'iter'
-    children = frozenset(('var', 'doc', 'status', 'kw', 'if', 'for', 'msg'))
+    children = frozenset(('var', 'doc', 'status', 'kw', 'if', 'for', 'msg', 'try',
+                          'while', 'return', 'break', 'continue'))
 
     def start(self, elem, result):
         return result.body.create_iteration()
@@ -195,19 +206,65 @@ class ForIterationHandler(ElementHandler):
 @ElementHandler.register
 class IfHandler(ElementHandler):
     tag = 'if'
-    children = frozenset(('status', 'branch', 'msg', 'doc'))
+    children = frozenset(('branch', 'status', 'doc', 'msg', 'kw'))
 
     def start(self, elem, result):
         return result.body.create_if()
 
 
 @ElementHandler.register
-class IfBranchHandler(ElementHandler):
+class BranchHandler(ElementHandler):
     tag = 'branch'
-    children = frozenset(('status', 'kw', 'if', 'for', 'msg', 'doc'))
+    children = frozenset(('status', 'kw', 'if', 'for', 'try', 'while', 'msg', 'doc',
+                          'return', 'pattern', 'break', 'continue'))
 
     def start(self, elem, result):
-        return result.body.create_branch(elem.get('type'), elem.get('condition'))
+        return result.body.create_branch(**elem.attrib)
+
+
+@ElementHandler.register
+class TryHandler(ElementHandler):
+    tag = 'try'
+    children = frozenset(('branch', 'status', 'doc', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_try()
+
+
+@ElementHandler.register
+class PatternHandler(ElementHandler):
+    tag = 'pattern'
+    children = frozenset()
+
+    def end(self, elem, result):
+        result.patterns += (elem.text or '',)
+
+
+@ElementHandler.register
+class ReturnHandler(ElementHandler):
+    tag = 'return'
+    children = frozenset(('status', 'value', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_return()
+
+
+@ElementHandler.register
+class ContinueHandler(ElementHandler):
+    tag = 'continue'
+    children = frozenset(('status', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_continue()
+
+
+@ElementHandler.register
+class BreakHandler(ElementHandler):
+    tag = 'break'
+    children = frozenset(('status', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_break()
 
 
 @ElementHandler.register
@@ -306,7 +363,7 @@ class VarHandler(ElementHandler):
             result.assign += (value,)
         elif result.type == result.FOR:
             result.variables += (value,)
-        elif result.type == result.FOR_ITERATION:
+        elif result.type == result.ITERATION:
             result.variables[elem.get('name')] = value
         else:
             raise DataError("Invalid element '%s' for result '%r'." % (elem, result))

@@ -13,22 +13,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from robot.model import BodyItem
 from robot.output import LEVELS
 
 from .jsbuildingcontext import JsBuildingContext
 from .jsexecutionresult import JsExecutionResult
 
 
-IF_ELSE_ROOT = BodyItem.IF_ELSE_ROOT
-STATUSES = {'FAIL': 0, 'PASS': 1, 'SKIP': 2, 'NOT RUN': 3, 'UNKNOWN': 4} #nhtcuong
+STATUSES = {'FAIL': 0, 'PASS': 1, 'SKIP': 2, 'NOT RUN': 3}
 KEYWORD_TYPES = {'KEYWORD': 0, 'SETUP': 1, 'TEARDOWN': 2,
-                 'FOR': 3, 'FOR ITERATION': 4,
-                 'IF': 5, 'ELSE IF': 6, 'ELSE': 7, 'THREAD': 8}  # cuongnht add thread
-MESSAGE_TYPE = 9
+                 'FOR': 3, 'ITERATION': 4,
+                 'IF': 5, 'ELSE IF': 6, 'ELSE': 7,
+                 'RETURN': 8, 'TRY': 9, 'EXCEPT': 10,
+                 'FINALLY': 11, 'WHILE': 12, 'CONTINUE': 13, 'BREAK': 14}
 
 
-class JsModelBuilder(object):
+class JsModelBuilder:
 
     def __init__(self, log_path=None, split_log=False, expand_keywords=None,
                  prune_input_to_save_memory=False):
@@ -49,7 +48,7 @@ class JsModelBuilder(object):
         )
 
 
-class _Builder(object):
+class _Builder:
 
     def __init__(self, context):
         self._context = context
@@ -73,20 +72,11 @@ class _Builder(object):
     def _build_keywords(self, steps, split=False):
         splitting = self._context.start_splitting_if_needed(split)
         # tuple([<listcomp>>]) is faster than tuple(<genex>) with short lists.
-        model = tuple([self._build_keyword(step) for step in self._flatten_ifs(steps)])
+        model = tuple([self._build_keyword(step) for step in steps])
         return model if not splitting else self._context.end_splitting(model)
 
     def _build_keyword(self, step):
         raise NotImplementedError
-
-    def _flatten_ifs(self, steps):
-        result = []
-        for step in steps:
-            if step.type != IF_ELSE_ROOT:
-                result.append(step)
-            else:
-                result.extend(step.body)
-        return result
 
 
 class SuiteBuilder(_Builder):
@@ -119,7 +109,7 @@ class SuiteBuilder(_Builder):
 
     def _get_statistics(self, suite):
         stats = suite.statistics  # Access property only once
-        return (stats.total, stats.passed, stats.failed, stats.skipped, stats.unknown) #nhtcuong
+        return (stats.total, stats.passed, stats.failed, stats.skipped)
 
 
 class TestBuilder(_Builder):
@@ -142,7 +132,7 @@ class TestBuilder(_Builder):
         kws = []
         if test.setup:
             kws.append(test.setup)
-        kws.extend(test.body)
+        kws.extend(test.body.flatten())
         if test.teardown:
             kws.append(test.teardown)
         return kws
@@ -162,9 +152,9 @@ class KeywordBuilder(_Builder):
 
     def build_keyword(self, kw, split=False):
         self._context.check_expansion(kw)
-        kws = list(kw.body)
-        if getattr(kw, 'has_teardown', False):
-            kws.append(kw.teardown)
+        items = kw.body.flatten()
+        if kw.has_teardown:
+            items.append(kw.teardown)
         with self._context.prune_input(kw.body):
             return (KEYWORD_TYPES[kw.type],
                     self._string(kw.kwname, attr=True),
@@ -175,7 +165,7 @@ class KeywordBuilder(_Builder):
                     self._string(', '.join(kw.assign)),
                     self._string(', '.join(kw.tags)),
                     self._get_status(kw),
-                    self._build_keywords(kws, split))
+                    self._build_keywords(items, split))
 
 
 class MessageBuilder(_Builder):
@@ -187,13 +177,12 @@ class MessageBuilder(_Builder):
         return self._build(msg)
 
     def _build(self, msg):
-        return (MESSAGE_TYPE,
-                self._timestamp(msg.timestamp),
+        return (self._timestamp(msg.timestamp),
                 LEVELS[msg.level],
                 self._string(msg.html_message, escape=False))
 
 
-class StatisticsBuilder(object):
+class StatisticsBuilder:
 
     def build(self, statistics):
         return (self._build_stats(statistics.total),

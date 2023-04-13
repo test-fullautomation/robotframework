@@ -20,13 +20,12 @@ import re
 
 from .charwidth import get_char_width
 from .misc import seq2str2
-from .platform import JYTHON, PY_VERSION
-from .robottypes import is_string, is_unicode
-from .unic import unic
+from .robottypes import is_string
+from .unic import safe_str
 
 
 MAX_ERROR_LINES = 40
-_MAX_ASSIGN_LENGTH = 200
+MAX_ASSIGN_LENGTH = 200
 _MAX_ERROR_LINE_LENGTH = 78
 _ERROR_CUT_EXPLN = '    [ Message content over the limit has been removed. ]'
 _TAGS_RE = re.compile(r'\s*tags:(.*)', re.IGNORECASE)
@@ -81,7 +80,7 @@ def _count_virtual_line_length(line):
 
 
 def format_assign_message(variable, value, cut_long=True):
-    formatter = {'$': unic, '@': seq2str2, '&': _dict_to_str}[variable[0]]
+    formatter = {'$': safe_str, '@': seq2str2, '&': _dict_to_str}[variable[0]]
     value = formatter(value)
     if cut_long:
         value = cut_assign_value(value)
@@ -90,15 +89,14 @@ def format_assign_message(variable, value, cut_long=True):
 def _dict_to_str(d):
     if not d:
         return '{ }'
-    return '{ %s }' % ' | '.join('%s=%s' % (unic(k), unic(v))
-                                 for k, v in d.items())
+    return '{ %s }' % ' | '.join('%s=%s' % (safe_str(k), safe_str(d[k])) for k in d)
 
 
 def cut_assign_value(value):
-    if not is_unicode(value):
-        value = unic(value)
-    if len(value) > _MAX_ASSIGN_LENGTH:
-        value = value[:_MAX_ASSIGN_LENGTH] + '...'
+    if not is_string(value):
+        value = safe_str(value)
+    if len(value) > MAX_ASSIGN_LENGTH:
+        value = value[:MAX_ASSIGN_LENGTH] + '...'
     return value
 
 
@@ -171,31 +169,12 @@ def split_tags_from_doc(doc):
 
 
 def getdoc(item):
-    doc = inspect.getdoc(item) or u''
-    if is_unicode(doc):
-        return doc
-    try:
-        return doc.decode('UTF-8')
-    except UnicodeDecodeError:
-        return unic(doc)
+    return inspect.getdoc(item) or ''
 
 
 def getshortdoc(doc_or_item, linesep='\n'):
     if not doc_or_item:
-        return u''
+        return ''
     doc = doc_or_item if is_string(doc_or_item) else getdoc(doc_or_item)
     lines = takewhile(lambda line: line.strip(), doc.splitlines())
     return linesep.join(lines)
-
-
-# https://bugs.jython.org/issue2772
-if JYTHON and PY_VERSION < (2, 7, 2):
-    trailing_spaces = re.compile(r'\s+$', re.UNICODE)
-
-    def rstrip(string):
-        return trailing_spaces.sub('', string)
-
-else:
-
-    def rstrip(string):
-        return string.rstrip()

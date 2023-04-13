@@ -19,48 +19,9 @@ Listen Some
     @{expected} =    Create List    Pass    Fail    ${SUITE_MSG}
     Check Listener File    ${SOME_FILE}    @{expected}
 
-Java Listener
-    [Documentation]    Listener listening all methods implemented with Java
-    [Tags]    require-jython
-    @{expected} =    Create List    Got settings on level: INFO
-    ...    START SUITE: Pass And Fail 'Some tests here' [ListenerMeta: Hello]
-    ...    START KW: My Keyword [Suite Setup]
-    ...    START KW: BuiltIn.Log [Hello says "\${who}"!\${LEVEL1}]
-    ...    LOG MESSAGE: [INFO] Hello says "Suite Setup"!
-    ...    START KW: BuiltIn.Log [Debug message\${LEVEL2}]
-    ...    START KW: String.Convert To Upper Case [Just testing...]
-    ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
-    ...    START TEST: Pass '' [forcepass]
-    ...    START KW: My Keyword [Pass]
-    ...    START KW: BuiltIn.Log [Hello says "\${who}"!\${LEVEL1}]
-    ...    LOG MESSAGE: [INFO] Hello says "Pass"!
-    ...    START KW: BuiltIn.Log [Debug message\${LEVEL2}]
-    ...    START KW: String.Convert To Upper Case [Just testing...]
-    ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
-    ...    END TEST: PASS
-    ...    START TEST: Fail 'FAIL Expected failure' [failforce]
-    ...    START KW: My Keyword [Fail]
-    ...    START KW: BuiltIn.Log [Hello says "\${who}"!\${LEVEL1}]
-    ...    LOG MESSAGE: [INFO] Hello says "Fail"!
-    ...    START KW: BuiltIn.Log [Debug message\${LEVEL2}]
-    ...    START KW: String.Convert To Upper Case [Just testing...]
-    ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
-    ...    START KW: BuiltIn.Fail [Expected failure]
-    ...    LOG MESSAGE: [FAIL] Expected failure
-    ...    END TEST: FAIL: Expected failure
-    ...    END SUITE: FAIL: 2 tests, 1 passed, 1 failed
-    ...    Output (java): output.xml    The End
-    Check Listener File    ${JAVA_FILE}    @{expected}
-
 Correct Attributes To Listener Methods
     ${status} =    Log File    %{TEMPDIR}/${ATTR_TYPE_FILE}
-    Stderr Should Not Contain    attributeverifyinglistener
-    Should Not Contain    ${status}    FAILED
-
-Correct Attributes To Java Listener Methods
-    [Tags]    require-jython
-    ${status} =    Log File    %{TEMPDIR}/${JAVA_ATTR_TYPE_FILE}
-    Stderr Should Not Contain    JavaAttributeVerifyingListener
+    Stderr Should Not Contain    VerifyAttributes
     Should Not Contain    ${status}    FAILED
 
 Keyword Tags
@@ -83,11 +44,6 @@ Keyword Status
     Run Tests    --listener listeners.KeywordStatus    misc/pass_and_fail.robot misc/if_else.robot
     Stderr Should Be Empty
 
-Suite And Test Counts With Java
-    [Tags]    require-jython
-    Run Tests    --listener JavaSuiteAndTestCountListener    misc/suites/subsuites misc/suites/subsuites2
-    Stderr Should Be Empty
-
 Executing Keywords from Listeners
     Run Tests    --listener listeners.KeywordExecutingListener    misc/pass_and_fail.robot
     ${tc}=    Get Test Case    Pass
@@ -100,10 +56,16 @@ Test Template
     Stderr Should Be Empty
 
 Keyword Arguments Are Always Strings
-    ${result} =    Run Tests    --listener attributeverifyinglistener    ${LISTENER DIR}/keyword_argument_types.robot
+    ${result} =    Run Tests    --listener VerifyAttributes    ${LISTENER DIR}/keyword_argument_types.robot
     Should Be Empty    ${result.stderr}
     Check Test Tags    Run Keyword with already resolved non-string arguments in test data    1    2
     Check Test Case    Run Keyword with non-string arguments in library
+    ${status} =    Log File    %{TEMPDIR}/${ATTR_TYPE_FILE}
+    Should Not Contain    ${status}    FAILED
+
+Keyword Attributes For Control Structures
+    Run Tests    --listener VerifyAttributes    misc/for_loops.robot misc/while.robot misc/try_except.robot
+    Stderr Should Be Empty
     ${status} =    Log File    %{TEMPDIR}/${ATTR_TYPE_FILE}
     Should Not Contain    ${status}    FAILED
 
@@ -123,9 +85,7 @@ Run Tests With Listeners
     ...    --listener    ListenAll:%{TEMPDIR}${/}${ALL_FILE2}
     ...    --listener    module_listener
     ...    --listener    listeners.ListenSome
-    ...    --listener    JavaListener
-    ...    --listener    attributeverifyinglistener
-    ...    --listener    JavaAttributeVerifyingListener
+    ...    --listener    VerifyAttributes
     ...    --metadata    ListenerMeta:Hello
     Run Tests    ${args}    misc/pass_and_fail.robot
 
@@ -142,6 +102,8 @@ Check Listen All File
     ...    KEYWORD START: \${assign} = String.Convert To Upper Case ['Just testing...'] (line 29)
     ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
     ...    KEYWORD END: PASS
+    ...    RETURN START: (line 30)
+    ...    RETURN END: PASS
     ...    SETUP END: PASS
     ...    TEST START: Pass (s1-t1, line 12) '' ['force', 'pass']
     ...    KEYWORD START: My Keyword ['Pass'] (line 15)
@@ -153,6 +115,8 @@ Check Listen All File
     ...    KEYWORD START: \${assign} = String.Convert To Upper Case ['Just testing...'] (line 29)
     ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
     ...    KEYWORD END: PASS
+    ...    RETURN START: (line 30)
+    ...    RETURN END: PASS
     ...    KEYWORD END: PASS
     ...    TEST END: PASS
     ...    TEST START: Fail (s1-t2, line 17) 'FAIL Expected failure' ['fail', 'force']
@@ -165,6 +129,8 @@ Check Listen All File
     ...    KEYWORD START: \${assign} = String.Convert To Upper Case ['Just testing...'] (line 29)
     ...    LOG MESSAGE: [INFO] \${assign} = JUST TESTING...
     ...    KEYWORD END: PASS
+    ...    RETURN START: (line 30)
+    ...    RETURN END: PASS
     ...    KEYWORD END: PASS
     ...    KEYWORD START: BuiltIn.Fail ['Expected failure'] (line 21)
     ...    LOG MESSAGE: [FAIL] Expected failure

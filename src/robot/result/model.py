@@ -48,44 +48,36 @@ from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandle
 
 
 class Body(model.Body):
-    message_class = None
     __slots__ = []
 
-    def create_message(self, *args, **kwargs):
-        return self.append(self.message_class(*args, **kwargs))
 
-    def filter(self, keywords=None, fors=None, ifs=None, messages=None, predicate=None):
-        return self._filter([(self.keyword_class, keywords),
-                             (self.for_class, fors),
-                             (self.if_class, ifs),
-                             (self.message_class, messages)], predicate)
-
-
-class ForIterations(Body):
-    for_iteration_class = None
-    if_class = None
-    for_class = None
+class Branches(model.Branches):
     __slots__ = []
+
+
+class Iterations(model.BaseBody):
+    __slots__ = ['iteration_class']
+
+    def __init__(self, iteration_class, parent=None, items=None):
+        self.iteration_class = iteration_class
+        super().__init__(parent, items)
 
     def create_iteration(self, *args, **kwargs):
-        return self.append(self.for_iteration_class(*args, **kwargs))
-
-
-class IfBranches(Body, model.IfBranches):
-    __slots__ = []
+        return self.append(self.iteration_class(*args, **kwargs))
 
 
 @Body.register
+@Branches.register
+@Iterations.register
 class Message(model.Message):
     __slots__ = []
 
 
-class StatusMixin(object):
+class StatusMixin:
     __slots__ = []
     PASS = 'PASS'
     FAIL = 'FAIL'
     SKIP = 'SKIP'
-    UNKNOWN = "UNKNOWN"  # cuongnht - add unknown state
     NOT_RUN = 'NOT RUN'
     NOT_SET = 'NOT SET'
 
@@ -111,16 +103,6 @@ class StatusMixin(object):
     @failed.setter
     def failed(self, failed):
         self.status = self.FAIL if failed else self.PASS
-
-    # cuongnht - add unknown state
-    @property
-    def unknown(self):
-        """``True`` when :attr:`status` is 'UNKNOWN', ``False`` otherwise."""
-        return self.status == self.UNKNOWN
-
-    @unknown.setter
-    def unknown(self, unknown):
-        self.status = self.UNKNOWN if unknown else self.PASS
 
     @property
     def skipped(self):
@@ -151,9 +133,9 @@ class StatusMixin(object):
         self.status = self.NOT_RUN
 
 
-@ForIterations.register
 class ForIteration(BodyItem, StatusMixin, DeprecatedAttributesMixin):
-    type = BodyItem.FOR_ITERATION
+    """Represents one FOR loop iteration."""
+    type = BodyItem.ITERATION
     body_class = Body
     repr_args = ('variables',)
     __slots__ = ['variables', 'status', 'starttime', 'endtime', 'doc']
@@ -183,16 +165,21 @@ class ForIteration(BodyItem, StatusMixin, DeprecatedAttributesMixin):
 
 @Body.register
 class For(model.For, StatusMixin, DeprecatedAttributesMixin):
-    body_class = ForIterations
+    iterations_class = Iterations
+    iteration_class = ForIteration
     __slots__ = ['status', 'starttime', 'endtime', 'doc']
 
     def __init__(self, variables=(),  flavor='IN', values=(), status='FAIL',
                  starttime=None, endtime=None, doc='', parent=None):
-        model.For.__init__(self, variables, flavor, values, parent)
+        super().__init__(variables, flavor, values, parent)
         self.status = status
         self.starttime = starttime
         self.endtime = endtime
         self.doc = doc
+
+    @setter
+    def body(self, iterations):
+        return self.iterations_class(self.iteration_class, self, iterations)
 
     @property
     @deprecated
@@ -201,48 +188,70 @@ class For(model.For, StatusMixin, DeprecatedAttributesMixin):
                                  ' | '.join(self.values))
 
 
-# cuongnht add thread
-@Body.register
-class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
-    body_class = ForIterations
+class WhileIteration(BodyItem, StatusMixin, DeprecatedAttributesMixin):
+    """Represents one WHILE loop iteration."""
+    type = BodyItem.ITERATION
+    body_class = Body
     __slots__ = ['status', 'starttime', 'endtime', 'doc']
 
-    def __init__(self, name='ROBOT_THREAD1',  daemon=True, status='PASS',
-                 starttime=None, endtime=None, doc='', parent=None):
-        model.Thread.__init__(self, name, daemon, parent)
+    def __init__(self, status='FAIL', starttime=None, endtime=None,
+                 doc='', parent=None):
+        self.parent = parent
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+        self.body = None
+
+    @setter
+    def body(self, body):
+        return self.body_class(self, body)
+
+    def visit(self, visitor):
+        visitor.visit_while_iteration(self)
+
+    @property
+    @deprecated
+    def name(self):
+        return ''
+
+
+@Body.register
+class While(model.While, StatusMixin, DeprecatedAttributesMixin):
+    iterations_class = Iterations
+    iteration_class = WhileIteration
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, condition=None, limit=None, parent=None, status='FAIL',
+                 starttime=None, endtime=None, doc=''):
+        super().__init__(condition, limit, parent)
         self.status = status
         self.starttime = starttime
         self.endtime = endtime
         self.doc = doc
 
-    # @property
-    # @deprecated
-    # def name(self):
-    #     return '%s %s [ %s ]' % (' | '.join(self.variables), self.flavor,
-    #                              ' | '.join(self.values))
+    @setter
+    def body(self, iterations):
+        return self.iterations_class(self.iteration_class, self, iterations)
+
+    @property
+    @deprecated
+    def name(self):
+        parts = []
+        if self.condition:
+            parts.append(self.condition)
+        if self.limit:
+            parts.append(f'limit={self.limit}')
+        return ' | '.join(parts)
 
 
-@Body.register
-class If(model.If, StatusMixin, DeprecatedAttributesMixin):
-    body_class = IfBranches
-    __slots__ = ['status', 'starttime', 'endtime', 'doc']
-
-    def __init__(self, parent=None, status='FAIL', starttime=None, endtime=None, doc=''):
-        model.If.__init__(self, parent)
-        self.status = status
-        self.starttime = starttime
-        self.endtime = endtime
-        self.doc = doc
-
-
-@IfBranches.register
 class IfBranch(model.IfBranch, StatusMixin, DeprecatedAttributesMixin):
     body_class = Body
     __slots__ = ['status', 'starttime', 'endtime', 'doc']
 
     def __init__(self, type=BodyItem.IF, condition=None, status='FAIL',
                  starttime=None, endtime=None, doc='', parent=None):
-        model.IfBranch.__init__(self, type, condition, parent)
+        super().__init__(type, condition, parent)
         self.status = status
         self.starttime = starttime
         self.endtime = endtime
@@ -255,6 +264,161 @@ class IfBranch(model.IfBranch, StatusMixin, DeprecatedAttributesMixin):
 
 
 @Body.register
+class If(model.If, StatusMixin, DeprecatedAttributesMixin):
+    branch_class = IfBranch
+    branches_class = Branches
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, status='FAIL', starttime=None, endtime=None, doc='', parent=None):
+        super().__init__(parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+
+class TryBranch(model.TryBranch, StatusMixin, DeprecatedAttributesMixin):
+    body_class = Body
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, type=BodyItem.TRY, patterns=(), pattern_type=None, variable=None,
+                 status='FAIL', starttime=None, endtime=None, doc='', parent=None):
+        super().__init__(type, patterns, pattern_type, variable, parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+    @property
+    @deprecated
+    def name(self):
+        patterns = list(self.patterns)
+        if self.pattern_type:
+            patterns.append(f'type={self.pattern_type}')
+        parts = []
+        if patterns:
+            parts.append(' | '.join(patterns))
+        if self.variable:
+            parts.append(f'AS {self.variable}')
+        return ' '.join(parts)
+
+
+@Body.register
+class Try(model.Try, StatusMixin, DeprecatedAttributesMixin):
+    branch_class = TryBranch
+    branches_class = Branches
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, status='FAIL', starttime=None, endtime=None, doc='', parent=None):
+        super().__init__(parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+
+@Body.register
+class Return(model.Return, StatusMixin, DeprecatedAttributesMixin):
+    __slots__ = ['status', 'starttime', 'endtime']
+    body_class = Body
+
+    def __init__(self, values=(), status='FAIL', starttime=None, endtime=None, parent=None):
+        super().__init__(values, parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.body = None
+
+    @setter
+    def body(self, body):
+        """Child keywords and messages as a :class:`~.Body` object.
+
+        Typically empty. Only contains something if running RETURN has failed
+        due to a syntax error or listeners have logged messages or executed
+        keywords.
+        """
+        return self.body_class(self, body)
+
+    @property
+    @deprecated
+    def args(self):
+        return self.values
+
+    @property
+    @deprecated
+    def doc(self):
+        return ''
+
+
+@Body.register
+class Continue(model.Continue, StatusMixin, DeprecatedAttributesMixin):
+    __slots__ = ['status', 'starttime', 'endtime']
+    body_class = Body
+
+    def __init__(self, status='FAIL', starttime=None, endtime=None, parent=None):
+        super().__init__(parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.body = None
+
+    @setter
+    def body(self, body):
+        """Child keywords and messages as a :class:`~.Body` object.
+
+        Typically empty. Only contains something if running CONTINUE has failed
+        due to a syntax error or listeners have logged messages or executed
+        keywords.
+        """
+        return self.body_class(self, body)
+
+    @property
+    @deprecated
+    def args(self):
+        return ()
+
+    @property
+    @deprecated
+    def doc(self):
+        return ''
+
+
+@Body.register
+class Break(model.Break, StatusMixin, DeprecatedAttributesMixin):
+    __slots__ = ['status', 'starttime', 'endtime']
+    body_class = Body
+
+    def __init__(self, status='FAIL', starttime=None, endtime=None, parent=None):
+        super().__init__(parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.body = None
+
+    @setter
+    def body(self, body):
+        """Child keywords and messages as a :class:`~.Body` object.
+
+        Typically empty. Only contains something if running BREAK has failed
+        due to a syntax error or listeners have logged messages or executed
+        keywords.
+        """
+        return self.body_class(self, body)
+
+    @property
+    @deprecated
+    def args(self):
+        return ()
+
+    @property
+    @deprecated
+    def doc(self):
+        return ''
+
+
+@Body.register
+@Branches.register
+@Iterations.register
 class Keyword(model.Keyword, StatusMixin):
     """Represents results of a single keyword.
 
@@ -267,7 +431,7 @@ class Keyword(model.Keyword, StatusMixin):
     def __init__(self, kwname='', libname='', doc='', args=(), assign=(), tags=(),
                  timeout=None, type=BodyItem.KEYWORD, status='FAIL', starttime=None,
                  endtime=None, parent=None, sourcename=None):
-        model.Keyword.__init__(self, None, doc, args, assign, tags, timeout, type, parent)
+        super().__init__(None, doc, args, assign, tags, timeout, type, parent)
         #: Name of the keyword without library or resource name.
         self.kwname = kwname
         #: Name of the library or resource containing this keyword.
@@ -355,9 +519,10 @@ class TestCase(model.TestCase, StatusMixin):
     body_class = Body
     fixture_class = Keyword
 
-    def __init__(self, name='', doc='', tags=None, timeout=None, status='FAIL',
-                 message='', starttime=None, endtime=None):
-        model.TestCase.__init__(self, name, doc, tags, timeout)
+    def __init__(self, name='', doc='', tags=None, timeout=None, lineno=None,
+                 status='FAIL', message='', starttime=None, endtime=None,
+                 parent=None):
+        super().__init__(name, doc, tags, timeout, lineno, parent)
         #: Status as a string ``PASS`` or ``FAIL``. See also :attr:`passed`.
         self.status = status
         #: Test message. Typically a failure message but can be set also when
@@ -387,9 +552,9 @@ class TestSuite(model.TestSuite, StatusMixin):
     test_class = TestCase
     fixture_class = Keyword
 
-    def __init__(self, name='', doc='', metadata=None, source=None,
-                 message='', starttime=None, endtime=None, rpa=False):
-        model.TestSuite.__init__(self, name, doc, metadata, source, rpa)
+    def __init__(self, name='', doc='', metadata=None, source=None, message='',
+                 starttime=None, endtime=None, rpa=False, parent=None):
+        super().__init__(name, doc, metadata, source, rpa, parent)
         #: Possible suite setup or teardown error message.
         self.message = message
         #: Suite execution start time in format ``%Y%m%d %H:%M:%S.%f``.
@@ -426,9 +591,6 @@ class TestSuite(model.TestSuite, StatusMixin):
           the case when all tests have been skipped and when there are no tests.
         """
         stats = self.statistics  # Local variable avoids recreating stats.
-        # cuongnht: add unknown state
-        if stats.unknown:
-            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:

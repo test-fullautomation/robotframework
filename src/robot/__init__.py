@@ -26,7 +26,6 @@ programmatic usage as follows:
     with command line argument processing.
   * :mod:`~robot.libdoc`: Module for library documentation generation.
   * :mod:`~robot.testdoc`: Module for test case documentation generation.
-  * :mod:`~robot.tidy`: Module for test data clean-up and format change.
 
 All the functions above can be imported like ``from robot import run``.
 Functions and classes provided by the modules need to be imported like
@@ -46,7 +45,7 @@ from robot.run import run, run_cli
 from robot.version import get_version
 
 
-# Avoid warnings when using `python -m robot.run` with Python 3.5.2 or newer.
+# Avoid warnings when using `python -m robot.run`.
 # https://github.com/robotframework/robotframework/issues/2552
 if not sys.warnoptions:
     warnings.filterwarnings('ignore', category=RuntimeWarning, module='runpy')

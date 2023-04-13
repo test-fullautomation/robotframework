@@ -8,12 +8,12 @@ Name
 
 Documentation
     Doc Should Start With
-    ...    A test library providing communication over Telnet connections.
+    ...    A library providing communication over Telnet connections.
     ...
     ...    ``Telnet`` is Robot Framework's standard library that makes it possible to
 
 Version
-    Version Should Match             [345].*
+    Version Should Match             [6789].*
 
 Type
     Type Should Be                   LIBRARY
@@ -25,7 +25,6 @@ Scope
     Scope Should Be                  SUITE
 
 Source info
-    [Tags]    no-standalone    # Standard library sources aren't included in standalone JAR
     Source should be                 ${CURDIR}/../../../src/robot/libraries/Telnet.py
     Lineno should be                 36
 
@@ -45,7 +44,6 @@ Init Arguments
     ...    telnetlib_log_level=TRACE    connection_timeout=None
 
 Init Source Info
-    [Tags]    no-standalone    # Standard library sources aren't included in standalone JAR
     Keyword Should Not Have Source   0    xpath=inits/init
     Keyword Lineno Should Be         0    281      xpath=inits/init
 
@@ -75,7 +73,6 @@ Keyword Documentation
     ...
 
 Keyword Source Info
-    [Tags]    no-standalone    # Standard library sources aren't included in standalone JAR
     # This keyword is from the "main library".
     Keyword Name Should Be           0    Close All Connections
     Keyword Should Not Have Source   0
@@ -83,7 +80,7 @@ Keyword Source Info
     # This keyword is from an external library component.
     Keyword Name Should Be           7    Read Until Prompt
     Keyword Should Not Have Source   7
-    Keyword Lineno Should Be         7    1011
+    Keyword Lineno Should Be         7    1009
 
 KwArgs and VarArgs
     Run Libdoc And Parse Output      Process
@@ -91,7 +88,6 @@ KwArgs and VarArgs
     Keyword Arguments Should Be      7    command    *arguments    **configuration
 
 Keyword-only Arguments
-    [Tags]    require-py3
     Run Libdoc And Parse Output      ${TESTDATADIR}/KeywordOnlyArgs.py
     Keyword Arguments Should Be      0    *    kwo
     Keyword Arguments Should Be      1    *varargs    kwo    another=default
@@ -111,17 +107,8 @@ Decorators
     Keyword Should Not Have Source   0
     Keyword Lineno Should Be         0    8
     Keyword Name Should Be           1    Keyword Using Decorator With Wraps
-    Run Keyword If
-    ...    $INTERPRETER.is_py3
-    ...        Run Keywords
-    ...            Keyword Arguments Should Be      1    args    are    preserved=True
-    ...        AND
-    ...            Keyword Lineno Should Be         1    26
-    ...    ELSE
-    ...        Run Keywords
-    ...            Keyword Arguments Should Be      1    *args    **kwargs
-    ...        AND
-    ...            Keyword Lineno Should Be         1    15
+    Keyword Arguments Should Be      1    args    are    preserved=True
+    Keyword Lineno Should Be         1    26
 
 Documentation set in __init__
     Run Libdoc And Parse Output      ${TESTDATADIR}/DocSetInInit.py

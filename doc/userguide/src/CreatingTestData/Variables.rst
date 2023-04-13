@@ -122,17 +122,17 @@ a string and then concatenated with the other data.
 The example below demonstrates the difference between having a
 variable in alone or with other content. First, let us assume
 that we have a variable `${STR}` set to a string `Hello,
-world!` and `${OBJ}` set to an instance of the following Java
+world!` and `${OBJ}` set to an instance of the following Python
 object:
 
-.. sourcecode:: java
+.. sourcecode:: python
 
- public class MyObj {
+ class MyObj:
 
-     public String toString() {
-         return "Hi, terra!";
-     }
- }
+     def __str__():
+         return "Hi, terra!"
+
+
 
 With these two variables set, we then have the following test data:
 
@@ -224,7 +224,7 @@ other list variables.
 Using list variables with settings
 ''''''''''''''''''''''''''''''''''
 
-List variables can be used only with some of the settings__. They can
+List variables can be used only with some of the settings_. They can
 be used in arguments to imported libraries and variable files, but
 library and variable file names themselves cannot be list
 variables. Also with setups and teardowns list variable can not be used
@@ -242,8 +242,6 @@ those places where list variables are not supported.
    Suite Setup     ${KEYWORD}          @{KW ARGS}     # This works
    Suite Setup     @{KEYWORD AND ARGS}                # This does not work
    Default Tags    @{TAGS}                            # This works
-
-__ `All available settings in test data`_
 
 .. _dictionary variable:
 .. _dictionary variables:
@@ -451,21 +449,6 @@ not effective after the test execution.
 
 .. note:: Support for specifying the default value is new in Robot Framework 3.2.
 
-Java system properties
-~~~~~~~~~~~~~~~~~~~~~~
-
-When running tests with Jython, it is possible to access `Java system properties`__
-using same syntax as `environment variables`_. If an environment variable and a
-system property with same name exist, the environment variable will be used.
-
-.. sourcecode:: robotframework
-
-   *** Test Cases ***
-   System properties
-       Log    %{user.name} running tests on %{os.name}
-       Log    %{custom.property=default value}
-
-__ http://docs.oracle.com/javase/tutorial/essential/environment/sysprop.html
 
 Creating variables
 ------------------
@@ -579,7 +562,7 @@ context), but using `${MANY.3}` is not possible.
 Another special property of dictionary variables is
 that they are ordered. This means that if these dictionaries are iterated,
 their items always come in the order they are defined. This can be useful
-if dictionaries are used as `list variables`_ with `for loops`_ or otherwise.
+if dictionaries are used as `list variables`_ with `FOR loops`_ or otherwise.
 When a dictionary is used as a list variable, the actual value contains
 dictionary keys. For example, `@{MANY}` variable would have value `['first',
 'second', 3]`.
@@ -760,6 +743,27 @@ It is an error if the returned list has more or less values than there are
 scalar variables to assign. Additionally, only one list variable is allowed
 and dictionary variables can only be assigned alone.
 
+Automatically logging assigned variable value
+'''''''''''''''''''''''''''''''''''''''''''''
+
+To make it easier to understand what happens during execution,
+the beginning of value that is assigned is automatically logged.
+The default is to show 200 first characters, but this can be changed
+by using the :option:`--maxassignlength` command line option when
+running tests. If the value is zero or negative, the whole assigned
+value is hidden.
+
+.. sourcecode:: bash
+
+   --maxassignlength 1000
+   --maxassignlength 0
+
+The reason the value is not logged fully is that it could be really
+big. If you always want to see a certain value fully, it is possible
+to use the BuiltIn_ :name:`Log` keyword to log it after the assignment.
+
+.. note:: The :option:`--maxassignlength` option is new in Robot Framework 5.0.
+
 Using :name:`Set Test/Suite/Global Variable` keywords
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -884,7 +888,7 @@ The syntax is case insensitive.
 Boolean and None/null variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Also Boolean values and Python `None` and Java `null` can
+Also Boolean values and Python `None` can
 be created using the variable syntax similarly as numbers.
 
 .. sourcecode:: robotframework
@@ -897,15 +901,9 @@ be created using the variable syntax similarly as numbers.
    None
        Do XYZ    ${None}                   # Do XYZ gets Python None as an argument
 
-   Null
-       ${ret} =    Get Value    arg        # Checking that Get Value returns Java null
-       Should Be Equal    ${ret}    ${null}
 
 These variables are case-insensitive, so for example `${True}` and
-`${true}` are equivalent. Additionally, `${None}` and
-`${null}` are synonyms, because when running tests on the Jython
-interpreter, Jython automatically converts `None` and
-`null` to the correct format when necessary.
+`${true}` are equivalent.
 
 Space and empty variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1047,12 +1045,25 @@ can be changed dynamically using keywords from the `BuiltIn`_ library.
    +------------------------+-------------------------------------------------------+------------+
    | ${OUTPUT DIR}          | An absolute path to the `output directory`_.          | Everywhere |
    +------------------------+-------------------------------------------------------+------------+
+   | &{OPTIONS}             | A dictionary exposing command line options. The       | Everywhere |
+   |                        | dictionary keys match the command line options and    |            |
+   |                        | can be accessed both like `${OPTIONS}[key]` and       |            |
+   |                        | `${OPTIONS.key}`. Available options:                  |            |
+   |                        |                                                       |            |
+   |                        | - `${OPTIONS.exclude}` (:option:`--exclude`)          |            |
+   |                        | - `${OPTIONS.include}` (:option:`--include`)          |            |
+   |                        | - `${OPTIONS.skip}` (:option:`--skip`)                |            |
+   |                        | - `${OPTIONS.skip_on_failure}`                        |            |
+   |                        |   (:option:`--skiponfailure`)                         |            |
+   |                        |                                                       |            |
+   |                        | New in RF 5.0. More options can be exposed later.     |            |
+   +------------------------+-------------------------------------------------------+------------+
 
-Suite related variables `${SUITE SOURCE}`, `${SUITE NAME}`,
-`${SUITE DOCUMENTATION}` and `&{SUITE METADATA}` are
-available already when test libraries and variable files are imported.
-Possible variables in these automatic variables are not yet resolved
-at the import time, though.
+Suite related variables `${SUITE SOURCE}`, `${SUITE NAME}`, `${SUITE DOCUMENTATION}`
+and `&{SUITE METADATA}` as well as options related to command line options like
+`${LOG FILE}` and `&{OPTIONS}` are available already when libraries and variable
+files are imported. Possible variables in these automatic variables are not yet
+resolved at the import time, though.
 
 Variable priorities and scopes
 ------------------------------
@@ -1270,37 +1281,6 @@ The extended variable syntax is evaluated in the following order:
 
 5. The whole extended variable is replaced with the value returned
    from the evaluation.
-
-If the object that is used is implemented with Java, the extended
-variable syntax allows you to access attributes using so-called bean
-properties. In essence, this means that if you have an object with the
-`getName`  method set into a variable `${OBJ}`, then the
-syntax `${OBJ.name}` is equivalent to but clearer than
-`${OBJ.getName()}`. The Python object used in the previous example
-could thus be replaced with the following Java implementation:
-
-.. sourcecode:: java
-
- public class MyObject:
-
-     private String name;
-
-     public MyObject(String name) {
-         name = name;
-     }
-
-     public String getName() {
-         return name;
-     }
-
-     public String eat(String what) {
-         return name + " eats " + what;
-     }
-
-     public String toString() {
-         return name;
-     }
- }
 
 Many standard Python objects, including strings and numbers, have
 methods that can be used with the extended variable syntax either

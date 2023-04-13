@@ -60,27 +60,6 @@ TOC with inits and tags
    ...
    ...    %TOC% not replaced here
 
-TOC with inits and tags and DataTypes
-   [Tags]    require-py3
-   Run Libdoc And Parse Output    ${TESTDATADIR}/TOCWithInitsAndKeywordsAndDataTypes.py
-   Doc should be
-   ...    = First entry =
-   ...
-   ...    TOC in somewhat strange place.
-   ...
-   ...    - `First entry`
-   ...    - `Second`
-   ...    - `3`
-   ...    - `Importing`
-   ...    - `Keywords`
-   ...    - `Data types`
-   ...
-   ...    = Second =
-   ...
-   ...    ${SPACE * 9}= 3 =
-   ...
-   ...    %TOC% not replaced here
-
 TOC in generated HTML
    Run Libdoc And Parse Model From HTML    ${TESTDATADIR}/TOCWithInitsAndKeywords.py
    Should Be Equal Multiline    ${MODEL}[doc]

@@ -1,18 +1,16 @@
-from __future__ import print_function
-
 import unittest
 
 from robot.output.listeners import Listeners, LibraryListeners
 from robot.output import LOGGER
 from robot.running.outputcapture import OutputCapturer
 from robot.utils.asserts import assert_equal, assert_raises
-from robot.utils import DotDict, JYTHON
+from robot.utils import DotDict
 
 
 LOGGER.unregister_console_logger()
 
 
-class Mock(object):
+class Mock:
     non_existing = ()
 
     def __getattr__(self, name):
@@ -54,7 +52,7 @@ class KwMock(Mock):
         self.type = 'kw'
 
 
-class ListenOutputs(object):
+class ListenOutputs:
 
     def output_file(self, path):
         self._out_file('Output', path)
@@ -167,18 +165,12 @@ class TestListeners(unittest.TestCase):
         assert_equal(stdout.rstrip(), expected)
 
 
-if JYTHON:
-
-    class TestJavaListeners(TestListeners):
-        listener_name = 'NewStyleJavaListener'
-        stat_message = 'stat message'
-
-
 class TestAttributesAreNotAccessedUnnecessarily(unittest.TestCase):
 
     def test_start_and_end_methods(self):
-        class ModelStub(object):
+        class ModelStub:
             IF_ELSE_ROOT = 'IF/ELSE ROOT'
+            TRY_EXCEPT_ROOT = 'TRY/EXCEPT ROOT'
             type = 'xxx'
         for listeners in [Listeners([]), LibraryListeners()]:
             for name in dir(listeners):
@@ -188,14 +180,14 @@ class TestAttributesAreNotAccessedUnnecessarily(unittest.TestCase):
                     method(model)
 
     def test_message_methods(self):
-        class Message(object):
+        class Message:
             level = 'INFO'
         for listeners in [Listeners([]), LibraryListeners()]:
             listeners.log_message(Message)
             listeners.message(Message)
 
     def test_some_methods_implemented(self):
-        class MyListener(object):
+        class MyListener:
             ROBOT_LISTENER_API_VERSION = 2
             def end_suite(self, suite):
                 pass

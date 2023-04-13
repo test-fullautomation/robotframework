@@ -11,25 +11,23 @@ Should Be String Positive
     Should be String    Robot
     Should be String    ${EMPTY}
 
-Bytes are strings in python 2
-    Should be String    ${BYTES}
-    Run keyword and expect error    '${BYTES}' is a string.    Should not be string    ${BYTES}
-
-Bytes are not strings in python 3 and ironpython
-    Run Keyword And Expect Error   '${BYTES}' is not a string.    Should Be String    ${BYTES}
+Bytes are not strings
+    Run Keyword And Expect Error   '${BYTES}' is bytes, not a string.    Should Be String    ${BYTES}
     Should not be string    ${BYTES}
 
 Should Be String Negative
     [Template]     Run Keyword And Expect Error
-    '0' is not a string.    Should be string    ${0}
-    My error    Should be string    ${TRUE}    My error
+    '0' is integer, not a string.    Should be string    ${0}
+    My error                         Should be string    ${TRUE}    My error
 
 Should Not Be String Positive
     Should Not Be String    ${0}
     Should Not Be String    ${TRUE}
 
 Should Not Be String Negative
-    Run Keyword And Expect Error    My error message    Should not be string    Hello    My error message
+    [Template]     Run Keyword And Expect Error
+    'Two\nlines' is a string.    Should not be string    Two\nlines
+    My error message             Should not be string    Hello    My error message
 
 Should Be Unicode String Positive
     Should be Unicode String    Robot
@@ -106,16 +104,12 @@ Should Be Title Case With Regex Excludes
     Full Match Only!      exclude=.
     full Match Only!      exclude=....
 
-Should Be Title Case Works With ASCII Bytes On Python 2
-    Should Be Title Case    ${BYTES}
-
-Should Be Title Case Does Not Work With ASCII Bytes On Python 2
+Should Be Title Case Does Not Work With ASCII Bytes
     [Documentation]    FAIL    TypeError: This keyword works only with Unicode strings.
     Should Be Title Case    ${BYTES}
 
 Should Be Title Case Does Not Work With Non-ASCII Bytes
-    [Documentation]    FAIL    REGEXP:
-    ...    TypeError: This keyword works only with Unicode strings( and non-ASCII bytes)?.
+    [Documentation]    FAIL    TypeError: This keyword works only with Unicode strings.
     Should Be Title Case    ${{b'\xe4iti'}}
 
 *** Keywords ***

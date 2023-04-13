@@ -13,127 +13,108 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from inspect import getdoc, isclass
+from inspect import isclass
+from enum import Enum
 
-try:
-    from enum import Enum
+from robot.utils import getdoc, Sortable, typeddict_types, type_name
+from robot.running import TypeConverter
 
-    EnumType = type(Enum)
-except ImportError:  # Standard in Py 3.4+ but can be separately installed
-    class EnumType(object):
-        pass
+from .standardtypes import STANDARD_TYPE_DOCS
 
 
-from robot.utils import py3to2, Sortable, unic, unicode, typeddict_types
+EnumType = type(Enum)
 
 
-@py3to2
-class DataTypeCatalog(object):
+class TypeDoc(Sortable):
+    ENUM = 'Enum'
+    TYPED_DICT = 'TypedDict'
+    CUSTOM = 'Custom'
+    STANDARD = 'Standard'
 
-    def __init__(self):
-        self._enums = set()
-        self._typed_dicts = set()
-
-    def __iter__(self):
-        return iter(sorted(self._typed_dicts | self._enums))
-
-    def __bool__(self):
-        return bool(self._enums or self._typed_dicts)
-
-    @property
-    def enums(self):
-        return sorted(self._enums)
-
-    @property
-    def typed_dicts(self):
-        return sorted(self._typed_dicts)
-
-    def update(self, types):
-        for typ in types:
-            type_doc = self._get_type_doc_object(typ)
-            if isinstance(type_doc, EnumDoc):
-                self._enums.add(type_doc)
-            elif isinstance(type_doc, TypedDictDoc):
-                self._typed_dicts.add(type_doc)
-
-    def _get_type_doc_object(self, typ):
-        if isinstance(typ, (EnumDoc, TypedDictDoc)):
-            return typ
-        if isinstance(typ, typeddict_types):
-            return TypedDictDoc.from_TypedDict(typ)
-        if isinstance(typ, EnumType):
-            return EnumDoc.from_Enum(typ)
-        if isinstance(typ, dict):
-            if typ.get('type', None) == 'TypedDict':
-                return TypedDictDoc(**typ)
-            if typ.get('type', None) == 'Enum':
-                return EnumDoc(**typ)
-        return None
-
-    def to_dictionary(self):
-        return {
-            'enums': [en.to_dictionary() for en in self.enums],
-            'typedDicts': [td.to_dictionary() for td in self.typed_dicts]
-        }
-
-
-class TypedDictDoc(Sortable):
-
-    def __init__(self, name='', doc='', items=None, type='TypedDict'):
-        self.name = name
-        self.doc = doc
-        self.items = items or []
+    def __init__(self, type, name, doc, accepts=(), usages=None,
+                 members=None, items=None):
         self.type = type
+        self.name = name
+        self.doc = doc or ''    # doc parsed from XML can be None.
+        self.accepts = [type_name(t) if not isinstance(t, str) else t for t in accepts]
+        self.usages = usages or []
+        # Enum members and TypedDict items are used only with appropriate types.
+        self.members = members
+        self.items = items
+
+    @property
+    def _sort_key(self):
+        return self.name.lower()
 
     @classmethod
-    def from_TypedDict(cls, typed_dict):
+    def for_type(cls, type_hint, converters):
+        if isinstance(type_hint, EnumType):
+            return cls.for_enum(type_hint)
+        if isinstance(type_hint, typeddict_types):
+            return cls.for_typed_dict(type_hint)
+        converter = TypeConverter.converter_for(type_hint, converters)
+        if not converter:
+            return None
+        elif not converter.type:
+            return cls(cls.CUSTOM, converter.type_name, converter.doc,
+                       converter.value_types)
+        else:
+            # Get `type_name` from class, not from instance, to get the original
+            # name with generics like `list[int]` that override it in instance.
+            return cls(cls.STANDARD, type(converter).type_name,
+                       STANDARD_TYPE_DOCS[converter.type], converter.value_types)
+
+    @classmethod
+    def for_enum(cls, enum):
+        accepts = (str, int) if issubclass(enum, int) else (str,)
+        return cls(cls.ENUM, enum.__name__, getdoc(enum), accepts,
+                   members=[EnumMember(name, str(member.value))
+                            for name, member in enum.__members__.items()])
+
+    @classmethod
+    def for_typed_dict(cls, typed_dict):
         items = []
         required_keys = list(getattr(typed_dict, '__required_keys__', []))
         optional_keys = list(getattr(typed_dict, '__optional_keys__', []))
         for key, value in typed_dict.__annotations__.items():
-            typ = value.__name__ if isclass(value) else unic(value)
+            typ = value.__name__ if isclass(value) else str(value)
             required = key in required_keys if required_keys or optional_keys else None
-            items.append({'key': key, 'type': typ, 'required': required})
-        return cls(name=typed_dict.__name__,
-                   doc=getdoc(typed_dict) or '',
-                   items=items)
+            items.append(TypedDictItem(key, typ, required))
+        return cls(cls.TYPED_DICT, typed_dict.__name__, getdoc(typed_dict),
+                   accepts=(str,), items=items)
 
-    @property
-    def _sort_key(self):
-        return self.name.lower()
-
-    def to_dictionary(self):
-        return {
-            'name': self.name,
+    def to_dictionary(self, legacy=False):
+        data = {
             'type': self.type,
+            'name': self.name,
             'doc': self.doc,
-            'items': self.items
         }
+        if not legacy:
+            data['usages'] = self.usages
+            data['accepts'] = self.accepts
+        if self.members is not None:
+            data['members'] = [m.to_dictionary() for m in self.members]
+        if self.items is not None:
+            data['items'] = [i.to_dictionary() for i in self.items]
+        return data
 
 
-class EnumDoc(Sortable):
+class TypedDictItem:
 
-    def __init__(self, name='', doc='', members=None, type='Enum'):
-        self.name = name
-        self.doc = doc
-        self.members = members or []
+    def __init__(self, key, type, required=None):
+        self.key = key
         self.type = type
-
-    @classmethod
-    def from_Enum(cls, enum_type):
-        return cls(name=enum_type.__name__,
-                   doc=getdoc(enum_type) or '',
-                   members=[{'name': name, 'value': unicode(member.value)}
-                            for name, member in enum_type.__members__.items()])
-
-    @property
-    def _sort_key(self):
-        return self.name.lower()
+        self.required = required
 
     def to_dictionary(self):
-        return {
-            'name': self.name,
-            'type': self.type,
-            'doc': self.doc,
-            'members': self.members
-        }
+        return {'key': self.key, 'type': self.type, 'required': self.required}
+
+
+class EnumMember:
+
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def to_dictionary(self):
+        return {'name': self.name, 'value': self.value}

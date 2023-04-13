@@ -23,7 +23,10 @@ Log with different levels
     Check Log Message    ${tc.kws[5].msgs[1]}    Error level    ERROR
     Check Log Message    ${ERRORS[0]}            Warn level     WARN
     Check Log Message    ${ERRORS[1]}            Error level    ERROR
-    Length Should Be     ${ERRORS}               2
+    Length Should Be     ${ERRORS}               4    # Two deprecation warnings from `repr`.
+
+Invalid log level failure is catchable
+    Check Test Case    ${TEST NAME}
 
 HTML is escaped by default
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -52,50 +55,29 @@ Log also to console
     Stdout Should Contain    ${HTML}\n
 
 repr=True
-    [Documentation]    In RF 3.1.2 `formatter=repr` and `repr=True` yield same
-    ...                results and thus these tests are identical.
     ${tc} =    Check Test Case    ${TEST NAME}
-    Check Log Message    ${tc.kws[0].msgs[0]}    'Nothing special here'
-    ${expected} =    Set Variable If    ${INTERPRETER.is_py2}
-    ...    'Hyv\\xe4\\xe4 y\\xf6t\\xe4 \\u2603!'
-    ...    'Hyvää yötä ☃!'
-    Check Log Message    ${tc.kws[1].msgs[0]}    ${expected}
-    Check Log Message    ${tc.kws[2].msgs[0]}    42    DEBUG
-    Check Log Message    ${tc.kws[4].msgs[0]}    b'\\x00abc\\xff (repr=True)'
-    ${expected} =    Set Variable If    ${INTERPRETER.is_py2}
-    ...    'hyva\\u0308'
-    ...    'hyvä'
-    Check Log Message    ${tc.kws[6].msgs[0]}    ${expected}
-    Stdout Should Contain    b'\\x00abc\\xff (repr=True)'
+    Check Log Message    ${tc.kws[0].msgs[0]}    The 'repr' argument of 'BuiltIn.Log' is deprecated. Use 'formatter=repr' instead.    WARN
+    Check Log Message    ${tc.kws[0].msgs[1]}    Nothing special here
+    Check Log Message    ${tc.kws[1].msgs[0]}    The 'repr' argument of 'BuiltIn.Log' is deprecated. Use 'formatter=repr' instead.    WARN
+    Check Log Message    ${tc.kws[1].msgs[1]}    'Hyvää yötä ☃!'
 
 formatter=repr
-    [Documentation]    In RF 3.1.2 `formatter=repr` and `repr=True` yield same
-    ...                results and thus these tests are identical.
     ${tc} =    Check Test Case    ${TEST NAME}
     Check Log Message    ${tc.kws[0].msgs[0]}    'Nothing special here'
-    ${expected} =    Set Variable If    ${INTERPRETER.is_py2}
-    ...    'Hyv\\xe4\\xe4 y\\xf6t\\xe4 \\u2603!'
-    ...    'Hyvää yötä ☃!'
-    Check Log Message    ${tc.kws[1].msgs[0]}    ${expected}
+    Check Log Message    ${tc.kws[1].msgs[0]}    'Hyvää yötä ☃!'
     Check Log Message    ${tc.kws[2].msgs[0]}    42    DEBUG
     Check Log Message    ${tc.kws[4].msgs[0]}    b'\\x00abc\\xff (formatter=repr)'
-    ${expected} =    Set Variable If    ${INTERPRETER.is_py2}
-    ...    'hyva\\u0308'
-    ...    'hyvä'
-    Check Log Message    ${tc.kws[6].msgs[0]}    ${expected}
+    Check Log Message    ${tc.kws[6].msgs[0]}    'hyvä'
     Stdout Should Contain    b'\\x00abc\\xff (formatter=repr)'
 
 formatter=ascii
     ${tc} =    Check Test Case    ${TEST NAME}
-    ${u} =     Set Variable If    ${INTERPRETER.is_py2}    u    ${EMPTY}
-    ${u2} =    Set Variable If    ${INTERPRETER.is_py2} and not ${INTERPRETER.is_ironpython}    u    ${EMPTY}
-    ${b} =     Set Variable If    ${INTERPRETER.is_py2} and not ${INTERPRETER.is_ironpython}    ${EMPTY}    b
-    Check Log Message    ${tc.kws[0].msgs[0]}    ${u2}'Nothing special here'
-    Check Log Message    ${tc.kws[1].msgs[0]}    ${u}'Hyv\\xe4\\xe4 y\\xf6t\\xe4 \\u2603!'
+    Check Log Message    ${tc.kws[0].msgs[0]}    'Nothing special here'
+    Check Log Message    ${tc.kws[1].msgs[0]}    'Hyv\\xe4\\xe4 y\\xf6t\\xe4 \\u2603!'
     Check Log Message    ${tc.kws[2].msgs[0]}    42    DEBUG
-    Check Log Message    ${tc.kws[4].msgs[0]}    ${b}'\\x00abc\\xff (formatter=ascii)'
-    Check Log Message    ${tc.kws[6].msgs[0]}    ${u}'hyva\\u0308'
-    Stdout Should Contain    ${b}'\\x00abc\\xff (formatter=ascii)'
+    Check Log Message    ${tc.kws[4].msgs[0]}    b'\\x00abc\\xff (formatter=ascii)'
+    Check Log Message    ${tc.kws[6].msgs[0]}    'hyva\\u0308'
+    Stdout Should Contain    b'\\x00abc\\xff (formatter=ascii)'
 
 formatter=str
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -116,12 +98,24 @@ formatter=repr pretty prints
     Check Log Message    ${tc.kws[5].msgs[0]}    {'big': 'dict',\n\ 'list': [1, 2, 3],\n\ 'long': '${long string}',\n\ 'nested': ${small dict}}
     Check Log Message    ${tc.kws[7].msgs[0]}    ${small list}
     Check Log Message    ${tc.kws[9].msgs[0]}    ['big',\n\ 'list',\n\ '${long string}',\n\ b'${long string}',\n\ ['nested', ('tuple', 2)],\n\ ${small dict}]
-    ${expected} =    Set Variable If    ${INTERPRETER.is_py2}
-    ...    ['hyv\\xe4', b'hyv\\xe4', {'\\u2603': b'\\x00\\xff'}]
-    ...    ['hyvä', b'hyv\\xe4', {'☃': b'\\x00\\xff'}]
-    Check Log Message    ${tc.kws[11].msgs[0]}    ${expected}
+    Check Log Message    ${tc.kws[11].msgs[0]}    ['hyvä', b'hyv\\xe4', {'☃': b'\\x00\\xff'}]
     Stdout Should Contain    ${small dict}
     Stdout Should Contain    ${small list}
+
+formatter=len
+    ${tc} =    Check Test Case    ${TEST NAME}
+    Check Log Message    ${tc.kws[0].msgs[0]}    20
+    Check Log Message    ${tc.kws[1].msgs[0]}    13    DEBUG
+    Check Log Message    ${tc.kws[3].msgs[0]}    21
+    Check Log Message    ${tc.kws[5].msgs[0]}    5
+
+formatter=type
+    ${tc} =    Check Test Case    ${TEST NAME}
+    Check Log Message    ${tc.kws[0].msgs[0]}    str
+    Check Log Message    ${tc.kws[1].msgs[0]}    str
+    Check Log Message    ${tc.kws[2].msgs[0]}    int    DEBUG
+    Check Log Message    ${tc.kws[4].msgs[0]}    bytes
+    Check Log Message    ${tc.kws[6].msgs[0]}    datetime
 
 formatter=invalid
     Check Test Case    ${TEST NAME}
@@ -209,3 +203,10 @@ Log To Console
     Stdout Should Contain    stdout äö w/o new......line äö
     Stderr Should Contain    stderr äö w/ newline\n
     Stdout Should Contain    42
+
+Log To Console With Formatting
+    Stdout Should Contain    ************test middle align with star padding*************
+    Stdout Should Contain    ####################test right align with hash padding
+    Stdout Should Contain    ${SPACE * 6}test-with-spacepad-and-weird-characters+%?,_\>~}./asdf
+    Stdout Should Contain    ${SPACE * 24}message starts here,this sentence should be on the same sentence as "message starts here"
+    Stderr Should Contain    ${SPACE * 26}test log to stderr

@@ -3,10 +3,10 @@ window.testdata = function () {
     var elementsById = {};
     var idCounter = 0;
     var _statistics = null;
-    var LEVELS = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FAIL', 'SKIP', 'UNKNOWN'];
-    var STATUSES = ['FAIL', 'PASS', 'SKIP', 'NOT RUN', 'UNKNOWN'];
-    var KEYWORD_TYPES = ['KEYWORD', 'SETUP', 'TEARDOWN', 'FOR', 'VAR', 'IF', 'ELSE IF', 'ELSE', 'THREAD'];
-    var MESSAGE_TYPE = 9;
+    var LEVELS = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FAIL', 'SKIP'];
+    var STATUSES = ['FAIL', 'PASS', 'SKIP', 'NOT RUN'];
+    var KEYWORD_TYPES = ['KEYWORD', 'SETUP', 'TEARDOWN', 'FOR', 'ITERATION', 'IF', 'ELSE IF', 'ELSE', 'RETURN',
+                         'TRY', 'EXCEPT', 'FINALLY', 'WHILE', 'CONTINUE', 'BREAK'];
 
     function addElement(elem) {
         if (!elem.id)
@@ -31,10 +31,10 @@ window.testdata = function () {
     }
 
     function createMessage(element, strings) {
-        return model.Message(LEVELS[element[2]],
-                             util.timestamp(element[1]),
-                             strings.get(element[3]),
-                             strings.get(element[4]));
+        return model.Message(LEVELS[element[1]],
+                             util.timestamp(element[0]),
+                             strings.get(element[2]),
+                             strings.get(element[3]));
     }
 
     function parseStatus(stats) {
@@ -48,7 +48,7 @@ window.testdata = function () {
     }
 
     function createBodyItem(parent, element, strings, index) {
-        if (element[0] == MESSAGE_TYPE)
+        if (element.length < 5)
             return createMessage(element, strings);
         var messages = util.filter(parent.children(), function (child) {
             return child.type == 'message';
@@ -166,8 +166,7 @@ window.testdata = function () {
             total: stats[0],
             pass: stats[1],
             fail: stats[2],
-            skip: stats[3],
-            unknow: stats[4],
+            skip: stats[3]
         };
     }
 

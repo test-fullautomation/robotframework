@@ -2,15 +2,12 @@ import logging
 import time
 import sys
 
-from robot.utils import py2to3
-
-logging.getLogger().addHandler(logging.StreamHandler())
-
 
 class CustomHandler(logging.Handler):
 
     def emit(self, record):
         sys.__stdout__.write(record.getMessage().title() + '\n')
+
 
 custom = logging.getLogger('custom')
 custom.addHandler(CustomHandler())
@@ -19,18 +16,21 @@ nonprop.propagate = False
 nonprop.addHandler(CustomHandler())
 
 
-@py2to3
-class Message(object):
+class Message:
+
     def __init__(self, msg=''):
         self.msg = msg
-    def __unicode__(self):
+
+    def __str__(self):
         return self.msg
+
     def __repr__(self):
         return repr(str(self))
 
-@py2to3
+
 class InvalidMessage(Message):
-    def __unicode__(self):
+
+    def __str__(self):
         raise AssertionError('Should not have been logged')
 
 
@@ -42,6 +42,7 @@ def log_with_default_levels():
     #critical is considered a warning
     logging.critical('critical message')
 
+
 def log_with_custom_levels():
     logging.log(logging.DEBUG-1, Message('below debug'))
     logging.log(logging.INFO-1, 'between debug and info')
@@ -49,25 +50,42 @@ def log_with_custom_levels():
     logging.log(logging.WARNING+5, 'between warning and error')
     logging.log(logging.ERROR*100,'above error')
 
+
 def log_exception():
     try:
         raise ValueError('Bang!')
     except ValueError:
         logging.exception('Error occurred!')
 
+
 def log_invalid_message():
     logging.info(InvalidMessage())
+
 
 def log_using_custom_logger():
     logging.getLogger('custom').info('custom logger')
 
+
 def log_using_non_propagating_logger():
     logging.getLogger('nonprop').info('nonprop logger')
+
 
 def log_messages_different_time():
     logging.info('First message')
     time.sleep(0.1)
     logging.info('Second message 0.1 sec later')
+
+
+def log_with_format():
+    test_format = "%(name)s %(levelname)s %(message)s"
+    formatter = logging.Formatter(fmt=test_format)
+    root = logging.getLogger()
+    handler = root.handlers[0]
+    old_formatter = handler.formatter
+    handler.setFormatter(formatter)
+    logging.info("logged at info")
+    handler.setFormatter(old_formatter)
+
 
 def log_something():
     logging.info('something')

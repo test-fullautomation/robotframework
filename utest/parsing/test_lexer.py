@@ -1,11 +1,11 @@
-from io import StringIO
 import os
 import unittest
 import tempfile
+from io import StringIO
+from pathlib import Path
 
-from robot.utils import PY3
+from robot.conf import Language, Languages
 from robot.utils.asserts import assert_equal
-
 from robot.parsing import get_tokens, get_init_tokens, get_resource_tokens, Token
 
 
@@ -16,10 +16,15 @@ def assert_tokens(source, expected, get_tokens=get_tokens, **config):
     tokens = list(get_tokens(source, **config))
     assert_equal(len(tokens), len(expected),
                  'Expected %d tokens:\n%s\n\nGot %d tokens:\n%s'
-                 % (len(expected), expected, len(tokens), tokens),
+                 % (len(expected), format_tokens(expected),
+                    len(tokens), format_tokens(tokens)),
                  values=False)
     for act, exp in zip(tokens, expected):
         assert_equal(act, Token(*exp), formatter=repr)
+
+
+def format_tokens(tokens):
+    return '\n'.join(repr(t) for t in tokens)
 
 
 class TestLexSettingsSection(unittest.TestCase):
@@ -37,6 +42,7 @@ Test Setup        None Shall Pass    ${NONE}
 TEST TEARDOWN     No Operation
 Test Timeout      1 day
 Force Tags        foo    bar
+Keyword Tags      tag
 '''
         expected = [
             (T.SETTING_HEADER, '*** Settings ***', 1, 0),
@@ -79,6 +85,9 @@ Force Tags        foo    bar
             (T.ARGUMENT, 'foo', 11, 18),
             (T.ARGUMENT, 'bar', 11, 25),
             (T.EOS, '', 11, 28),
+            (T.KEYWORD_TAGS, 'Keyword Tags', 12, 0),
+            (T.ARGUMENT, 'tag', 12, 18),
+            (T.EOS, '', 12, 21),
         ]
         assert_tokens(data, expected, get_tokens, data_only=True)
         assert_tokens(data, expected, get_init_tokens, data_only=True)
@@ -132,6 +141,7 @@ Test Template     NONE
 Test Timeout      1 day
 Force Tags        foo    bar
 Default Tags      zap
+Task Tags         quux
 Documentation     Valid in all data files.
 '''
         # Values of invalid settings are ignored with `data_only=True`.
@@ -165,9 +175,12 @@ Documentation     Valid in all data files.
             (T.ERROR, 'Default Tags', 10, 0,
              "Setting 'Default Tags' is not allowed in resource file."),
             (T.EOS, '', 10, 12),
-            (T.DOCUMENTATION, 'Documentation', 11, 0),
-            (T.ARGUMENT, 'Valid in all data files.', 11, 18),
-            (T.EOS, '', 11, 42)
+            (T.ERROR, 'Task Tags', 11, 0,
+             "Setting 'Task Tags' is not allowed in resource file."),
+            (T.EOS, '', 11, 9),
+            (T.DOCUMENTATION, 'Documentation', 12, 0),
+            (T.ARGUMENT, 'Valid in all data files.', 12, 18),
+            (T.EOS, '', 12, 42)
         ]
         assert_tokens(data, expected, get_resource_tokens, data_only=True)
 
@@ -744,11 +757,22 @@ class TestName(unittest.TestCase):
                       (T.ASSIGN, '${v}=', 2, 3), (T.SEPARATOR, '  ', 2, 8),
                       (T.KEYWORD, 'K', 2, 10), (T.EOL, '', 2, 11), (T.EOS, '', 2, 11)])
 
+    def test_name_and_keyword_on_same_continued_rows(self):
+        self._verify('Name\n...    Keyword',
+                     [(T.TESTCASE_NAME, 'Name', 2, 0), (T.EOS, '', 2, 4), (T.EOL, '\n', 2, 4),
+                      (T.CONTINUATION, '...', 3, 0), (T.SEPARATOR, '    ', 3, 3),
+                      (T.KEYWORD, 'Keyword', 3, 7), (T.EOL, '', 3, 14), (T.EOS, '', 3, 14)])
+
     def test_name_and_setting_on_same_row(self):
         self._verify('Name    [Documentation]    The doc.',
                      [(T.TESTCASE_NAME, 'Name', 2, 0), (T.EOS, '', 2, 4), (T.SEPARATOR, '    ', 2, 4),
                       (T.DOCUMENTATION, '[Documentation]', 2, 8), (T.SEPARATOR, '    ', 2, 23),
                       (T.ARGUMENT, 'The doc.', 2, 27), (T.EOL, '', 2, 35), (T.EOS, '', 2, 35)])
+
+    def test_name_with_extra(self):
+        self._verify('Name\n...\n',
+                     [(T.TESTCASE_NAME, 'Name', 2, 0), (T.EOS, '', 2, 4), (T.EOL, '\n', 2, 4),
+                      (T.CONTINUATION, '...', 3, 0), (T.KEYWORD, '', 3, 3), (T.EOL, '\n', 3, 3), (T.EOS, '', 3, 4)])
 
     def _verify(self, data, tokens):
         assert_tokens('*** Test Cases ***\n' + data,
@@ -786,11 +810,24 @@ class TestNameWithPipes(unittest.TestCase):
                       (T.SEPARATOR, '  |  ', 2, 6), (T.ASSIGN, '${v} =', 2, 11), (T.SEPARATOR, '    |    ', 2, 17),
                       (T.KEYWORD, 'K', 2, 26), (T.EOL, '    ', 2, 27), (T.EOS, '', 2, 31)])
 
+    def test_name_and_keyword_on_same_continued_row(self):
+        self._verify('| Name | \n| ... | Keyword',
+                     [(T.SEPARATOR, '| ', 2, 0), (T.TESTCASE_NAME, 'Name', 2, 2), (T.EOS, '', 2, 6), (T.SEPARATOR, ' |', 2, 6), (T.EOL, ' \n', 2, 8),
+                      (T.SEPARATOR, '| ', 3, 0), (T.CONTINUATION, '...', 3, 2), (T.SEPARATOR, ' | ', 3, 5),
+                      (T.KEYWORD, 'Keyword', 3, 8), (T.EOL, '', 3, 15), (T.EOS, '', 3, 15)])
+
     def test_name_and_setting_on_same_row(self):
         self._verify('| Name | [Documentation] | The doc.',
                      [(T.SEPARATOR, '| ', 2, 0), (T.TESTCASE_NAME, 'Name', 2, 2), (T.EOS, '', 2, 6), (T.SEPARATOR, ' | ', 2, 6),
                       (T.DOCUMENTATION, '[Documentation]', 2, 9), (T.SEPARATOR, ' | ', 2, 24),
                       (T.ARGUMENT, 'The doc.', 2, 27), (T.EOL, '', 2, 35), (T.EOS, '', 2, 35)])
+
+    def test_name_with_extra(self):
+        self._verify('| Name |  |   |\n| ... |',
+                     [(T.SEPARATOR, '| ', 2, 0), (T.TESTCASE_NAME, 'Name', 2, 2), (T.EOS, '', 2, 6),
+                      (T.SEPARATOR, ' |  ', 2, 6), (T.SEPARATOR, '|   ', 2, 10), (T.SEPARATOR, '|', 2, 14), (T.EOL, '\n', 2, 15),
+                      (T.SEPARATOR, '| ', 3, 0), (T.CONTINUATION, '...', 3, 2), (T.KEYWORD, '', 3, 5), (T.SEPARATOR, ' |', 3, 5),
+                      (T.EOL, '', 3, 7), (T.EOS, '', 3, 7)])
 
     def _verify(self, data, tokens):
         assert_tokens('*** Test Cases ***\n' + data,
@@ -923,6 +960,487 @@ Name
                       get_resource_tokens, data_only=True)
 
 
+class TestIf(unittest.TestCase):
+
+    def test_if_only(self):
+        block = '''\
+    IF    ${True}
+        Log Many    foo    bar
+    END
+'''
+        expected = [
+            (T.IF, 'IF', 3, 4),
+            (T.ARGUMENT, '${True}', 3, 10),
+            (T.EOS, '', 3, 17),
+            (T.KEYWORD, 'Log Many', 4, 8),
+            (T.ARGUMENT, 'foo', 4, 20),
+            (T.ARGUMENT, 'bar', 4, 27),
+            (T.EOS, '', 4, 30),
+            (T.END, 'END', 5, 4),
+            (T.EOS, '', 5, 7)
+        ]
+        self._verify(block, expected)
+
+    def test_with_else(self):
+        block = '''\
+    IF    ${False}
+        Log    foo
+    ELSE
+        Log    bar
+    END
+'''
+        expected = [
+            (T.IF, 'IF', 3, 4),
+            (T.ARGUMENT, '${False}', 3, 10),
+            (T.EOS, '', 3, 18),
+            (T.KEYWORD, 'Log', 4, 8),
+            (T.ARGUMENT, 'foo', 4, 15),
+            (T.EOS, '', 4, 18),
+            (T.ELSE, 'ELSE', 5, 4),
+            (T.EOS, '', 5, 8),
+            (T.KEYWORD, 'Log', 6,8),
+            (T.ARGUMENT, 'bar', 6, 15),
+            (T.EOS, '', 6, 18),
+            (T.END, 'END', 7, 4),
+            (T.EOS, '', 7, 7)
+        ]
+        self._verify(block, expected)
+
+    def test_with_else_if_and_else(self):
+        block = '''\
+    IF    ${False}
+        Log    foo
+    ELSE IF    ${True}
+        Log    bar
+    ELSE
+        Noop
+    END
+'''
+        expected = [
+            (T.IF, 'IF', 3, 4),
+            (T.ARGUMENT, '${False}', 3, 10),
+            (T.EOS, '', 3, 18),
+            (T.KEYWORD, 'Log', 4, 8),
+            (T.ARGUMENT, 'foo', 4, 15),
+            (T.EOS, '', 4, 18),
+            (T.ELSE_IF, 'ELSE IF', 5, 4),
+            (T.ARGUMENT, '${True}', 5, 15),
+            (T.EOS, '', 5, 22),
+            (T.KEYWORD, 'Log', 6, 8),
+            (T.ARGUMENT, 'bar', 6, 15),
+            (T.EOS, '', 6, 18),
+            (T.ELSE, 'ELSE', 7, 4),
+            (T.EOS, '', 7, 8),
+            (T.KEYWORD, 'Noop', 8, 8),
+            (T.EOS, '', 8, 12),
+            (T.END, 'END', 9, 4),
+            (T.EOS, '', 9, 7)
+        ]
+        self._verify(block, expected)
+
+    def test_multiline_and_comments(self):
+        block = '''\
+    IF                 # 3
+    ...    ${False}    # 4
+        Log            # 5
+    ...    foo         # 6
+    ELSE IF            # 7
+    ...    ${True}     # 8
+        Log            # 9
+    ...    bar         # 10
+    ELSE               # 11
+        Log            # 12
+    ...    zap         # 13
+    END                # 14
+        '''
+        expected = [
+            (T.IF, 'IF', 3, 4),
+            (T.ARGUMENT, '${False}', 4, 11),
+            (T.EOS, '', 4, 19),
+            (T.KEYWORD, 'Log', 5, 8),
+            (T.ARGUMENT, 'foo', 6, 11),
+            (T.EOS, '', 6, 14),
+            (T.ELSE_IF, 'ELSE IF', 7, 4),
+            (T.ARGUMENT, '${True}', 8, 11),
+            (T.EOS, '', 8, 18),
+            (T.KEYWORD, 'Log', 9, 8),
+            (T.ARGUMENT, 'bar', 10, 11),
+            (T.EOS, '', 10, 14),
+            (T.ELSE, 'ELSE', 11, 4),
+            (T.EOS, '', 11, 8),
+            (T.KEYWORD, 'Log', 12, 8),
+            (T.ARGUMENT, 'zap', 13, 11),
+            (T.EOS, '', 13, 14),
+            (T.END, 'END', 14, 4),
+            (T.EOS, '', 14, 7)
+        ]
+        self._verify(block, expected)
+
+    def _verify(self, block, expected_header):
+        data = f'''\
+*** Test Cases ***
+Name
+{block}
+'''
+        expected_tokens = [
+            (T.TESTCASE_HEADER, '*** Test Cases ***', 1, 0),
+            (T.EOS, '', 1, 18),
+            (T.TESTCASE_NAME, 'Name', 2, 0),
+            (T.EOS, '', 2, 4)
+        ] + expected_header
+        assert_tokens(data, expected_tokens, data_only=True)
+
+
+class TestInlineIf(unittest.TestCase):
+
+    def test_if_only(self):
+        header = '    IF    ${True}    Log Many   foo    bar'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, '${True}', 3, 10),
+            (T.EOS, '', 3, 17),
+            (T.SEPARATOR, '    ', 3, 17),
+            (T.KEYWORD, 'Log Many', 3, 21),
+            (T.SEPARATOR, '   ', 3, 29),
+            (T.ARGUMENT, 'foo', 3, 32),
+            (T.SEPARATOR, '    ', 3, 35),
+            (T.ARGUMENT, 'bar', 3, 39),
+            (T.EOL, '\n', 3, 42),
+            (T.EOS, '', 3, 43),
+            (T.END, '', 3, 43),
+            (T.EOS, '', 3, 43)
+        ]
+        self._verify(header, expected)
+
+    def test_with_else(self):
+        #             4     10          22     29     36     43     50
+        header = '    IF    ${False}    Log    foo    ELSE   Log    bar'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, '${False}', 3, 10),
+            (T.EOS, '', 3, 18),
+            (T.SEPARATOR, '    ', 3, 18),
+            (T.KEYWORD, 'Log', 3, 22),
+            (T.SEPARATOR, '    ', 3, 25),
+            (T.ARGUMENT, 'foo', 3, 29),
+            (T.SEPARATOR, '    ', 3, 32),
+            (T.EOS, '', 3, 36),
+            (T.ELSE, 'ELSE', 3, 36),
+            (T.EOS, '', 3, 40),
+            (T.SEPARATOR, '   ', 3, 40),
+            (T.KEYWORD, 'Log', 3, 43),
+            (T.SEPARATOR, '    ', 3, 46),
+            (T.ARGUMENT, 'bar', 3, 50),
+            (T.EOL, '\n', 3, 53),
+            (T.EOS, '', 3, 54),
+            (T.END, '', 3, 54),
+            (T.EOS, '', 3, 54)
+        ]
+        self._verify(header, expected)
+
+    def test_with_else_if_and_else(self):
+        #             4     10          22     29     36         47       56     63     70      78
+        header = '    IF    ${False}    Log    foo    ELSE IF    ${True}  Log    bar    ELSE    Noop'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, '${False}', 3, 10),
+            (T.EOS, '', 3, 18),
+            (T.SEPARATOR, '    ', 3, 18),
+            (T.KEYWORD, 'Log', 3, 22),
+            (T.SEPARATOR, '    ', 3, 25),
+            (T.ARGUMENT, 'foo', 3, 29),
+            (T.SEPARATOR, '    ', 3, 32),
+            (T.EOS, '', 3, 36),
+            (T.ELSE_IF, 'ELSE IF', 3, 36),
+            (T.SEPARATOR, '    ', 3, 43),
+            (T.ARGUMENT, '${True}', 3, 47),
+            (T.EOS, '', 3, 54),
+            (T.SEPARATOR, '  ', 3, 54),
+            (T.KEYWORD, 'Log', 3, 56),
+            (T.SEPARATOR, '    ', 3, 59),
+            (T.ARGUMENT, 'bar', 3, 63),
+            (T.SEPARATOR, '    ', 3, 66),
+            (T.EOS, '', 3, 70),
+            (T.ELSE, 'ELSE', 3, 70),
+            (T.EOS, '', 3, 74),
+            (T.SEPARATOR, '    ', 3, 74),
+            (T.KEYWORD, 'Noop', 3, 78),
+            (T.EOL, '\n', 3, 82),
+            (T.EOS, '', 3, 83),
+            (T.END, '', 3, 83),
+            (T.EOS, '', 3, 83)
+        ]
+        self._verify(header, expected)
+
+    def test_else_if_with_non_ascii_space(self):
+        #             4     10   15    21
+        header = '    IF    1    K1    ELSE\N{NO-BREAK SPACE}IF    2    K2'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, '1', 3, 10),
+            (T.EOS, '', 3, 11),
+            (T.SEPARATOR, '    ', 3, 11),
+            (T.KEYWORD, 'K1', 3, 15),
+            (T.SEPARATOR, '    ', 3, 17),
+            (T.EOS, '', 3, 21),
+            (T.ELSE_IF, 'ELSE\N{NO-BREAK SPACE}IF', 3, 21),
+            (T.SEPARATOR, '    ', 3, 28),
+            (T.ARGUMENT, '2', 3, 32),
+            (T.EOS, '', 3, 33),
+            (T.SEPARATOR, '    ', 3, 33),
+            (T.KEYWORD, 'K2', 3, 37),
+            (T.EOL, '\n', 3, 39),
+            (T.EOS, '', 3, 40),
+            (T.END, '', 3, 40),
+            (T.EOS, '', 3, 40)
+        ]
+        self._verify(header, expected)
+
+    def test_empty_else(self):
+        header = '    IF    e    K    ELSE'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, 'e', 3, 10),
+            (T.EOS, '', 3, 11),
+            (T.SEPARATOR, '    ', 3, 11),
+            (T.KEYWORD, 'K', 3, 15),
+            (T.SEPARATOR, '    ', 3, 16),
+            (T.EOS, '', 3, 20),
+            (T.ELSE, 'ELSE', 3, 20),
+            (T.EOL, '\n', 3, 24),
+            (T.EOS, '', 3, 25),
+            (T.END, '', 3, 25),
+            (T.EOS, '', 3, 25)
+        ]
+        self._verify(header, expected)
+
+    def test_empty_else_if(self):
+        header = '    IF    e    K    ELSE IF'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, 'e', 3, 10),
+            (T.EOS, '', 3, 11),
+            (T.SEPARATOR, '    ', 3, 11),
+            (T.KEYWORD, 'K', 3, 15),
+            (T.SEPARATOR, '    ', 3, 16),
+            (T.EOS, '', 3, 20),
+            (T.ELSE_IF, 'ELSE IF', 3, 20),
+            (T.EOL, '\n', 3, 27),
+            (T.EOS, '', 3, 28),
+            (T.END, '', 3, 28),
+            (T.EOS, '', 3, 28)
+        ]
+        self._verify(header, expected)
+
+    def test_else_if_with_only_expression(self):
+        header = '    IF    e    K    ELSE IF    e'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '    ', 3, 6),
+            (T.ARGUMENT, 'e', 3, 10),
+            (T.EOS, '', 3, 11),
+            (T.SEPARATOR, '    ', 3, 11),
+            (T.KEYWORD, 'K', 3, 15),
+            (T.SEPARATOR, '    ', 3, 16),
+            (T.EOS, '', 3, 20),
+            (T.ELSE_IF, 'ELSE IF', 3, 20),
+            (T.SEPARATOR, '    ', 3, 27),
+            (T.ARGUMENT, 'e', 3, 31),
+            (T.EOL, '\n', 3, 32),
+            (T.EOS, '', 3, 33),
+            (T.END, '', 3, 33),
+            (T.EOS, '', 3, 33)
+        ]
+        self._verify(header, expected)
+
+    def test_assign(self):
+        #             4         14    20      28    34      42
+        header = '    ${x} =    IF    True    K1    ELSE    K2'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.ASSIGN, '${x} =', 3, 4),
+            (T.SEPARATOR, '    ', 3, 10),
+            (T.INLINE_IF, 'IF', 3, 14),
+            (T.SEPARATOR, '    ', 3, 16),
+            (T.ARGUMENT, 'True', 3, 20),
+            (T.EOS, '', 3, 24),
+            (T.SEPARATOR, '    ', 3, 24),
+            (T.KEYWORD, 'K1', 3, 28),
+            (T.SEPARATOR, '    ', 3, 30),
+            (T.EOS, '', 3, 34),
+            (T.ELSE, 'ELSE', 3, 34),
+            (T.EOS, '', 3, 38),
+            (T.SEPARATOR, '    ', 3, 38),
+            (T.KEYWORD, 'K2', 3, 42),
+            (T.EOL, '\n', 3, 44),
+            (T.EOS, '', 3, 45),
+            (T.END, '', 3, 45),
+            (T.EOS, '', 3, 45),
+        ]
+        self._verify(header, expected)
+
+    def test_assign_with_empty_else(self):
+        #             4         14    20      28    34
+        header = '    ${x} =    IF    True    K1    ELSE'
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.ASSIGN, '${x} =', 3, 4),
+            (T.SEPARATOR, '    ', 3, 10),
+            (T.INLINE_IF, 'IF', 3, 14),
+            (T.SEPARATOR, '    ', 3, 16),
+            (T.ARGUMENT, 'True', 3, 20),
+            (T.EOS, '', 3, 24),
+            (T.SEPARATOR, '    ', 3, 24),
+            (T.KEYWORD, 'K1', 3, 28),
+            (T.SEPARATOR, '    ', 3, 30),
+            (T.EOS, '', 3, 34),
+            (T.ELSE, 'ELSE', 3, 34),
+            (T.EOL, '\n', 3, 38),
+            (T.EOS, '', 3, 39),
+            (T.END, '', 3, 39),
+            (T.EOS, '', 3, 39),
+        ]
+        self._verify(header, expected)
+
+    def test_multiline_and_comments(self):
+        header = '''\
+    IF                 # 3
+    ...    ${False}    # 4
+    ...    Log         # 5
+    ...    foo         # 6
+    ...    ELSE IF     # 7
+    ...    ${True}     # 8
+    ...    Log         # 9
+    ...    bar         # 10
+    ...    ELSE        # 11
+    ...    Log         # 12
+    ...    zap         # 13
+'''
+        expected = [
+            (T.SEPARATOR, '    ', 3, 0),
+            (T.INLINE_IF, 'IF', 3, 4),
+            (T.SEPARATOR, '                 ', 3, 6),
+            (T.COMMENT, '# 3', 3, 23),
+            (T.EOL, '\n', 3, 26),
+            (T.SEPARATOR, '    ', 4, 0),
+            (T.CONTINUATION, '...', 4, 4),
+            (T.SEPARATOR, '    ', 4, 7),
+            (T.ARGUMENT, '${False}', 4, 11),
+            (T.EOS, '', 4, 19),
+
+            (T.SEPARATOR, '    ', 4, 19),
+            (T.COMMENT, '# 4', 4, 23),
+            (T.EOL, '\n', 4, 26),
+            (T.SEPARATOR, '    ', 5, 0),
+            (T.CONTINUATION, '...', 5, 4),
+            (T.SEPARATOR, '    ', 5, 7),
+            (T.KEYWORD, 'Log', 5, 11),
+            (T.SEPARATOR, '         ', 5, 14),
+            (T.COMMENT, '# 5', 5, 23),
+            (T.EOL, '\n', 5, 26),
+            (T.SEPARATOR, '    ', 6, 0),
+            (T.CONTINUATION, '...', 6, 4),
+            (T.SEPARATOR, '    ', 6, 7),
+            (T.ARGUMENT, 'foo', 6, 11),
+            (T.SEPARATOR, '         ', 6, 14),
+            (T.COMMENT, '# 6', 6, 23),
+            (T.EOL, '\n', 6, 26),
+            (T.SEPARATOR, '    ', 7, 0),
+            (T.CONTINUATION, '...', 7, 4),
+            (T.SEPARATOR, '    ', 7, 7),
+            (T.EOS, '', 7, 11),
+
+            (T.ELSE_IF, 'ELSE IF', 7, 11),
+            (T.SEPARATOR, '     ', 7, 18),
+            (T.COMMENT, '# 7', 7, 23),
+            (T.EOL, '\n', 7, 26),
+            (T.SEPARATOR, '    ', 8, 0),
+            (T.CONTINUATION, '...', 8, 4),
+            (T.SEPARATOR, '    ', 8, 7),
+            (T.ARGUMENT, '${True}', 8, 11),
+            (T.EOS, '', 8, 18),
+
+            (T.SEPARATOR, '     ', 8, 18),
+            (T.COMMENT, '# 8', 8, 23),
+            (T.EOL, '\n', 8, 26),
+            (T.SEPARATOR, '    ', 9, 0),
+            (T.CONTINUATION, '...', 9, 4),
+            (T.SEPARATOR, '    ', 9, 7),
+            (T.KEYWORD, 'Log', 9, 11),
+            (T.SEPARATOR, '         ', 9, 14),
+            (T.COMMENT, '# 9', 9, 23),
+            (T.EOL, '\n', 9, 26),
+            (T.SEPARATOR, '    ', 10, 0),
+            (T.CONTINUATION, '...', 10, 4),
+            (T.SEPARATOR, '    ', 10, 7),
+            (T.ARGUMENT, 'bar', 10, 11),
+            (T.SEPARATOR, '         ', 10, 14),
+            (T.COMMENT, '# 10', 10, 23),
+            (T.EOL, '\n', 10, 27),
+            (T.SEPARATOR, '    ', 11, 0),
+            (T.CONTINUATION, '...', 11, 4),
+            (T.SEPARATOR, '    ', 11, 7),
+            (T.EOS, '', 11, 11),
+
+            (T.ELSE, 'ELSE', 11, 11),
+            (T.EOS, '', 11, 15),
+
+            (T.SEPARATOR, '        ', 11, 15),
+            (T.COMMENT, '# 11', 11, 23),
+            (T.EOL, '\n', 11, 27),
+            (T.SEPARATOR, '    ', 12, 0),
+            (T.CONTINUATION, '...', 12, 4),
+            (T.SEPARATOR, '    ', 12, 7),
+            (T.KEYWORD, 'Log', 12, 11),
+            (T.SEPARATOR, '         ', 12, 14),
+            (T.COMMENT, '# 12', 12, 23),
+            (T.EOL, '\n', 12, 27),
+            (T.SEPARATOR, '    ', 13, 0),
+            (T.CONTINUATION, '...', 13, 4),
+            (T.SEPARATOR, '    ', 13, 7),
+            (T.ARGUMENT, 'zap', 13, 11),
+            (T.SEPARATOR, '         ', 13, 14),
+            (T.COMMENT, '# 13', 13, 23),
+            (T.EOL, '\n', 13, 27),
+            (T.EOS, '', 13, 28),
+
+            (T.END, '', 13, 28),
+            (T.EOS, '', 13, 28),
+            (T.EOL, '\n', 14, 0),
+            (T.EOS, '', 14, 1)
+        ]
+        self._verify(header, expected)
+
+    def _verify(self, header, expected_header):
+        data = f'''\
+*** Test Cases ***
+Name
+{header}
+'''
+        expected_tokens = [
+            (T.TESTCASE_HEADER, '*** Test Cases ***', 1, 0),
+            (T.EOL, '\n', 1, 18),
+            (T.EOS, '', 1, 19),
+            (T.TESTCASE_NAME, 'Name', 2, 0),
+            (T.EOL, '\n', 2, 4),
+            (T.EOS, '', 2, 5),
+        ] + expected_header
+        assert_tokens(data, expected_tokens)
+
+
 class TestCommentRowsAndEmptyRows(unittest.TestCase):
 
     def test_between_names(self):
@@ -1010,7 +1528,7 @@ class TestCommentRowsAndEmptyRows(unittest.TestCase):
 class TestGetTokensSourceFormats(unittest.TestCase):
     path = os.path.join(os.getenv('TEMPDIR') or tempfile.gettempdir(),
                         'test_lexer.robot')
-    data = u'''\
+    data = '''\
 *** Settings ***
 Library         Easter
 
@@ -1070,12 +1588,9 @@ Example
         self._verify(self.path)
         self._verify(self.path, data_only=True)
 
-    if PY3:
-
-        def test_pathlib_path(self):
-            from pathlib import Path
-            self._verify(Path(self.path))
-            self._verify(Path(self.path), data_only=True)
+    def test_pathlib_path(self):
+        self._verify(Path(self.path))
+        self._verify(Path(self.path), data_only=True)
 
     def test_open_file(self):
         with open(self.path) as f:
@@ -1097,7 +1612,7 @@ Example
 
 
 class TestGetResourceTokensSourceFormats(TestGetTokensSourceFormats):
-    data = u'''\
+    data = '''\
 *** Variable ***
 ${VAR}    Value
 
@@ -1291,7 +1806,7 @@ do something
                     (T.EOS, '', 2, 12),
                     (T.ASSIGN, '${a}', 3, 4),
                     (T.EOS, '', 3, 8)]
-                    
+
         assert_tokens(data, expected, get_tokens=get_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_resource_tokens,
@@ -1312,7 +1827,7 @@ do something
                     (T.ASSIGN, '${a}', 3, 4),
                     (T.KEYWORD, 'do nothing', 3, 10),
                     (T.EOS, '', 3, 20)]
-                    
+
         assert_tokens(data, expected, get_tokens=get_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_resource_tokens,
@@ -1332,7 +1847,7 @@ do something
                     (T.EOS, '', 2, 12),
                     (T.KEYWORD, '${a', 3, 4),
                     (T.EOS, '', 3, 7)]
-                    
+
         assert_tokens(data, expected, get_tokens=get_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_resource_tokens,
@@ -1352,7 +1867,7 @@ do something
                     (T.EOS, '', 2, 12),
                     (T.KEYWORD, '${=', 3, 4),
                     (T.EOS, '', 3, 7)]
-                    
+
         assert_tokens(data, expected, get_tokens=get_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_resource_tokens,
@@ -1372,13 +1887,436 @@ do something
                     (T.EOS, '', 2, 12),
                     (T.KEYWORD, '${abc def=', 3, 4),
                     (T.EOS, '', 3, 14)]
-                    
+
         assert_tokens(data, expected, get_tokens=get_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_resource_tokens,
                       data_only=True, tokenize_variables=True)
         assert_tokens(data, expected, get_tokens=get_init_tokens,
                       data_only=True, tokenize_variables=True)
+
+
+class TestReturn(unittest.TestCase):
+
+    def test_in_keyword(self):
+        data = '    RETURN'
+        expected = [(T.RETURN_STATEMENT, 'RETURN', 3, 4),
+                    (T.EOS, '', 3, 10)]
+        self._verify(data, expected)
+
+    def test_in_test(self):
+        # This is not valid usage but that's not recognized during lexing.
+        data = '    RETURN'
+        expected = [(T.RETURN_STATEMENT, 'RETURN', 3, 4),
+                    (T.EOS, '', 3, 10)]
+        self._verify(data, expected, test=True)
+
+    def test_in_if(self):
+        data = '''\
+    IF    True
+        RETURN    Hello!
+    END
+'''
+        expected = [(T.IF, 'IF', 3, 4),
+                    (T.ARGUMENT, 'True', 3, 10),
+                    (T.EOS, '', 3, 14),
+                    (T.RETURN_STATEMENT, 'RETURN', 4, 8),
+                    (T.ARGUMENT, 'Hello!', 4, 18),
+                    (T.EOS, '', 4, 24),
+                    (T.END, 'END', 5, 4),
+                    (T.EOS, '', 5, 7)]
+        self._verify(data, expected)
+
+    def test_in_for(self):
+            data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        RETURN    ${x}
+    END
+'''
+            expected = [(T.FOR, 'FOR', 3, 4),
+                        (T.VARIABLE, '${x}', 3, 11),
+                        (T.FOR_SEPARATOR, 'IN', 3, 19),
+                        (T.ARGUMENT, '@{STUFF}', 3, 25),
+                        (T.EOS, '', 3, 33),
+                        (T.RETURN_STATEMENT, 'RETURN', 4, 8),
+                        (T.ARGUMENT, '${x}', 4, 18),
+                        (T.EOS, '', 4, 22),
+                        (T.END, 'END', 5, 4),
+                        (T.EOS, '', 5, 7)]
+            self._verify(data, expected)
+
+    def _verify(self, data, expected, test=False):
+        if not test:
+            header = '*** Keywords ***'
+            header_type = T.KEYWORD_HEADER
+            name_type = T.KEYWORD_NAME
+        else:
+            header = '*** Test Cases ***'
+            header_type = T.TESTCASE_HEADER
+            name_type = T.TESTCASE_NAME
+        data = f'{header}\nName\n{data}'
+        expected = [(header_type, header, 1, 0),
+                    (T.EOS, '', 1, len(header)),
+                    (name_type, 'Name', 2, 0),
+                    (T.EOS, '', 2, 4)] + expected
+        assert_tokens(data, expected, data_only=True)
+
+
+class TestContinue(unittest.TestCase):
+
+    def test_in_keyword(self):
+        data = '    CONTINUE'
+        expected = [(T.CONTINUE, 'CONTINUE', 3, 4),
+                    (T.EOS, '', 3, 12)]
+        self._verify(data, expected)
+
+    def test_in_test(self):
+        data = '    CONTINUE'
+        expected = [(T.CONTINUE, 'CONTINUE', 3, 4),
+                    (T.EOS, '', 3, 12)]
+        self._verify(data, expected, test=True)
+
+    def test_in_if(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        IF    True
+            CONTINUE
+        END
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.IF, 'IF', 4, 8),
+                    (T.ARGUMENT, 'True', 4, 14),
+                    (T.EOS, '', 4, 18),
+                    (T.CONTINUE, 'CONTINUE', 5, 12),
+                    (T.EOS, '', 5, 20),
+                    (T.END, 'END', 6, 8),
+                    (T.EOS, '', 6, 11),
+                    (T.END, 'END', 7, 4),
+                    (T.EOS, '', 7, 7)]
+        self._verify(data, expected)
+
+    def test_in_try(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        TRY
+            KW
+        EXCEPT
+            CONTINUE
+        END
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.TRY, 'TRY', 4, 8),
+                    (T.EOS, '', 4, 11),
+                    (T.KEYWORD, 'KW', 5, 12),
+                    (T.EOS, '', 5, 14),
+                    (T.EXCEPT, 'EXCEPT', 6, 8),
+                    (T.EOS, '', 6, 14),
+                    (T.CONTINUE, 'CONTINUE', 7, 12),
+                    (T.EOS, '', 7, 20),
+                    (T.END, 'END', 8, 8),
+                    (T.EOS, '', 8, 11),
+                    (T.END, 'END', 9, 4),
+                    (T.EOS, '', 9, 7)]
+        self._verify(data, expected)
+
+    def test_in_for(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        CONTINUE
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.CONTINUE, 'CONTINUE', 4, 8),
+                    (T.EOS, '', 4, 16),
+                    (T.END, 'END', 5, 4),
+                    (T.EOS, '', 5, 7)]
+        self._verify(data, expected)
+
+    def test_in_while(self):
+        data = '''\
+    WHILE    ${EXPR}
+        CONTINUE
+    END
+'''
+        expected = [(T.WHILE, 'WHILE', 3, 4),
+                    (T.ARGUMENT, '${EXPR}', 3, 13),
+                    (T.EOS, '', 3, 20),
+                    (T.CONTINUE, 'CONTINUE', 4, 8),
+                    (T.EOS, '', 4, 16),
+                    (T.END, 'END', 5, 4),
+                    (T.EOS, '', 5, 7)]
+        self._verify(data, expected)
+
+    def _verify(self, data, expected, test=False):
+        if not test:
+            header = '*** Keywords ***'
+            header_type = T.KEYWORD_HEADER
+            name_type = T.KEYWORD_NAME
+        else:
+            header = '*** Test Cases ***'
+            header_type = T.TESTCASE_HEADER
+            name_type = T.TESTCASE_NAME
+        data = f'{header}\nName\n{data}'
+        expected = [(header_type, header, 1, 0),
+                    (T.EOS, '', 1, len(header)),
+                    (name_type, 'Name', 2, 0),
+                    (T.EOS, '', 2, 4)] + expected
+        assert_tokens(data, expected, data_only=True)
+
+
+class TestBreak(unittest.TestCase):
+
+    def test_in_keyword(self):
+        data = '    BREAK'
+        expected = [(T.BREAK, 'BREAK', 3, 4),
+                    (T.EOS, '', 3, 9)]
+        self._verify(data, expected)
+
+    def test_in_test(self):
+        data = '    BREAK'
+        expected = [(T.BREAK, 'BREAK', 3, 4),
+                    (T.EOS, '', 3, 9)]
+        self._verify(data, expected, test=True)
+
+    def test_in_if(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        IF    True
+            BREAK
+        END
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.IF, 'IF', 4, 8),
+                    (T.ARGUMENT, 'True', 4, 14),
+                    (T.EOS, '', 4, 18),
+                    (T.BREAK, 'BREAK', 5, 12),
+                    (T.EOS, '', 5, 17),
+                    (T.END, 'END', 6, 8),
+                    (T.EOS, '', 6, 11),
+                    (T.END, 'END', 7, 4),
+                    (T.EOS, '', 7, 7)]
+        self._verify(data, expected)
+
+    def test_in_for(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        BREAK
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.BREAK, 'BREAK', 4, 8),
+                    (T.EOS, '', 4, 13),
+                    (T.END, 'END', 5, 4),
+                    (T.EOS, '', 5, 7)]
+        self._verify(data, expected)
+
+    def test_in_while(self):
+        data = '''\
+    WHILE    ${EXPR}
+        BREAK
+    END
+'''
+        expected = [(T.WHILE, 'WHILE', 3, 4),
+                    (T.ARGUMENT, '${EXPR}', 3, 13),
+                    (T.EOS, '', 3, 20),
+                    (T.BREAK, 'BREAK', 4, 8),
+                    (T.EOS, '', 4, 13),
+                    (T.END, 'END', 5, 4),
+                    (T.EOS, '', 5, 7)]
+        self._verify(data, expected)
+
+    def test_in_try(self):
+        data = '''\
+    FOR    ${x}    IN    @{STUFF}
+        TRY
+            KW
+        EXCEPT
+            BREAK
+        END
+    END
+'''
+        expected = [(T.FOR, 'FOR', 3, 4),
+                    (T.VARIABLE, '${x}', 3, 11),
+                    (T.FOR_SEPARATOR, 'IN', 3, 19),
+                    (T.ARGUMENT, '@{STUFF}', 3, 25),
+                    (T.EOS, '', 3, 33),
+                    (T.TRY, 'TRY', 4, 8),
+                    (T.EOS, '', 4, 11),
+                    (T.KEYWORD, 'KW', 5, 12),
+                    (T.EOS, '', 5, 14),
+                    (T.EXCEPT, 'EXCEPT', 6, 8),
+                    (T.EOS, '', 6, 14),
+                    (T.BREAK, 'BREAK', 7, 12),
+                    (T.EOS, '', 7, 17),
+                    (T.END, 'END', 8, 8),
+                    (T.EOS, '', 8, 11),
+                    (T.END, 'END', 9, 4),
+                    (T.EOS, '', 9, 7)]
+        self._verify(data, expected)
+
+    def _verify(self, data, expected, test=False):
+        if not test:
+            header = '*** Keywords ***'
+            header_type = T.KEYWORD_HEADER
+            name_type = T.KEYWORD_NAME
+        else:
+            header = '*** Test Cases ***'
+            header_type = T.TESTCASE_HEADER
+            name_type = T.TESTCASE_NAME
+        data = f'{header}\nName\n{data}'
+        expected = [(header_type, header, 1, 0),
+                    (T.EOS, '', 1, len(header)),
+                    (name_type, 'Name', 2, 0),
+                    (T.EOS, '', 2, 4)] + expected
+        assert_tokens(data, expected, data_only=True)
+
+
+class TestLanguageConfig(unittest.TestCase):
+
+    def test_lang_as_code(self):
+        self._test_explicit_config('fi')
+        self._test_explicit_config('F-I')
+
+    def test_lang_as_name(self):
+        self._test_explicit_config('Finnish')
+        self._test_explicit_config('FINNISH')
+
+    def test_lang_as_Language(self):
+        self._test_explicit_config(Language.from_name('fi'))
+
+    def test_lang_as_list(self):
+        self._test_explicit_config(['fi', Language.from_name('de')])
+        self._test_explicit_config([Language.from_name('fi'), 'de'])
+
+    def test_lang_as_tuple(self):
+        self._test_explicit_config(('f-i', Language.from_name('de')))
+        self._test_explicit_config((Language.from_name('fi'), 'de'))
+
+    def test_lang_as_Languages(self):
+        self._test_explicit_config(Languages('fi'))
+
+    def _test_explicit_config(self, lang):
+        data = '''\
+*** Asetukset ***
+Dokumentaatio    Documentation
+'''
+        expected = [
+            (T.SETTING_HEADER, '*** Asetukset ***', 1, 0),
+            (T.EOL, '\n', 1, 17),
+            (T.EOS, '', 1, 18),
+            (T.DOCUMENTATION, 'Dokumentaatio', 2, 0),
+            (T.SEPARATOR, '    ', 2, 13),
+            (T.ARGUMENT, 'Documentation', 2, 17),
+            (T.EOL, '\n', 2, 30),
+            (T.EOS, '', 2, 31),
+        ]
+        assert_tokens(data, expected, get_tokens, lang=lang)
+        assert_tokens(data, expected, get_init_tokens, lang=lang)
+        assert_tokens(data, expected, get_resource_tokens, lang=lang)
+
+    def test_per_file_config(self):
+        data = '''\
+language: pt    not recognized
+language: fi
+ignored    language: pt
+Language:German    # ok!
+*** Asetukset ***
+Dokumentaatio    Documentation
+'''
+        expected = [
+            (T.COMMENT, 'language: pt', 1, 0),
+            (T.SEPARATOR, '    ', 1, 12),
+            (T.COMMENT, 'not recognized', 1, 16),
+            (T.EOL, '\n', 1, 30),
+            (T.EOS, '', 1, 31),
+            (T.CONFIG, 'language: fi', 2, 0),
+            (T.EOL, '\n', 2, 12),
+            (T.EOS, '', 2, 13),
+            (T.COMMENT, 'ignored', 3, 0),
+            (T.SEPARATOR, '    ', 3, 7),
+            (T.COMMENT, 'language: pt', 3, 11),
+            (T.EOL, '\n', 3, 23),
+            (T.EOS, '', 3, 24),
+            (T.CONFIG, 'Language:German', 4, 0),
+            (T.SEPARATOR, '    ', 4, 15),
+            (T.COMMENT, '# ok!', 4, 19),
+            (T.EOL, '\n', 4, 24),
+            (T.EOS, '', 4, 25),
+            (T.SETTING_HEADER, '*** Asetukset ***', 5, 0),
+            (T.EOL, '\n', 5, 17),
+            (T.EOS, '', 5, 18),
+            (T.DOCUMENTATION, 'Dokumentaatio', 6, 0),
+            (T.SEPARATOR, '    ', 6, 13),
+            (T.ARGUMENT, 'Documentation', 6, 17),
+            (T.EOL, '\n', 6, 30),
+            (T.EOS, '', 6, 31),
+        ]
+        assert_tokens(data, expected, get_tokens)
+        lang = Languages()
+        assert_tokens(data, expected, get_init_tokens, lang=lang)
+        assert_equal(lang.languages,
+                     [Language.from_name(lang) for lang in ('en', 'fi', 'de')])
+
+    def test_invalid_per_file_config(self):
+        data = '''\
+language: in:va:lid
+language: bad again    but not recognized as config and ignored
+Language: Finnish
+*** Asetukset ***
+Dokumentaatio    Documentation
+'''
+        expected = [
+            (T.ERROR, 'language: in:va:lid', 1, 0,
+             "Invalid language configuration: Language 'in:va:lid' not found "
+             "nor importable as a language module."),
+            (T.EOL, '\n', 1, 19),
+            (T.EOS, '', 1, 20),
+            (T.COMMENT, 'language: bad again', 2, 0),
+            (T.SEPARATOR, '    ', 2, 19),
+            (T.COMMENT, 'but not recognized as config and ignored', 2, 23),
+            (T.EOL, '\n', 2, 63),
+            (T.EOS, '', 2, 64),
+            (T.CONFIG, 'Language: Finnish', 3, 0),
+            (T.EOL, '\n', 3, 17),
+            (T.EOS, '', 3, 18),
+            (T.SETTING_HEADER, '*** Asetukset ***', 4, 0),
+            (T.EOL, '\n', 4, 17),
+            (T.EOS, '', 4, 18),
+            (T.DOCUMENTATION, 'Dokumentaatio', 5, 0),
+            (T.SEPARATOR, '    ', 5, 13),
+            (T.ARGUMENT, 'Documentation', 5, 17),
+            (T.EOL, '\n', 5, 30),
+            (T.EOS, '', 5, 31),
+        ]
+        assert_tokens(data, expected, get_tokens)
+        lang = Languages()
+        assert_tokens(data, expected, get_init_tokens, lang=lang)
+        assert_equal(lang.languages,
+                     [Language.from_name(lang) for lang in ('en', 'fi')])
+
 
 if __name__ == '__main__':
     unittest.main()

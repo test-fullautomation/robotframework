@@ -14,12 +14,12 @@
 #  limitations under the License.
 
 from ..lexer import Token, get_tokens, get_resource_tokens, get_init_tokens
-from ..model import Statement
+from ..model import Statement, ModelVisitor
 
 from .fileparser import FileParser
 
 
-def get_model(source, data_only=False, curdir=None):
+def get_model(source, data_only=False, curdir=None, lang=None):
     """Parses the given source to a model represented as an AST.
 
     How to use the model is explained more thoroughly in the general
@@ -38,34 +38,39 @@ def get_model(source, data_only=False, curdir=None):
         When not given, the variable is left as-is. Should only be given
         only if the model will be executed afterwards. If the model is saved
         back to disk, resolving ``${CURDIR}`` is typically not a good idea.
+    :param lang: Additional languages to be supported during parsing.
+        Can be a string matching any of the supported language codes or names,
+        an initialized :class:`~robot.conf.languages.Language` subsclass,
+        a list containing such strings or instances, or a
+        :class:`~robot.conf.languages.Languages` instance.
 
     Use :func:`get_resource_model` or :func:`get_init_model` when parsing
     resource or suite initialization files, respectively.
     """
-    return _get_model(get_tokens, source, data_only, curdir)
+    return _get_model(get_tokens, source, data_only, curdir, lang)
 
 
-def get_resource_model(source, data_only=False, curdir=None):
+def get_resource_model(source, data_only=False, curdir=None, lang=None):
     """Parses the given source to a resource file model.
 
     Otherwise same as :func:`get_model` but the source is considered to be
     a resource file. This affects, for example, what settings are valid.
     """
-    return _get_model(get_resource_tokens, source, data_only, curdir)
+    return _get_model(get_resource_tokens, source, data_only, curdir, lang)
 
 
-def get_init_model(source, data_only=False, curdir=None):
+def get_init_model(source, data_only=False, curdir=None, lang=None):
     """Parses the given source to a init file model.
 
     Otherwise same as :func:`get_model` but the source is considered to be
     a suite initialization file. This affects, for example, what settings are
     valid.
     """
-    return _get_model(get_init_tokens, source, data_only, curdir)
+    return _get_model(get_init_tokens, source, data_only, curdir, lang)
 
 
-def _get_model(token_getter, source, data_only=False, curdir=None):
-    tokens = token_getter(source, data_only)
+def _get_model(token_getter, source, data_only=False, curdir=None, lang=None):
+    tokens = token_getter(source, data_only, lang=lang)
     statements = _tokens_to_statements(tokens, curdir)
     model = _statements_to_model(statements, source)
     model.validate_model()
@@ -95,4 +100,16 @@ def _statements_to_model(statements, source=None):
         parser = stack[-1].parse(statement)
         if parser:
             stack.append(parser)
+    # Implicit comment sections have no header.
+    if model.sections and model.sections[0].header is None:
+        SetLanguages(model).visit(model.sections[0])
     return model
+
+
+class SetLanguages(ModelVisitor):
+
+    def __init__(self, file):
+        self.file = file
+
+    def visit_Config(self, node):
+        self.file.languages += (node.language.code,)

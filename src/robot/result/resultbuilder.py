@@ -15,7 +15,7 @@
 
 from robot.errors import DataError
 from robot.model import SuiteVisitor
-from robot.utils import ET, ETSource, get_error_message, unic
+from robot.utils import ET, ETSource, get_error_message
 
 from .executionresult import Result, CombinedResult
 from .flattenkeywordmatcher import (FlattenByNameMatcher, FlattenByTypeMatcher,
@@ -74,10 +74,10 @@ def _single_result(source, options):
         error = err.strerror
     except:
         error = get_error_message()
-    raise DataError("Reading XML source '%s' failed: %s" % (unic(ets), error))
+    raise DataError(f"Reading XML source '{ets}' failed: {error}")
 
 
-class ExecutionResultBuilder(object):
+class ExecutionResultBuilder:
     """Builds :class:`~.executionresult.Result` objects based on output files.
 
     Instead of using this builder directly, it is recommended to use the
@@ -147,42 +147,41 @@ class ExecutionResultBuilder(object):
         tags_match, by_tags = self._get_matcher(FlattenByTagMatcher, flattened)
         started = -1  # if 0 or more, we are flattening
         tags = []
-        containers = {'kw', 'for', 'iter', 'if'}
+        containers = {'kw', 'for', 'while', 'iter', 'if', 'try'}
         inside_kw = 0  # to make sure we don't read tags from a test
         seen_doc = False
         for event, elem in context:
             tag = elem.tag
             start = event == 'start'
             end = not start
-            if start and tag in containers:
-                inside_kw += 1
-                if started >= 0:
-                    started += 1
-                elif by_name and name_match(elem.get('name', ''), elem.get('library')):
-                    started = 0
-                    seen_doc = False
-                elif by_type and type_match(tag):
-                    started = 0
-                    seen_doc = False
-            elif started < 0 and by_tags and inside_kw:
-                if end and tag == 'tag':
-                    tags.append(elem.text or '')
-                elif end and tags:
-                    if tags_match(tags):
+            if start:
+                if tag in containers:
+                    inside_kw += 1
+                    if started >= 0:
+                        started += 1
+                    elif by_name and name_match(elem.get('name', ''), elem.get('library')):
+                        started = 0
+                        seen_doc = False
+                    elif by_type and type_match(tag):
                         started = 0
                         seen_doc = False
                     tags = []
-            if end and tag in containers:
-                inside_kw -= 1
-                if started == 0 and not seen_doc:
-                    doc = ET.Element('doc')
-                    doc.text = '_*Keyword content flattened.*_'
-                    yield 'start', doc
-                    yield 'end', doc
-            if started == 0 and end and tag == 'doc':
-                seen_doc = True
-                elem.text = ('%s\n\n_*Keyword content flattened.*_'
-                             % (elem.text or '')).strip()
+            else:
+                if tag in containers:
+                    inside_kw -= 1
+                    if started == 0 and not seen_doc:
+                        doc = ET.Element('doc')
+                        doc.text = '_*Content flattened.*_'
+                        yield 'start', doc
+                        yield 'end', doc
+                elif by_tags and inside_kw and started < 0 and tag == 'tag':
+                    tags.append(elem.text or '')
+                    if tags_match(tags):
+                        started = 0
+                        seen_doc = False
+                elif started == 0 and tag == 'doc':
+                    seen_doc = True
+                    elem.text = f"{elem.text or ''}\n\n_*Content flattened.*_".strip()
             if started <= 0 or tag == 'msg':
                 yield event, elem
             else:

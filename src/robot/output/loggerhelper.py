@@ -15,12 +15,11 @@
 
 from robot.errors import DataError
 from robot.model import Message as BaseMessage
-from robot.utils import get_timestamp, is_unicode, unic
+from robot.utils import get_timestamp, is_string, safe_str
 
 
 LEVELS = {
-  'NONE'  : 8,
-  'UNKNOWN' : 7, #nhtcuong
+  'NONE'  : 7,
   'SKIP'  : 6,
   'FAIL'  : 5,
   'ERROR' : 4,
@@ -31,7 +30,7 @@ LEVELS = {
 }
 
 
-class AbstractLogger(object):
+class AbstractLogger:
 
     def __init__(self, level='TRACE'):
         self._is_logged = IsLogged(level)
@@ -65,14 +64,6 @@ class AbstractLogger(object):
             msg = msg[6:].lstrip()
         self.write(msg, 'SKIP', html)
 
-    # nhtcuong
-    def unknown(self, msg):
-        html = False
-        if msg.startswith("*HTML*"):
-            html = True
-            msg = msg[6:].lstrip()
-        self.write(msg, 'UNKNOWN', html)
-
     def error(self, msg):
         self.write(msg, 'ERROR')
 
@@ -90,13 +81,13 @@ class Message(BaseMessage):
         message = self._normalize_message(message)
         level, html = self._get_level_and_html(level, html)
         timestamp = timestamp or get_timestamp()
-        BaseMessage.__init__(self, message, level, html, timestamp)
+        super().__init__(message, level, html, timestamp)
 
     def _normalize_message(self, msg):
         if callable(msg):
             return msg
-        if not is_unicode(msg):
-            msg = unic(msg)
+        if not is_string(msg):
+            msg = safe_str(msg)
         if '\r\n' in msg:
             msg = msg.replace('\r\n', '\n')
         return msg
@@ -123,7 +114,7 @@ class Message(BaseMessage):
             self._message = self._message()
 
 
-class IsLogged(object):
+class IsLogged:
 
     def __init__(self, level):
         self.level = level.upper()
@@ -144,7 +135,7 @@ class IsLogged(object):
             raise DataError("Invalid log level '%s'." % level)
 
 
-class AbstractLoggerProxy(object):
+class AbstractLoggerProxy:
     _methods = None
     _no_method = lambda *args: None
 

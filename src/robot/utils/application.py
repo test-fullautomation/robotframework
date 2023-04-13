@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import print_function
-
 import sys
 
 from robot.errors import (INFO_PRINTED, DATA_ERROR, STOPPED_BY_USER,
@@ -25,7 +23,7 @@ from .encoding import console_encode
 from .error import get_error_details
 
 
-class Application(object):
+class Application:
 
     def __init__(self, usage, name=None, version=None, arg_limits=None,
                  env_options=None, logger=None, **auto_options):
@@ -112,7 +110,7 @@ class Application(object):
         sys.exit(rc)
 
 
-class DefaultLogger(object):
+class DefaultLogger:
 
     def info(self, message):
         pass

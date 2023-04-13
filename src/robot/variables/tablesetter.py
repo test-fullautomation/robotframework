@@ -16,12 +16,13 @@
 from contextlib import contextmanager
 
 from robot.errors import DataError
-from robot.utils import DotDict, is_string, split_from_equals, unic
+from robot.utils import DotDict, is_string, split_from_equals
 
+from .resolvable import Resolvable
 from .search import is_assign, is_list_variable, is_dict_variable
 
 
-class VariableTableSetter(object):
+class VariableTableSetter:
 
     def __init__(self, store):
         self._store = store
@@ -53,7 +54,7 @@ def VariableTableValue(value, name, error_reporter=None):
     return VariableTableValue(value, error_reporter)
 
 
-class VariableTableValueBase(object):
+class VariableTableValueBase(Resolvable):
 
     def __init__(self, values, error_reporter=None):
         self._values = self._format_values(values)
@@ -83,7 +84,7 @@ class VariableTableValueBase(object):
 
     def report_error(self, error):
         if self._error_reporter:
-            self._error_reporter(unic(error))
+            self._error_reporter(str(error))
 
 
 class ScalarVariableTableValue(VariableTableValueBase):
@@ -106,7 +107,7 @@ class ScalarVariableTableValue(VariableTableValueBase):
             separator = ' '
         separator = variables.replace_string(separator)
         values = variables.replace_list(values)
-        return separator.join(unic(item) for item in values)
+        return separator.join(str(item) for item in values)
 
     def _is_single_value(self, separator, values):
         return (separator is None and len(values) == 1 and

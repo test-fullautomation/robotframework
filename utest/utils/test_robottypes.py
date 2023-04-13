@@ -1,33 +1,13 @@
 import unittest
 
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping
 from array import array
-try:
-    from UserDict import UserDict
-    from UserList import UserList
-    from UserString import UserString
-except ImportError:
-    from collections import UserDict, UserList, UserString
+from collections import UserDict, UserList, UserString
+from collections.abc import Mapping
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
-try:
-    import java
-    from java.lang import String
-    from java.util import HashMap, Hashtable
-except ImportError:
-    pass
-
-from robot.utils import (is_bytes, is_falsy, is_dict_like, is_list_like,
-                         is_string, is_truthy, type_name, IRONPYTHON, JYTHON,
-                         PY3)
+from robot.utils import (is_bytes, is_falsy, is_dict_like, is_list_like, is_string,
+                         is_truthy, is_union, PY_VERSION, type_name, type_repr)
 from robot.utils.asserts import assert_equal, assert_true
-
-
-if PY3:
-    long = int
-    xrange = range
 
 
 class MyMapping(Mapping):
@@ -46,23 +26,35 @@ def generator():
     yield 'generated'
 
 
-class TestStringsAndBytes(unittest.TestCase):
+class TestIsMisc(unittest.TestCase):
 
     def test_strings(self):
-        for thing in ['string', u'unicode', '', u'']:
+        for thing in ['string', 'hyvä', '']:
             assert_equal(is_string(thing), True, thing)
-            assert_equal(is_bytes(thing), isinstance(thing, bytes), thing)
+            assert_equal(is_bytes(thing), False, thing)
 
     def test_bytes(self):
         for thing in [b'bytes', bytearray(b'ba'), b'', bytearray()]:
             assert_equal(is_bytes(thing), True, thing)
-            assert_equal(is_string(thing), isinstance(thing, str), thing)
+            assert_equal(is_string(thing), False, thing)
+
+    def test_is_union(self):
+        assert is_union(Union[int, str])
+        assert is_union(Union[int, str], allow_tuple=True)
+        assert not is_union((int, str))
+        assert is_union((int, str), allow_tuple=True)
+        if PY_VERSION >= (3, 10):
+            assert is_union(eval('int | str'))
+            assert is_union(eval('int | str'), allow_tuple=True)
+        for not_union in 'string', 3, [int, str], list, List[int]:
+            assert not is_union(not_union)
+            assert not is_union(not_union, allow_tuple=True)
 
 
 class TestListLike(unittest.TestCase):
 
     def test_strings_are_not_list_like(self):
-        for thing in ['str', u'unicode', UserString('user')]:
+        for thing in ['string', UserString('user')]:
             assert_equal(is_list_like(thing), False, thing)
 
     def test_bytes_are_not_list_like(self):
@@ -73,34 +65,25 @@ class TestListLike(unittest.TestCase):
         for thing in [dict(), UserDict(), MyMapping()]:
             assert_equal(is_list_like(thing), True, thing)
 
-    if JYTHON:
-
-        def test_java_strings_are_not_list_like(self):
-            assert_equal(is_list_like(String()), False)
-
-        def test_java_dict_likes_are_list_like(self):
-            assert_equal(is_list_like(HashMap()), True)
-            assert_equal(is_list_like(Hashtable()), True)
-
     def test_files_are_not_list_like(self):
         with open(__file__) as f:
             assert_equal(is_list_like(f), False)
         assert_equal(is_list_like(f), False)
 
     def test_iter_makes_object_iterable_regardless_implementation(self):
-        class Example(object):
+        class Example:
             def __iter__(self):
                 1/0
         assert_equal(is_list_like(Example()), True)
 
     def test_only_getitem_does_not_make_object_iterable(self):
-        class Example(object):
+        class Example:
             def __getitem__(self, item):
                 return "I'm not iterable!"
         assert_equal(is_list_like(Example()), False)
 
     def test_iterables_in_general_are_list_like(self):
-        for thing in [[], (), set(), xrange(1), generator(), array('i'), UserList()]:
+        for thing in [[], (), set(), range(1), generator(), array('i'), UserList()]:
             assert_equal(is_list_like(thing), True, thing)
 
     def test_others_are_not_list_like(self):
@@ -126,22 +109,15 @@ class TestDictLike(unittest.TestCase):
         for thing in ['', u'', 1, None, True, object(), [], (), set()]:
             assert_equal(is_dict_like(thing), False, thing)
 
-    if JYTHON:
-
-        def test_java_maps(self):
-            assert_equal(is_dict_like(HashMap()), True)
-            assert_equal(is_dict_like(Hashtable()), True)
-
 
 class TestTypeName(unittest.TestCase):
 
     def test_base_types(self):
         for item, exp in [('x', 'string'),
                           (u'x', 'string'),
-                          (b'x', 'bytes' if (PY3 or IRONPYTHON) else 'string'),
+                          (b'x', 'bytes'),
                           (bytearray(), 'bytearray'),
                           (1, 'integer'),
-                          (long(1), 'integer'),
                           (1.0, 'float'),
                           (True, 'boolean'),
                           (None, 'None'),
@@ -156,54 +132,42 @@ class TestTypeName(unittest.TestCase):
             assert_equal(type_name(f), 'file')
 
     def test_custom_objects(self):
-        class NewStyle(object): pass
-        class OldStyle: pass
+        class CamelCase: pass
         class lower: pass
-        for item, exp in [(NewStyle(), 'NewStyle'),
-                          (OldStyle(), 'OldStyle'),
+        for item, exp in [(CamelCase(), 'CamelCase'),
                           (lower(), 'lower'),
-                          (NewStyle, 'NewStyle'),
-                          (OldStyle, 'OldStyle')]:
+                          (CamelCase, 'CamelCase')]:
             assert_equal(type_name(item), exp)
 
     def test_strip_underscores(self):
-        class _Foo_(object): pass
+        class _Foo_: pass
         assert_equal(type_name(_Foo_), 'Foo')
 
     def test_none_as_underscore_name(self):
-        class C(object):
+        class C:
             _name = None
         assert_equal(type_name(C()), 'C')
         assert_equal(type_name(C(), capitalize=True), 'C')
 
-    if PY3:
+    def test_typing(self):
+        for item, exp in [(List, 'list'),
+                          (List[int], 'list'),
+                          (Tuple, 'tuple'),
+                          (Tuple[int], 'tuple'),
+                          (Set, 'set'),
+                          (Set[int], 'set'),
+                          (Dict, 'dictionary'),
+                          (Dict[int, str], 'dictionary'),
+                          (Union, 'Union'),
+                          (Union[int, str], 'Union'),
+                          (Optional, 'Optional'),
+                          (Optional[int], 'Union'),
+                          (Any, 'Any')]:
+            assert_equal(type_name(item), exp)
 
-        def test_typing(self):
-            from typing import Any, Dict, List, Optional, Set, Tuple, Union
-
-            for item, exp in [(List, 'list'),
-                              (List[int], 'list'),
-                              (Tuple, 'tuple'),
-                              (Tuple[int], 'tuple'),
-                              (Set, 'set'),
-                              (Set[int], 'set'),
-                              (Dict, 'dictionary'),
-                              (Dict[int, str], 'dictionary'),
-                              (Union, 'Union'),
-                              (Union[int, str], 'Union'),
-                              (Optional, 'Optional'),
-                              (Optional[int], 'Union'),
-                              (Any, 'Any')]:
-                assert_equal(type_name(item), exp)
-
-    if JYTHON:
-
-        def test_java_object(self):
-            for item, exp in [(String(), 'String'),
-                              (String, 'String'),
-                              (java.lang, 'javapackage'),
-                              (java, 'javapackage')]:
-                assert_equal(type_name(item), exp)
+    if PY_VERSION >= (3, 10):
+        def test_union_syntax(self):
+            assert_equal(type_name(int | float), 'Union')
 
     def test_capitalize(self):
         class lowerclass: pass
@@ -212,6 +176,42 @@ class TestTypeName(unittest.TestCase):
         assert_equal(type_name(None, capitalize=True), 'None')
         assert_equal(type_name(lowerclass(), capitalize=True), 'Lowerclass')
         assert_equal(type_name(CamelClass(), capitalize=True), 'CamelClass')
+
+
+class TestTypeRepr(unittest.TestCase):
+
+    def test_class(self):
+        class Foo:
+            pass
+        assert_equal(type_repr(Foo), 'Foo')
+
+    def test_none(self):
+        assert_equal(type_repr(None), 'None')
+
+    def test_ellipsis(self):
+        assert_equal(type_repr(...), '...')
+
+    def test_string(self):
+        assert_equal(type_repr('MyType'), 'MyType')
+
+    def test_no_typing_prefix(self):
+        assert_equal(type_repr(List), 'List')
+
+    def test_generics_from_typing(self):
+        assert_equal(type_repr(List[Any]), 'List[Any]')
+        assert_equal(type_repr(Dict[int, None]), 'Dict[int, None]')
+        assert_equal(type_repr(Tuple[int, ...]), 'Tuple[int, ...]')
+
+    if PY_VERSION >= (3, 9):
+        def test_generics(self):
+            assert_equal(type_repr(list[Any]), 'list[Any]')
+            assert_equal(type_repr(dict[int, None]), 'dict[int, None]')
+
+    def test_union(self):
+        assert_equal(type_repr(Union[int, float]), 'int | float')
+        assert_equal(type_repr(Union[int, None, List[Any]]), 'int | None | List[Any]')
+        if PY_VERSION >= (3, 10):
+            assert_equal(type_repr(int | None | list[Any]), 'int | None | list[Any]')
 
 
 class TestIsTruthyFalsy(unittest.TestCase):
@@ -223,7 +223,7 @@ class TestIsTruthyFalsy(unittest.TestCase):
                 assert_true(is_falsy(item) is False)
 
     def test_falsy_values(self):
-        class AlwaysFalse(object):
+        class AlwaysFalse:
             __bool__ = __nonzero__ = lambda self: False
         falsy_strings = ['', 'faLse', 'nO', 'nOne', 'oFF', '0']
         for item in falsy_strings + [False, None, 0, [], {}, AlwaysFalse()]:

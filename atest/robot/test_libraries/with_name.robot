@@ -77,20 +77,6 @@ Module Library
     Syslog Should Contain    Imported library 'module_library' with name 'MOD1'
     Syslog Should Contain    Imported library 'pythonmodule.library' with name 'mod 2'
 
-Java Library
-    [Tags]    require-jython
-    ${tc} =    Check Test Case    ${TEST NAME}
-    Check Keyword Data    ${tc.kws[0]}    Java Lib.Return String From Library    \${s}    whatever
-    Check Keyword Data    ${tc.kws[2]}    Java Lib.Get Java Object    \${obj}    My Name
-    Syslog Should Contain    Imported library 'ExampleJavaLibrary' with name 'Java Lib'
-
-Java Library In Package
-    [Tags]    require-jython
-    ${tc} =    Check Test Case    ${TEST NAME}
-    Check Keyword Data    ${tc.kws[0]}    Java Pkg.Return Value    \${s1}
-    Check Keyword Data    ${tc.kws[1]}    Java Pkg.Return Value    \${s2}    Returned string value
-    Syslog Should Contain    Imported library 'javapkg.JavaPackageExample' with name 'Java Pkg'
-
 Import Library Keyword
     ${tc} =    Check Test Case    ${TEST NAME}
     Check Keyword Data    ${tc.kws[1]}    MyOS.Directory Should Exist    args=.
@@ -102,10 +88,6 @@ Correct Error When Using Keyword From Same Library With Different Names Without 
     Check Test Case    ${TEST NAME} 3
 
 Dynamic Library
-    Check Test Case    ${TEST NAME}
-
-Dynamic Java Library
-    [Tags]    require-jython
     Check Test Case    ${TEST NAME}
 
 Global Scope
@@ -130,8 +112,12 @@ With Name When Library Arguments Are Not Strings
     Syslog Should Contain    Imported library 'ParameterLibrary' with arguments [ 1 | 2 ]
 
 'WITH NAME' is case-sensitive
-    Error In File    -1    test_libraries/with_name_3.robot    5
+    # WITH NAME
+    Error In File    -2    test_libraries/with_name_3.robot    5
     ...    Library 'ParameterLibrary' expected 0 to 2 arguments, got 4.
+    # AS
+    Error In File    -1    test_libraries/with_name_3.robot    6
+    ...    Library 'ParameterLibrary' expected 0 to 2 arguments, got 5.
 
 'WITH NAME' cannot come from variable
     Check Test Case    ${TEST NAME}

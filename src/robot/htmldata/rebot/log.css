@@ -68,6 +68,9 @@
     padding: 3px;
     cursor: default;
 }
+.element-header .label {
+    margin-right: 0.5em;
+}
 .name {
     font-weight: bold;
 }
@@ -131,7 +134,7 @@
     white-space: nowrap;
 }
 .level {
-    width: 7em;
+    width: 5em;
     text-align: center;
 }
 .select-message {

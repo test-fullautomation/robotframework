@@ -1,6 +1,5 @@
 *** Settings ***
 Suite Setup      Run Tests    ${EMPTY}    keywords/type_conversion/annotations.robot
-Force Tags       require-py3
 Resource         atest_resource.robot
 
 *** Test Cases ***
@@ -92,6 +91,12 @@ Timedelta
     Check Test Case    ${TESTNAME}
 
 Invalid timedelta
+    Check Test Case    ${TESTNAME}
+
+Path
+    Check Test Case    ${TESTNAME}
+
+Invalid Path
     Check Test Case    ${TESTNAME}
 
 Enum
@@ -209,7 +214,6 @@ None as default
     Check Test Case    ${TESTNAME}
 
 Forward references
-    [Tags]    require-py3.5
     Check Test Case    ${TESTNAME}
 
 @keyword decorator overrides annotations

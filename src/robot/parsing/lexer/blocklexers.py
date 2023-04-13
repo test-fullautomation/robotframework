@@ -13,26 +13,31 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from robot.utils import normalize_whitespace
+
 from .tokens import Token
 from .statementlexers import (Lexer,
                               SettingSectionHeaderLexer, SettingLexer,
                               VariableSectionHeaderLexer, VariableLexer,
                               TestCaseSectionHeaderLexer,
+                              TaskSectionHeaderLexer,
                               KeywordSectionHeaderLexer,
-                              CommentSectionHeaderLexer, CommentLexer,
+                              CommentSectionHeaderLexer, CommentLexer, ImplicitCommentLexer,
                               ErrorSectionHeaderLexer,
                               TestOrKeywordSettingLexer,
                               KeywordCallLexer,
-                              ForHeaderLexer,
                               IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
-                              EndLexer, ThreadHeaderLexer)   # cuongnht add thread
+                              InlineIfHeaderLexer, EndLexer,
+                              TryHeaderLexer, ExceptHeaderLexer, FinallyHeaderLexer,
+                              ForHeaderLexer, WhileHeaderLexer,
+                              ContinueLexer, BreakLexer, ReturnLexer)
 
 
 class BlockLexer(Lexer):
 
     def __init__(self, ctx):
         """:type ctx: :class:`robot.parsing.lexer.context.FileContext`"""
-        Lexer.__init__(self, ctx)
+        super().__init__(ctx)
         self.lexers = []
 
     def accepts_more(self, statement):
@@ -49,11 +54,11 @@ class BlockLexer(Lexer):
 
     def lexer_for(self, statement):
         for cls in self.lexer_classes():
-            lexer = cls(self.ctx)
-            if lexer.handles(statement):
+            if cls.handles(statement, self.ctx):
+                lexer = cls(self.ctx)
                 return lexer
-        raise TypeError("%s did not find lexer for statement %s."
-                        % (type(self).__name__, statement))
+        raise TypeError(f"{type(self).__name__} does not have lexer for "
+                        f"statement {statement}.")
 
     def lexer_classes(self):
         return ()
@@ -78,9 +83,9 @@ class FileLexer(BlockLexer):
 
     def lexer_classes(self):
         return (SettingSectionLexer, VariableSectionLexer,
-                TestCaseSectionLexer, KeywordSectionLexer,
-                CommentSectionLexer, ErrorSectionLexer,
-                ImplicitCommentSectionLexer)
+                TestCaseSectionLexer, TaskSectionLexer,
+                KeywordSectionLexer, CommentSectionLexer,
+                ErrorSectionLexer, ImplicitCommentSectionLexer)
 
 
 class SectionLexer(BlockLexer):
@@ -91,8 +96,9 @@ class SectionLexer(BlockLexer):
 
 class SettingSectionLexer(SectionLexer):
 
-    def handles(self, statement):
-        return self.ctx.setting_section(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.setting_section(statement)
 
     def lexer_classes(self):
         return (SettingSectionHeaderLexer, SettingLexer)
@@ -100,8 +106,9 @@ class SettingSectionLexer(SectionLexer):
 
 class VariableSectionLexer(SectionLexer):
 
-    def handles(self, statement):
-        return self.ctx.variable_section(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.variable_section(statement)
 
     def lexer_classes(self):
         return (VariableSectionHeaderLexer, VariableLexer)
@@ -109,17 +116,29 @@ class VariableSectionLexer(SectionLexer):
 
 class TestCaseSectionLexer(SectionLexer):
 
-    def handles(self, statement):
-        return self.ctx.test_case_section(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.test_case_section(statement)
 
     def lexer_classes(self):
         return (TestCaseSectionHeaderLexer, TestCaseLexer)
 
 
+class TaskSectionLexer(SectionLexer):
+
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.task_section(statement)
+
+    def lexer_classes(self):
+        return (TaskSectionHeaderLexer, TestCaseLexer)
+
+
 class KeywordSectionLexer(SettingSectionLexer):
 
-    def handles(self, statement):
-        return self.ctx.keyword_section(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.keyword_section(statement)
 
     def lexer_classes(self):
         return (KeywordSectionHeaderLexer, KeywordLexer)
@@ -127,8 +146,9 @@ class KeywordSectionLexer(SettingSectionLexer):
 
 class CommentSectionLexer(SectionLexer):
 
-    def handles(self, statement):
-        return self.ctx.comment_section(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ctx.comment_section(statement)
 
     def lexer_classes(self):
         return (CommentSectionHeaderLexer, CommentLexer)
@@ -136,16 +156,18 @@ class CommentSectionLexer(SectionLexer):
 
 class ImplicitCommentSectionLexer(SectionLexer):
 
-    def handles(self, statement):
+    @classmethod
+    def handles(cls, statement, ctx):
         return True
 
     def lexer_classes(self):
-        return (CommentLexer,)
+        return (ImplicitCommentLexer,)
 
 
 class ErrorSectionLexer(SectionLexer):
 
-    def handles(self, statement):
+    @classmethod
+    def handles(cls, statement, ctx):
         return statement and statement[0].value.startswith('*')
 
     def lexer_classes(self):
@@ -162,18 +184,23 @@ class TestOrKeywordLexer(BlockLexer):
     def input(self, statement):
         self._handle_name_or_indentation(statement)
         if statement:
-            BlockLexer.input(self, statement)
+            super().input(statement)
 
     def _handle_name_or_indentation(self, statement):
         if not self._name_seen:
-            statement.pop(0).type = self.name_type
+            token = statement.pop(0)
+            token.type = self.name_type
+            if statement:
+                token._add_eos_after = True
             self._name_seen = True
         else:
             while statement and not statement[0].value:
-                statement.pop(0).type = None    # These tokens will be ignored
+                statement.pop(0).type = None  # These tokens will be ignored
 
     def lexer_classes(self):
-        return (TestOrKeywordSettingLexer, ForLexer, ThreadLexer, IfLexer, KeywordCallLexer)   # cuongnht add thread
+        return (TestOrKeywordSettingLexer, BreakLexer, ContinueLexer,
+                ForLexer, InlineIfLexer, IfLexer, ReturnLexer, TryLexer,
+                WhileLexer, KeywordCallLexer)
 
 
 class TestCaseLexer(TestOrKeywordLexer):
@@ -181,7 +208,7 @@ class TestCaseLexer(TestOrKeywordLexer):
 
     def __init__(self, ctx):
         """:type ctx: :class:`robot.parsing.lexer.context.TestCaseFileContext`"""
-        TestOrKeywordLexer.__init__(self, ctx.test_case_context())
+        super().__init__(ctx.test_case_context())
 
     def lex(self,):
         self._lex_with_priority(priority=TestOrKeywordSettingLexer)
@@ -191,21 +218,22 @@ class KeywordLexer(TestOrKeywordLexer):
     name_type = Token.KEYWORD_NAME
 
     def __init__(self, ctx):
-        TestOrKeywordLexer.__init__(self, ctx.keyword_context())
+        super().__init__(ctx.keyword_context())
 
 
 class NestedBlockLexer(BlockLexer):
 
     def __init__(self, ctx):
-        BlockLexer.__init__(self, ctx)
+        super().__init__(ctx)
         self._block_level = 0
 
     def accepts_more(self, statement):
         return self._block_level > 0
 
     def input(self, statement):
-        lexer = BlockLexer.input(self, statement)
-        if isinstance(lexer, (IfHeaderLexer, ForHeaderLexer, ThreadHeaderLexer)):   # cuongnht add thread
+        lexer = super().input(statement)
+        if isinstance(lexer, (ForHeaderLexer, IfHeaderLexer, TryHeaderLexer,
+                              WhileHeaderLexer)):
             self._block_level += 1
         if isinstance(lexer, EndLexer):
             self._block_level -= 1
@@ -213,28 +241,97 @@ class NestedBlockLexer(BlockLexer):
 
 class ForLexer(NestedBlockLexer):
 
-    def handles(self, statement):
-        return ForHeaderLexer(self.ctx).handles(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return ForHeaderLexer.handles(statement, ctx)
 
     def lexer_classes(self):
-        return (ForHeaderLexer, IfLexer, EndLexer, KeywordCallLexer)
+        return (ForHeaderLexer, InlineIfLexer, IfLexer, TryLexer, WhileLexer, EndLexer,
+                ReturnLexer, ContinueLexer, BreakLexer, KeywordCallLexer)
+
+
+class WhileLexer(NestedBlockLexer):
+
+    @classmethod
+    def handles(cls, statement, ctx):
+        return WhileHeaderLexer.handles(statement, ctx)
+
+    def lexer_classes(self):
+        return (WhileHeaderLexer, ForLexer, InlineIfLexer, IfLexer, TryLexer, EndLexer,
+                ReturnLexer, ContinueLexer, BreakLexer, KeywordCallLexer)
 
 
 class IfLexer(NestedBlockLexer):
 
-    def handles(self, statement):
-        return IfHeaderLexer(self.ctx).handles(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        return IfHeaderLexer.handles(statement, ctx)
 
     def lexer_classes(self):
-        return (IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
-                ForLexer, EndLexer, KeywordCallLexer)
+        return (InlineIfLexer, IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
+                ForLexer, TryLexer, WhileLexer, EndLexer, ReturnLexer, ContinueLexer,
+                BreakLexer, KeywordCallLexer)
 
 
-# cuongnht add thread
-class ThreadLexer(NestedBlockLexer):
+class InlineIfLexer(BlockLexer):
 
-    def handles(self, statement):
-        return ThreadHeaderLexer(self.ctx).handles(statement)
+    @classmethod
+    def handles(cls, statement, ctx):
+        if len(statement) <= 2:
+            return False
+        return InlineIfHeaderLexer.handles(statement, ctx)
+
+    def accepts_more(self, statement):
+        return False
 
     def lexer_classes(self):
-        return ThreadHeaderLexer, IfLexer, EndLexer, KeywordCallLexer
+        return (InlineIfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
+                ReturnLexer, ContinueLexer, BreakLexer, KeywordCallLexer)
+
+    def input(self, statement):
+        for part in self._split(statement):
+            if part:
+                super().input(part)
+        return self
+
+    def _split(self, statement):
+        current = []
+        expect_condition = False
+        for token in statement:
+            if expect_condition:
+                if token is not statement[-1]:
+                    token._add_eos_after = True
+                current.append(token)
+                yield current
+                current = []
+                expect_condition = False
+            elif token.value == 'IF':
+                current.append(token)
+                expect_condition = True
+            elif normalize_whitespace(token.value) == 'ELSE IF':
+                token._add_eos_before = True
+                yield current
+                current = [token]
+                expect_condition = True
+            elif token.value == 'ELSE':
+                token._add_eos_before = True
+                if token is not statement[-1]:
+                    token._add_eos_after = True
+                yield current
+                current = []
+                yield [token]
+            else:
+                current.append(token)
+        yield current
+
+
+class TryLexer(NestedBlockLexer):
+
+    @classmethod
+    def handles(cls, statement, ctx):
+        return TryHeaderLexer(ctx).handles(statement, ctx)
+
+    def lexer_classes(self):
+        return (TryHeaderLexer, ExceptHeaderLexer, ElseHeaderLexer, FinallyHeaderLexer,
+                ForLexer, InlineIfLexer, IfLexer, WhileLexer, EndLexer, ReturnLexer,
+                BreakLexer, ContinueLexer, KeywordCallLexer)

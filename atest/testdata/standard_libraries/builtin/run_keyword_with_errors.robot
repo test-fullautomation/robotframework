@@ -51,12 +51,11 @@ Ignore Error When Timeout Occurs In UK
     [Documentation]    FAIL Keyword timeout 100 milliseconds exceeded.
     Run Keyword And Ignore Error    Timeouting UK
 
-Ignore Error When Syntax Error At Parsing Time
+Ignore Error Cannot Catch Syntax Errors
     [Documentation]    FAIL Keyword name cannot be empty.
     Run Keyword And Ignore Error    Broken User Keyword
 
-Ignore Error When Syntax Error At Run Time
-    [Documentation]    FAIL Keyword 'BuiltIn.No Operation' expected 0 arguments, got 4.
+Ignore Error Can Catch Non-Syntax Errors
     Run Keyword And Ignore Error    No Operation    wrong    number    of    arguments
 
 Ignore Error When Syntax Error In Setting Variables
@@ -155,11 +154,11 @@ Expect Error When Timeout Occurs In UK
     [Documentation]    FAIL Keyword timeout 100 milliseconds exceeded.
     Run Keyword And Expect Error    *    Timeouting UK
 
-Expect Error When Syntax Error At Parsing Time
+Expect Error Cannot Catch Syntax Errors
     [Documentation]    FAIL Keyword name cannot be empty.
     Run Keyword And Expect Error    *    Broken User Keyword
 
-Expect Error When Syntax Error At Run Time
+Expect Error Can Catch Non-Syntax Errors
     Run Keyword And Expect Error
     ...    No keyword with name 'Non existing keyword' found.
     ...    Non existing keyword
@@ -233,7 +232,17 @@ Expect Error With REGEXP
     [Template]    Run Keyword And Expect Error
     REGEXP:My.*                       Fail    My message
     REGEXP: (My|Your) [Mm]\\w+ge!?    Fail    My message
+    REGEXP: (?i)MY MESSAGE            Fail    My message
     REGEXP:oopps                      Fail    My message
+
+Expect Error With REGEXP requires full match
+    [Documentation]    FAIL Expected error 'REGEXP: Start' but got 'Start and end'.
+    [Template]    Run Keyword And Expect Error
+    REGEXP: Start and end             Fail    Start and end
+    REGEXP: Start .*                  Fail    Start and end
+    REGEXP: Start .*$                 Fail    Start and end
+    REGEXP: \\AStart and end\\Z       Fail    Start and end
+    REGEXP: Start                     Fail    Start and end
 
 Expect Error With Unrecognized Prefix
     [Documentation]    FAIL Expected error '1:2:3:4:5' but got 'Ooops'.

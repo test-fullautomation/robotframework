@@ -1,5 +1,3 @@
-# coding: utf-8
-
 import os.path
 import functools
 
@@ -198,7 +196,7 @@ class VersionObjectLibrary:
     kw = lambda x:None
 
 
-class RecordingLibrary(object):
+class RecordingLibrary:
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
 
     def __init__(self):
@@ -263,8 +261,8 @@ class DynamicWithSource:
                 'path w/ colon': r'c:\temp\lib.py',
                 'path w/ colon & lineno': r'c:\temp\lib.py:1234567890',
                 'no source': None,
-                u'nön-äscii': u'hyvä esimerkki',
-                u'nön-äscii utf-8': b'\xe7\xa6\x8f:88',
+                'nön-äscii': 'hyvä esimerkki',
+                'nön-äscii utf-8': b'\xe7\xa6\x8f:88',
                 'invalid source': 666}
 
     def get_keyword_names(self):
@@ -316,7 +314,7 @@ def wraps(x):
 @noop
 @noop
 @functools.total_ordering
-class Decorated(object):
+class Decorated:
 
     @noop
     def no_wrapper(self):
