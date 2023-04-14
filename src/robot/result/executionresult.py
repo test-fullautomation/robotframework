@@ -75,9 +75,18 @@ class Result:
 
         By default returns the number of failed tests (max 250),
         but can be :func:`configured <configure>` to always return 0.
+
+        Upt. 20.03.2023: Return value will be a combine value of both the number of failed and unknown tests (max 250).
+                         To obtain the number of failed and unknown tests, using the bitwise operator for extracting as below:
+                            unknown_test = (ret_val >> 8) & 0xff
+                            failed_test = ret_val & 0xff
         """
         if self._status_rc:
-            return min(self.suite.statistics.failed, 250)
+            # return min(self.suite.statistics.failed, 250)
+            unknown_test = min(self.suite.statistics.unknown, 250)
+            failed_test = min(self.suite.statistics.failed, 250)
+            ret_val = (unknown_test << 8) | failed_test
+            return ret_val
         return 0
 
     def configure(self, status_rc=True, suite_config=None, stat_config=None):

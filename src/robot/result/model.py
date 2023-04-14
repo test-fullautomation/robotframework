@@ -78,6 +78,7 @@ class StatusMixin:
     PASS = 'PASS'
     FAIL = 'FAIL'
     SKIP = 'SKIP'
+    UNKNOWN = "UNKNOWN"  # cuongnht - add unknown state
     NOT_RUN = 'NOT RUN'
     NOT_SET = 'NOT SET'
 
@@ -103,6 +104,16 @@ class StatusMixin:
     @failed.setter
     def failed(self, failed):
         self.status = self.FAIL if failed else self.PASS
+
+    # cuongnht - add unknown state
+    @property
+    def unknown(self):
+        """``True`` when :attr:`status` is 'UNKNOWN', ``False`` otherwise."""
+        return self.status == self.UNKNOWN
+
+    @unknown.setter
+    def unknown(self, unknown):
+        self.status = self.UNKNOWN if unknown else self.PASS
 
     @property
     def skipped(self):
@@ -591,6 +602,9 @@ class TestSuite(model.TestSuite, StatusMixin):
           the case when all tests have been skipped and when there are no tests.
         """
         stats = self.statistics  # Local variable avoids recreating stats.
+        # cuongnht: add unknown state
+        if stats.unknown:
+            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:
