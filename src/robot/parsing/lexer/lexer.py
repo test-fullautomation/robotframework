@@ -21,10 +21,10 @@ from robot.utils import get_error_message, FileReader
 from .blocklexers import FileLexer
 from .context import InitFileContext, TestCaseFileContext, ResourceFileContext
 from .tokenizer import Tokenizer
-from .tokens import EOS, Token
+from .tokens import EOS, END, Token
 
 
-def get_tokens(source, data_only=False, tokenize_variables=False):
+def get_tokens(source, data_only=False, tokenize_variables=False, lang=None):
     """Parses the given source to tokens.
 
     :param source: The source where to read the data. Can be a path to
@@ -38,39 +38,44 @@ def get_tokens(source, data_only=False, tokenize_variables=False):
         arguments and elsewhere are tokenized. See the
         :meth:`~robot.parsing.lexer.tokens.Token.tokenize_variables`
         method for details.
+    :param lang: Additional languages to be supported during parsing.
+        Can be a string matching any of the supported language codes or names,
+        an initialized :class:`~robot.conf.languages.Language` subsclass,
+        a list containing such strings or instances, or a
+        :class:`~robot.conf.languages.Languages` instance.
 
     Returns a generator that yields :class:`~robot.parsing.lexer.tokens.Token`
     instances.
     """
-    lexer = Lexer(TestCaseFileContext(), data_only, tokenize_variables)
+    lexer = Lexer(TestCaseFileContext(lang=lang), data_only, tokenize_variables)
     lexer.input(source)
     return lexer.get_tokens()
 
 
-def get_resource_tokens(source, data_only=False, tokenize_variables=False):
+def get_resource_tokens(source, data_only=False, tokenize_variables=False, lang=None):
     """Parses the given source to resource file tokens.
 
-    Otherwise same as :func:`get_tokens` but the source is considered to be
+    Same as :func:`get_tokens` otherwise, but the source is considered to be
     a resource file. This affects, for example, what settings are valid.
     """
-    lexer = Lexer(ResourceFileContext(), data_only, tokenize_variables)
+    lexer = Lexer(ResourceFileContext(lang=lang), data_only, tokenize_variables)
     lexer.input(source)
     return lexer.get_tokens()
 
 
-def get_init_tokens(source, data_only=False, tokenize_variables=False):
+def get_init_tokens(source, data_only=False, tokenize_variables=False, lang=None):
     """Parses the given source to init file tokens.
 
-    Otherwise same as :func:`get_tokens` but the source is considered to be
+    Same as :func:`get_tokens` otherwise, but the source is considered to be
     a suite initialization file. This affects, for example, what settings are
     valid.
     """
-    lexer = Lexer(InitFileContext(), data_only, tokenize_variables)
+    lexer = Lexer(InitFileContext(lang=lang), data_only, tokenize_variables)
     lexer.input(source)
     return lexer.get_tokens()
 
 
-class Lexer(object):
+class Lexer:
 
     def __init__(self, ctx, data_only=False, tokenize_variables=False):
         self.lexer = FileLexer(ctx)
@@ -95,7 +100,7 @@ class Lexer(object):
         try:
             with FileReader(source, accept_text=True) as reader:
                 return reader.read()
-        except:
+        except Exception:
             raise DataError(get_error_message())
 
     def get_tokens(self):
@@ -112,38 +117,31 @@ class Lexer(object):
         return tokens
 
     def _get_tokens(self, statements):
-        # Setting local variables is performance optimization to avoid
-        # unnecessary lookups and attribute access.
         if self.data_only:
             ignored_types = {None, Token.COMMENT_HEADER, Token.COMMENT}
         else:
             ignored_types = {None}
-        name_types = (Token.TESTCASE_NAME, Token.KEYWORD_NAME)
-        separator_type = Token.SEPARATOR
-        eol_type = Token.EOL
+        inline_if_type = Token.INLINE_IF
         for statement in statements:
-            name_seen = False
-            separator_after_name = None
-            prev_token = None
+            last = None
+            inline_if = False
             for token in statement:
                 token_type = token.type
                 if token_type in ignored_types:
                     continue
-                if name_seen:
-                    if token_type == separator_type:
-                        separator_after_name = token
-                        continue
-                    if token_type != eol_type:
-                        yield EOS.from_token(prev_token)
-                    if separator_after_name:
-                        yield separator_after_name
-                    name_seen = False
-                if token_type in name_types:
-                    name_seen = True
-                prev_token = token
+                if token._add_eos_before and not (last and last._add_eos_after):
+                    yield EOS.from_token(token, before=True)
                 yield token
-            if prev_token:
-                yield EOS.from_token(prev_token)
+                if token._add_eos_after:
+                    yield EOS.from_token(token)
+                if token_type == inline_if_type:
+                    inline_if = True
+                last = token
+            if last and not last._add_eos_after:
+                yield EOS.from_token(last)
+            if inline_if:
+                yield END.from_token(last, virtual=True)
+                yield EOS.from_token(last)
 
     def _split_trailing_commented_and_empty_lines(self, statement):
         lines = self._split_to_lines(statement)

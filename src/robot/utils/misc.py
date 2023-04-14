@@ -13,44 +13,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import division
-
-from operator import add, sub
 import re
 
-from .platform import PY2
 from .robottypes import is_integer
-from .unic import unic
-
-
-def roundup(number, ndigits=0, return_type=None):
-    """Rounds number to the given number of digits.
-
-    Numbers equally close to a certain precision are always rounded away from
-    zero. By default return value is float when ``ndigits`` is positive and
-    int otherwise, but that can be controlled with ``return_type``.
-
-    With the built-in ``round()`` rounding equally close numbers as well as
-    the return type depends on the Python version.
-    """
-    result = _roundup(number, ndigits)
-    if not return_type:
-        return_type = float if ndigits > 0 else int
-    return return_type(result)
-
-
-# Python 2 rounds half away from zero (as taught in school) but Python 3
-# uses "bankers' rounding" that rounds half towards the even number. We want
-# consistent rounding and expect Python 2 style to be more familiar for users.
-if PY2:
-    _roundup = round
-else:
-    def _roundup(number, ndigits):
-        precision = 10 ** (-1 * ndigits)
-        if number % (0.5 * precision) == 0 and number % precision != 0:
-            operator = add if number > 0 else sub
-            number = operator(number, 0.1 * precision)
-        return round(number, ndigits)
+from .unic import safe_str
 
 
 def printable_name(string, code_style=False):
@@ -111,7 +77,7 @@ def plural_or_not(item):
 
 def seq2str(sequence, quote="'", sep=', ', lastsep=' and '):
     """Returns sequence in format `'item 1', 'item 2' and 'item 3'`."""
-    sequence = [quote + unic(item) + quote for item in sequence]
+    sequence = [f'{quote}{safe_str(item)}{quote}' for item in sequence]
     if not sequence:
         return ''
     if len(sequence) == 1:
@@ -124,15 +90,80 @@ def seq2str2(sequence):
     """Returns sequence in format `[ item 1 | item 2 | ... ]`."""
     if not sequence:
         return '[ ]'
-    return '[ %s ]' % ' | '.join(unic(item) for item in sequence)
+    return '[ %s ]' % ' | '.join(safe_str(item) for item in sequence)
 
 
-def test_or_task(text, rpa=False):
-    """Replaces `{test}` in `text` with `test` or `task` depending on `rpa`."""
-    def replace(match):
-        test = match.group(1)
+def test_or_task(text: str, rpa: bool):
+    """Replace 'test' with 'task' in the given `text` depending on `rpa`.
+
+     If given text is `test`, `test` or `task` is returned directly. Otherwise,
+     pattern `{test}` is searched from the text and occurrences replaced with
+     `test` or `task`.
+
+     In both cases matching the word `test` is case-insensitive and the returned
+     `test` or `task` has exactly same case as the original.
+     """
+    def replace(test):
         if not rpa:
             return test
         upper = [c.isupper() for c in test]
         return ''.join(c.upper() if up else c for c, up in zip('task', upper))
-    return re.sub('{(test)}', replace, text, flags=re.IGNORECASE)
+    if text.upper() == 'TEST':
+        return replace(text)
+    return re.sub('{(test)}', lambda m: replace(m.group(1)), text, flags=re.IGNORECASE)
+
+
+def isatty(stream):
+    # first check if buffer was detached
+    if hasattr(stream, 'buffer') and stream.buffer is None:
+        return False
+    if not hasattr(stream, 'isatty'):
+        return False
+    try:
+        return stream.isatty()
+    except ValueError:    # Occurs if file is closed.
+        return False
+
+
+def parse_re_flags(flags=None):
+    result = 0
+    if not flags:
+        return result
+    for flag in flags.split('|'):
+        try:
+            re_flag = getattr(re, flag.upper().strip())
+        except AttributeError:
+            raise ValueError(f'Unknown regexp flag: {flag}')
+        else:
+            if isinstance(re_flag, re.RegexFlag):
+                result |= re_flag
+            else:
+                raise ValueError(f'Unknown regexp flag: {flag}')
+    return result
+
+
+class classproperty(property):
+    """Property that works with classes in addition to instances.
+
+    Only supports getters. Setters and deleters cannot work with classes due
+    to how the descriptor protocol works, and they are thus explicitly disabled.
+    Metaclasses must be used if they are needed.
+    """
+
+    def __init__(self, fget, fset=None, fdel=None, doc=None):
+        if fset:
+            self.setter(fset)
+        if fdel:
+            self.deleter(fset)
+        super().__init__(fget)
+        if doc:
+            self.__doc__ = doc
+
+    def __get__(self, instance, owner):
+        return self.fget(owner)
+
+    def setter(self, fset):
+        raise TypeError('Setters are not supported.')
+
+    def deleter(self, fset):
+        raise TypeError('Deleters are not supported.')

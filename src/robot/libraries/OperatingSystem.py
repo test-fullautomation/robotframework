@@ -15,10 +15,10 @@
 
 import fnmatch
 import glob
-import io
 import os
+import pathlib
+import re
 import shutil
-import sys
 import tempfile
 import time
 
@@ -27,17 +27,16 @@ from robot.api import logger
 from robot.api.deco import keyword
 from robot.utils import (abspath, ConnectionCache, console_decode, del_env_var,
                          get_env_var, get_env_vars, get_time, is_truthy,
-                         is_unicode, normpath, parse_time, plural_or_not,
-                         secs_to_timestamp, secs_to_timestr, seq2str,
-                         set_env_var, timestr_to_secs, unic, CONSOLE_ENCODING,
-                         IRONPYTHON, JYTHON, PY2, PY3, SYSTEM_ENCODING, WINDOWS)
+                         is_string, normpath, parse_time, plural_or_not,
+                         safe_str, secs_to_timestamp, secs_to_timestr, seq2str,
+                         set_env_var, timestr_to_secs, CONSOLE_ENCODING, WINDOWS)
 
 __version__ = get_version()
 PROCESSES = ConnectionCache('No active processes.')
 
 
-class OperatingSystem(object):
-    """A test library providing keywords for OS related tasks.
+class OperatingSystem:
+    r"""A library providing keywords for operating system related tasks.
 
     ``OperatingSystem`` is Robot Framework's standard library that
     enables various operating system related tasks to be performed in
@@ -54,22 +53,26 @@ class OperatingSystem(object):
 
     = Path separators =
 
-    Because Robot Framework uses the backslash (``\\``) as an escape character
-    in the test data, using a literal backslash requires duplicating it like
-    in ``c:\\\\path\\\\file.txt``. That can be inconvenient especially with
+    Because Robot Framework uses the backslash (``\``) as an escape character
+    in its data, using a literal backslash requires duplicating it like
+    in ``c:\\path\\file.txt``. That can be inconvenient especially with
     longer Windows paths, and thus all keywords expecting paths as arguments
     convert forward slashes to backslashes automatically on Windows. This also
     means that paths like ``${CURDIR}/path/file.txt`` are operating system
     independent.
 
     Notice that the automatic path separator conversion does not work if
-    the path is only a part of an argument like with `Run` and `Start Process`
-    keywords. In these cases the built-in variable ``${/}`` that contains
-    ``\\`` or ``/``, depending on the operating system, can be used instead.
+    the path is only a part of an argument like with the `Run` keyword.
+    In these cases the built-in variable ``${/}`` that contains ``\`` or ``/``,
+    depending on the operating system, can be used instead.
 
     = Pattern matching =
 
-    Some keywords allow their arguments to be specified as
+    Many keywords accept arguments as either _glob_ or _regular expression_ patterns.
+
+    == Glob patterns ==
+
+    Some keywords, for example `List Directory`, support so called
     [http://en.wikipedia.org/wiki/Glob_(programming)|glob patterns] where:
 
     | ``*``        | matches any string, even an empty string                |
@@ -79,18 +82,40 @@ class OperatingSystem(object):
     | ``[a-z]``    | matches one character from the range in the bracket     |
     | ``[!a-z]``   | matches one character not from the range in the bracket |
 
-    Unless otherwise noted, matching is case-insensitive on
-    case-insensitive operating systems such as Windows.
+    Unless otherwise noted, matching is case-insensitive on case-insensitive
+    operating systems such as Windows.
+
+    == Regular expressions ==
+
+    Some keywords, for example `Grep File`, support
+    [http://en.wikipedia.org/wiki/Regular_expression|regular expressions]
+    that are more powerful but also more complicated that glob patterns.
+    The regular expression support is implemented using Python's
+    [http://docs.python.org/library/re.html|re module] and its documentation
+    should be consulted for more information about the syntax.
+
+    Because the backslash character (``\``) is an escape character in
+    Robot Framework data, possible backslash characters in regular
+    expressions need to be escaped with another backslash like ``\\d\\w+``.
+    Strings that may contain special characters but should be handled
+    as literal strings, can be escaped with the `Regexp Escape` keyword
+    from the BuiltIn library.
 
     = Tilde expansion =
 
     Paths beginning with ``~`` or ``~username`` are expanded to the current or
     specified user's home directory, respectively. The resulting path is
     operating system dependent, but typically e.g. ``~/robot`` is expanded to
-    ``C:\\Users\\<user>\\robot`` on Windows and ``/home/<user>/robot`` on
-    Unixes.
+    ``C:\Users\<user>\robot`` on Windows and ``/home/<user>/robot`` on Unixes.
 
-    The ``~username`` form does not work on Jython.
+    = ``pathlib.Path`` support =
+
+    Starting from Robot Framework 6.0, arguments representing paths can be given
+    as [https://docs.python.org/3/library/pathlib.html pathlib.Path] instances
+    in addition to strings.
+
+    All keywords returning paths return them as strings. This may change in
+    the future so that the return value type matches the argument type.
 
     = Boolean arguments =
 
@@ -113,21 +138,19 @@ class OperatingSystem(object):
     | `Remove Directory` | ${path} | recursive=${EMPTY} | # Empty string is false.       |
     | `Remove Directory` | ${path} | recursive=${FALSE} | # Python ``False`` is false.   |
 
-    Considering `OFF`` and ``0`` false is new in Robot Framework 3.1.
-
     = Example =
 
-    |  =Setting=  |     =Value=     |
-    | Library     | OperatingSystem |
-
-    | =Variable=  |       =Value=         |
-    | ${PATH}     | ${CURDIR}/example.txt |
-
-    | =Test Case= |     =Action=      | =Argument= |    =Argument=        |
-    | Example     | Create File       | ${PATH}    | Some text            |
-    |             | File Should Exist | ${PATH}    |                      |
-    |             | Copy File         | ${PATH}    | ~/file.txt           |
-    |             | ${output} =       | Run | ${TEMPDIR}${/}script.py arg |
+    | ***** Settings *****
+    | Library         OperatingSystem
+    |
+    | ***** Variables *****
+    | ${PATH}         ${CURDIR}/example.txt
+    |
+    | ***** Test Cases *****
+    | Example
+    |     `Create File`          ${PATH}    Some text
+    |     `File Should Exist`    ${PATH}
+    |     `Copy File`            ${PATH}    ~/file.txt
     """
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
     ROBOT_LIBRARY_VERSION = __version__
@@ -255,21 +278,16 @@ class OperatingSystem(object):
         path = self._absnorm(path)
         self._link("Getting file '%s'.", path)
         encoding = self._map_encoding(encoding)
-        if IRONPYTHON:
-            # https://github.com/IronLanguages/main/issues/1233
-            with open(path) as f:
-                content = f.read().decode(encoding, encoding_errors)
-        else:
-            with io.open(path, encoding=encoding, errors=encoding_errors,
-                         newline='') as f:
-                content = f.read()
-        return content.replace('\r\n', '\n')
+        # Using `newline=None` (default) and not converting `\r\n` -> `\n`
+        # ourselves would be better but some of our own acceptance tests
+        # depend on these semantics. Best solution would probably be making
+        # `newline` configurable.
+        # FIXME: Make `newline` configurable or at least submit an issue about that.
+        with open(path, encoding=encoding, errors=encoding_errors, newline='') as f:
+            return f.read().replace('\r\n', '\n')
 
     def _map_encoding(self, encoding):
-        # Python 3 opens files in native system encoding by default.
-        if PY3 and encoding.upper() == 'SYSTEM':
-            return None
-        return {'SYSTEM': SYSTEM_ENCODING,
+        return {'SYSTEM': None,
                 'CONSOLE': CONSOLE_ENCODING}.get(encoding.upper(), encoding)
 
     def get_binary_file(self, path):
@@ -281,47 +299,57 @@ class OperatingSystem(object):
         path = self._absnorm(path)
         self._link("Getting file '%s'.", path)
         with open(path, 'rb') as f:
-            return bytes(f.read())
+            return f.read()
 
-    def grep_file(self, path, pattern, encoding='UTF-8', encoding_errors='strict'):
-        """Returns the lines of the specified file that match the ``pattern``.
+    def grep_file(self, path, pattern, encoding='UTF-8', encoding_errors='strict',
+                  regexp=False):
+        r"""Returns the lines of the specified file that match the ``pattern``.
 
         This keyword reads a file from the file system using the defined
         ``path``, ``encoding`` and ``encoding_errors`` similarly as `Get File`.
         A difference is that only the lines that match the given ``pattern`` are
-        returned. Lines are returned as a single string catenated back together
+        returned. Lines are returned as a single string concatenated back together
         with newlines and the number of matched lines is automatically logged.
         Possible trailing newline is never returned.
 
-        A line matches if it contains the ``pattern`` anywhere in it and
-        it *does not need to match the pattern fully*. The pattern
-        matching syntax is explained in `introduction`, and in this
-        case matching is case-sensitive.
+        A line matches if it contains the ``pattern`` anywhere in it i.e. it does
+        not need to match the pattern fully. There are two supported pattern types:
+
+        - By default the pattern is considered a _glob_ pattern where, for example,
+          ``*`` and ``?`` can be used as wildcards.
+        - If the ``regexp`` argument is given a true value, the pattern is
+          considered to be a _regular expression_. These patterns are more
+          powerful but also more complicated than glob patterns. They often use
+          the backslash character and it needs to be escaped in Robot Framework
+          date like `\\`.
+
+        For more information about glob and regular expression syntax, see
+        the `Pattern matching` section. With this keyword matching is always
+        case-sensitive.
 
         Examples:
         | ${errors} = | Grep File | /var/log/myapp.log | ERROR |
         | ${ret} = | Grep File | ${CURDIR}/file.txt | [Ww]ildc??d ex*ple |
+        | ${ret} = | Grep File | ${CURDIR}/file.txt | [Ww]ildc\\w+d ex.*ple | regexp=True |
 
-        If more complex pattern matching is needed, it is possible to use
-        `Get File` in combination with String library keywords like `Get
-        Lines Matching Regexp`.
+        Special encoding values ``SYSTEM`` and ``CONSOLE`` that `Get File` supports
+        are supported by this keyword only with Robot Framework 4.0 and newer.
 
-        This keyword supports special ``SYSTEM`` and ``CONSOLE`` encodings that
-        `Get File` supports only with Robot Framework 4.0 and newer. When using
-        Python 3, it is possible to use ``${NONE}`` instead of ``SYSTEM`` with
-        earlier versions.
+        Support for regular expressions is new in Robot Framework 5.0.
         """
         path = self._absnorm(path)
-        pattern = '*%s*' % pattern
+        if not regexp:
+            pattern = fnmatch.translate(f'{pattern}*')
+        reobj = re.compile(pattern)
         encoding = self._map_encoding(encoding)
         lines = []
         total_lines = 0
         self._link("Reading file '%s'.", path)
-        with io.open(path, encoding=encoding, errors=encoding_errors) as f:
-            for line in f.readlines():
+        with open(path, encoding=encoding, errors=encoding_errors) as file:
+            for line in file:
                 total_lines += 1
                 line = line.rstrip('\r\n')
-                if fnmatch.fnmatchcase(line, pattern):
+                if reobj.search(line):
                     lines.append(line)
             self._info('%d out of %d lines matched' % (len(lines), total_lines))
             return '\n'.join(lines)
@@ -346,7 +374,8 @@ class OperatingSystem(object):
         """Fails unless the given path (file or directory) exists.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -358,7 +387,8 @@ class OperatingSystem(object):
         """Fails if the given path (file or directory) exists.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -382,7 +412,8 @@ class OperatingSystem(object):
         """Fails unless the given ``path`` points to an existing file.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -395,7 +426,8 @@ class OperatingSystem(object):
         """Fails if the given path points to an existing file.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -408,7 +440,8 @@ class OperatingSystem(object):
         """Fails unless the given path points to an existing directory.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -421,7 +454,8 @@ class OperatingSystem(object):
         """Fails if the given path points to an existing file.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
+
         The default error message can be overridden with the ``msg`` argument.
         """
         path = self._absnorm(path)
@@ -436,7 +470,7 @@ class OperatingSystem(object):
         """Waits until the given file or directory is removed.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
         If the path is a pattern, the keyword waits until all matching
         items are removed.
 
@@ -462,7 +496,7 @@ class OperatingSystem(object):
         """Waits until the given file or directory is created.
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
         If the path is a pattern, the keyword returns when an item matching
         it is created.
 
@@ -525,7 +559,7 @@ class OperatingSystem(object):
         self._link("File '%s' is empty.", path)
 
     def file_should_not_be_empty(self, path, msg=None):
-        """Fails if the specified directory is empty.
+        """Fails if the specified file is empty.
 
         The default error message can be overridden with the ``msg`` argument.
         """
@@ -561,9 +595,6 @@ class OperatingSystem(object):
         and `Create Binary File` if you need to write bytes without encoding.
         `File Should Not Exist` can be used to avoid overwriting existing
         files.
-
-        Automatically converting ``\\n`` to ``\\r\\n`` on Windows is new in
-        Robot Framework 3.1.
         """
         path = self._write_to_file(path, content, encoding)
         self._link("Created file '%s'.", path)
@@ -573,18 +604,14 @@ class OperatingSystem(object):
         parent = os.path.dirname(path)
         if not os.path.exists(parent):
             os.makedirs(parent)
-        # io.open() only accepts Unicode, not byte-strings, in text mode.
-        # We expect possible byte-strings to be all ASCII.
-        if PY2 and isinstance(content, str) and 'b' not in mode:
-            content = unicode(content)
         if encoding:
             encoding = self._map_encoding(encoding)
-        with io.open(path, mode, encoding=encoding) as f:
+        with open(path, mode, encoding=encoding) as f:
             f.write(content)
         return path
 
     def create_binary_file(self, path, content):
-        """Creates a binary file with the given content.
+        r"""Creates a binary file with the given content.
 
         If content is given as a Unicode string, it is first converted to bytes
         character by character. All characters with ordinal below 256 can be
@@ -597,15 +624,15 @@ class OperatingSystem(object):
         with missing intermediate directories.
 
         Examples:
-        | Create Binary File | ${dir}/example.png | ${image content}     |
-        | Create Binary File | ${path}            | \\x01\\x00\\xe4\\x00 |
+        | Create Binary File | ${dir}/example.png | ${image content} |
+        | Create Binary File | ${path}            | \x01\x00\xe4\x00 |
 
         Use `Create File` if you want to create a text file using a certain
         encoding. `File Should Not Exist` can be used to avoid overwriting
         existing files.
         """
-        if is_unicode(content):
-            content = bytes(bytearray(ord(c) for c in content))
+        if is_string(content):
+            content = bytes(ord(c) for c in content)
         path = self._write_to_file(path, content, mode='wb')
         self._link("Created binary file '%s'.", path)
 
@@ -618,9 +645,6 @@ class OperatingSystem(object):
         Other than not overwriting possible existing files, this keyword works
         exactly like `Create File`. See its documentation for more details
         about the usage.
-
-        Note that special encodings ``SYSTEM`` and ``CONSOLE`` only work
-        with this keyword starting from Robot Framework 3.1.2.
         """
         path = self._write_to_file(path, content, encoding, mode='a')
         self._link("Appended to file '%s'.", path)
@@ -632,7 +656,7 @@ class OperatingSystem(object):
         not point to a regular file (e.g. it points to a directory).
 
         The path can be given as an exact path or as a glob pattern.
-        The pattern matching syntax is explained in `introduction`.
+        See the `Glob patterns` section for details about the supported syntax.
         If the path is a pattern, all files matching it are removed.
         """
         path = self._absnorm(path)
@@ -712,10 +736,10 @@ class OperatingSystem(object):
     # Moving and copying files and directories
 
     def copy_file(self, source, destination):
-        """Copies the source file into the destination.
+        r"""Copies the source file into the destination.
 
         Source must be a path to an existing file or a glob pattern (see
-        `Pattern matching`) that matches exactly one file. How the
+        `Glob patterns`) that matches exactly one file. How the
         destination is interpreted is explained below.
 
         1) If the destination is an existing file, the source file is copied
@@ -726,7 +750,7 @@ class OperatingSystem(object):
         overwritten.
 
         3) If the destination does not exist and it ends with a path
-        separator (``/`` or ``\\``), it is considered a directory. That
+        separator (``/`` or ``\``), it is considered a directory. That
         directory is created and a source file copied into it.
         Possible missing intermediate directories are also created.
 
@@ -766,6 +790,8 @@ class OperatingSystem(object):
         return source
 
     def _normalize_copy_and_move_destination(self, destination):
+        if isinstance(destination, pathlib.Path):
+            destination = str(destination)
         is_dir = os.path.isdir(destination) or destination.endswith(('/', '\\'))
         destination = self._absnorm(destination)
         directory = destination if is_dir else os.path.dirname(destination)
@@ -839,7 +865,7 @@ class OperatingSystem(object):
         """Copies specified files to the target directory.
 
         Source files can be given as exact paths and as glob patterns (see
-        `Pattern matching`). At least one source must be given, but it is
+        `Glob patterns`). At least one source must be given, but it is
         not an error if it is a pattern that does not match anything.
 
         Last argument must be the destination directory. If the destination
@@ -889,14 +915,8 @@ class OperatingSystem(object):
         the destination directory and the possible missing intermediate
         directories are created.
         """
-        source, destination \
-            = self._prepare_copy_and_move_directory(source, destination)
-        try:
-            shutil.copytree(source, destination)
-        except shutil.Error:
-            # https://github.com/robotframework/robotframework/issues/2321
-            if not (WINDOWS and JYTHON):
-                raise
+        source, destination = self._prepare_copy_and_move_directory(source, destination)
+        shutil.copytree(source, destination)
         self._link("Copied directory from '%s' to '%s'.", source, destination)
 
     def _prepare_copy_and_move_directory(self, source, destination):
@@ -935,8 +955,8 @@ class OperatingSystem(object):
     def get_environment_variable(self, name, default=None):
         """Returns the value of an environment variable with the given name.
 
-        If no such environment variable is set, returns the default value, if
-        given. Otherwise fails the test case.
+        If no environment variable is found, returns possible default value.
+        If no default value is given, the keyword fails.
 
         Returned variables are automatically decoded to Unicode using
         the system encoding.
@@ -1069,9 +1089,9 @@ class OperatingSystem(object):
         - ${p4} = '/path'
         - ${p5} = '/my/path2'
         """
-        base = base.replace('/', os.sep)
-        parts = [p.replace('/', os.sep) for p in parts]
-        return self.normalize_path(os.path.join(base, *parts))
+        parts = [str(p) if isinstance(p, pathlib.Path) else p.replace('/', os.sep)
+                 for p in (base,) + parts]
+        return self.normalize_path(os.path.join(*parts))
 
     def join_paths(self, base, *paths):
         """Joins given paths with base and returns resulted paths.
@@ -1095,10 +1115,9 @@ class OperatingSystem(object):
         - Collapses redundant separators and up-level references.
         - Converts ``/`` to ``\\`` on Windows.
         - Replaces initial ``~`` or ``~user`` by that user's home directory.
-          The latter is not supported on Jython.
         - If ``case_normalize`` is given a true value (see `Boolean arguments`)
-          on Windows, converts the path to all lowercase. New in Robot
-          Framework 3.1.
+          on Windows, converts the path to all lowercase.
+        - Converts ``pathlib.Path`` instances to ``str``.
 
         Examples:
         | ${path1} = | Normalize Path | abc/           |
@@ -1114,7 +1133,11 @@ class OperatingSystem(object):
         On Windows result would use ``\\`` instead of ``/`` and home directory
         would be different.
         """
-        path = os.path.normpath(os.path.expanduser(path.replace('/', os.sep)))
+        if isinstance(path, pathlib.Path):
+            path = str(path)
+        else:
+            path = path.replace('/', os.sep)
+        path = os.path.normpath(os.path.expanduser(path))
         # os.path.normcase doesn't normalize on OSX which also, by default,
         # has case-insensitive file system. Our robot.utils.normpath would
         # do that, but it's not certain would that, or other things that the
@@ -1302,8 +1325,9 @@ class OperatingSystem(object):
         argument a true value (see `Boolean arguments`).
 
         If ``pattern`` is given, only items matching it are returned. The pattern
-        matching syntax is explained in `introduction`, and in this case
-        matching is case-sensitive.
+        is considered to be a _glob pattern_ and the full syntax is explained in
+        the `Glob patterns` section. With this keyword matching is always
+        case-sensitive.
 
         Examples (using also other `List Directory` variants):
         | @{items} = | List Directory           | ${TEMPDIR} |
@@ -1358,8 +1382,8 @@ class OperatingSystem(object):
         self._link("Listing contents of directory '%s'.", path)
         if not os.path.isdir(path):
             self._error("Directory '%s' does not exist." % path)
-        # result is already unicode but unic also handles NFC normalization
-        items = sorted(unic(item) for item in os.listdir(path))
+        # result is already unicode but safe_str also handles NFC normalization
+        items = sorted(safe_str(item) for item in os.listdir(path))
         if pattern:
             items = [i for i in items if fnmatch.fnmatchcase(i, pattern)]
         if is_truthy(absolute):
@@ -1399,11 +1423,7 @@ class OperatingSystem(object):
             self._link("Touched new file '%s'.", path)
 
     def _absnorm(self, path):
-        path = self.normalize_path(path)
-        try:
-            return abspath(path)
-        except ValueError:  # http://ironpython.codeplex.com/workitem/29489
-            return path
+        return abspath(self.normalize_path(path))
 
     def _fail(self, *messages):
         raise AssertionError(next(msg for msg in messages if msg))
@@ -1444,13 +1464,12 @@ class _Process:
             return 255
         if rc is None:
             return 0
-        # In Windows (Python and Jython) return code is value returned by
+        # In Windows return code is value returned by
         # command (can be almost anything)
         # In other OS:
-        #   In Jython return code can be between '-255' - '255'
-        #   In Python return code must be converted with 'rc >> 8' and it is
+        #   Return code must be converted with 'rc >> 8' and it is
         #   between 0-255 after conversion
-        if WINDOWS or JYTHON:
+        if WINDOWS:
             return rc % 256
         return rc >> 8
 
@@ -1460,15 +1479,11 @@ class _Process:
                 command = command[:-1] + ' 2>&1 &'
             else:
                 command += ' 2>&1'
-        return self._encode_to_file_system(command)
-
-    def _encode_to_file_system(self, string):
-        enc = sys.getfilesystemencoding() if PY2 else None
-        return string.encode(enc) if enc else string
+        return command
 
     def _process_output(self, output):
         if '\r\n' in output:
             output = output.replace('\r\n', '\n')
         if output.endswith('\n'):
             output = output[:-1]
-        return console_decode(output, force=True)
+        return console_decode(output)

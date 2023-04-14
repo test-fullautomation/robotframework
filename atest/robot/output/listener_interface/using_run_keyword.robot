@@ -85,13 +85,57 @@ In start_keyword and end_keyword with FOR loop
     Should Be Equal       ${for.body[-1].name}                     BuiltIn.Log
     Check Log Message     ${for.body[-1].body[0]}                  end_keyword
 
-In start_keyword and end_keyword with IF/ELSE
+In start_keyword and end_keyword with WHILE
+    ${tc} =               Check Test Case                          While loop executed multiple times
+    ${while} =            Set Variable                             ${tc.body[2]}
+    Should Be Equal       ${while.type}                            WHILE
+    Length Should Be      ${while.body}                            7
+    Length Should Be      ${while.body.filter(keywords=True)}      2
+    Should Be Equal       ${while.body[0].name}                    BuiltIn.Log
+    Check Log Message     ${while.body[0].body[0]}                 start_keyword
+    Should Be Equal       ${while.body[-1].name}                   BuiltIn.Log
+    Check Log Message     ${while.body[-1].body[0]}                end_keyword
+
+ In start_keyword and end_keyword with IF/ELSE
     ${tc} =               Check Test Case                          IF structure
     Should Be Equal       ${tc.body[1].type}                       IF/ELSE ROOT
-    Length Should Be      ${tc.body[1].body}                       3                     # Listener if not called with root
+    Length Should Be      ${tc.body[1].body}                       3                     # Listener is not called with root
     Validate IF branch    ${tc.body[1].body[0]}                    IF         NOT RUN    # but is called with unexecuted branches.
     Validate IF branch    ${tc.body[1].body[1]}                    ELSE IF    PASS
     Validate IF branch    ${tc.body[1].body[2]}                    ELSE       NOT RUN
+
+In start_keyword and end_keyword with TRY/EXCEPT
+    ${tc} =               Check Test Case                          Everything
+    Should Be Equal       ${tc.body[1].type}                       TRY/EXCEPT ROOT
+    Length Should Be      ${tc.body[1].body}                       5                     # Listener is not called with root
+    Validate FOR branch   ${tc.body[1].body[0]}                    TRY        FAIL
+    Validate FOR branch   ${tc.body[1].body[1]}                    EXCEPT     NOT RUN    # but is called with unexecuted branches.
+    Validate FOR branch   ${tc.body[1].body[2]}                    EXCEPT     PASS
+    Validate FOR branch   ${tc.body[1].body[3]}                    ELSE       NOT RUN
+    Validate FOR branch   ${tc.body[1].body[4]}                    FINALLY    PASS
+
+In start_keyword and end_keyword with BREAK and CONTINUE
+    ${tc} =                   Check Test Case                                    WHILE loop in keyword
+    FOR    ${iter}     IN     @{tc.body[1].body[2].body[1:-1]}
+        Should Be Equal       ${iter.body[3].body[0].body[1].type}               CONTINUE
+        Should Be Equal       ${iter.body[3].body[0].body[1].body[0].name}       BuiltIn.Log
+        Check Log Message     ${iter.body[3].body[0].body[1].body[0].body[0]}    start_keyword
+        Should Be Equal       ${iter.body[3].body[0].body[1].body[1].name}       BuiltIn.Log
+        Check Log Message     ${iter.body[3].body[0].body[1].body[1].body[0]}    end_keyword
+        Should Be Equal       ${iter.body[4].body[0].body[1].type}               BREAK
+        Should Be Equal       ${iter.body[4].body[0].body[1].body[0].name}       BuiltIn.Log
+        Check Log Message     ${iter.body[4].body[0].body[1].body[0].body[0]}    start_keyword
+        Should Be Equal       ${iter.body[4].body[0].body[1].body[1].name}       BuiltIn.Log
+        Check Log Message     ${iter.body[4].body[0].body[1].body[1].body[0]}    end_keyword
+    END
+
+In start_keyword and end_keyword with RETURN
+    ${tc} =               Check Test Case                                          Second One
+    Should Be Equal       ${tc.body[3].body[1].body[1].body[2].type}               RETURN
+    Should Be Equal       ${tc.body[3].body[1].body[1].body[2].body[0].name}       BuiltIn.Log
+    Check Log Message     ${tc.body[3].body[1].body[1].body[2].body[0].body[0]}    start_keyword
+    Should Be Equal       ${tc.body[3].body[1].body[1].body[2].body[1].name}       BuiltIn.Log
+    Check Log Message     ${tc.body[3].body[1].body[1].body[2].body[1].body[0]}    end_keyword
 
 *** Keywords ***
 Run Tests With Keyword Running Listener
@@ -100,7 +144,9 @@ Run Tests With Keyword Running Listener
     ...    misc/normal.robot
     ...    misc/setups_and_teardowns.robot
     ...    misc/for_loops.robot
+    ...    misc/while.robot
     ...    misc/if_else.robot
+    ...    misc/try_except.robot
     Run Tests    --listener ${path}    ${files}    validate output=True
     Should Be Empty    ${ERRORS}
 
@@ -122,5 +168,14 @@ Validate IF branch
         Should Be Equal       ${branch.body[1].name}                   BuiltIn.Fail
         Should Be Equal       ${branch.body[1].status}                 NOT RUN
     END
+    Should Be Equal       ${branch.body[-1].name}                  BuiltIn.Log
+    Check Log Message     ${branch.body[-1].body[0]}               end_keyword
+
+Validate FOR branch
+    [Arguments]    ${branch}    ${type}    ${status}
+    Should Be Equal       ${branch.type}                           ${type}
+    Should Be Equal       ${branch.status}                         ${status}
+    Should Be Equal       ${branch.body[0].name}                   BuiltIn.Log
+    Check Log Message     ${branch.body[0].body[0]}                start_keyword
     Should Be Equal       ${branch.body[-1].name}                  BuiltIn.Log
     Check Log Message     ${branch.body[-1].body[0]}               end_keyword

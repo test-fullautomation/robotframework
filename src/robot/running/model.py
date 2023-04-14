@@ -37,19 +37,19 @@ import os
 
 from robot import model
 from robot.conf import RobotSettings
+from robot.errors import BreakLoop, ContinueLoop, ReturnFromKeyword, DataError
 from robot.model import Keywords, BodyItem
 from robot.output import LOGGER, Output, pyloggingconf
+from robot.result import (Break as BreakResult, Continue as ContinueResult,
+                          Return as ReturnResult)
 from robot.utils import seq2str, setter
 
-from .bodyrunner import ForRunner, IfRunner, KeywordRunner, ThreadRunner  # cuongnht add thread
+from .bodyrunner import ForRunner, IfRunner, KeywordRunner, TryRunner, WhileRunner
 from .randomizer import Randomizer
+from .statusreporter import StatusReporter
 
 
 class Body(model.Body):
-    __slots__ = []
-
-
-class IfBranches(model.IfBranches):
     __slots__ = []
 
 
@@ -66,8 +66,7 @@ class Keyword(model.Keyword):
 
     def __init__(self, name='', doc='', args=(), assign=(), tags=(), timeout=None,
                  type=BodyItem.KEYWORD, parent=None, lineno=None):
-        model.Keyword.__init__(self, name, doc, args, assign, tags, timeout, type,
-                               parent)
+        super().__init__(name, doc, args, assign, tags, timeout, type, parent)
         self.lineno = lineno
 
     @property
@@ -84,7 +83,7 @@ class For(model.For):
     body_class = Body
 
     def __init__(self, variables, flavor, values, parent=None, lineno=None, error=None):
-        model.For.__init__(self, variables, flavor, values, parent)
+        super().__init__(variables, flavor, values, parent)
         self.lineno = lineno
         self.error = error
 
@@ -96,14 +95,13 @@ class For(model.For):
         return ForRunner(context, self.flavor, run, templated).run(self)
 
 
-# cuongnht add thread
 @Body.register
-class Thread(model.Thread):
+class While(model.While):
     __slots__ = ['lineno', 'error']
     body_class = Body
 
-    def __init__(self, name, daemon, parent=None, lineno=None, error=None):
-        model.Thread.__init__(self, name, daemon, parent)
+    def __init__(self, condition=None, limit=None, parent=None, lineno=None, error=None):
+        super().__init__(condition, limit, parent)
         self.lineno = lineno
         self.error = error
 
@@ -112,16 +110,29 @@ class Thread(model.Thread):
         return self.parent.source if self.parent is not None else None
 
     def run(self, context, run=True, templated=False):
-        return ThreadRunner(context, run, templated).run(self)
+        return WhileRunner(context, run, templated).run(self)
+
+
+class IfBranch(model.IfBranch):
+    __slots__ = ['lineno']
+    body_class = Body
+
+    def __init__(self, type=BodyItem.IF, condition=None, parent=None, lineno=None):
+        super().__init__(type, condition, parent)
+        self.lineno = lineno
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
 
 
 @Body.register
 class If(model.If):
     __slots__ = ['lineno', 'error']
-    body_class = IfBranches
+    branch_class = IfBranch
 
     def __init__(self, parent=None, lineno=None, error=None):
-        model.If.__init__(self, parent)
+        super().__init__(parent)
         self.lineno = lineno
         self.error = error
 
@@ -133,13 +144,13 @@ class If(model.If):
         return IfRunner(context, run, templated).run(self)
 
 
-@IfBranches.register
-class IfBranch(model.IfBranch):
+class TryBranch(model.TryBranch):
     __slots__ = ['lineno']
     body_class = Body
 
-    def __init__(self, type=BodyItem.IF, condition=None, parent=None, lineno=None):
-        model.IfBranch.__init__(self, type, condition, parent)
+    def __init__(self, type=BodyItem.TRY, patterns=(), pattern_type=None,
+                 variable=None, parent=None, lineno=None):
+        super().__init__(type, patterns, pattern_type, variable, parent)
         self.lineno = lineno
 
     @property
@@ -147,22 +158,105 @@ class IfBranch(model.IfBranch):
         return self.parent.source if self.parent is not None else None
 
 
+@Body.register
+class Try(model.Try):
+    __slots__ = ['lineno', 'error']
+    branch_class = TryBranch
+
+    def __init__(self, parent=None, lineno=None, error=None):
+        super().__init__(parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        return TryRunner(context, run, templated).run(self)
+
+
+@Body.register
+class Return(model.Return):
+    __slots__ = ['lineno', 'error']
+
+    def __init__(self, values=(), parent=None, lineno=None, error=None):
+        super().__init__(values, parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        with StatusReporter(self, ReturnResult(self.values), context, run):
+            if run:
+                if self.error:
+                    raise DataError(self.error, syntax=True)
+                if not context.dry_run:
+                    raise ReturnFromKeyword(self.values)
+
+
+@Body.register
+class Continue(model.Continue):
+    __slots__ = ['lineno', 'error']
+
+    def __init__(self, parent=None, lineno=None, error=None):
+        super().__init__(parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        with StatusReporter(self, ContinueResult(), context, run):
+            if run:
+                if self.error:
+                    raise DataError(self.error, syntax=True)
+                if not context.dry_run:
+                    raise ContinueLoop()
+
+
+@Body.register
+class Break(model.Break):
+    __slots__ = ['lineno', 'error']
+
+    def __init__(self, parent=None, lineno=None, error=None):
+        super().__init__(parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        with StatusReporter(self, BreakResult(), context, run):
+            if run:
+                if self.error:
+                    raise DataError(self.error, syntax=True)
+                if not context.dry_run:
+                    raise BreakLoop()
+
+
 class TestCase(model.TestCase):
     """Represents a single executable test case.
 
     See the base class for documentation of attributes not documented here.
     """
-    __slots__ = ['template', 'lineno']
+    __slots__ = ['template']
     body_class = Body        #: Internal usage only.
     fixture_class = Keyword  #: Internal usage only.
 
     def __init__(self, name='', doc='', tags=None, timeout=None, template=None,
                  lineno=None):
-        model.TestCase.__init__(self, name, doc, tags, timeout)
+        super().__init__(name, doc, tags, timeout, lineno)
         #: Name of the keyword that has been used as a template when building the test.
         # ``None`` if template is not used.
         self.template = template
-        self.lineno = lineno
 
     @property
     def source(self):
@@ -179,7 +273,7 @@ class TestSuite(model.TestSuite):
     fixture_class = Keyword  #: Internal usage only.
 
     def __init__(self,  name='', doc='', metadata=None, source=None, rpa=None):
-        model.TestSuite.__init__(self, name, doc, metadata, source, rpa)
+        super().__init__(name, doc, metadata, source, rpa)
         #: :class:`ResourceFile` instance containing imports, variables and
         #: keywords the suite owns. When data is parsed from the file system,
         #: this data comes from the same test case file that creates the suite.
@@ -317,7 +411,7 @@ class TestSuite(model.TestSuite):
         return runner.result
 
 
-class Variable(object):
+class Variable:
 
     def __init__(self, name, value, source=None, lineno=None, error=None):
         self.name = name
@@ -328,12 +422,12 @@ class Variable(object):
 
     def report_invalid_syntax(self, message, level='ERROR'):
         source = self.source or '<unknown>'
-        line = ' on line %s' % self.lineno if self.lineno is not None else ''
-        LOGGER.write("Error in file '%s'%s: Setting variable '%s' failed: %s"
-                     % (source, line, self.name, message), level)
+        line = f' on line {self.lineno}' if self.lineno else ''
+        LOGGER.write(f"Error in file '{source}'{line}: "
+                     f"Setting variable '{self.name}' failed: {message}", level)
 
 
-class ResourceFile(object):
+class ResourceFile:
 
     def __init__(self, doc='', source=None):
         self.doc = doc
@@ -355,7 +449,7 @@ class ResourceFile(object):
         return model.ItemList(Variable, {'source': self.source}, items=variables)
 
 
-class UserKeyword(object):
+class UserKeyword:
 
     def __init__(self, name, args=(), doc='', tags=(), return_=None,
                  timeout=None, lineno=None, parent=None, error=None):
@@ -406,13 +500,13 @@ class UserKeyword(object):
         return self.parent.source if self.parent is not None else None
 
 
-class Import(object):
+class Import:
     ALLOWED_TYPES = ('Library', 'Resource', 'Variables')
 
     def __init__(self, type, name, args=(), alias=None, source=None, lineno=None):
         if type not in self.ALLOWED_TYPES:
-            raise ValueError("Invalid import type '%s'. Should be one of %s."
-                             % (type, seq2str(self.ALLOWED_TYPES, lastsep=' or ')))
+            raise ValueError(f"Invalid import type '{type}'. Should be one of "
+                             f"{seq2str(self.ALLOWED_TYPES, lastsep=' or ')}.")
         self.type = type
         self.name = name
         self.args = args
@@ -430,14 +524,14 @@ class Import(object):
 
     def report_invalid_syntax(self, message, level='ERROR'):
         source = self.source or '<unknown>'
-        line = ' on line %s' % self.lineno if self.lineno is not None else ''
-        LOGGER.write("Error in file '%s'%s: %s" % (source, line, message), level)
+        line = f' on line {self.lineno}' if self.lineno else ''
+        LOGGER.write(f"Error in file '{source}'{line}: {message}", level)
 
 
 class Imports(model.ItemList):
 
     def __init__(self, source, imports=None):
-        model.ItemList.__init__(self, Import, {'source': source}, items=imports)
+        super().__init__(Import, {'source': source}, items=imports)
 
     def library(self, name, args=(), alias=None, lineno=None):
         self.create('Library', name, args, alias, lineno)

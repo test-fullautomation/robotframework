@@ -13,25 +13,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import warnings
-
-from .compat import py3to2
 from .normalizing import NormalizedDict
 from .robottypes import is_string
 
 
-@py3to2
-class ConnectionCache(object):
-    """Cache for test libs to use with concurrent connections, processes, etc.
+class ConnectionCache:
+    """Cache for libraries to use with concurrent connections, processes, etc.
 
     The cache stores the registered connections (or other objects) and allows
     switching between them using generated indices or user given aliases.
-    This is useful with any test library where there's need for multiple
-    concurrent connections, processes, etc.
+    This is useful with any library where there's need for multiple concurrent
+    connections, processes, etc.
 
-    This class can, and is, used also outside the core framework by SSHLibrary,
-    Selenium(2)Library, etc. Backwards compatibility is thus important when
-    doing changes.
+    This class is used also outside the core framework by SeleniumLibrary,
+    SSHLibrary, etc. Backwards compatibility is thus important when doing changes.
     """
 
     def __init__(self, no_current_msg='No open connection.'):
@@ -138,12 +133,12 @@ class ConnectionCache(object):
         return self.current is not self._no_current
 
     def resolve_alias_or_index(self, alias_or_index):
-        for resolver in self._resolve_alias, self._resolve_index:
+        for resolver in self._resolve_alias, self._resolve_index, self._is_connection:
             try:
                 return resolver(alias_or_index)
             except ValueError:
                 pass
-        raise ValueError("Non-existing index or alias '%s'." % alias_or_index)
+        raise ValueError(f"Non-existing index or alias '{alias_or_index}'.")
 
     def _resolve_alias(self, alias):
         if is_string(alias) and alias in self._aliases:
@@ -159,9 +154,11 @@ class ConnectionCache(object):
             raise ValueError
         return index
 
+    def _is_connection(self, conn):
+        return self._connections.index(conn) + 1
 
-@py3to2
-class NoConnection(object):
+
+class NoConnection:
 
     def __init__(self, message):
         self.message = message

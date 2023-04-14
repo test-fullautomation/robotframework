@@ -20,7 +20,7 @@ from robot.variables import is_dict_variable
 from .argumentvalidator import ArgumentValidator
 
 
-class ArgumentResolver(object):
+class ArgumentResolver:
 
     def __init__(self, argspec, resolve_named=True,
                  resolve_variables_until=None, dict_to_kwargs=False):
@@ -32,15 +32,14 @@ class ArgumentResolver(object):
 
     def resolve(self, arguments, variables=None):
         positional, named = self._named_resolver.resolve(arguments, variables)
-        positional, named = self._variable_replacer.replace(positional, named,
-                                                            variables)
+        positional, named = self._variable_replacer.replace(positional, named, variables)
         positional, named = self._dict_to_kwargs.handle(positional, named)
         self._argument_validator.validate(positional, named,
                                           dryrun=variables is None)
         return positional, named
 
 
-class NamedArgumentResolver(object):
+class NamedArgumentResolver:
 
     def __init__(self, argspec):
         """:type argspec: :py:class:`robot.running.arguments.ArgumentSpec`"""
@@ -80,13 +79,13 @@ class NamedArgumentResolver(object):
                         % (self._argspec.type.capitalize(), self._argspec.name))
 
 
-class NullNamedArgumentResolver(object):
+class NullNamedArgumentResolver:
 
     def resolve(self, arguments, variables=None):
         return arguments, {}
 
 
-class DictToKwargs(object):
+class DictToKwargs:
 
     def __init__(self, argspec, enabled=False):
         self._maxargs = argspec.maxargs
@@ -103,7 +102,7 @@ class DictToKwargs(object):
         return is_dict_like(positional[-1])
 
 
-class VariableReplacer(object):
+class VariableReplacer:
 
     def __init__(self, resolve_until=None):
         self._resolve_until = resolve_until
@@ -114,8 +113,8 @@ class VariableReplacer(object):
             positional = variables.replace_list(positional, self._resolve_until)
             named = list(self._replace_named(named, variables.replace_scalar))
         else:
-            positional = list(positional)
-            named = [item for item in named if isinstance(item, tuple)]
+            # If `var` isn't a tuple, it's a &{dict} variables.
+            named = [var if isinstance(var, tuple) else (var, var) for var in named]
         return positional, named
 
     def _replace_named(self, named, replace_scalar):

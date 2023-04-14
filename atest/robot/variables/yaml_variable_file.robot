@@ -15,10 +15,15 @@ Valid YML file
     Check Test Case    ${TESTNAME}
 
 Non-ASCII strings
-    [Tags]    no-ipy
     Check Test Case    ${TESTNAME}
 
 Dictionary is dot-accessible
+    Check Test Case    ${TESTNAME}
+
+Nested dictionary is dot-accessible
+    Check Test Case    ${TESTNAME}
+
+Dictionary inside list is dot-accessible
     Check Test Case    ${TESTNAME}
 
 YAML file in PYTHONPATH

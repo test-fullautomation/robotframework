@@ -3,8 +3,8 @@ Resource          libdoc_resource.robot
 Suite Setup       Run Libdoc And Parse Output    ${TESTDATADIR}/DataTypesLibrary.json
 
 *** Test Cases ***
-Check DataType Enums
-    DataType Enums Should Be    0
+Enum
+    DataType Enum Should Be    0
     ...    AssertionOperator
     ...    <p>This is some Doc</p>\n<p>This has was defined by assigning to __doc__.</p>
     ...    {"name": "equal","value": "=="}
@@ -13,8 +13,7 @@ Check DataType Enums
     ...    {"name": ">","value": ">"}
     ...    {"name": "<=","value": "<="}
     ...    {"name": ">=","value": ">="}
-
-    DataType Enums Should Be    1
+    DataType Enum Should Be    1
     ...    Small
     ...    <p>This is the Documentation.</p>\n<p>This was defined within the class definition.</p>
     ...    {"name": "one","value": "1"}
@@ -22,10 +21,52 @@ Check DataType Enums
     ...    {"name": "three","value": "3"}
     ...    {"name": "four","value": "4"}
 
-Check DataType TypedDict
+TypedDict
     DataType TypedDict Should Be    0
     ...    GeoLocation
-    ...    <p>Defines the geolocation.</p>\n<ul>\n<li><code>latitude</code> Latitude between -90 and 90.</li>\n<li><code>longitude</code> Longitude between -180 and 180.</li>\n<li><code>accuracy</code> <b>Optional</b> Non-negative accuracy value. Defaults to 0. Example usage: <code>{'latitude': 59.95, 'longitude': 30.31667}</code></li>\n</ul>
+    ...    <p>Defines the geolocation.</p>\n<ul>\n<li><code>latitude</code> Latitude between -90 and 90.</li>\n<li><code>longitude</code> Longitude between -180 and 180.</li>\n<li><code>accuracy</code> <b>Optional</b> Non-negative accuracy value. Defaults to 0.</li>\n</ul>\n<p>Example usage: <code>{'latitude': 59.95, 'longitude': 30.31667}</code></p>
     ...    {"key": "longitude", "type": "float", "required": "true"}
     ...    {"key": "latitude", "type": "float", "required": "true"}
     ...    {"key": "accuracy", "type": "float", "required": "false"}
+
+Custom
+    DataType Custom Should Be    0
+    ...    CustomType
+    ...    <p>Converter method doc is used when defined.</p>
+    DataType Custom Should Be    1
+    ...    CustomType2
+    ...    <p>Class doc is used when converter method has no doc.</p>
+
+Accepted types
+    Accepted Types Should Be    1     Standard     boolean
+    ...    string    integer    float    None
+    Accepted Types Should Be    2     Custom       CustomType
+    ...    string    integer
+    Accepted Types Should Be    3     Custom       CustomType2
+    Accepted Types Should Be    6     TypedDict    GeoLocation
+    ...    string
+    Accepted Types Should Be    0     Enum         AssertionOperator
+    ...    string
+    Accepted Types Should Be    10    Enum         Small
+    ...    string    integer
+
+Usages
+    Usages Should Be    1     Standard     boolean
+    ...    Funny Unions
+    Usages Should Be    2     Custom       CustomType
+    ...    Custom
+    Usages Should be    6     TypedDict    GeoLocation
+    ...    Funny Unions    Set Location
+    Usages Should Be    10    Enum         Small
+    ...    __init__    Funny Unions
+
+Typedoc links in arguments
+    Typedoc links should be    0    1    AssertionOperator    None
+    Typedoc links should be    0    2    str:string
+    Typedoc links should be    1    0    CustomType
+    Typedoc links should be    1    1    CustomType2
+    Typedoc links should be    2    0    bool:boolean    int:integer    float    str:string    AssertionOperator    Small    GeoLocation    None
+    Typedoc links should be    4    0    List[str]:list
+    Typedoc links should be    4    1    Dict[str, int]:dictionary
+    Typedoc links should be    4    2    Any:
+    Typedoc links should be    4    3    List[Any]:list

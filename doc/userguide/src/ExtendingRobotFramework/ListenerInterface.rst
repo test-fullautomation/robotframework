@@ -7,9 +7,8 @@ external test monitors, sending a mail message when a test fails, and
 communicating with other systems. Listener API version 3 also makes
 it possible to modify tests and results during the test execution.
 
-Listeners are classes or modules with certain special methods, and they
-can be implemented both with Python and Java. Listeners that monitor
-the whole test execution must be taken into use from the command line.
+Listeners are classes or modules with certain special methods. Listeners that
+monitor the whole test execution must be taken into use from the command line.
 In addition to that, `test libraries can register listeners`__ that receive
 notifications while that library is active.
 
@@ -63,7 +62,7 @@ this listener
 
 .. sourcecode:: python
 
-    class Listener(object):
+    class Listener:
 
         def __init__(self, port: int, log=True):
             self.port = post
@@ -96,9 +95,6 @@ gets information about the execution but cannot directly affect it. The latter
 interface gets data and result objects Robot Framework itself uses and is thus
 able to alter execution and change results. See `listener examples`_ for more
 information about what listeners can do.
-
-Another difference between versions 2 and 3 is that the former supports
-both Python and Java but the latter supports only Python.
 
 Listener interface methods
 --------------------------
@@ -213,24 +209,32 @@ it. If that is needed, `listener version 3`_ can be used instead.
    |                  |                  | * `message`: Status message. Normally an error                 |
    |                  |                  |   message or an empty string.                                  |
    +------------------+------------------+----------------------------------------------------------------+
-   | start_keyword    | name, attributes | Called when a keyword starts.                                  |
+   | start_keyword    | name, attributes | Called when a keyword or a control structure such as `IF/ELSE` |
+   |                  |                  | or `TRY/EXCEPT` starts.                                        |
    |                  |                  |                                                                |
-   |                  |                  | `name` is the full keyword name containing                     |
-   |                  |                  | possible library or resource name as a prefix.                 |
-   |                  |                  | For example, `MyLibrary.Example Keyword`.                      |
+   |                  |                  | With keywords `name` is the full keyword name containing       |
+   |                  |                  | possible library or resource name as a prefix like             |
+   |                  |                  | `MyLibrary.Example Keyword`. With control structures `name`    |
+   |                  |                  | contains string representation of parameters.                  |
    |                  |                  |                                                                |
-   |                  |                  | Contents of the attribute dictionary:                          |
+   |                  |                  | Keywords and control structures share most of attributes, but  |
+   |                  |                  | control structures can have additional attributes depending    |
+   |                  |                  | on their `type`.                                               |
    |                  |                  |                                                                |
-   |                  |                  | * `type`: String specifying keyword type. Possible values are: |
-   |                  |                  |   `KEYWORD`, `SETUP`, `TEARDOWN`, `FOR`, `FOR ITERATION`, `IF`,|
-   |                  |                  |   `ELSE IF` and `ELSE`. **NOTE:** Prior to RF 4.0 values were: |
-   |                  |                  |   `Keyword`, `Setup`, `Teardown`, `For` and `For Item`.        |
+   |                  |                  | Shared attributes:                                             |
+   |                  |                  |                                                                |
+   |                  |                  | * `type`: String specifying type of the started item. Possible |
+   |                  |                  |   values are: `KEYWORD`, `SETUP`, `TEARDOWN`, `FOR`, `WHILE`,  |
+   |                  |                  |   `ITERATION`, `IF`, `ELSE IF`, `ELSE`, `TRY`, `EXCEPT`,       |
+   |                  |                  |   `FINALLY`, `RETURN`, `BREAK` and `CONTINUE`. All type values |
+   |                  |                  |   were changed in RF 4.0 and in RF 5.0 `FOR ITERATION` was     |
+   |                  |                  |   changed to `ITERATION`.                                      |
    |                  |                  | * `kwname`: Name of the keyword without library or             |
    |                  |                  |   resource prefix. String representation of parameters with    |
-   |                  |                  |   FOR and IF/ELSE structures.                                  |
+   |                  |                  |   control structures.                                          |
    |                  |                  | * `libname`: Name of the library or resource file the keyword  |
-   |                  |                  |   belongs to. An empty string when the keyword is in a test    |
-   |                  |                  |   case file and with FOR and IF/ELSE structures.               |
+   |                  |                  |   belongs to. An empty string with user keywords in a test     |
+   |                  |                  |   case file and with control structures.                       |
    |                  |                  | * `doc`: Keyword documentation.                                |
    |                  |                  | * `args`: Keyword's arguments as a list of strings.            |
    |                  |                  | * `assign`: A list of variable names that keyword's            |
@@ -243,12 +247,49 @@ it. If that is needed, `listener version 3`_ can be used instead.
    |                  |                  |   not executed (e.g. due to an earlier failure), `NOT SET`     |
    |                  |                  |   otherwise. New in RF 4.0.                                    |
    |                  |                  | * `starttime`: Keyword execution start time.                   |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `FOR` types:                         |
+   |                  |                  |                                                                |
+   |                  |                  | * `variables`: Assigned variables for each loop iteration.     |
+   |                  |                  | * `flavor`: Type of loop (e.g. `IN RANGE`).                    |
+   |                  |                  | * `values`: List of values being looped over.                  |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `ITERATION` types:                   |
+   |                  |                  |                                                                |
+   |                  |                  | * `variables`: Variables and string representations of their   |
+   |                  |                  |   contents for one `FOR` loop iteration.                       |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `WHILE` types:                       |
+   |                  |                  |                                                                |
+   |                  |                  | * `condition`: The looping condition.                          |
+   |                  |                  | * `limit`: The maximum iteration limit.                        |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `IF` and `ELSE_IF` types:            |
+   |                  |                  |                                                                |
+   |                  |                  | * `condition`: The conditional expression being evaluated.     |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `EXCEPT` types:                      |
+   |                  |                  |                                                                |
+   |                  |                  | * `patterns`: The exception pattern being matched.             |
+   |                  |                  | * `pattern_type`: The type of pattern match (e.g. `GLOB`).     |
+   |                  |                  | * `variable`: The variable containing the captured exception.  |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for `RETURN` types:                      |
+   |                  |                  |                                                                |
+   |                  |                  | * `values`: Return values from a keyword.                      |
+   |                  |                  |                                                                |
+   |                  |                  | Additional attributes for control structures are new in RF 6.0.|
+   |                  |                  |                                                                |
    +------------------+------------------+----------------------------------------------------------------+
    | end_keyword      | name, attributes | Called when a keyword ends.                                    |
    |                  |                  |                                                                |
    |                  |                  | `name` is the full keyword name containing                     |
    |                  |                  | possible library or resource name as a prefix.                 |
    |                  |                  | For example, `MyLibrary.Example Keyword`.                      |
+   |                  |                  |                                                                |
+   |                  |                  | Control structures have additional attributes, which change    |
+   |                  |                  | based on the `type` attribute. For descriptions of all         |
+   |                  |                  | possible attributes, see the `start_keyword` section.          |
    |                  |                  |                                                                |
    |                  |                  | Contents of the attribute dictionary:                          |
    |                  |                  |                                                                |
@@ -290,16 +331,16 @@ it. If that is needed, `listener version 3`_ can be used instead.
    | library_import   | name, attributes | Called when a library has been imported.                       |
    |                  |                  |                                                                |
    |                  |                  | `name` is the name of the imported library. If the library     |
-   |                  |                  | has been imported using the `WITH NAME syntax`_, `name` is     |
-   |                  |                  | the specified alias.                                           |
+   |                  |                  | has been given a custom name when imported it using `AS`,      |
+   |                  |                  | `name` is the specified alias.                                 |
    |                  |                  |                                                                |
    |                  |                  | Contents of the attribute dictionary:                          |
    |                  |                  |                                                                |
    |                  |                  | * `args`: Arguments passed to the library as a list.           |
-   |                  |                  | * `originalname`: The original library name when using the     |
-   |                  |                  |   WITH NAME syntax, otherwise same as `name`.                  |
+   |                  |                  | * `originalname`: The original library name if the library has |
+   |                  |                  |   been given an alias using `AS`, otherwise same as `name`.    |
    |                  |                  | * `source`: An absolute path to the library source. `None`     |
-   |                  |                  |   with libraries implemented with Java or if getting the       |
+   |                  |                  |   if getting the                                               |
    |                  |                  |   source of the library failed for some reason.                |
    |                  |                  | * `importer`: An absolute path to the file importing the       |
    |                  |                  |   library. `None` when BuiltIn_ is imported well as when       |
@@ -356,29 +397,6 @@ it. If that is needed, `listener version 3`_ can be used instead.
    |                  |                  | of scope.                                                      |
    +------------------+------------------+----------------------------------------------------------------+
 
-The available methods and their arguments are also shown in a formal Java
-interface specification below. Contents of the `java.util.Map attributes` are
-as in the table above.  It should be remembered that a listener *does not* need
-to implement any explicit interface or have all these methods.
-
-.. sourcecode:: java
-
-   public interface RobotListenerInterface {
-       public static final int ROBOT_LISTENER_API_VERSION = 2;
-       void startSuite(String name, java.util.Map attributes);
-       void endSuite(String name, java.util.Map attributes);
-       void startTest(String name, java.util.Map attributes);
-       void endTest(String name, java.util.Map attributes);
-       void startKeyword(String name, java.util.Map attributes);
-       void endKeyword(String name, java.util.Map attributes);
-       void logMessage(java.util.Map message);
-       void message(java.util.Map message);
-       void outputFile(String path);
-       void logFile(String path);
-       void reportFile(String path);
-       void debugFile(String path);
-       void close();
-   }
 
 Listener version 3
 ~~~~~~~~~~~~~~~~~~
@@ -522,7 +540,7 @@ version 2`_.
    def end_test(name, attrs):
        if attrs['status'] == 'FAIL':
            print('Test "%s" failed: %s' % (name, attrs['message']))
-           raw_input('Press enter to continue.')
+           input('Press enter to continue.')
 
 If the above example would be saved to, for example, :file:`PauseExecution.py`
 file, it could be used from the command line like this::
@@ -541,7 +559,7 @@ The same example could also be implemented also using the newer
    def end_test(data, result):
        if not result.passed:
            print('Test "%s" failed: %s' % (result.name, result.message))
-           raw_input('Press enter to continue.')
+           input('Press enter to continue.')
 
 The next example, which still uses Python, is slightly more complicated. It
 writes all the information it gets into a text file in a temporary directory
@@ -582,63 +600,6 @@ probably more useful than this example.
        def close(self):
             self.outfile.close()
 
-The following example implements the same functionality as the previous one,
-but uses Java instead of Python.
-
-.. sourcecode:: java
-
-   import java.io.*;
-   import java.util.Map;
-   import java.util.List;
-
-
-   public class JavaListener {
-       public static final int ROBOT_LISTENER_API_VERSION = 2;
-       public static final String DEFAULT_FILENAME = "listen_java.txt";
-       private BufferedWriter outfile = null;
-
-       public JavaListener() throws IOException {
-           this(DEFAULT_FILENAME);
-       }
-
-       public JavaListener(String filename) throws IOException {
-           String tmpdir = System.getProperty("java.io.tmpdir");
-           String sep = System.getProperty("file.separator");
-           String outpath = tmpdir + sep + filename;
-           outfile = new BufferedWriter(new FileWriter(outpath));
-       }
-
-       public void startSuite(String name, Map attrs) throws IOException {
-           outfile.write(name + " '" + attrs.get("doc") + "'\n");
-       }
-
-       public void startTest(String name, Map attrs) throws IOException {
-           outfile.write("- " + name + " '" + attrs.get("doc") + "' [ ");
-           List tags = (List)attrs.get("tags");
-           for (int i=0; i < tags.size(); i++) {
-              outfile.write(tags.get(i) + " ");
-           }
-           outfile.write(" ] :: ");
-       }
-
-       public void endTest(String name, Map attrs) throws IOException {
-           String status = attrs.get("status").toString();
-           if (status.equals("PASS")) {
-               outfile.write("PASS\n");
-           }
-           else {
-               outfile.write("FAIL: " + attrs.get("message") + "\n");
-           }
-       }
-
-       public void endSuite(String name, Map attrs) throws IOException {
-           outfile.write(attrs.get("status") + "\n" + attrs.get("message") + "\n");
-       }
-
-       public void close() throws IOException {
-           outfile.close();
-       }
-   }
 
 Modifying execution and results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -707,7 +668,7 @@ that is implemented as a class.
 
 .. sourcecode:: python
 
-    class ResultModifier(object):
+    class ResultModifier:
         ROBOT_LISTENER_API_VERSION = 3
 
         def __init__(self, max_seconds=10):
@@ -755,21 +716,20 @@ attribute. The value of this attribute should be an instance of the listener
 to use. It may be a totally independent listener or the library itself can
 act as a listener. To avoid listener methods to be exposed as keywords in
 the latter case, it is possible to prefix them with an underscore.
-For example, instead of using `end_suite` or `endSuite`, it is
-possible to use `_end_suite` or `_endSuite`.
+For example, instead of using `end_suite` it is possible to use `_end_suite`.
 
 Following examples illustrates using an external listener as well as library
 acting as a listener itself:
 
-.. sourcecode:: java
+.. sourcecode:: python
 
-   import my.project.Listener;
+   from listener import Listener
 
 
-   public class JavaLibraryWithExternalListener {
-       public static final Listener ROBOT_LIBRARY_LISTENER = new Listener();
-       public static final String ROBOT_LIBRARY_SCOPE = "GLOBAL";
-       public static final int ROBOT_LISTENER_API_VERSION = 2;
+   class LibraryWithExternalListener:
+       ROBOT_LIBRARY_LISTENER = Listener()
+       ROBOT_LIBRARY_SCOPE = 'GLOBAL'
+       ROBOT_LISTENER_API_VERSION = 2
 
        // actual library code here ...
    }

@@ -16,10 +16,9 @@
 from contextlib import contextmanager
 
 from robot.errors import DataError
-from robot.utils import unic, ThreadSafeDict, PriorityQueue   # cuongnht add thread
 
 
-class ExecutionContexts(object):
+class ExecutionContexts:
 
     def __init__(self):
         self._contexts = []
@@ -52,8 +51,8 @@ class ExecutionContexts(object):
 EXECUTION_CONTEXTS = ExecutionContexts()
 
 
-class _ExecutionContext(object):
-    _started_keywords_threshold = 42  # Jython on Windows don't work with higher
+class _ExecutionContext:
+    _started_keywords_threshold = 100
 
     def __init__(self, suite, namespace, output, dry_run=False):
         self.suite = suite
@@ -68,9 +67,7 @@ class _ExecutionContext(object):
         self._started_keywords = 0
         self.timeout_occurred = False
         self.user_keywords = []
-        # cuongnht add thread
-        self.thread_message_queue_dict = ThreadSafeDict() 
-        self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
+        self.step_types = []
 
     @contextmanager
     def suite_teardown(self):
@@ -94,7 +91,7 @@ class _ExecutionContext(object):
     @contextmanager
     def keyword_teardown(self, error):
         self.variables.set_keyword('${KEYWORD_STATUS}', 'FAIL' if error else 'PASS')
-        self.variables.set_keyword('${KEYWORD_MESSAGE}', unic(error or ''))
+        self.variables.set_keyword('${KEYWORD_MESSAGE}', str(error or ''))
         self.in_keyword_teardown += 1
         try:
             yield
@@ -110,6 +107,12 @@ class _ExecutionContext(object):
         finally:
             self.namespace.end_user_keyword()
             self.user_keywords.pop()
+
+    def warn_on_invalid_private_call(self, handler):
+        parent = self.user_keywords[-1] if self.user_keywords else None
+        if not parent or parent.source != handler.source:
+            self.warn(f"Keyword '{handler.longname}' is private and should only "
+                      f"be called by keywords in the same file.")
 
     @contextmanager
     def timeout(self, timeout):
@@ -129,14 +132,25 @@ class _ExecutionContext(object):
     def variables(self):
         return self.namespace.variables
 
-    @property
-    def continue_on_failure(self):
+    def continue_on_failure(self, default=False):
         parents = ([self.test] if self.test else []) + self.user_keywords
-        if not parents:
-            return False
-        if 'robot:continue-on-failure' in parents[-1].tags:
-            return True
-        return any('robot:recursive-continue-on-failure' in p.tags for p in parents)
+        for index, parent in enumerate(reversed(parents)):
+            if (parent.tags.robot('recursive-stop-on-failure')
+                    or index == 0 and parent.tags.robot('stop-on-failure')):
+                return False
+            if (parent.tags.robot('recursive-continue-on-failure')
+                    or index == 0 and parent.tags.robot('continue-on-failure')):
+                return True
+        return default or self.in_teardown
+
+    @property
+    def allow_loop_control(self):
+        for typ in reversed(self.step_types):
+            if typ == 'ITERATION':
+                return True
+            if typ == 'KEYWORD':
+                return False
+        return False
 
     def end_suite(self, suite):
         for name in ['${PREV_TEST_NAME}',
@@ -186,12 +200,17 @@ class _ExecutionContext(object):
     def start_keyword(self, keyword):
         self._started_keywords += 1
         if self._started_keywords > self._started_keywords_threshold:
-            raise DataError('Maximum limit of started keywords exceeded.')
+            raise DataError('Maximum limit of started keywords and control '
+                            'structures exceeded.')
         self.output.start_keyword(keyword)
+        if keyword.libname != 'BuiltIn':
+            self.step_types.append(keyword.type)
 
     def end_keyword(self, keyword):
         self.output.end_keyword(keyword)
         self._started_keywords -= 1
+        if keyword.libname != 'BuiltIn':
+            self.step_types.pop()
 
     def get_runner(self, name):
         return self.namespace.get_runner(name)

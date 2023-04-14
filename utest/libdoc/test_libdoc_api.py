@@ -1,10 +1,10 @@
+from io import StringIO
 import sys
 import tempfile
 import unittest
 
 from robot import libdoc
 from robot.utils.asserts import assert_equal
-from robot.utils import StringIO
 
 
 class TestLibdoc(unittest.TestCase):
@@ -42,6 +42,10 @@ class TestLibdoc(unittest.TestCase):
         assert_equal(sys.stdout.getvalue().strip(), '')
         with open(output) as f:
             assert '"name": "String"' in f.read()
+
+    def test_LibraryDocumentation(self):
+        doc = libdoc.LibraryDocumentation('OperatingSystem')
+        assert_equal(doc.name, 'OperatingSystem')
 
 
 if __name__ == '__main__':

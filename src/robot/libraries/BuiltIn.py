@@ -13,53 +13,46 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import absolute_import
-
 from collections import OrderedDict
 import difflib
 import re
 import time
-# cuongnht add thread
-import threading, queue
 
 from robot.api import logger, SkipExecution
 from robot.api.deco import keyword
-from robot.errors import (ContinueForLoop, DataError, ExecutionFailed,
-                          ExecutionFailures, ExecutionPassed, ExitForLoop,
-                          PassExecution, ReturnFromKeyword, VariableError, UnknownAssertionError)
+from robot.errors import (BreakLoop, ContinueLoop, DataError, ExecutionFailed,
+                          ExecutionFailures, ExecutionPassed, PassExecution,
+                          ReturnFromKeyword, VariableError, UnknownAssertionError)
 from robot.running import Keyword, RUN_KW_REGISTER
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.running.usererrorhandler import UserErrorHandler
-from robot.utils import (DotDict, escape, format_assign_message,
-                         get_error_message, get_time, html_escape, is_falsy,
-                         is_integer, is_list_like, is_string, is_truthy,
-                         is_unicode, IRONPYTHON, JYTHON, Matcher, normalize,
-                         normalize_whitespace, parse_time, prepr,
-                         plural_or_not as s, PY3, RERAISED_EXCEPTIONS,
-                         roundup, secs_to_timestr, seq2str, split_from_equals,
-                         timestr_to_secs, type_name, unic, PriorityQueue)
+from robot.utils import (DotDict, escape, format_assign_message, get_error_message,
+                         get_time, html_escape, is_falsy, is_integer, is_list_like,
+                         is_string, is_truthy, Matcher, normalize,
+                         normalize_whitespace, parse_re_flags, parse_time, prepr,
+                         plural_or_not as s, RERAISED_EXCEPTIONS, safe_str,
+                         secs_to_timestr, seq2str, split_from_equals,
+                         timestr_to_secs, type_name)
 from robot.utils.asserts import assert_equal, assert_not_equal
 from robot.variables import (evaluate_expression, is_dict_variable,
                              is_list_variable, search_variable,
                              DictVariableTableValue, VariableTableValue)
 from robot.version import get_version
 
-if JYTHON:
-    from java.lang import String, Number
 
-
-# TODO: Clean-up registering run keyword variants in RF 3.1.
+# FIXME: Clean-up registering run keyword variants!
 # https://github.com/robotframework/robotframework/issues/2190
 
-def run_keyword_variant(resolve):
+def run_keyword_variant(resolve, dry_run=False):
     def decorator(method):
         RUN_KW_REGISTER.register_run_keyword('BuiltIn', method.__name__,
-                                             resolve, deprecation_warning=False)
+                                             resolve, deprecation_warning=False,
+                                             dry_run=dry_run)
         return method
     return decorator
 
 
-class _BuiltInBase(object):
+class _BuiltInBase:
 
     @property
     def _context(self):
@@ -97,9 +90,6 @@ class _BuiltInBase(object):
         self.log('\n'.join(msg), level)
 
     def _get_type(self, arg):
-        # In IronPython type(u'x') is str. We want to report unicode anyway.
-        if is_unicode(arg):
-            return "<type 'unicode'>"
         return str(type(arg))
 
 
@@ -136,23 +126,13 @@ class _Converter(_BuiltInBase):
 
     def _convert_to_integer(self, orig, base=None):
         try:
-            item = self._handle_java_numbers(orig)
-            item, base = self._get_base(item, base)
+            item, base = self._get_base(orig, base)
             if base:
                 return int(item, self._convert_to_integer(base))
             return int(item)
         except:
             raise RuntimeError("'%s' cannot be converted to an integer: %s"
                                % (orig, get_error_message()))
-
-    def _handle_java_numbers(self, item):
-        if not JYTHON:
-            return item
-        if isinstance(item, String):
-            return unic(item)
-        if isinstance(item, Number):
-            return item.doubleValue()
-        return item
 
     def _get_base(self, item, base):
         if not is_string(item):
@@ -287,14 +267,11 @@ class _Converter(_BuiltInBase):
     def _convert_to_number(self, item, precision=None):
         number = self._convert_to_number_without_precision(item)
         if precision is not None:
-            number = roundup(number, self._convert_to_integer(precision),
-                             return_type=float)
+            number = float(round(number, self._convert_to_integer(precision)))
         return number
 
     def _convert_to_number_without_precision(self, item):
         try:
-            if JYTHON:
-                item = self._handle_java_numbers(item)
             return float(item)
         except:
             error = get_error_message()
@@ -316,10 +293,7 @@ class _Converter(_BuiltInBase):
         want to create byte strings.
         """
         self._log_types(item)
-        return self._convert_to_string(item)
-
-    def _convert_to_string(self, item):
-        return unic(item)
+        return safe_str(item)
 
     def convert_to_boolean(self, item):
         """Converts the given item to Boolean true or false.
@@ -338,14 +312,14 @@ class _Converter(_BuiltInBase):
         return bool(item)
 
     def convert_to_bytes(self, input, input_type='text'):
-        u"""Converts the given ``input`` to bytes according to the ``input_type``.
+        r"""Converts the given ``input`` to bytes according to the ``input_type``.
 
         Valid input types are listed below:
 
         - ``text:`` Converts text to bytes character by character. All
           characters with ordinal below 256 can be used and are converted to
           bytes with same values. Many characters are easiest to represent
-          using escapes like ``\\x00`` or ``\\xff``. Supports both Unicode
+          using escapes like ``\x00`` or ``\xff``. Supports both Unicode
           strings and bytes.
 
         - ``int:`` Converts integers separated by spaces to bytes. Similarly as
@@ -367,16 +341,17 @@ class _Converter(_BuiltInBase):
         they cannot contain extra spaces.
 
         Examples (last column shows returned bytes):
-        | ${bytes} = | Convert To Bytes | hyv\xe4    |     | # hyv\\xe4        |
-        | ${bytes} = | Convert To Bytes | \\xff\\x07 |     | # \\xff\\x07      |
-        | ${bytes} = | Convert To Bytes | 82 70      | int | # RF              |
-        | ${bytes} = | Convert To Bytes | 0b10 0x10  | int | # \\x02\\x10      |
-        | ${bytes} = | Convert To Bytes | ff 00 07   | hex | # \\xff\\x00\\x07 |
-        | ${bytes} = | Convert To Bytes | 5246212121 | hex | # RF!!!           |
-        | ${bytes} = | Convert To Bytes | 0000 1000  | bin | # \\x08           |
-        | ${input} = | Create List      | 1          | 2   | 12                |
-        | ${bytes} = | Convert To Bytes | ${input}   | int | # \\x01\\x02\\x0c |
-        | ${bytes} = | Convert To Bytes | ${input}   | hex | # \\x01\\x02\\x12 |
+        | ${bytes} = | Convert To Bytes | hyvä      |     | # hyv\xe4      |
+        | ${bytes} = | Convert To Bytes | hyv\xe4   |     | # hyv\xe4      |
+        | ${bytes} = | Convert To Bytes | \xff\x07  |     | # \xff\x07     |
+        | ${bytes} = | Convert To Bytes | 82 70     | int | # RF           |
+        | ${bytes} = | Convert To Bytes | 0b10 0x10 | int | # \x02\x10     |
+        | ${bytes} = | Convert To Bytes | ff 00 07  | hex | # \xff\x00\x07 |
+        | ${bytes} = | Convert To Bytes | 52462121  | hex | # RF!!         |
+        | ${bytes} = | Convert To Bytes | 0000 1000 | bin | # \x08         |
+        | ${input} = | Create List      | 1         | 2   | 12             |
+        | ${bytes} = | Convert To Bytes | ${input}  | int | # \x01\x02\x0c |
+        | ${bytes} = | Convert To Bytes | ${input}  | hex | # \x01\x02\x12 |
 
         Use `Encode String To Bytes` in ``String`` library if you need to
         convert text to bytes using a certain encoding.
@@ -391,9 +366,6 @@ class _Converter(_BuiltInBase):
             raise RuntimeError("Creating bytes failed: %s" % get_error_message())
 
     def _get_ordinals_from_text(self, input):
-        # https://github.com/IronLanguages/main/issues/1237
-        if IRONPYTHON and isinstance(input, bytearray):
-            input = bytes(input)
         for char in input:
             ordinal = char if is_integer(char) else ord(char)
             yield self._test_ordinal(ordinal, char, 'Character')
@@ -560,49 +532,6 @@ class _Verify(_BuiltInBase):
         """
         self._set_and_remove_tags(tags)
         raise UnknownAssertionError(msg) if msg else UnknownAssertionError()
-	
-	# cuongnht add thread
-    def send_thread_notification(self, msg=None):
-        """Send notification broadcast to others threads.
-
-        Examples:
-        | Send thread notification | Thread done   |             | | # Send message 'Thread done' to others threads.    |
-        """
-        for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
-            if threading.current_thread().name != thread_name:
-                thread_queue.put(msg)
-
-    def wait_thread_notification(self, msg, timeout):
-        """Send notification broadcast to others threads.
-
-        Examples:
-        | Send thread notification | Thread done   |             | | # Send message 'Thread done' to others threads.    |
-        """
-        is_receive = False
-        timeout = float(timeout)
-        max_time = time.time() + timeout
-        tmp_queue = PriorityQueue(queue_type="FIFO")
-        NQ = self._context.thread_message_queue_dict[threading.current_thread().name]
-        while time.time() < max_time:
-            try:
-                priority, notification = NQ.get(False)
-                if notification == msg:
-                    is_receive = True
-                    break
-                else:
-                    tmp_queue.put(notification, priority)
-            except queue.Empty:
-               pass
-        while True:
-            try:
-                priority, notification = tmp_queue.get(False)
-                NQ.put(notification, priority)
-            except queue.Empty:
-                break
-
-        if not is_receive:
-            raise AssertionError("Unable to received thread message '%s' in '%d' seconds." % (msg, timeout))
-
     def fatal_error(self, msg=None):
         """Stops the whole test execution.
 
@@ -652,16 +581,6 @@ class _Verify(_BuiltInBase):
         Examples:
         | Should Be True | $rc < 10          |
         | Should Be True | $status == 'PASS' | # Expected string must be quoted |
-
-        `Should Be True` automatically imports Python's
-        [http://docs.python.org/library/os.html|os] and
-        [http://docs.python.org/library/sys.html|sys] modules that contain
-        several useful attributes:
-
-        | Should Be True | os.linesep == '\\n'             | # Unixy   |
-        | Should Be True | os.linesep == '\\r\\n'          | # Windows |
-        | Should Be True | sys.platform == 'darwin'        | # OS X    |
-        | Should Be True | sys.platform.startswith('java') | # Jython  |
         """
         if not self._is_true(condition):
             raise AssertionError(msg or "'%s' should be true." % condition)
@@ -926,8 +845,8 @@ class _Verify(_BuiltInBase):
         in Robot Framework 4.1.
         """
         self._log_types_at_info_if_different(first, second)
-        first = self._convert_to_string(first)
-        second = self._convert_to_string(second)
+        first = safe_str(first)
+        second = safe_str(second)
         if ignore_case:
             first = first.lower()
             second = second.lower()
@@ -967,8 +886,8 @@ class _Verify(_BuiltInBase):
         and ``collapse_spaces`` is new in Robot Framework 4.1.
         """
         self._log_types_at_info_if_different(first, second)
-        first = self._convert_to_string(first)
-        second = self._convert_to_string(second)
+        first = safe_str(first)
+        second = safe_str(second)
         if ignore_case:
             first = first.lower()
             second = second.lower()
@@ -1350,8 +1269,8 @@ class _Verify(_BuiltInBase):
                     container = [self._collapse_spaces(x) for x in container]
         x = self.get_count(container, item)
         if not msg:
-            msg = "'%s' contains '%s' %d time%s, not %d time%s." \
-                    % (unic(orig_container), unic(item), x, s(x), count, s(count))
+            msg = "%r contains '%s' %d time%s, not %d time%s." \
+                    % (orig_container, item, x, s(x), count, s(count))
         self.should_be_equal_as_integers(x, count, msg, values=False)
 
     def get_count(self, container, item):
@@ -1411,7 +1330,7 @@ class _Verify(_BuiltInBase):
             raise AssertionError(self._get_string_msg(string, pattern, msg,
                                                       values, 'does not match'))
 
-    def should_match_regexp(self, string, pattern, msg=None, values=True):
+    def should_match_regexp(self, string, pattern, msg=None, values=True, flags=None):
         """Fails if ``string`` does not match ``pattern`` as a regular expression.
 
         See the `Regular expressions` section for more information about
@@ -1423,11 +1342,10 @@ class _Verify(_BuiltInBase):
         to denote the beginning and end of the string, respectively.
         For example, ``^ello$`` only matches the exact string ``ello``.
 
-        Possible flags altering how the expression is parsed (e.g.
-        ``re.IGNORECASE``, ``re.MULTILINE``) must be embedded to the
-        pattern like ``(?im)pattern``. The most useful flags are ``i``
-        (case-insensitive), ``m`` (multiline mode), ``s`` (dotall mode)
-        and ``x`` (verbose).
+        Possible flags altering how the expression is parsed (e.g. ``re.IGNORECASE``,
+        ``re.MULTILINE``) can be given using the ``flags`` argument (e.g.
+        ``flags=IGNORECASE | MULTILINE``) or embedded to the pattern (e.g.
+        ``(?im)pattern``).
 
         If this keyword passes, it returns the portion of the string that
         matched the pattern. Additionally, the possible captured groups are
@@ -1439,6 +1357,7 @@ class _Verify(_BuiltInBase):
         Examples:
         | Should Match Regexp | ${output} | \\\\d{6}   | # Output contains six numbers  |
         | Should Match Regexp | ${output} | ^\\\\d{6}$ | # Six numbers and nothing more |
+        | ${ret} = | Should Match Regexp | Foo: 42 | foo: \\\\d+ | flags=IGNORECASE |
         | ${ret} = | Should Match Regexp | Foo: 42 | (?i)foo: \\\\d+ |
         | ${match} | ${group1} | ${group2} = |
         | ...      | Should Match Regexp | Bar: 43 | (Foo|Bar): (\\\\d+) |
@@ -1447,8 +1366,10 @@ class _Verify(_BuiltInBase):
         | ${match} = 'Bar: 43'
         | ${group1} = 'Bar'
         | ${group2} = '43'
+
+        The ``flags`` argument is new in Robot Framework 6.0.
         """
-        res = re.search(pattern, string)
+        res = re.search(pattern, string, flags=parse_re_flags(flags))
         if res is None:
             raise AssertionError(self._get_string_msg(string, pattern, msg,
                                                       values, 'does not match'))
@@ -1458,12 +1379,12 @@ class _Verify(_BuiltInBase):
             return [match] + list(groups)
         return match
 
-    def should_not_match_regexp(self, string, pattern, msg=None, values=True):
+    def should_not_match_regexp(self, string, pattern, msg=None, values=True, flags=None):
         """Fails if ``string`` matches ``pattern`` as a regular expression.
 
         See `Should Match Regexp` for more information about arguments.
         """
-        if re.search(pattern, string) is not None:
+        if re.search(pattern, string, flags=parse_re_flags(flags)) is not None:
             raise AssertionError(self._get_string_msg(string, pattern, msg,
                                                       values, 'matches'))
 
@@ -1549,8 +1470,8 @@ class _Verify(_BuiltInBase):
                         delimiter, quote_item1=True, quote_item2=True):
         if custom_message and not self._include_values(include_values):
             return custom_message
-        item1 = "'%s'" % unic(item1) if quote_item1 else unic(item1)
-        item2 = "'%s'" % unic(item2) if quote_item2 else unic(item2)
+        item1 = "'%s'" % safe_str(item1) if quote_item1 else safe_str(item1)
+        item2 = "'%s'" % safe_str(item2) if quote_item2 else safe_str(item2)
         default_message = '%s %s %s' % (item1, delimiter, item2)
         if not custom_message:
             return default_message
@@ -1590,25 +1511,24 @@ class _Variables(_BuiltInBase):
     @keyword(types=None)
     @run_keyword_variant(resolve=0)
     def get_variable_value(self, name, default=None):
-        """Returns variable value or ``default`` if the variable does not exist.
+        r"""Returns variable value or ``default`` if the variable does not exist.
 
         The name of the variable can be given either as a normal variable name
-        (e.g. ``${NAME}``) or in escaped format (e.g. ``\\${NAME}``). Notice
-        that the former has some limitations explained in `Set Suite Variable`.
+        like ``${name}`` or in escaped format like ``$name`` or ``\${name}``.
+        For the reasons explained in the `Using variables with keywords creating
+        or accessing variables` section, using the escaped format is recommended.
 
         Examples:
-        | ${x} = | Get Variable Value | ${a} | default |
-        | ${y} = | Get Variable Value | ${a} | ${b}    |
-        | ${z} = | Get Variable Value | ${z} |         |
+        | ${x} =    `Get Variable Value`    $a    default
+        | ${y} =    `Get Variable Value`    $a    ${b}
+        | ${z} =    `Get Variable Value`    $z
         =>
-        | ${x} gets value of ${a} if ${a} exists and string 'default' otherwise
-        | ${y} gets value of ${a} if ${a} exists and value of ${b} otherwise
-        | ${z} is set to Python None if it does not exist previously
-
-        See `Set Variable If` for another keyword to set variables dynamically.
+        - ``${x}`` gets value of ``${a}`` if ``${a}`` exists and string ``default`` otherwise
+        - ``${y}`` gets value of ``${a}`` if ``${a}`` exists and value of ``${b}`` otherwise
+        - ``${z}`` is set to Python ``None`` if it does not exist previously
         """
-        name = self._get_var_name(name)
         try:
+            name = self._get_var_name(name, require_assign=False)
             return self._variables.replace_scalar(name)
         except VariableError:
             return self._variables.replace_scalar(default)
@@ -1636,11 +1556,12 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def variable_should_exist(self, name, msg=None):
-        """Fails unless the given variable exists within the current scope.
+        r"""Fails unless the given variable exists within the current scope.
 
         The name of the variable can be given either as a normal variable name
-        (e.g. ``${NAME}``) or in escaped format (e.g. ``\\${NAME}``). Notice
-        that the former has some limitations explained in `Set Suite Variable`.
+        like ``${name}`` or in escaped format like ``$name`` or ``\${name}``.
+        For the reasons explained in the `Using variables with keywords creating
+        or accessing variables` section, using the escaped format is recommended.
 
         The default error message can be overridden with the ``msg`` argument.
 
@@ -1655,11 +1576,12 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def variable_should_not_exist(self, name, msg=None):
-        """Fails if the given variable exists within the current scope.
+        r"""Fails if the given variable exists within the current scope.
 
         The name of the variable can be given either as a normal variable name
-        (e.g. ``${NAME}``) or in escaped format (e.g. ``\\${NAME}``). Notice
-        that the former has some limitations explained in `Set Suite Variable`.
+        like ``${name}`` or in escaped format like ``$name`` or ``\${name}``.
+        For the reasons explained in the `Using variables with keywords creating
+        or accessing variables` section, using the escaped format is recommended.
 
         The default error message can be overridden with the ``msg`` argument.
 
@@ -1722,7 +1644,7 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def set_local_variable(self, name, *values):
-        """Makes a variable available everywhere within the local scope.
+        r"""Makes a variable available everywhere within the local scope.
 
         Variables set with this keyword are available within the
         local scope of the currently executed test case or in the local scope
@@ -1731,23 +1653,26 @@ class _Variables(_BuiltInBase):
         test cases or keywords will not see variables set with this keyword.
 
         This keyword is equivalent to a normal variable assignment based on a
-        keyword return value.
+        keyword return value. For example,
 
-        Example:
-        | @{list} =          | Create List | item1     | item2     | item3     |
+        | ${var} =    `Set Variable`    value
+        | @{list} =    `Create List`    item1    item2    item3
 
-        is equivalent with
+        are equivalent with
 
-        | Set Local Variable | @{list} | item1    | item2    | item3    |
+        | `Set Local Variable`    @var    value
+        | `Set Local Variable`    @list    item1    item2    item3
 
-        This keyword will provide the option of setting local variables inside keywords
-        like `Run Keyword If`, `Run Keyword And Return If`, `Run Keyword Unless`
-        which until now was not possible by using `Set Variable`.
+        The main use case for this keyword is creating local variables in
+        libraries.
 
-        It will also be possible to use this keyword from external libraries
-        that want to set local variables.
+        See `Set Suite Variable` for more information and usage examples. See
+        also the `Using variables with keywords creating or accessing variables`
+        section for information why it is recommended to give the variable name
+        in escaped format like ``$name`` or ``\${name}`` instead of the normal
+        ``${name}``.
 
-        New in Robot Framework 3.2.
+        See also `Set Global Variable` and `Set Test Variable`.
         """
         name = self._get_var_name(name)
         value = self._get_var_value(name, values)
@@ -1756,7 +1681,7 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def set_test_variable(self, name, *values):
-        """Makes a variable available everywhere within the scope of the current test.
+        r"""Makes a variable available everywhere within the scope of the current test.
 
         Variables set with this keyword are available everywhere within the
         scope of the currently executed test case. For example, if you set a
@@ -1766,7 +1691,14 @@ class _Variables(_BuiltInBase):
         It is an error to call `Set Test Variable` outside the
         scope of a test (e.g. in a Suite Setup or Teardown).
 
-        See `Set Suite Variable` for more information and examples.
+        See `Set Suite Variable` for more information and usage examples. See
+        also the `Using variables with keywords creating or accessing variables`
+        section for information why it is recommended to give the variable name
+        in escaped format like ``$name`` or ``\${name}`` instead of the normal
+        ``${name}``.
+
+        When creating automated tasks, not tests, it is possible to use `Set
+        Task Variable`. See also `Set Global Variable` and `Set Local Variable`.
         """
         name = self._get_var_name(name)
         value = self._get_var_value(name, values)
@@ -1784,56 +1716,53 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def set_suite_variable(self, name, *values):
-        """Makes a variable available everywhere within the scope of the current suite.
+        r"""Makes a variable available everywhere within the scope of the current suite.
 
         Variables set with this keyword are available everywhere within the
         scope of the currently executed test suite. Setting variables with this
-        keyword thus has the same effect as creating them using the Variable
-        table in the test data file or importing them from variable files.
+        keyword thus has the same effect as creating them using the Variables
+        section in the data file or importing them from variable files.
 
         Possible child test suites do not see variables set with this keyword
         by default, but that can be controlled by using ``children=<option>``
-        as the last argument. If the specified ``<option>`` given a true value
+        as the last argument. If the specified ``<option>`` is given a true value
         (see `Boolean arguments`), the variable is set also to the child
         suites. Parent and sibling suites will never see variables set with
         this keyword.
 
         The name of the variable can be given either as a normal variable name
-        (e.g. ``${NAME}``) or in escaped format as ``\\${NAME}`` or ``$NAME``.
-        Variable value can be given using the same syntax as when variables
-        are created in the Variable table.
+        like ``${NAME}`` or in escaped format as ``\${NAME}`` or ``$NAME``.
+        For the reasons explained in the `Using variables with keywords creating
+        or accessing variables` section, *using the escaped format is highly
+        recommended*.
+
+        Variable value can be specified using the same syntax as when variables
+        are created in the Variables section. Same way as in that section,
+        it is possible to create scalar values, lists and dictionaries.
+        The type is got from the variable name prefix ``$``, ``@`` and ``&``,
+        respectively.
 
         If a variable already exists within the new scope, its value will be
-        overwritten. Otherwise a new variable is created. If a variable already
-        exists within the current scope, the value can be left empty and the
-        variable within the new scope gets the value within the current scope.
+        overwritten. If a variable already exists within the current scope,
+        the value can be left empty and the variable within the new scope gets
+        the value within the current scope.
 
         Examples:
-        | Set Suite Variable | ${SCALAR} | Hello, world! |
-        | Set Suite Variable | ${SCALAR} | Hello, world! | children=true |
-        | Set Suite Variable | @{LIST}   | First item    | Second item   |
-        | Set Suite Variable | &{DICT}   | key=value     | foo=bar       |
-        | ${ID} =            | Get ID    |
-        | Set Suite Variable | ${ID}     |
+        | Set Suite Variable    $SCALAR    Hello, world!
+        | Set Suite Variable    $SCALAR    Hello, world!    children=True
+        | Set Suite Variable    @LIST      First item       Second item
+        | Set Suite Variable    &DICT      key=value        foo=bar
+        | ${ID} =    Get ID
+        | Set Suite Variable    $ID
 
         To override an existing value with an empty value, use built-in
         variables ``${EMPTY}``, ``@{EMPTY}`` or ``&{EMPTY}``:
 
-        | Set Suite Variable | ${SCALAR} | ${EMPTY} |
-        | Set Suite Variable | @{LIST}   | @{EMPTY} |
-        | Set Suite Variable | &{DICT}   | &{EMPTY} |
+        | Set Suite Variable    $SCALAR    ${EMPTY}
+        | Set Suite Variable    @LIST      @{EMPTY}
+        | Set Suite Variable    &DICT      &{EMPTY}
 
-        *NOTE:* If the variable has value which itself is a variable (escaped
-        or not), you must always use the escaped format to set the variable:
-
-        Example:
-        | ${NAME} =          | Set Variable | \\${var} |
-        | Set Suite Variable | ${NAME}      | value | # Sets variable ${var}  |
-        | Set Suite Variable | \\${NAME}    | value | # Sets variable ${NAME} |
-
-        This limitation applies also to `Set Test Variable`, `Set Global
-        Variable`, `Variable Should Exist`, `Variable Should Not Exist` and
-        `Get Variable Value` keywords.
+        See also `Set Global Variable`, `Set Test Variable` and `Set Local Variable`.
         """
         name = self._get_var_name(name)
         if values and is_string(values[-1]) and values[-1].startswith('children='):
@@ -1848,21 +1777,25 @@ class _Variables(_BuiltInBase):
 
     @run_keyword_variant(resolve=0)
     def set_global_variable(self, name, *values):
-        """Makes a variable available globally in all tests and suites.
+        r"""Makes a variable available globally in all tests and suites.
 
         Variables set with this keyword are globally available in all
         subsequent test suites, test cases and user keywords. Also variables
-        in variable tables are overridden. Variables assigned locally based
-        on keyword return values or by using `Set Test Variable` and
-        `Set Suite Variable` override these variables in that scope, but
-        the global value is not changed in those cases.
+        created Variables sections are overridden. Variables assigned locally
+        based on keyword return values or by using `Set Suite Variable`,
+        `Set Test Variable` or `Set Local Variable` override these variables
+        in that scope, but the global value is not changed in those cases.
 
         In practice setting variables with this keyword has the same effect
         as using command line options ``--variable`` and ``--variablefile``.
         Because this keyword can change variables everywhere, it should be
         used with care.
 
-        See `Set Suite Variable` for more information and examples.
+        See `Set Suite Variable` for more information and usage examples. See
+        also the `Using variables with keywords creating or accessing variables`
+        section for information why it is recommended to give the variable name
+        in escaped format like ``$name`` or ``\${name}`` instead of the normal
+        ``${name}``.
         """
         name = self._get_var_name(name)
         value = self._get_var_value(name, values)
@@ -1871,7 +1804,7 @@ class _Variables(_BuiltInBase):
 
     # Helpers
 
-    def _get_var_name(self, original):
+    def _get_var_name(self, original, require_assign=True):
         try:
             replaced = self._variables.replace_string(original)
         except VariableError:
@@ -1880,11 +1813,12 @@ class _Variables(_BuiltInBase):
             name = self._resolve_var_name(replaced)
         except ValueError:
             name = original
-        match = search_variable(name)
+        match = search_variable(name, identifiers='$@&')
         match.resolve_base(self._variables)
-        if not match.is_assign():
+        valid = match.is_assign() if require_assign else match.is_variable()
+        if not valid:
             raise DataError("Invalid variable name '%s'." % name)
-        return unic(match)
+        return str(match)
 
     def _resolve_var_name(self, name):
         if name.startswith('\\'):
@@ -1897,7 +1831,7 @@ class _Variables(_BuiltInBase):
         match.resolve_base(self._variables)
         if not match.is_assign():
             raise ValueError
-        return unic(match)
+        return str(match)
 
     def _get_var_value(self, name, values):
         if not values:
@@ -1926,7 +1860,7 @@ class _RunKeyword(_BuiltInBase):
     # other run keyword variant keywords in BuiltIn which can also be seen
     # at the end of this file.
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword(self, name, *args):
         """Executes the given keyword with the given arguments.
 
@@ -1934,12 +1868,31 @@ class _RunKeyword(_BuiltInBase):
         can be a variable and thus set dynamically, e.g. from a return value of
         another keyword or from the command line.
         """
+        if (is_string(name)
+                and not self._context.dry_run
+                and not self._accepts_embedded_arguments(name)):
+            name, args = self._replace_variables_in_name([name] + list(args))
         if not is_string(name):
             raise RuntimeError('Keyword name must be a string.')
         kw = Keyword(name, args=args)
         return kw.run(self._context)
 
-    @run_keyword_variant(resolve=0)
+    def _accepts_embedded_arguments(self, name):
+        if '{' in name:
+            runner = self._context.get_runner(name)
+            if hasattr(runner, 'embedded_args'):
+                return True
+        return False
+
+    def _replace_variables_in_name(self, name_and_args):
+        resolved = self._variables.replace_list(name_and_args, replace_until=1,
+                                                ignore_errors=self._context.in_teardown)
+        if not resolved:
+            raise DataError(f'Keyword name missing: Given arguments {name_and_args} '
+                            f'resolved to an empty list.')
+        return resolved[0], resolved[1:]
+
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keywords(self, *keywords):
         """Executes all the given keywords in a sequence.
 
@@ -1990,53 +1943,58 @@ class _RunKeyword(_BuiltInBase):
 
     def _split_run_keywords(self, keywords):
         if 'AND' not in keywords:
-            for name in self._variables.replace_list(keywords):
+            for name in self._split_run_keywords_without_and(keywords):
                 yield name, ()
         else:
-            for name, args in self._split_run_keywords_from_and(keywords):
-                yield name, args
+            for kw_call in self._split_run_keywords_with_and(keywords):
+                if not kw_call:
+                    raise DataError('AND must have keyword before and after.')
+                yield kw_call[0], kw_call[1:]
 
-    def _split_run_keywords_from_and(self, keywords):
+    def _split_run_keywords_without_and(self, keywords):
+        replace_list = self._variables.replace_list
+        ignore_errors = self._context.in_teardown
+        # `run_keyword` resolves variables, but list variables must be expanded
+        # here to pass it each keyword name separately.
+        for name in keywords:
+            if is_list_variable(name):
+                for n in replace_list([name], ignore_errors=ignore_errors):
+                    yield escape(n)
+            else:
+                yield name
+
+    def _split_run_keywords_with_and(self, keywords):
         while 'AND' in keywords:
             index = keywords.index('AND')
-            yield self._resolve_run_keywords_name_and_args(keywords[:index])
+            yield keywords[:index]
             keywords = keywords[index+1:]
-        yield self._resolve_run_keywords_name_and_args(keywords)
+        yield keywords
 
-    def _resolve_run_keywords_name_and_args(self, kw_call):
-        kw_call = self._variables.replace_list(kw_call, replace_until=1)
-        if not kw_call:
-            raise DataError('Incorrect use of AND')
-        return kw_call[0], kw_call[1:]
-
-    @run_keyword_variant(resolve=2)
+    @run_keyword_variant(resolve=1, dry_run=True)
     def run_keyword_if(self, condition, name, *args):
         """Runs the given keyword with the given arguments, if ``condition`` is true.
 
         *NOTE:* Robot Framework 4.0 introduced built-in IF/ELSE support and using
         that is generally recommended over using this keyword.
 
-        The given ``condition`` is evaluated in Python as explained in
-        `Evaluating expressions`, and ``name`` and ``*args`` have same
+        The given ``condition`` is evaluated in Python as explained in the
+        `Evaluating expressions` section, and ``name`` and ``*args`` have same
         semantics as with `Run Keyword`.
 
         Example, a simple if/else construct:
-        | ${status} | ${value} = | `Run Keyword And Ignore Error` | `My Keyword` |
-        | `Run Keyword If`     | '${status}' == 'PASS' | `Some Action`    | arg |
-        | `Run Keyword Unless` | '${status}' == 'PASS' | `Another Action` |
+        | `Run Keyword If` | '${status}' == 'OK' | Some Action    | arg |
+        | `Run Keyword If` | '${status}' != 'OK' | Another Action |
 
-        In this example, only either `Some Action` or `Another Action` is
-        executed, based on the status of `My Keyword`. Instead of `Run Keyword
-        And Ignore Error` you can also use `Run Keyword And Return Status`.
+        In this example, only either ``Some Action`` or ``Another Action`` is
+        executed, based on the value of the ``${status}`` variable.
 
         Variables used like ``${variable}``, as in the examples above, are
         replaced in the expression before evaluation. Variables are also
         available in the evaluation namespace and can be accessed using special
-        syntax ``$variable`` as explained in the `Evaluating expressions`
-        section.
+        ``$variable`` syntax as explained in the `Evaluating expressions` section.
 
         Example:
-        | `Run Keyword If` | $result is None or $result == 'FAIL' | `Keyword` |
+        | `Run Keyword If` | $result is None or $result == 'FAIL' | Keyword |
 
         This keyword supports also optional ELSE and ELSE IF branches. Both
         of them are defined in ``*args`` and must use exactly format ``ELSE``
@@ -2049,21 +2007,20 @@ class _RunKeyword(_BuiltInBase):
         supported when using ELSE and/or ELSE IF branches.
 
         Given previous example, if/else construct can also be created like this:
-        | ${status} | ${value} = | `Run Keyword And Ignore Error` | `My Keyword` |
-        | `Run Keyword If` | '${status}' == 'PASS' | `Some Action` | arg | ELSE | `Another Action` |
+        | `Run Keyword If` | '${status}' == 'PASS' | Some Action | arg | ELSE | Another Action |
 
         The return value of this keyword is the return value of the actually
         executed keyword or Python ``None`` if no keyword was executed (i.e.
         if ``condition`` was false). Hence, it is recommended to use ELSE
         and/or ELSE IF branches to conditionally assign return values from
-        keyword to variables (see `Set Variable If` if you need to set fixed
+        keyword to variables (see `Set Variable If` you need to set fixed
         values conditionally). This is illustrated by the example below:
 
-        | ${var1} =   | `Run Keyword If` | ${rc} == 0     | `Some keyword returning a value` |
-        | ...         | ELSE IF          | 0 < ${rc} < 42 | `Another keyword` |
-        | ...         | ELSE IF          | ${rc} < 0      | `Another keyword with args` | ${rc} | arg2 |
-        | ...         | ELSE             | `Final keyword to handle abnormal cases` | ${rc} |
-        | ${var2} =   | `Run Keyword If` | ${condition}  | `Some keyword` |
+        | ${var1} =   | `Run Keyword If` | ${rc} == 0     | Some keyword returning a value |
+        | ...         | ELSE IF          | 0 < ${rc} < 42 | Another keyword |
+        | ...         | ELSE IF          | ${rc} < 0      | Another keyword with args | ${rc} | arg2 |
+        | ...         | ELSE             | Final keyword to handle abnormal cases | ${rc} |
+        | ${var2} =   | `Run Keyword If` | ${condition}  | Some keyword |
 
         In this example, ${var2} will be set to ``None`` if ${condition} is
         false.
@@ -2072,15 +2029,6 @@ class _RunKeyword(_BuiltInBase):
         explicitly and thus cannot come from variables. If you need to use
         literal ``ELSE`` and ``ELSE IF`` strings as arguments, you can escape
         them with a backslash like ``\\ELSE`` and ``\\ELSE IF``.
-
-        Python's [http://docs.python.org/library/os.html|os] and
-        [http://docs.python.org/library/sys.html|sys] modules are
-        automatically imported when evaluating the ``condition``.
-        Attributes they contain can thus be used in the condition:
-
-        | `Run Keyword If` | os.sep == '/' | `Unix Keyword`        |
-        | ...              | ELSE IF       | sys.platform.startswith('java') | `Jython Keyword` |
-        | ...              | ELSE          | `Windows Keyword`     |
         """
         args, branch = self._split_elif_or_else_branch(args)
         if self._is_true(condition):
@@ -2104,18 +2052,19 @@ class _RunKeyword(_BuiltInBase):
             raise DataError('%s requires %s.' % (control_word, required_error))
         return args[:index], branch
 
-    @run_keyword_variant(resolve=2)
+    @run_keyword_variant(resolve=1, dry_run=True)
     def run_keyword_unless(self, condition, name, *args):
-        """Runs the given keyword with the given arguments if ``condition`` is false.
+        """*DEPRECATED since RF 5.0. Use Native IF/ELSE or `Run Keyword If` instead.*
 
-        See `Run Keyword If` for more information and an example. Notice that
-        this keyword does not support ``ELSE`` or ``ELSE IF`` branches like
-        `Run Keyword If` does, though.
+        Runs the given keyword with the given arguments if ``condition`` is false.
+
+        See `Run Keyword If` for more information and an example. Notice that this
+        keyword does not support ELSE or ELSE IF branches like `Run Keyword If` does.
         """
         if not self._is_true(condition):
             return self.run_keyword(name, *args)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_and_ignore_error(self, name, *args):
         """Runs the given keyword with the given arguments and ignores possible error.
 
@@ -2130,15 +2079,18 @@ class _RunKeyword(_BuiltInBase):
 
         Errors caused by invalid syntax, timeouts, or fatal exceptions are not
         caught by this keyword. Otherwise this keyword itself never fails.
+
+        *NOTE:* Robot Framework 5.0 introduced native TRY/EXCEPT functionality
+        that is generally recommended for error handling.
         """
         try:
             return 'PASS', self.run_keyword(name, *args)
         except ExecutionFailed as err:
             if err.dont_continue or err.skip:
                 raise
-            return 'FAIL', unic(err)
+            return 'FAIL', str(err)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_and_warn_on_failure(self, name, *args):
         """Runs the specified keyword logs a warning if the keyword fails.
 
@@ -2157,7 +2109,7 @@ class _RunKeyword(_BuiltInBase):
             logger.warn("Executing keyword '%s' failed:\n%s" % (name, message))
         return status, message
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_and_return_status(self, name, *args):
         """Runs the given keyword with given arguments and returns the status as a Boolean value.
 
@@ -2178,7 +2130,7 @@ class _RunKeyword(_BuiltInBase):
         status, _ = self.run_keyword_and_ignore_error(name, *args)
         return status == 'PASS'
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_and_continue_on_failure(self, name, *args):
         """Runs the keyword and continues execution even if a failure occurs.
 
@@ -2198,7 +2150,7 @@ class _RunKeyword(_BuiltInBase):
                 err.continue_on_failure = True
             raise err
 
-    @run_keyword_variant(resolve=2)
+    @run_keyword_variant(resolve=1, dry_run=True)
     def run_keyword_and_expect_error(self, expected_error, name, *args):
         """Runs the keyword and checks that the expected error occurred.
 
@@ -2237,6 +2189,16 @@ class _RunKeyword(_BuiltInBase):
 
         Errors caused by invalid syntax, timeouts, or fatal exceptions are not
         caught by this keyword.
+
+        *NOTE:* Regular expression matching used to require only the beginning
+        of the error to match the given pattern. That was changed in Robot
+        Framework 5.0 and nowadays the pattern must match the error fully.
+        To match only the beginning, add ``.*`` at the end of the pattern like
+        ``REGEXP: Start.*``.
+
+        *NOTE:* Robot Framework 5.0 introduced native TRY/EXCEPT functionality
+        that is generally recommended for error handling. It supports same
+        pattern matching syntax as this keyword.
         """
         try:
             self.run_keyword(name, *args)
@@ -2257,14 +2219,14 @@ class _RunKeyword(_BuiltInBase):
         matchers = {'GLOB': glob,
                     'EQUALS': lambda s, p: s == p,
                     'STARTS': lambda s, p: s.startswith(p),
-                    'REGEXP': lambda s, p: re.match(p, s) is not None}
+                    'REGEXP': lambda s, p: re.match(p + r'\Z', s) is not None}
         prefixes = tuple(prefix + ':' for prefix in matchers)
         if not expected_error.startswith(prefixes):
             return glob(error, expected_error)
         prefix, expected_error = expected_error.split(':', 1)
         return matchers[prefix](error, expected_error.lstrip())
 
-    @run_keyword_variant(resolve=2)
+    @run_keyword_variant(resolve=1, dry_run=True)
     def repeat_keyword(self, repeat, name, *args):
         """Executes the specified keyword multiple times.
 
@@ -2343,7 +2305,7 @@ class _RunKeyword(_BuiltInBase):
                         secs_to_timestr(maxtime - time.time(), compact=True)))
             yield name, args
 
-    @run_keyword_variant(resolve=3)
+    @run_keyword_variant(resolve=2, dry_run=True)
     def wait_until_keyword_succeeds(self, retry, retry_interval, name, *args):
         """Runs the specified keyword and retries if it fails.
 
@@ -2483,7 +2445,7 @@ class _RunKeyword(_BuiltInBase):
             return self._verify_values_for_set_variable_if(values)
         return values
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_if_test_failed(self, name, *args):
         """Runs the given keyword with the given arguments, if the test failed.
 
@@ -2497,7 +2459,7 @@ class _RunKeyword(_BuiltInBase):
         if test.failed:
             return self.run_keyword(name, *args)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_if_test_passed(self, name, *args):
         """Runs the given keyword with the given arguments, if the test passed.
 
@@ -2511,7 +2473,7 @@ class _RunKeyword(_BuiltInBase):
         if test.passed:
             return self.run_keyword(name, *args)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_if_timeout_occurred(self, name, *args):
         """Runs the given keyword if either a test or a keyword timeout has occurred.
 
@@ -2529,20 +2491,9 @@ class _RunKeyword(_BuiltInBase):
         ctx = self._context
         if ctx.test and ctx.in_test_teardown:
             return ctx.test
-        raise RuntimeError("Keyword '%s' can only be used in test teardown."
-                           % kwname)
+        raise RuntimeError(f"Keyword '{kwname}' can only be used in test teardown.")
 
-    @run_keyword_variant(resolve=1)
-    def run_keyword_if_all_critical_tests_passed(self, name, *args):
-        """*DEPRECATED.* Use `BuiltIn.Run Keyword If All Tests Passed` instead."""
-        self.run_keyword_if_all_tests_passed(name, args)
-
-    @run_keyword_variant(resolve=1)
-    def run_keyword_if_any_critical_tests_failed(self, name, *args):
-        """*DEPRECATED.* Use `BuiltIn.Run Keyword If Any Tests Failed` instead."""
-        self.run_keyword_if_any_tests_failed(name, args)
-
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_if_all_tests_passed(self, name, *args):
         """Runs the given keyword with the given arguments, if all tests passed.
 
@@ -2556,7 +2507,7 @@ class _RunKeyword(_BuiltInBase):
         if suite.statistics.failed == 0:
             return self.run_keyword(name, *args)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_if_any_tests_failed(self, name, *args):
         """Runs the given keyword with the given arguments, if one or more tests failed.
 
@@ -2600,11 +2551,26 @@ class _Control(_BuiltInBase):
             raise SkipExecution(msg or condition)
 
     def continue_for_loop(self):
-        """Skips the current for loop iteration and continues from the next.
+        """Skips the current FOR loop iteration and continues from the next.
 
-        Skips the remaining keywords in the current for loop iteration and
-        continues from the next one. Can be used directly in a for loop or
-        in a keyword that the loop uses.
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``CONTINUE`` statement that
+        is recommended over this keyword. In the examples below, ``Continue For Loop``
+        can simply be replaced with ``CONTINUE``. In addition to that, native ``IF``
+        syntax (new in RF 4.0) or inline ``IF`` syntax (new in RF 5.0) can be used
+        instead of ``Run Keyword If``. For example, the first example below could be
+        written like this instead:
+
+        | IF    '${var}' == 'CONTINUE'    CONTINUE
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
+
+        Skips the remaining keywords in the current FOR loop iteration and
+        continues from the next one. Starting from Robot Framework 5.0, this
+        keyword can only be used inside a loop, not in a keyword used in a loop.
 
         Example:
         | FOR | ${var}         | IN                     | @{VALUES}         |
@@ -2612,16 +2578,31 @@ class _Control(_BuiltInBase):
         |     | Do Something   | ${var}                 |
         | END |
 
-        See `Continue For Loop If` to conditionally continue a for loop without
+        See `Continue For Loop If` to conditionally continue a FOR loop without
         using `Run Keyword If` or other wrapper keywords.
         """
+        if not self._context.allow_loop_control:
+            raise DataError("'Continue For Loop' can only be used inside a loop.")
         self.log("Continuing for loop from the next iteration.")
-        raise ContinueForLoop()
+        raise ContinueLoop()
 
     def continue_for_loop_if(self, condition):
-        """Skips the current for loop iteration if the ``condition`` is true.
+        """Skips the current FOR loop iteration if the ``condition`` is true.
 
-        A wrapper for `Continue For Loop` to continue a for loop based on
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``CONTINUE`` statement
+        and for inline ``IF``, and that combination should be used instead of this
+        keyword. For example, ``Continue For Loop If`` usage in the example below
+        could be replaced with
+
+        | IF    '${var}' == 'CONTINUE'    CONTINUE
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
+
+        A wrapper for `Continue For Loop` to continue a FOR loop based on
         the given condition. The condition is evaluated using the same
         semantics as with `Should Be True` keyword.
 
@@ -2631,14 +2612,32 @@ class _Control(_BuiltInBase):
         |     | Do Something         | ${var}                 |
         | END |
         """
+        if not self._context.allow_loop_control:
+            raise DataError("'Continue For Loop If' can only be used inside a loop.")
         if self._is_true(condition):
             self.continue_for_loop()
 
     def exit_for_loop(self):
-        """Stops executing the enclosing for loop.
+        """Stops executing the enclosing FOR loop.
 
-        Exits the enclosing for loop and continues execution after it.
-        Can be used directly in a for loop or in a keyword that the loop uses.
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``BREAK`` statement that
+        is recommended over this keyword. In the examples below, ``Exit For Loop``
+        can simply be replaced with ``BREAK``. In addition to that, native ``IF``
+        syntax (new in RF 4.0) or inline ``IF`` syntax (new in RF 5.0) can be used
+        instead of ``Run Keyword If``. For example, the first example below could be
+        written like this instead:
+
+        | IF    '${var}' == 'EXIT'    BREAK
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
+
+        Exits the enclosing FOR loop and continues execution after it. Starting
+        from Robot Framework 5.0, this keyword can only be used inside a loop,
+        not in a keyword used in a loop.
 
         Example:
         | FOR | ${var}         | IN                 | @{VALUES}     |
@@ -2646,16 +2645,31 @@ class _Control(_BuiltInBase):
         |     | Do Something   | ${var} |
         | END |
 
-        See `Exit For Loop If` to conditionally exit a for loop without
+        See `Exit For Loop If` to conditionally exit a FOR loop without
         using `Run Keyword If` or other wrapper keywords.
         """
+        if not self._context.allow_loop_control:
+            raise DataError("'Exit For Loop' can only be used inside a loop.")
         self.log("Exiting for loop altogether.")
-        raise ExitForLoop()
+        raise BreakLoop()
 
     def exit_for_loop_if(self, condition):
-        """Stops executing the enclosing for loop if the ``condition`` is true.
+        """Stops executing the enclosing FOR loop if the ``condition`` is true.
 
-        A wrapper for `Exit For Loop` to exit a for loop based on
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``BREAK`` statement
+        and for inline ``IF``, and that combination should be used instead of this
+        keyword. For example, ``Exit For Loop If`` usage in the example below
+        could be replaced with
+
+        | IF    '${var}' == 'EXIT'    BREAK
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
+
+        A wrapper for `Exit For Loop` to exit a FOR loop based on
         the given condition. The condition is evaluated using the same
         semantics as with `Should Be True` keyword.
 
@@ -2665,6 +2679,8 @@ class _Control(_BuiltInBase):
         |     | Do Something     | ${var}             |
         | END |
         """
+        if not self._context.allow_loop_control:
+            raise DataError("'Exit For Loop If' can only be used inside a loop.")
         if self._is_true(condition):
             self.exit_for_loop()
 
@@ -2672,23 +2688,36 @@ class _Control(_BuiltInBase):
     def return_from_keyword(self, *return_values):
         """Returns from the enclosing user keyword.
 
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``RETURN`` statement that
+        is recommended over this keyword. In the examples below, ``Return From Keyword``
+        can simply be replaced with ``RETURN``. In addition to that, native ``IF``
+        syntax (new in RF 4.0) or inline ``IF`` syntax (new in RF 5.0) can be used
+        instead of ``Run Keyword If``. For example, the first example below could be
+        written like this instead:
+
+        | IF    ${rc} < 0    RETURN
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
+
         This keyword can be used to return from a user keyword with PASS status
         without executing it fully. It is also possible to return values
         similarly as with the ``[Return]`` setting. For more detailed information
         about working with the return values, see the User Guide.
 
         This keyword is typically wrapped to some other keyword, such as
-        `Run Keyword If` or `Run Keyword If Test Passed`, to return based
-        on a condition:
+        `Run Keyword If`, to return based on a condition:
 
-        | Run Keyword If | ${rc} < 0 | Return From Keyword |
-        | Run Keyword If Test Passed | Return From Keyword |
+        | Run Keyword If    ${rc} < 0    Return From Keyword
 
         It is possible to use this keyword to return from a keyword also inside
         a for loop. That, as well as returning values, is demonstrated by the
         `Find Index` keyword in the following somewhat advanced example.
         Notice that it is often a good idea to move this kind of complicated
-        logic into a test library.
+        logic into a library.
 
         | ***** Variables *****
         | @{LIST} =    foo    baz
@@ -2708,7 +2737,7 @@ class _Control(_BuiltInBase):
         |        Run Keyword If    '${item}' == '${element}'    Return From Keyword    ${index}
         |        ${index} =    Set Variable    ${index + 1}
         |    END
-        |    Return From Keyword    ${-1}    # Also [Return] would work here.
+        |    Return From Keyword    ${-1}
 
         The most common use case, returning based on an expression, can be
         accomplished directly with `Return From Keyword If`. See also
@@ -2723,6 +2752,19 @@ class _Control(_BuiltInBase):
     @run_keyword_variant(resolve=1)
     def return_from_keyword_if(self, condition, *return_values):
         """Returns from the enclosing user keyword if ``condition`` is true.
+
+        ---
+
+        *NOTE:* Robot Framework 5.0 added support for native ``RETURN`` statement
+        and for inline ``IF``, and that combination should be used instead of this
+        keyword. For example, ``Return From Keyword`` usage in the example below
+        could be replaced with
+
+        | IF    '${item}' == '${element}'    RETURN    ${index}
+
+        This keyword will eventually be deprecated and removed.
+
+        ---
 
         A wrapper for `Return From Keyword` to return based on the given
         condition. The condition is evaluated using the same semantics as
@@ -2739,14 +2781,14 @@ class _Control(_BuiltInBase):
         |        Return From Keyword If    '${item}' == '${element}'    ${index}
         |        ${index} =    Set Variable    ${index + 1}
         |    END
-        |    Return From Keyword    ${-1}    # Also [Return] would work here.
+        |    Return From Keyword    ${-1}
 
         See also `Run Keyword And Return` and `Run Keyword And Return If`.
         """
         if self._is_true(condition):
             self._return_from_keyword(return_values)
 
-    @run_keyword_variant(resolve=1)
+    @run_keyword_variant(resolve=0, dry_run=True)
     def run_keyword_and_return(self, name, *args):
         """Runs the specified keyword and returns from the enclosing user keyword.
 
@@ -2772,7 +2814,7 @@ class _Control(_BuiltInBase):
         else:
             self._return_from_keyword(return_values=[escape(ret)])
 
-    @run_keyword_variant(resolve=2)
+    @run_keyword_variant(resolve=1, dry_run=True)
     def run_keyword_and_return_if(self, condition, name, *args):
         """Runs the specified keyword and returns from the enclosing user keyword.
 
@@ -2874,7 +2916,9 @@ class _Misc(_BuiltInBase):
         ``time`` may be either a number or a time string. Time strings are in
         a format such as ``1 day 2 hours 3 minutes 4 seconds 5milliseconds`` or
         ``1d 2h 3m 4s 5ms``, and they are fully explained in an appendix of
-        Robot Framework User Guide. Optional `reason` can be used to explain why
+        Robot Framework User Guide. Providing a value without specifying minutes
+        or seconds, defaults to seconds.
+        Optional `reason` can be used to explain why
         sleeping is necessary. Both the time slept and the reason are logged.
 
         Examples:
@@ -2921,7 +2965,7 @@ class _Misc(_BuiltInBase):
         """
         if not items:
             return ''
-        items = [unic(item) for item in items]
+        items = [str(item) for item in items]
         if items[0].startswith('SEPARATOR='):
             sep = items[0][len('SEPARATOR='):]
             items = items[1:]
@@ -2930,8 +2974,8 @@ class _Misc(_BuiltInBase):
         return sep.join(items)
 
     def log(self, message, level='INFO', html=False, console=False,
-            repr=False, formatter='str'):
-        u"""Logs the given message with the given level.
+            repr='DEPRECATED', formatter='str'):
+        r"""Logs the given message with the given level.
 
         Valid levels are TRACE, DEBUG, INFO (default), HTML, WARN, and ERROR.
         Messages below the current active log level are ignored. See
@@ -2958,16 +3002,15 @@ class _Misc(_BuiltInBase):
 
         The ``formatter`` argument controls how to format the string
         representation of the message. Possible values are ``str`` (default),
-        ``repr`` and ``ascii``, and they work similarly to Python built-in
-        functions with same names. When using ``repr``, bigger lists,
-        dictionaries and other containers are also pretty-printed so that
-        there is one item per row. For more details see `String
+        ``repr``, ``ascii``, ``len``, and ``type``. They work similarly to
+        Python built-in functions with same names. When using ``repr``, bigger
+        lists, dictionaries and other containers are also pretty-printed so
+        that there is one item per row. For more details see `String
         representations`.
 
         The old way to control string representation was using the ``repr``
-        argument, and ``repr=True`` is still equivalent to using
-        ``formatter=repr``. The ``repr`` argument will be deprecated in the
-        future, though, and using ``formatter`` is thus recommended.
+        argument. This argument has been deprecated and ``formatter=repr``
+        should be used instead.
 
         Examples:
         | Log | Hello, world!        |          |   | # Normal INFO message.   |
@@ -2976,16 +3019,20 @@ class _Misc(_BuiltInBase):
         | Log | <b>Hello</b>, world! | HTML     |   | # Same as above.         |
         | Log | <b>Hello</b>, world! | DEBUG    | html=true | # DEBUG as HTML. |
         | Log | Hello, console!   | console=yes | | # Log also to the console. |
-        | Log | Null is \\x00  | formatter=repr | | # Log ``'Null is \\x00'``. |
+        | Log | Null is \x00    | formatter=repr | | # Log ``'Null is \x00'``. |
 
         See `Log Many` if you want to log multiple messages in one go, and
         `Log To Console` if you only want to write to the console.
+
+        Formatter options ``type`` and ``log`` are new in Robot Framework 5.0.
         """
-        # TODO: Deprecate `repr` in RF 3.2 or latest in RF 3.3.
-        if repr:
-            formatter = prepr
-        else:
+        # TODO: Remove `repr` altogether in RF 7.0. It was deprecated in RF 5.0.
+        if repr == 'DEPRECATED':
             formatter = self._get_formatter(formatter)
+        else:
+            logger.warn("The 'repr' argument of 'BuiltIn.Log' is deprecated. "
+                        "Use 'formatter=repr' instead.")
+            formatter = prepr if is_truthy(repr) else self._get_formatter(formatter)
         message = formatter(message)
         logger.write(message, level, html)
         if console:
@@ -2993,12 +3040,14 @@ class _Misc(_BuiltInBase):
 
     def _get_formatter(self, formatter):
         try:
-            return {'str': unic,
+            return {'str': safe_str,
                     'repr': prepr,
-                    'ascii': ascii if PY3 else repr}[formatter.lower()]
+                    'ascii': ascii,
+                    'len': len,
+                    'type': lambda x: type(x).__name__}[formatter.lower()]
         except KeyError:
             raise ValueError("Invalid formatter '%s'. Available "
-                             "'str', 'repr' and 'ascii'." % formatter)
+                             "'str', 'repr', 'ascii', 'len', and 'type'." % formatter)
 
     @run_keyword_variant(resolve=0)
     def log_many(self, *messages):
@@ -3029,26 +3078,37 @@ class _Misc(_BuiltInBase):
             else:
                 yield value
 
-    def log_to_console(self, message, stream='STDOUT', no_newline=False):
+    def log_to_console(self, message, stream='STDOUT', no_newline=False, format=''):
         """Logs the given message to the console.
 
         By default uses the standard output stream. Using the standard error
-        stream is possibly by giving the ``stream`` argument value ``STDERR``
+        stream is possible by giving the ``stream`` argument value ``STDERR``
         (case-insensitive).
 
         By default appends a newline to the logged message. This can be
         disabled by giving the ``no_newline`` argument a true value (see
         `Boolean arguments`).
 
+        By default adds no alignment formatting. The ``format`` argument allows,
+        for example, alignment and customized padding of the log message. Please see the
+        [https://docs.python.org/3/library/string.html#formatspec|format specification] for
+        detailed alignment possibilities. This argument is new in Robot
+        Framework 5.0.
+
         Examples:
         | Log To Console | Hello, console!             |                 |
         | Log To Console | Hello, stderr!              | STDERR          |
         | Log To Console | Message starts here and is  | no_newline=true |
         | Log To Console | continued without newline.  |                 |
+        | Log To Console | center message with * pad   | format=*^60     |
+        | Log To Console | 30 spaces before msg starts | format=>30      |
 
         This keyword does not log the message to the normal log file. Use
         `Log` keyword, possibly with argument ``console``, if that is desired.
         """
+        if format:
+            format = "{:" + format + "}"
+            message = format.format(message)
         logger.console(message, newline=is_falsy(no_newline), stream=stream)
 
     @run_keyword_variant(resolve=0)
@@ -3076,7 +3136,7 @@ class _Misc(_BuiltInBase):
         try:
             old = self._context.output.set_log_level(level)
         except DataError as err:
-            raise RuntimeError(unic(err))
+            raise RuntimeError(str(err))
         self._namespace.variables.set_global('${LOG_LEVEL}', level.upper())
         self.log('Log level changed from %s to %s.' % (old, level.upper()))
         return old
@@ -3118,17 +3178,16 @@ class _Misc(_BuiltInBase):
 
         Examples:
         | Import Library | MyLibrary |
-        | Import Library | ${CURDIR}/../Library.py | arg1 | named=arg2 |
-        | Import Library | ${LIBRARIES}/Lib.java | arg | WITH NAME | JavaLib |
+        | Import Library | ${CURDIR}/Lib.py | arg1 | named=arg2 | WITH NAME | Custom |
         """
         args, alias = self._split_alias(args)
         try:
             self._namespace.import_library(name, args, alias)
         except DataError as err:
-            raise RuntimeError(unic(err))
+            raise RuntimeError(str(err))
 
     def _split_alias(self, args):
-        if len(args) > 1 and normalize_whitespace(args[-2]) == 'WITH NAME':
+        if len(args) > 1 and normalize_whitespace(args[-2]) in ('WITH NAME', 'AS'):
             return args[:-2], args[-1]
         return args, None
 
@@ -3143,8 +3202,8 @@ class _Misc(_BuiltInBase):
         variables, for example, for each test in a test suite.
 
         The given path must be absolute or found from
-        [http://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#pythonpath-jythonpath-and-ironpythonpath|
-        search path]. Forward slashes can be used as path separator regardless
+        [http://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html##module-search-path|search path].
+        Forward slashes can be used as path separator regardless
         the operating system.
 
         Examples:
@@ -3155,7 +3214,7 @@ class _Misc(_BuiltInBase):
         try:
             self._namespace.import_variables(path, list(args), overwrite=True)
         except DataError as err:
-            raise RuntimeError(unic(err))
+            raise RuntimeError(str(err))
 
     @run_keyword_variant(resolve=0)
     def import_resource(self, path):
@@ -3166,8 +3225,8 @@ class _Misc(_BuiltInBase):
         setting.
 
         The given path must be absolute or found from
-        [http://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#pythonpath-jythonpath-and-ironpythonpath|
-        search path]. Forward slashes can be used as path separator regardless
+        [http://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#module-search-path|search path].
+        Forward slashes can be used as path separator regardless
         the operating system.
 
         Examples:
@@ -3178,17 +3237,17 @@ class _Misc(_BuiltInBase):
         try:
             self._namespace.import_resource(path)
         except DataError as err:
-            raise RuntimeError(unic(err))
+            raise RuntimeError(str(err))
 
     def set_library_search_order(self, *search_order):
         """Sets the resolution order to use when a name matches multiple keywords.
 
-        The library search order is used to resolve conflicts when a keyword
-        name in the test data matches multiple keywords. The first library
+        The library search order is used to resolve conflicts when a keyword name
+        that is used matches multiple keyword implementations. The first library
         (or resource, see below) containing the keyword is selected and that
         keyword implementation used. If the keyword is not found from any library
-        (or resource), test executing fails the same way as when the search
-        order is not set.
+        (or resource), execution fails the same way as when the search order is
+        not set.
 
         When this keyword is used, there is no need to use the long
         ``LibraryName.Keyword Name`` notation.  For example, instead of
@@ -3212,10 +3271,11 @@ class _Misc(_BuiltInBase):
         | Set Library Search Order | resource | another_resource |
 
         *NOTE:*
-        - The search order is valid only in the suite where this keywords is used.
+        - The search order is valid only in the suite where this keyword is used.
         - Keywords in resources always have higher priority than
           keywords in libraries regardless the search order.
         - The old order is returned and can be used to reset the search order later.
+        - Calling this keyword without arguments removes possible search order.
         - Library and resource names in the search order are both case and space
           insensitive.
         """
@@ -3224,7 +3284,7 @@ class _Misc(_BuiltInBase):
     def keyword_should_exist(self, name, msg=None):
         """Fails unless the given keyword exists in the current scope.
 
-        Fails also if there are more than one keywords with the same name.
+        Fails also if there is more than one keyword with the same name.
         Works both with the short name (e.g. ``Log``) and the full name
         (e.g. ``BuiltIn.Log``).
 
@@ -3233,7 +3293,7 @@ class _Misc(_BuiltInBase):
         See also `Variable Should Exist`.
         """
         try:
-            runner = self._namespace.get_runner(name)
+            runner = self._namespace.get_runner(name, recommend_on_failure=False)
         except DataError as error:
             raise AssertionError(msg or error.message)
         if isinstance(runner, UserErrorHandler):
@@ -3401,13 +3461,13 @@ class _Misc(_BuiltInBase):
         try:
             method = getattr(object, method_name)
         except AttributeError:
-            raise RuntimeError("%s object does not have method '%s'."
-                               % (type_name(object), method_name))
+            raise RuntimeError(f"{type(object).__name__} object does not have "
+                               f"method '{method_name}'.")
         try:
             return method(*args, **kwargs)
-        except:
-            raise RuntimeError("Calling method '%s' failed: %s"
-                               % (method_name, get_error_message()))
+        except Exception as err:
+            msg = get_error_message()
+            raise RuntimeError(f"Calling method '{method_name}' failed: {msg}") from err
 
     def regexp_escape(self, *patterns):
         """Returns each argument string escaped for use as a regular expression.
@@ -3462,8 +3522,8 @@ class _Misc(_BuiltInBase):
         self.log('Set test message to:\n%s' % message, level)
 
     def _get_new_text(self, old, new, append, handle_html=False):
-        if not is_unicode(new):
-            new = unic(new)
+        if not is_string(new):
+            new = str(new)
         if not (is_truthy(append) and old):
             return new
         if handle_html:
@@ -3534,8 +3594,8 @@ class _Misc(_BuiltInBase):
         ``${SUITE METADATA}`` in a Python dictionary. Notice that modifying this
         variable directly has no effect on the actual metadata the suite has.
         """
-        if not is_unicode(name):
-            name = unic(name)
+        if not is_string(name):
+            name = str(name)
         metadata = self._get_context(top).suite.metadata
         original = metadata.get(name, '')
         metadata[name] = self._get_new_text(original, value, append)
@@ -3596,10 +3656,10 @@ class _Misc(_BuiltInBase):
         self.log('Removed tag%s %s.' % (s(tags), seq2str(tags)))
 
     def get_library_instance(self, name=None, all=False):
-        """Returns the currently active instance of the specified test library.
+        """Returns the currently active instance of the specified library.
 
-        This keyword makes it easy for test libraries to interact with
-        other test libraries that have state. This is illustrated by
+        This keyword makes it easy for libraries to interact with
+        other libraries that have state. This is illustrated by
         the Python example below:
 
         | from robot.libraries.BuiltIn import BuiltIn
@@ -3627,11 +3687,11 @@ class _Misc(_BuiltInBase):
         try:
             return self._namespace.get_library_instance(name)
         except DataError as err:
-            raise RuntimeError(unic(err))
+            raise RuntimeError(str(err))
 
 
 class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
-    u"""An always available standard library with often needed keywords.
+    r"""An always available standard library with often needed keywords.
 
     ``BuiltIn`` is Robot Framework's standard library that provides a set
     of generic keywords needed often. It is imported automatically and
@@ -3652,6 +3712,40 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     HTML in messages is not limited to BuiltIn library but works with any
     error message.
 
+    = Using variables with keywords creating or accessing variables =
+
+    This library has special keywords `Set Global Variable`, `Set Suite Variable`,
+    `Set Test Variable` and `Set Local Variable` for creating variables in
+    different scopes. These keywords take the variable name and its value as
+    arguments. The name can be given using the normal ``${variable}`` syntax or
+    in escaped format either like ``$variable`` or ``\${variable}``. For example,
+    these are typically equivalent and create new suite level variable
+    ``${name}`` with value ``value``:
+
+    | Set Suite Variable    ${name}     value
+    | Set Suite Variable    $name       value
+    | Set Suite Variable    \${name}    value
+
+    A problem with using the normal ``${variable}`` syntax is that these
+    keywords cannot easily know is the idea to create a variable with exactly
+    that name or does that variable actually contain the name of the variable
+    to create. If the variable does not initially exist, it will always be
+    created. If it exists and its value is a variable name either in the normal
+    or in the escaped syntax, variable with _that_ name is created instead.
+    For example, if ``${name}`` variable would exist and contain value
+    ``$example``, these examples would create different variables:
+
+    | Set Suite Variable    ${name}     value    # Creates ${example}.
+    | Set Suite Variable    $name       value    # Creates ${name}.
+    | Set Suite Variable    \${name}    value    # Creates ${name}.
+
+    Because the behavior when using the normal ``${variable}`` syntax depends
+    on the possible existing value of the variable, it is *highly recommended
+    to use the escaped ``$variable`` or ``\${variable}`` format instead*.
+
+    This same problem occurs also with special keywords for accessing variables
+    `Get Variable Value`, `Variable Should Exist` and `Variable Should Not Exist`.
+
     = Evaluating expressions =
 
     Many keywords, such as `Evaluate`, `Run Keyword If` and `Should Be True`,
@@ -3668,9 +3762,9 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     third party modules.
 
     Examples:
-    | `Should Be True`   | len('${result}') > 3 |
-    | `Run Keyword If`   | os.sep == '/'        | Non-Windows Keyword  |
-    | ${robot version} = | `Evaluate`           | robot.__version__    |
+    | `Should Be True`    len('${result}') > 3
+    | `Run Keyword If`    os.sep == '/'    Non-Windows Keyword
+    | ${version} =    `Evaluate`    robot.__version__
 
     `Evaluate` also allows configuring the execution namespace with a custom
     namespace and with custom modules to be imported. The latter functionality
@@ -3679,12 +3773,7 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     comprehensions. See the documentation of the `Evaluate` keyword for mode
     details.
 
-    *NOTE:* Automatic module import is a new feature in Robot Framework 3.2.
-    Earlier modules needed to be explicitly taken into use when using the
-    `Evaluate` keyword and other keywords only had access to ``sys`` and
-    ``os`` modules.
-
-    == Using variables ==
+    == Variables in expressions ==
 
     When a variable is used in the expressing using the normal ``${variable}``
     syntax, its value is replaced before the expression is evaluated. This
@@ -3697,20 +3786,20 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     be triple quoted.
 
     Examples:
-    | `Should Be True` | ${rc} < 10                | Return code greater than 10 |
-    | `Run Keyword If` | '${status}' == 'PASS'     | Log | Passed                |
-    | `Run Keyword If` | 'FAIL' in '''${output}''' | Log | Output contains FAIL  |
+    | `Should Be True`    ${rc} < 10                   Return code greater than 10
+    | `Run Keyword If`    '${status}' == 'PASS'        Log    Passed
+    | `Run Keyword If`    'FAIL' in '''${output}'''    Log    Output contains FAIL
 
     Actual variables values are also available in the evaluation namespace.
     They can be accessed using special variable syntax without the curly
     braces like ``$variable``. These variables should never be quoted.
 
     Examples:
-    | `Should Be True` | $rc < 10          | Return code greater than 10  |
-    | `Run Keyword If` | $status == 'PASS' | `Log` | Passed               |
-    | `Run Keyword If` | 'FAIL' in $output | `Log` | Output contains FAIL |
-    | `Should Be True` | len($result) > 1 and $result[1] == 'OK' |
-    | `Should Be True` | $result is not None                     |
+    | `Should Be True`    $rc < 10             Return code greater than 10
+    | `Run Keyword If`    $status == 'PASS'    `Log`    Passed
+    | `Run Keyword If`    'FAIL' in $output    `Log`    Output contains FAIL
+    | `Should Be True`    len($result) > 1 and $result[1] == 'OK'
+    | `Should Be True`    $result is not None
 
     Using the ``$variable`` syntax slows down expression evaluation a little.
     This should not typically matter, but should be taken into account if
@@ -3718,7 +3807,7 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     constrains.
 
     Notice that instead of creating complicated expressions, it is often better
-    to move the logic into a test library. That eases maintenance and can also
+    to move the logic into a library. That eases maintenance and can also
     enhance execution speed.
 
     = Boolean arguments =
@@ -3734,22 +3823,21 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     [http://docs.python.org/library/stdtypes.html#truth|rules as in Python].
 
     True examples:
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=True    | # Strings are generally true.    |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=yes     | # Same as the above.             |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=${TRUE} | # Python ``True`` is true.       |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=${42}   | # Numbers other than 0 are true. |
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=True         # Strings are generally true.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=yes          # Same as the above.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=${TRUE}      # Python ``True`` is true.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=${42}        # Numbers other than 0 are true.
 
     False examples:
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=False     | # String ``false`` is false.   |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=no        | # Also string ``no`` is false. |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=${EMPTY}  | # Empty string is false.       |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=${FALSE}  | # Python ``False`` is false.   |
-    | `Should Be Equal` | ${x} | ${y}  | Custom error | values=no values | # ``no values`` works with ``values`` argument |
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=False        # String ``false`` is false.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=no           # Also string ``no`` is false.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=${EMPTY}     # Empty string is false.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=${FALSE}     # Python ``False`` is false.
+    | `Should Be Equal`    ${x}    ${y}    Custom error    values=no values    # ``no values`` works with ``values`` argument
 
     = Pattern matching =
 
-    Many keywords accepts arguments as either glob or regular expression
-    patterns.
+    Many keywords accept arguments as either glob or regular expression patterns.
 
     == Glob patterns ==
 
@@ -3764,7 +3852,7 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     | ``[!a-z]``   | matches one character not from the range in the bracket |
 
     Unlike with glob patterns normally, path separator characters ``/`` and
-    ``\\`` and the newline character ``\\n`` are matches by the above
+    ``\`` and the newline character ``\n`` are matches by the above
     wildcards.
 
     == Regular expressions ==
@@ -3776,9 +3864,9 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     [http://docs.python.org/library/re.html|re module] and its documentation
     should be consulted for more information about the syntax.
 
-    Because the backslash character (``\\``) is an escape character in
+    Because the backslash character (``\``) is an escape character in
     Robot Framework test data, possible backslash characters in regular
-    expressions need to be escaped with another backslash like ``\\\\d\\\\w+``.
+    expressions need to be escaped with another backslash like ``\\d\\w+``.
     Strings that may contain special characters but should be handled
     as literal strings, can be escaped with the `Regexp Escape` keyword.
 
@@ -3789,9 +3877,9 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     format] if both strings have more than two lines.
 
     Example:
-    | ${first} =  | `Catenate` | SEPARATOR=\\n | Not in second | Same | Differs | Same |
-    | ${second} = | `Catenate` | SEPARATOR=\\n | Same | Differs2 | Same | Not in first |
-    | `Should Be Equal` | ${first} | ${second} |
+    | ${first} =     `Catenate`    SEPARATOR=\n    Not in second    Same    Differs    Same
+    | ${second} =    `Catenate`    SEPARATOR=\n    Same    Differs2    Same    Not in first
+    | `Should Be Equal`    ${first}    ${second}
 
     Results in the following error message:
 
@@ -3809,13 +3897,13 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
     = String representations =
 
     Several keywords log values explicitly (e.g. `Log`) or implicitly (e.g.
-    `Should Be Equal` when there are failures). By default keywords log values
-    using "human readable" string representation, which means that strings
+    `Should Be Equal` when there are failures). By default, keywords log values
+    using human-readable string representation, which means that strings
     like ``Hello`` and numbers like ``42`` are logged as-is. Most of the time
     this is the desired behavior, but there are some problems as well:
 
     - It is not possible to see difference between different objects that
-      have same string representation like string ``42`` and integer ``42``.
+      have the same string representation like string ``42`` and integer ``42``.
       `Should Be Equal` and some other keywords add the type information to
       the error message in these cases, though.
 
@@ -3823,21 +3911,20 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
 
     - Trailing whitespace is not visible.
 
-    - Different newlines (``\\r\\n`` on Windows, ``\\n`` elsewhere) cannot
+    - Different newlines (``\r\n`` on Windows, ``\n`` elsewhere) cannot
       be separated from each others.
 
     - There are several Unicode characters that are different but look the
-      same. One example is the Latin ``\u0061`` (``\\u0061``) and the Cyrillic
-      ``\u0430`` (``\\u0430``). Error messages like ``\u0061 != \u0430`` are
-      not very helpful.
+      same. One example is the Latin ``a`` (``\u0061``) and the Cyrillic
+      ``а`` (``\u0430``). Error messages like ``a != а`` are not very helpful.
 
     - Some Unicode characters can be represented using
       [https://en.wikipedia.org/wiki/Unicode_equivalence|different forms].
-      For example, ``\xe4`` can be represented either as a single code point
-      ``\\u00e4`` or using two code points ``\\u0061`` and ``\\u0308`` combined
-      together. Such forms are considered canonically equivalent, but strings
+      For example, ``ä`` can be represented either as a single code point
+      ``\u00e4`` or using two combined code points ``\u0061`` and ``\u0308``.
+      Such forms are considered canonically equivalent, but strings
       containing them are not considered equal when compared in Python. Error
-      messages like ``\xe4 != \u0061\u0308`` are not that helpful either.
+      messages like ``ä != ä`` are not that helpful either.
 
     - Containers such as lists and dictionaries are formatted into a single
       line making it hard to see individual items they contain.
@@ -3851,37 +3938,27 @@ class BuiltIn(_Verify, _Converter, _Variables, _RunKeyword, _Control, _Misc):
 
     == str ==
 
-    Use the "human readable" string representation. Equivalent to using
-    ``str()`` in Python 3 and ``unicode()`` in Python 2. This is the default.
+    Use the human-readable string representation. Equivalent to using ``str()``
+    in Python. This is the default.
 
     == repr ==
 
-    Use the "machine readable" string representation. Similar to using
-    ``repr()`` in Python, which means that strings like ``Hello`` are logged
-    like ``'Hello'``, newlines and non-printable characters are escaped like
-    ``\\n`` and ``\\x00``, and so on. Non-ASCII characters are shown as-is
-    like ``\xe4`` in Python 3 and in escaped format like ``\\xe4`` in Python 2.
-    Use ``ascii`` to always get the escaped format.
+    Use the machine-readable string representation. Similar to using ``repr()``
+    in Python, which means that strings like ``Hello`` are logged like
+    ``'Hello'``, newlines and non-printable characters are escaped like ``\n``
+    and ``\x00``, and so on. Non-ASCII characters are shown as-is like ``ä``.
 
-    There are also some enhancements compared to the standard ``repr()``:
-    - Bigger lists, dictionaries and other containers are pretty-printed so
-      that there is one item per row.
-    - On Python 2 the ``u`` prefix is omitted with Unicode strings and
-      the ``b`` prefix is added to byte strings.
+    In this mode bigger lists, dictionaries and other containers are
+    pretty-printed so that there is one item per row.
 
     == ascii ==
 
-    Same as using ``ascii()`` in Python 3 or ``repr()`` in Python 2 where
-    ``ascii()`` does not exist. Similar to using ``repr`` explained above
+    Same as using ``ascii()`` in Python. Similar to using ``repr`` explained above
     but with the following differences:
 
-    - On Python 3 non-ASCII characters are escaped like ``\\xe4`` instead of
-      showing them as-is like ``\xe4``. This makes it easier to see differences
-      between Unicode characters that look the same but are not equal. This
-      is how ``repr()`` works in Python 2.
-    - On Python 2 just uses the standard ``repr()`` meaning that Unicode
-      strings get the ``u`` prefix and no ``b`` prefix is added to byte
-      strings.
+    - Non-ASCII characters are escaped like ``\xe4`` instead of
+      showing them as-is like ``ä``. This makes it easier to see differences
+      between Unicode characters that look the same but are not equal.
     - Containers are not pretty-printed.
     """
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
@@ -3898,51 +3975,63 @@ class RobotNotRunningError(AttributeError):
     pass
 
 
-def register_run_keyword(library, keyword, args_to_process=None,
-                         deprecation_warning=True):
+def register_run_keyword(library, keyword, args_to_process=0, deprecation_warning=True):
     """Tell Robot Framework that this keyword runs other keywords internally.
 
     *NOTE:* This API will change in the future. For more information see
-    https://github.com/robotframework/robotframework/issues/2190. Use with
-    `deprecation_warning=False` to avoid related deprecation warnings.
+    https://github.com/robotframework/robotframework/issues/2190.
 
-    1) Why is this method needed
+    :param library: Name of the library the keyword belongs to.
+    :param keyword: Name of the keyword itself.
+    :param args_to_process: How many arguments to process normally before
+        passing them to the keyword. Other arguments are not touched at all.
+    :param deprecation_warning: Set to ``False```to avoid the warning.
 
-    Keywords running other keywords internally using `Run Keyword` or its variants
-    like `Run Keyword If` need some special handling by the framework. This includes
-    not processing arguments (e.g. variables in them) twice, special handling of
-    timeouts, and so on.
+    Registered keywords are handled specially by Robot so that:
 
-    2) How to use this method
+    - Their arguments are not resolved normally (use ``args_to_process``
+      to control that). This basically means not replacing variables or
+      handling escapes.
+    - They are not stopped by timeouts.
+    - If there are conflicts with keyword names, these keywords have
+      *lower* precedence than other keywords.
 
-    `library` is the name of the library where the registered keyword is implemented.
+    Main use cases are:
 
-    `keyword` is the name of the keyword. With Python 2 it is possible to pass also
-    the function or method implementing the keyword.
+    - Library keyword is using `BuiltIn.run_keyword` internally to execute other
+      keywords. Registering the caller as a "run keyword variant" avoids variables
+      and escapes in arguments being resolved multiple times. All arguments passed
+      to `run_keyword` can and should be left unresolved.
+    - Keyword has some need to not resolve variables in arguments. This way
+      variable values are not logged anywhere by Robot automatically.
 
-    `args_to_process`` defines how many of the arguments to the registered keyword must
-    be processed normally.
+    As mentioned above, this API will likely be reimplemented in the future
+    or there could be new API for library keywords to execute other keywords.
+    External libraries can nevertheless use this API if they really need it and
+    are aware of the possible breaking changes in the future.
 
-    3) Examples
+    Examples::
 
-    from robot.libraries.BuiltIn import BuiltIn, register_run_keyword
+        from robot.libraries.BuiltIn import BuiltIn, register_run_keyword
 
-    def my_run_keyword(name, *args):
-        # do something
-        return BuiltIn().run_keyword(name, *args)
-
-    register_run_keyword(__name__, 'My Run Keyword', 1)
-
-    -------------
-
-    from robot.libraries.BuiltIn import BuiltIn, register_run_keyword
-
-    class MyLibrary:
-        def my_run_keyword_if(self, expression, name, *args):
+        def my_run_keyword(name, *args):
             # do something
-            return BuiltIn().run_keyword_if(expression, name, *args)
+            return BuiltIn().run_keyword(name, *args)
 
-    register_run_keyword('MyLibrary', 'my_run_keyword_if', 2)
+        register_run_keyword(__name__, 'My Run Keyword')
+
+        -------------
+
+        from robot.libraries.BuiltIn import BuiltIn, register_run_keyword
+
+        class MyLibrary:
+            def my_run_keyword_if(self, expression, name, *args):
+                # Do something
+                if self._is_true(expression):
+                    return BuiltIn().run_keyword(name, *args)
+
+        # Process one argument normally to get `expression` resolved.
+        register_run_keyword('MyLibrary', 'my_run_keyword_if', args_to_process=1)
     """
     RUN_KW_REGISTER.register_run_keyword(library, keyword, args_to_process,
                                          deprecation_warning)

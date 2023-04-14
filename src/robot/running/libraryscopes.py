@@ -15,7 +15,7 @@
 
 import inspect
 
-from robot.utils import normalize, unic
+from robot.utils import normalize
 
 
 def LibraryScope(libcode, library):
@@ -31,10 +31,10 @@ def _get_scope(libcode):
     if inspect.ismodule(libcode):
         return 'GLOBAL'
     scope = getattr(libcode, 'ROBOT_LIBRARY_SCOPE', '')
-    return normalize(unic(scope), ignore='_').upper()
+    return normalize(str(scope), ignore='_').upper()
 
 
-class GlobalScope(object):
+class GlobalScope:
     is_global = True
 
     def __init__(self, library):

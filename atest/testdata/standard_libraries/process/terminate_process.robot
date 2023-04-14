@@ -28,25 +28,21 @@ Kill process
 
 Terminate process running on shell
     Check Precondition    os.sep == '/' or hasattr(signal, 'CTRL_BREAK_EVENT')
-    Check Precondition    not sys.platform.startswith('java')
     Start Process    python    ${COUNTDOWN}    ${TEMPFILE}    shell=True
     Terminate should stop countdown
 
 Kill process running on shell
     Check Precondition    os.sep == '/'
-    Check Precondition    not sys.platform.startswith('java')
     Start Process    python    ${COUNTDOWN}    ${TEMPFILE}    shell=True
     Terminate should stop countdown    kill=yes
 
 Also child processes are terminated
     Check Precondition    os.sep == '/' or hasattr(signal, 'CTRL_BREAK_EVENT')
-    Check Precondition    not sys.platform.startswith('java')
     Start Process    python    ${COUNTDOWN}    ${TEMPFILE}    3
     Terminate should stop countdown
 
 Also child processes are killed
     Check Precondition    os.sep == '/'
-    Check Precondition    not sys.platform.startswith('java')
     Start Process    python    ${COUNTDOWN}    ${TEMPFILE}    3
     Terminate should stop countdown    kill=${True}
 
@@ -96,10 +92,12 @@ Terminate all processes
     END
 
 Terminating all empties cache
+    [Documentation]    FAIL Non-existing index or alias '1'.
     Some process
+    Some process
+    Switch process    ${2}
     Terminate All Processes    kill=True
-    ${handle} =    Some Process
-    Should Be Equal    ${handle}    ${1}
+    Switch process    ${1}
 
 *** Keywords ***
 Terminate should stop countdown

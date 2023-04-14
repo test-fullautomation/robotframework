@@ -28,10 +28,11 @@ def KeywordRemover(how):
         return {'ALL': AllKeywordsRemover,
                 'PASSED': PassedKeywordRemover,
                 'FOR': ForLoopItemsRemover,
+                'WHILE': WhileLoopItemsRemover,
                 'WUKS': WaitUntilKeywordSucceedsRemover}[upper]()
     except KeyError:
-        raise DataError("Expected 'ALL', 'PASSED', 'NAME:<pattern>', "
-                        "'TAG:<pattern>', 'FOR', or 'WUKS' but got '%s'." % how)
+        raise DataError(f"Expected 'ALL', 'PASSED', 'NAME:<pattern>', 'TAG:<pattern>', "
+                        f"'FOR' or 'WUKS', got '{how}'.")
 
 
 class _KeywordRemover(SuiteVisitor):
@@ -104,19 +105,31 @@ class ByTagKeywordRemover(_KeywordRemover):
             self._clear_content(kw)
 
 
-class ForLoopItemsRemover(_KeywordRemover):
+class _LoopItemsRemover(_KeywordRemover):
     _message = '%d passing step%s removed using --RemoveKeywords option.'
 
-    def start_for(self, for_):
-        before = len(for_.body)
-        self._remove_keywords(for_.body)
-        self._removal_message.set_if_removed(for_, before)
+    def _remove_from_loop(self, loop):
+        before = len(loop.body)
+        self._remove_keywords(loop.body)
+        self._removal_message.set_if_removed(loop, before)
 
     def _remove_keywords(self, body):
         iterations = body.filter(messages=False)
         for it in iterations[:-1]:
             if not self._failed_or_warning_or_error(it):
                 body.remove(it)
+
+
+class ForLoopItemsRemover(_LoopItemsRemover):
+
+    def start_for(self, for_):
+        self._remove_from_loop(for_)
+
+
+class WhileLoopItemsRemover(_LoopItemsRemover):
+
+    def start_while(self, while_):
+        self._remove_from_loop(while_)
 
 
 class WaitUntilKeywordSucceedsRemover(_KeywordRemover):
@@ -156,7 +169,7 @@ class WarningAndErrorFinder(SuiteVisitor):
             self.found = True
 
 
-class RemovalMessage(object):
+class RemovalMessage:
 
     def __init__(self, message):
         self._message = message

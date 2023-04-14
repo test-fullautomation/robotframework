@@ -14,20 +14,14 @@
 #  limitations under the License.
 
 import sys
-from threading import current_thread
+from threading import current_thread, main_thread
 import signal
 
 from robot.errors import ExecutionFailed
 from robot.output import LOGGER
-from robot.utils import JYTHON
-
-if JYTHON:
-    from java.lang import IllegalArgumentException
-else:
-    IllegalArgumentException = ValueError
 
 
-class _StopSignalMonitor(object):
+class _StopSignalMonitor:
 
     def __init__(self):
         self._signal_count = 0
@@ -42,7 +36,7 @@ class _StopSignalMonitor(object):
             sys.__stderr__.write('Execution forcefully stopped.\n')
             raise SystemExit()
         sys.__stderr__.write('Second signal will force exit.\n')
-        if self._running_keyword and not JYTHON:
+        if self._running_keyword:
             self._stop_execution_gracefully()
 
     def _stop_execution_gracefully(self):
@@ -63,13 +57,12 @@ class _StopSignalMonitor(object):
 
     @property
     def _can_register_signal(self):
-        return signal and current_thread().name == 'MainThread'
+        return signal and current_thread() is main_thread()
 
     def _register_signal_handler(self, signum):
         try:
             signal.signal(signum, self)
-        except (ValueError, IllegalArgumentException) as err:
-            # IllegalArgumentException due to http://bugs.jython.org/issue1729
+        except ValueError as err:
             self._warn_about_registeration_error(signum, err)
 
     def _warn_about_registeration_error(self, signum, err):

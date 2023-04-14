@@ -20,9 +20,9 @@ from robot.utils import ErrorDetails, get_timestamp
 from .modelcombiner import ModelCombiner
 
 
-class StatusReporter(object):
+class StatusReporter:
 
-    def __init__(self, data, result, context, run=True):
+    def __init__(self, data, result, context, run=True, suppress=False):
         self.data = data
         self.result = result
         self.context = context
@@ -31,13 +31,15 @@ class StatusReporter(object):
             result.status = result.NOT_SET
         else:
             self.pass_status = result.status = result.NOT_RUN
+        self.suppress = suppress
         self.initial_test_status = None
 
     def __enter__(self):
         context = self.context
         result = self.result
         self.initial_test_status = context.test.status if context.test else None
-        result.starttime = get_timestamp()
+        if not result.starttime:
+            result.starttime = get_timestamp()
         context.start_keyword(ModelCombiner(self.data, result))
         self._warn_if_deprecated(result.doc, result.name)
         return self
@@ -61,8 +63,9 @@ class StatusReporter(object):
             context.test.status = result.status
         result.endtime = get_timestamp()
         context.end_keyword(ModelCombiner(self.data, result))
-        if failure is not exc_val:
+        if failure is not exc_val and not self.suppress:
             raise failure
+        return self.suppress
 
     def _get_failure(self, exc_type, exc_value, exc_tb, context):
         if exc_value is None:
@@ -72,19 +75,18 @@ class StatusReporter(object):
         if isinstance(exc_value, DataError):
             msg = exc_value.message
             context.unknown(msg)
-            syntax = not isinstance(exc_value, (KeywordError, VariableError))
-            return ExecutionFailed(msg, syntax=syntax, unknown=True)
-        exc_info = (exc_type, exc_value, exc_tb)
-        failure = HandlerExecutionFailed(ErrorDetails(exc_info))
+            return ExecutionFailed(msg, syntax=exc_value.syntax, unknown=True)
+        error = ErrorDetails(exc_value)
+        failure = HandlerExecutionFailed(error)
         if failure.timeout:
             context.timeout_occurred = True
         if failure.skip:
-            context.skip(failure.full_message)
+            context.skip(error.message)
         # cuongnht - add unknown state 
         elif failure.unknown:
-            context.unknown(failure.full_message)
+            context.unknown(error.message)
         else:
-            context.fail(failure.full_message)
-        if failure.traceback:
-            context.debug(failure.traceback)
+            context.fail(error.message)
+        if error.traceback:
+            context.debug(error.traceback)
         return failure

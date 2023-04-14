@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 
-class setter(object):
+class setter:
 
     def __init__(self, method):
         self.method = method
@@ -38,9 +38,10 @@ class setter(object):
 class SetterAwareType(type):
 
     def __new__(cls, name, bases, dct):
-        slots = dct.get('__slots__')
-        if slots is not None:
+        if '__slots__' in dct:
+            slots = list(dct['__slots__'])
             for item in dct.values():
                 if isinstance(item, setter):
                     slots.append(item.attr_name)
+            dct['__slots__'] = slots
         return type.__new__(cls, name, bases, dct)

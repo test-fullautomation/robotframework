@@ -28,12 +28,6 @@ Should Contain X Times with containers
     ${LIST}    42       0
     ${DICT}    a        1
 
-Should Contain X Times with Java types
-    ${HASHTABLE1}    a    1
-    ${ARRAY3}        b    1
-    ${VECTOR3}       c    1
-    ${VECTOR3}       d    0
-
 Should Contain X Times failing
     [Documentation]    FAIL
     ...    Several failures occurred:
@@ -51,7 +45,7 @@ Should Contain X Times failing
     hello    xxx    3    My message
 
 Should Contain X Times case-insensitive
-    [Documentation]    FAIL    '{'a': 1}' contains 'a' 1 time, not 100 times.
+    [Documentation]    FAIL    {'a': 1} contains 'a' 1 time, not 100 times.
     XxX          X     3      ignore_case=True
     XxX          xx    1      ignore_case=True
     ${DICT}      a     2      ignore_case=yes
@@ -59,7 +53,7 @@ Should Contain X Times case-insensitive
     ${DICT 1}    a     100    ignore_case=yes, please
 
 Should Contain X Times without leading spaces
-    [Documentation]    FAIL    '${DICT_5}' contains 'b' 1 time, not 2 times.
+    [Documentation]    FAIL    ${DICT_5} contains 'b' 1 time, not 2 times.
     a\ \ a\ \ a    \ a      2    strip_spaces=False
     a\ \ a\ \ a    \ a      3    strip_spaces=Leading
     ${DICT_5}      \n\na    2    strip_spaces=Leading
@@ -68,7 +62,7 @@ Should Contain X Times without leading spaces
     ${LIST_4}      \ a      2    strip_spaces=LEADING
 
 Should Contain X Times without trailing spaces
-    [Documentation]    FAIL    '${DICT_5}' contains 'd' 1 time, not 2 times.
+    [Documentation]    FAIL    ${DICT_5} contains 'd' 1 time, not 2 times.
     a\ \ a\ \ a    a${SPACE}    2    strip_spaces=No
     a\ \ a\ \ a    a${SPACE}    3    strip_spaces=TRailing
     ${DICT_5}      a\t          1    strip_spaces=Trailing
@@ -77,7 +71,7 @@ Should Contain X Times without trailing spaces
     ${LIST_4}      b\n\n        2    strip_spaces=trailing
 
 Should Contain X Times without leading and trailing spaces
-    [Documentation]    FAIL  '${LIST_4}' contains 'c' 1 time, not 0 times.
+    [Documentation]    FAIL  ${LIST_4} contains 'c' 1 time, not 0 times.
     a\ \ a\ \ a    \ a${SPACE}    1    strip_spaces=No
     a\ \ a\ \ a    \ a${SPACE}    3    strip_spaces=Yes
     ${DICT_5}      \n a\t         3    strip_spaces=sure
@@ -87,14 +81,14 @@ Should Contain X Times without leading and trailing spaces
     ${LIST_4}      c              0    strip_spaces=sure thing
 
 Should Contain X Times and do not collapse spaces
-    [Documentation]    FAIL  '${LIST_4}' contains '\ \ c' 0 times, not 1 time.
+    [Documentation]    FAIL  ${LIST_4} contains '\ \ c' 0 times, not 1 time.
     a\t\ a\n\ a    \ a      2    collapse_spaces=False
     a\n\ a\n\ a    a\n      2    collapse_spaces=${FALSE}
     ${DICT_5}      \ a      1    collapse_spaces=No
     ${LIST_4}      \ \ c    1    collapse_spaces=False
 
 Should Contain X Times and collapse spaces
-    [Documentation]    FAIL  '${LIST_4}' contains ' a' 2 times, not 3 times.
+    [Documentation]    FAIL  ${LIST_4} contains ' a' 2 times, not 3 times.
     a\ \ a\ \ a    \ a\n    1    collapse_spaces=True
     a\n\ta\t\ a    \ a      2    collapse_spaces=${TRUE}
     ${DICT_5}      \ta      2    collapse_spaces=TRUE

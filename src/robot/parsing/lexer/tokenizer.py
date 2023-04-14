@@ -15,12 +15,10 @@
 
 import re
 
-from robot.utils import rstrip
-
 from .tokens import Token
 
 
-class Tokenizer(object):
+class Tokenizer:
     _space_splitter = re.compile(r'(\s{2,}|\t)', re.UNICODE)
     _pipe_splitter = re.compile(r'((?:\A|\s+)\|(?:\s+|\Z))', re.UNICODE)
 
@@ -46,14 +44,14 @@ class Tokenizer(object):
             splitter = self._split_from_pipes
         else:
             splitter = self._split_from_spaces
-        for value, is_data in splitter(rstrip(line)):
+        for value, is_data in splitter(line.rstrip()):
             if is_data:
                 append(Token(None, value, lineno, offset))
             elif include_separators:
                 append(Token(Token.SEPARATOR, value, lineno, offset))
             offset += len(value)
         if include_separators:
-            trailing_whitespace = line[len(rstrip(line)):]
+            trailing_whitespace = line[len(line.rstrip()):]
             append(Token(Token.EOL, trailing_whitespace, lineno, offset))
         return tokens
 
@@ -74,46 +72,44 @@ class Tokenizer(object):
         yield rest, True
 
     def _cleanup_tokens(self, tokens, data_only):
-        has_data = self._handle_comments(tokens)
-        continues = self._handle_continuation(tokens)
+        has_data, continues = self._handle_comments_and_continuation(tokens)
         self._remove_trailing_empty(tokens)
         if continues:
             self._remove_leading_empty(tokens)
-            self._ensure_data_after_continuation(tokens)
+            if not has_data:
+                self._ensure_data_after_continuation(tokens)
+            starts_new = False
+        else:
+            starts_new = has_data
         if data_only:
             tokens = self._remove_non_data(tokens)
-        return tokens, has_data and not continues
+        return tokens, starts_new
 
-    def _handle_comments(self, tokens):
+    def _handle_comments_and_continuation(self, tokens):
         has_data = False
+        continues = False
         commented = False
         for token in tokens:
             if token.type is None:
                 # lstrip needed to strip possible leading space from first token.
                 # Other leading/trailing spaces have been consumed as separators.
                 value = token.value.lstrip()
-                if value and not commented:
-                    if value[0] == '#':
-                        commented = True
-                    else:
-                        has_data = True
                 if commented:
                     token.type = Token.COMMENT
-        return has_data
-
-    def _handle_continuation(self, tokens):
-        for token in tokens:
-            if token.value == '...' and token.type is None:
-                token.type = Token.CONTINUATION
-                return True
-            elif token.value and token.type != Token.SEPARATOR:
-                return False
-        return False
+                elif value:
+                    if value[0] == '#':
+                        token.type = Token.COMMENT
+                        commented = True
+                    elif not has_data:
+                        if value == '...' and not continues:
+                            token.type = Token.CONTINUATION
+                            continues = True
+                        else:
+                            has_data = True
+        return has_data, continues
 
     def _remove_trailing_empty(self, tokens):
-        # list() needed w/ IronPython, otherwise reversed() alone is enough.
-        # https://github.com/IronLanguages/ironpython2/issues/699
-        for token in reversed(list(tokens)):
+        for token in reversed(tokens):
             if not token.value and token.type != Token.EOL:
                 tokens.remove(token)
             elif token.type is None:
@@ -128,10 +124,9 @@ class Tokenizer(object):
                 break
 
     def _ensure_data_after_continuation(self, tokens):
-        if not any(t.type is None for t in tokens):
-            cont = self._find_continuation(tokens)
-            token = Token(lineno=cont.lineno, col_offset=cont.end_col_offset)
-            tokens.insert(tokens.index(cont) + 1, token)
+        cont = self._find_continuation(tokens)
+        token = Token(lineno=cont.lineno, col_offset=cont.end_col_offset)
+        tokens.insert(tokens.index(cont) + 1, token)
 
     def _find_continuation(self, tokens):
         for token in tokens:

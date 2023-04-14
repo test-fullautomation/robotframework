@@ -23,16 +23,6 @@ Importing Python Library By Path With Variables
     ${test} =    Check Test Case    Importing Python Library By Path With Variables
     Check Keyword Data    ${test.kws[0]}    MyLibDir2.Keyword In My Lib Dir 2    \${sum}    1, 2, 3, 4, 5
 
-Importing Java Library File By Path With .java Extension
-    [Tags]    require-jython
-    ${test} =    Check Test Case    Importing Java Library File By Path With .java Extension
-    Check Keyword Data    ${test.kws[0]}    MyJavaLib.Keyword In My Java Lib    \${ret}    tellus
-
-Importing Java Library File By Path With .class Extension
-    [Tags]    require-jython
-    ${test} =    Check Test Case    Importing Java Library File By Path With .class Extension
-    Check Keyword Data    ${test.kws[0]}    MyJavaLib2.Keyword In My Java Lib 2    \${ret}    maailma
-
 Importing By Path Having Spaces
     Check Test Case    ${TEST NAME}
 
@@ -57,14 +47,14 @@ Importing Non Python File Fails
 
 Importing Non Python Dir Fails
     Error in file    3    test_libraries/library_import_by_path.robot    11
-    ...    Test library 'library_scope' does not exist.
+    ...    Library 'library_scope' does not exist.
 
 Importing Non Existing Py File
     Error in file    4    test_libraries/library_import_by_path.robot    13
-    ...    Test library 'this_does_not_exist.py' does not exist.
+    ...    Library 'this_does_not_exist.py' does not exist.
 
 Import failure when path contains non-ASCII characters is handled correctly
     ${path} =    Normalize path    ${DATADIR}/test_libraries/nön_äscii_dïr/invalid.py
-    Error in file    -1    test_libraries/library_import_by_path.robot    17
+    Error in file    -1    test_libraries/library_import_by_path.robot    15
     ...    Importing library '${path}' failed: Ööööps!
-    ...    traceback=File "${path}", line 2, in <module>\n*raise RuntimeError(u'Ööööps!')
+    ...    traceback=File "${path}", line 1, in <module>\n*raise RuntimeError('Ööööps!')

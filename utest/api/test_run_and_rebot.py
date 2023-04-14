@@ -6,13 +6,13 @@ import threading
 import tempfile
 import signal
 import logging
+from io import StringIO
 from os.path import abspath, curdir, dirname, exists, join
 from os import chdir, getenv
 
 from robot import run, run_cli, rebot, rebot_cli
 from robot.model import SuiteVisitor
 from robot.running import namespace
-from robot.utils import JYTHON, StringIO
 from robot.utils.asserts import assert_equal, assert_raises, assert_true
 
 from resources.runningtestcase import RunningTestCase
@@ -35,19 +35,10 @@ def run_without_outputs(*args, **kwargs):
 
 def assert_signal_handler_equal(signum, expected):
     sig = signal.getsignal(signum)
-    try:
-        assert_equal(sig, expected)
-    except AssertionError:
-        if not JYTHON:
-            raise
-        # With Jython `getsignal` seems to always return different object so that
-        # even `getsignal(SIGINT) == getsignal(SIGINT)` is false. This doesn't
-        # happen always and may be dependent e.g. on the underlying JVM. Comparing
-        # string representations ought to be good enough.
-        assert_equal(str(sig), str(expected))
+    assert_equal(sig, expected)
 
 
-class StreamWithOnlyWriteAndFlush(object):
+class StreamWithOnlyWriteAndFlush:
 
     def __init__(self):
         self._buffer = []
@@ -110,10 +101,9 @@ class TestRun(RunningTestCase):
         self._assert_outputs()
 
     def test_multi_options_as_single_string(self):
-        assert_equal(run_without_outputs(self.data, exclude='fail', skip='pass',
-                                         skiponfailure='xxx'), 0)
-        self._assert_outputs([('FAIL', 0)])
-        self._assert_outputs([('1 test, 0 passed, 0 failed, 1 skipped', 1)])
+        assert_equal(run_without_outputs(self.data, include='?a??', skip='pass',
+                                         skiponfailure='fail'), 0)
+        self._assert_outputs([('2 tests, 0 passed, 0 failed, 2 skipped', 1)])
 
     def test_multi_options_as_tuples(self):
         assert_equal(run_without_outputs(self.data, exclude=('fail',), skip=('pass',),
@@ -124,7 +114,7 @@ class TestRun(RunningTestCase):
     def test_listener_gets_notification_about_log_report_and_output(self):
         listener = join(ROOT, 'utest', 'resources', 'Listener.py')
         assert_equal(run(self.data, output=OUTPUT_PATH, report=REPORT_PATH,
-                          log=LOG_PATH, listener=listener), 1)
+                         log=LOG_PATH, listener=listener), 1)
         self._assert_outputs(stdout=[('[output {0}]'.format(OUTPUT_PATH), 1),
                                      ('[report {0}]'.format(REPORT_PATH), 1),
                                      ('[log {0}]'.format(LOG_PATH), 1),
@@ -167,6 +157,19 @@ class TestRun(RunningTestCase):
         self._assert_outputs([('Pass       ', 1), ('Fail :: FAIL', 1)],
                              [("[ ERROR ] Executing model modifier 'integer' "
                                "failed: AttributeError: ", 1)])
+
+    def test_invalid_option_value(self):
+        stderr = StringIO()
+        assert_equal(run(self.data, loglevel='INV', stderr=stderr), 252)
+        self._assert_output(stderr, [("[ ERROR ] Invalid value for option '--loglevel': "
+                                      "Invalid level 'INV'.", 1)])
+        self._assert_outputs()
+
+    def test_invalid_option(self):
+        stderr = StringIO()
+        assert_equal(run(self.data, invalid=True, stderr=stderr), 252)
+        self._assert_output(stderr, [("[ ERROR ] Invalid option 'invalid'.", 1)])
+        self._assert_outputs()
 
     def test_run_cli_system_exits_by_default(self):
         exit = assert_raises(SystemExit, run_cli, ['-d', TEMP, self.data])
@@ -227,6 +230,19 @@ class TestRebot(RunningTestCase):
         assert_equal(rebot(self.data, outputdir=TEMP,
                            prerebotmodifier=modifier), 3)
         assert_equal(modifier.tests, ['Test 1.1', 'Test 1.2', 'Test 2.1'])
+
+    def test_invalid_option_value(self):
+        stderr = StringIO()
+        assert_equal(rebot(self.data, loglevel='INFO:INV', stderr=stderr), 252)
+        self._assert_output(stderr, [("[ ERROR ] Invalid value for option '--loglevel': "
+                                      "Invalid level 'INV'.", 1)])
+        self._assert_outputs()
+
+    def test_invalid_option(self):
+        stderr = StringIO()
+        assert_equal(rebot(self.data, inv=True, stderr=stderr, bad=-1), 252)
+        self._assert_output(stderr, [("[ ERROR ] Invalid options 'inv' and 'bad'.", 1)])
+        self._assert_outputs()
 
     def test_rebot_cli_system_exits_by_default(self):
         exit = assert_raises(SystemExit, rebot_cli, ['-d', TEMP, self.data])

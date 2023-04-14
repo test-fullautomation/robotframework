@@ -2,21 +2,18 @@
 Library           OperatingSystem    WITH NAME    OS
 Library           ParameterLibrary    1    2    WITH NAME    Param1
 Library           ParameterLibrary    ${VAR}    ${42}    WITH NAME    Param2
-Library           ParameterLibrary    a    b    WITH NAME    ${VAR}
+Library           ParameterLibrary    a    b    AS    ${VAR}
 Library           ParameterLibrary    whatever    WITH NAME
 Library           BuiltIn    WITH NAME    B2
-Library           module_library    WITH NAME    MOD1
+Library           module_library    AS    MOD1
 Library           pythonmodule.library    WITH NAME    mod 2
-Library           ExampleJavaLibrary    WITH NAME    Java Lib
-Library           javapkg.JavaPackageExample    WITH NAME    Java Pkg
 Library           MyLibFile.py    WITH NAME    Params
-Library           Embedded.py    WITH NAME    Embedded1
+Library           Embedded.py    AS    Embedded1
 Library           Embedded.py    WITH NAME    Embedded2
 Library           RunKeywordLibrary    WITH NAME    dynamic
-Library           RunKeywordLibraryJava    WITH NAME    dynamicJava
-Library           libraryscope.Global    WITH NAME    G Scope
+Library           libraryscope.Global    AS    G Scope
 Library           libraryscope.Suite    WITH NAME    S Scope
-Library           libraryscope.Test    WITH NAME    T Scope
+Library           libraryscope.Test    AS    T Scope
 
 *** Variables ***
 ${VAR}            VAR
@@ -61,36 +58,26 @@ Module Library
     BuiltIn.Should Be Equal    ${s}    Hello, Tellus!
     Failing
 
-Java Library
-    [Documentation]    FAIL No keyword with name 'ExampleJavaLibrary.Get Java Object' found.
-    ${s} =    returnStringFromLibrary    whatever
-    BuiltIn.Should Be Equal    ${s}    whatever
-    ${obj} =    Java Lib . Get Java Object    My Name
-    BuiltIn.Should Be Equal    ${obj.name}    My Name
-    ${arr} =    JavaLib.GetStringArray    foo    bar
-    BuiltIn.Should Be Equal    ${arr[0]}    foo
-    ExampleJavaLibrary.Get Java Object    This fails
-
-Java Library In Package
-    [Documentation]    FAIL No keyword with name 'javapkg.JavaPackageExample.whatever' found.
-    ${s1} =    javapkg.returnvalue
-    ${s2} =    Return Value    Returned string value
-    BuiltIn.Should Be Equal    ${s1}    ${s2}
-    javapkg.JavaPackageExample.whatever
-
 Name Given Using "With Name" Can Be Reused In Different Suites
     Para MS.Keyword In My Lib File
 
 Import Library Keyword
+    # WITH NAME
     BuiltIn.Import Library    OperatingSystem    WITH NAME    MyOS
     MyOS.Directory Should Exist    .
     B2.Import Library    ParameterLibrary    my first argument    second arg    WITH NAME    MyParamLib
     My Param Lib.Parameters should be    my first argument    second arg
+    # AS
+    BuiltIn.Import Library    OperatingSystem    AS    MyAS
+    MyAS.Directory Should Exist    .
+    B2.Import Library    ParameterLibrary    my first argument    second arg    AS    MyParamLibAs
+    My Param LibAs.Parameters should be    my first argument    second arg
 
 Correct Error When Using Keyword From Same Library With Different Names Without Prefix 2
     [Documentation]    FAIL Multiple keywords with name 'Parameters' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}MyParamLib.Parameters
+    ...    ${SPACE*4}MyParamLibAs.Parameters
     ...    ${SPACE*4}Param1.Parameters
     ...    ${SPACE*4}Param2.Parameters
     ...    ${SPACE*4}ParameterLibrary.Parameters
@@ -101,11 +88,6 @@ Dynamic Library
     [Documentation]    FAIL No keyword with name 'RunKeywordLibrary.Run Keyword That Passes' found.
     dynamic.Run Keyword That Passes    arg1    arg2
     RunKeywordLibrary.Run Keyword That Passes
-
-Dynamic Java Library
-    [Documentation]    FAIL No keyword with name 'RunKeywordLibraryJava.Run Keyword That Passes' found.
-    dynamicJava.Run Keyword That Passes    arg1    arg2
-    RunKeywordLibraryJava.Run Keyword That Passes
 
 Global Scope 2.1
     Register And Test Registered    G Scope    G.2.1    G.1.1    G.1.2

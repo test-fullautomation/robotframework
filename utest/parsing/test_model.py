@@ -2,22 +2,22 @@ import ast
 import os
 import unittest
 import tempfile
+from pathlib import Path
 
 from robot.parsing import get_model, get_resource_model, ModelVisitor, ModelTransformer, Token
 from robot.parsing.model.blocks import (
-    Block, CommentSection, File, For, If, Keyword, KeywordSection,
-    SettingSection, TestCase, TestCaseSection, VariableSection
+    CommentSection, File, For, If, Try, While,
+    Keyword, KeywordSection, SettingSection, TestCase, TestCaseSection, VariableSection
 )
 from robot.parsing.model.statements import (
-    Arguments, Comment, Documentation, ForHeader, End, ElseHeader, ElseIfHeader,
-    EmptyLine, Error, IfHeader, KeywordCall, KeywordName, SectionHeader,
-    Statement, TestCaseName, Variable
+    Arguments, Break, Comment, Config, Continue, Documentation, ForHeader, End, ElseHeader,
+    ElseIfHeader, EmptyLine, Error, IfHeader, InlineIfHeader, TryHeader, ExceptHeader,
+    FinallyHeader, KeywordCall, KeywordName, ReturnStatement, SectionHeader,
+    TestCaseName, Variable, WhileHeader
 )
-from robot.utils import PY3
 from robot.utils.asserts import assert_equal, assert_raises_with_msg
 
-if PY3:
-    from pathlib import Path
+from parsing_test_utils import assert_model, remove_non_data
 
 
 DATA = '''\
@@ -35,9 +35,9 @@ Example
 Keyword
     [Arguments]    ${arg1}    ${arg2}
     Log    Got ${arg1} and ${arg}!
+    RETURN    x
 '''
-PATH = os.path.join(os.getenv('TEMPDIR') or tempfile.gettempdir(),
-                    'test_model.robot')
+PATH = os.path.join(os.getenv('TEMPDIR') or tempfile.gettempdir(), 'test_model.robot')
 EXPECTED = File(sections=[
     CommentSection(
         body=[
@@ -115,6 +115,13 @@ EXPECTED = File(sections=[
                         Token('SEPARATOR', '    ', 14, 7),
                         Token('ARGUMENT', 'Got ${arg1} and ${arg}!', 14, 11),
                         Token('EOL', '\n', 14, 34)
+                    ]),
+                    ReturnStatement([
+                        Token('SEPARATOR', '    ', 15, 0),
+                        Token('RETURN STATEMENT', 'RETURN', 15, 4),
+                        Token('SEPARATOR', '    ', 15, 10),
+                        Token('ARGUMENT', 'x', 15, 14),
+                        Token('EOL', '\n', 15, 15)
                     ])
                 ]
             )
@@ -123,56 +130,15 @@ EXPECTED = File(sections=[
 ])
 
 
-def assert_model(model, expected=EXPECTED, **expected_attrs):
-    if type(model) is not type(expected):
-        raise AssertionError('Incompatible types:\n%s\n%s'
-                             % (dump_model(model), dump_model(expected)))
-    if isinstance(model, list):
-        assert_equal(len(model), len(expected),
-                     '%r != %r' % (model, expected), values=False)
-        for m, e in zip(model, expected):
-            assert_model(m, e)
-    elif isinstance(model, Block):
-        assert_block(model, expected, expected_attrs)
-    elif isinstance(model, Statement):
-        assert_statement(model, expected)
-    elif model is None and expected is None:
-        pass
-    else:
-        raise AssertionError('Incompatible children:\n%r\n%r'
-                             % (model, expected))
-
-
-def dump_model(model):
-    if isinstance(model, ast.AST):
-        return ast.dump(model)
-    elif isinstance(model, (list, tuple)):
-        return [dump_model(m) for m in model]
-    else:
-        raise TypeError('Invalid model %r' % model)
-
-def assert_block(model, expected, expected_attrs):
-    assert_equal(model._fields, expected._fields)
-    for field in expected._fields:
-        assert_model(getattr(model, field), getattr(expected, field))
-    for attr in expected._attributes:
-        exp = expected_attrs.get(attr, getattr(expected, attr))
-        assert_equal(getattr(model, attr), exp)
-
-
-def assert_statement(model, expected):
-    assert_equal(model._fields, ('type', 'tokens'))
-    assert_equal(model.type, expected.type)
-    assert_equal(len(model.tokens), len(expected.tokens))
-    for m, e in zip(model.tokens, expected.tokens):
-        assert_equal(m, e, formatter=repr)
-    assert_equal(model._attributes, ('lineno', 'col_offset', 'end_lineno',
-                                     'end_col_offset', 'errors'))
-    assert_equal(model.lineno, expected.tokens[0].lineno)
-    assert_equal(model.col_offset, expected.tokens[0].col_offset)
-    assert_equal(model.end_lineno, expected.tokens[-1].lineno)
-    assert_equal(model.end_col_offset, expected.tokens[-1].end_col_offset)
-    assert_equal(model.errors, expected.errors)
+def get_and_assert_model(data, expected, depth=2):
+    for data_only in True, False:
+        model = get_model(data.strip(), data_only=data_only)
+        if not data_only:
+            remove_non_data(model)
+        node = model.sections[0]
+        for _ in range(depth):
+            node = node.body[0]
+        assert_model(node, expected)
 
 
 class TestGetModel(unittest.TestCase):
@@ -188,22 +154,20 @@ class TestGetModel(unittest.TestCase):
 
     def test_from_string(self):
         model = get_model(DATA)
-        assert_model(model)
+        assert_model(model, EXPECTED)
 
     def test_from_path_as_string(self):
         model = get_model(PATH)
-        assert_model(model, source=PATH)
+        assert_model(model, EXPECTED, source=PATH)
 
-    if PY3:
-
-        def test_from_path_as_path(self):
-            model = get_model(Path(PATH))
-            assert_model(model, source=PATH)
+    def test_from_path_as_path(self):
+        model = get_model(Path(PATH))
+        assert_model(model, EXPECTED, source=PATH)
 
     def test_from_open_file(self):
         with open(PATH) as f:
             model = get_model(f)
-        assert_model(model)
+        assert_model(model, EXPECTED)
 
 
 class TestSaveModel(unittest.TestCase):
@@ -221,27 +185,25 @@ class TestSaveModel(unittest.TestCase):
         model = get_model(PATH)
         os.remove(PATH)
         model.save()
-        assert_model(get_model(PATH), source=PATH)
+        assert_model(get_model(PATH), EXPECTED, source=PATH)
 
     def test_save_to_different_path(self):
         model = get_model(PATH)
         different = PATH + '.robot'
         model.save(different)
-        assert_model(get_model(different), source=different)
+        assert_model(get_model(different), EXPECTED, source=different)
 
-    if PY3:
+    def test_save_to_original_path_as_path(self):
+        model = get_model(Path(PATH))
+        os.remove(PATH)
+        model.save()
+        assert_model(get_model(PATH), EXPECTED, source=PATH)
 
-        def test_save_to_original_path_as_path(self):
-            model = get_model(Path(PATH))
-            os.remove(PATH)
-            model.save()
-            assert_model(get_model(PATH), source=PATH)
-
-        def test_save_to_different_path_as_path(self):
-            model = get_model(PATH)
-            different = PATH + '.robot'
-            model.save(Path(different))
-            assert_model(get_model(different), source=different)
+    def test_save_to_different_path_as_path(self):
+        model = get_model(PATH)
+        different = PATH + '.robot'
+        model.save(Path(different))
+        assert_model(get_model(different), EXPECTED, source=different)
 
     def test_save_to_original_fails_if_source_is_not_path(self):
         message = 'Saving model requires explicit output ' \
@@ -254,14 +216,13 @@ class TestSaveModel(unittest.TestCase):
 class TestForLoop(unittest.TestCase):
 
     def test_valid(self):
-        model = get_model('''\
+        data = '''
 *** Test Cases ***
 Example
     FOR    ${x}    IN    a    b    c
         Log    ${x}
     END
-''', data_only=True)
-        loop = model.sections[0].body[0].body[0]
+'''
         expected = For(
             header=ForHeader([
                 Token(Token.FOR, 'FOR', 3, 4),
@@ -279,10 +240,10 @@ Example
                 Token(Token.END, 'END', 5, 4)
             ])
         )
-        assert_model(loop, expected)
+        get_and_assert_model(data, expected)
 
     def test_nested(self):
-        model = get_model('''\
+        data = '''
 *** Test Cases ***
 Example
     FOR    ${x}    IN    1    2
@@ -290,8 +251,7 @@ Example
             Log    ${y}
         END
     END
-''', data_only=True)
-        loop = model.sections[0].body[0].body[0]
+'''
         expected = For(
             header=ForHeader([
                 Token(Token.FOR, 'FOR', 3, 4),
@@ -321,18 +281,21 @@ Example
                 Token(Token.END, 'END', 7, 4)
             ])
         )
-        assert_model(loop, expected)
+        get_and_assert_model(data, expected)
 
     def test_invalid(self):
-        model = get_model('''\
+        data1 = '''
 *** Test Cases ***
 Example
     FOR
-    END    ooops
 
+    END    ooops
+'''
+        data2 = '''
+*** Test Cases ***
+Example
     FOR    wrong    IN
-''', data_only=True)
-        loop1, loop2 = model.sections[0].body[0].body
+'''
         expected1 = For(
             header=ForHeader(
                 tokens=[Token(Token.FOR, 'FOR', 3, 4)],
@@ -340,39 +303,111 @@ Example
                         "FOR loop has no 'IN' or other valid separator."),
             ),
             end=End(
-                tokens=[Token(Token.END, 'END', 4, 4),
-                        Token(Token.ARGUMENT, 'ooops', 4, 11)],
-                errors=('END does not accept arguments.',)
+                tokens=[Token(Token.END, 'END', 5, 4),
+                        Token(Token.ARGUMENT, 'ooops', 5, 11)],
+                errors=("END does not accept arguments, got 'ooops'.",)
             ),
-            errors=('FOR loop has empty body.',)
+            errors=('FOR loop cannot be empty.',)
         )
         expected2 = For(
             header=ForHeader(
-                tokens=[Token(Token.FOR, 'FOR', 6, 4),
-                        Token(Token.VARIABLE, 'wrong', 6, 11),
-                        Token(Token.FOR_SEPARATOR, 'IN', 6, 20)],
+                tokens=[Token(Token.FOR, 'FOR', 3, 4),
+                        Token(Token.VARIABLE, 'wrong', 3, 11),
+                        Token(Token.FOR_SEPARATOR, 'IN', 3, 20)],
                 errors=("FOR loop has invalid loop variable 'wrong'.",
                         "FOR loop has no loop values."),
             ),
-            errors=('FOR loop has empty body.',
-                    'FOR loop has no closing END.')
+            errors=('FOR loop cannot be empty.',
+                    'FOR loop must have closing END.')
         )
-        assert_model(loop1, expected1)
-        assert_model(loop2, expected2)
+        get_and_assert_model(data1, expected1)
+        get_and_assert_model(data2, expected2)
+
+
+class TestWhileLoop(unittest.TestCase):
+
+    def test_valid(self):
+        data = '''
+*** Test Cases ***
+Example
+    WHILE    True
+        Log    ${x}
+    END
+'''
+        expected = While(
+            header=WhileHeader([
+                Token(Token.WHILE, 'WHILE', 3, 4),
+                Token(Token.ARGUMENT, 'True', 3, 13),
+            ]),
+            body=[
+                KeywordCall([Token(Token.KEYWORD, 'Log', 4, 8),
+                             Token(Token.ARGUMENT, '${x}', 4, 15)])
+            ],
+            end=End([
+                Token(Token.END, 'END', 5, 4)
+            ])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_limit(self):
+        data = '''
+*** Test Cases ***
+Example
+    WHILE    True    limit=100
+        Log    ${x}
+    END
+'''
+        expected = While(
+            header=WhileHeader([
+                Token(Token.WHILE, 'WHILE', 3, 4),
+                Token(Token.ARGUMENT, 'True', 3, 13),
+                Token(Token.OPTION, 'limit=100', 3, 21),
+            ]),
+            body=[
+                KeywordCall([Token(Token.KEYWORD, 'Log', 4, 8),
+                             Token(Token.ARGUMENT, '${x}', 4, 15)])
+            ],
+            end=End([
+                Token(Token.END, 'END', 5, 4)
+            ])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_invalid(self):
+        data = '''
+*** Test Cases ***
+Example
+    WHILE    too    many    values
+        # Empty body
+    END
+'''
+        expected = While(
+            header=WhileHeader(
+                tokens=[Token(Token.WHILE, 'WHILE', 3, 4),
+                        Token(Token.ARGUMENT, 'too', 3, 13),
+                        Token(Token.ARGUMENT, 'many', 3, 20),
+                        Token(Token.ARGUMENT, 'values', 3, 28)],
+                errors=('WHILE cannot have more than one condition.',)
+            ),
+            end=End([
+                Token(Token.END, 'END', 5, 4)
+            ]),
+            errors=('WHILE loop cannot be empty.',)
+        )
+        get_and_assert_model(data, expected)
 
 
 class TestIf(unittest.TestCase):
 
     def test_if(self):
-        model = get_model('''\
+        data = '''
 *** Test Cases ***
 Example
     IF    True
         Keyword
         Another    argument
     END
-    ''', data_only=True)
-        node = model.sections[0].body[0].body[0]
+    '''
         expected = If(
             header=IfHeader([
                 Token(Token.IF, 'IF', 3, 4),
@@ -385,10 +420,10 @@ Example
             ],
             end=End([Token(Token.END, 'END', 6, 4)])
         )
-        assert_model(node, expected)
+        get_and_assert_model(data, expected)
 
     def test_if_else_if_else(self):
-        model = get_model('''\
+        data = '''
 *** Test Cases ***
 Example
     IF    True
@@ -398,8 +433,7 @@ Example
     ELSE
         K3
     END
-    ''', data_only=True)
-        node = model.sections[0].body[0].body[0]
+    '''
         expected = If(
             header=IfHeader([
                 Token(Token.IF, 'IF', 3, 4),
@@ -427,10 +461,10 @@ Example
             ),
             end=End([Token(Token.END, 'END', 9, 4)])
         )
-        assert_model(node, expected)
+        get_and_assert_model(data, expected)
 
     def test_nested(self):
-        model = get_model('''\
+        data = '''
 *** Test Cases ***
 Example
     IF    ${x}
@@ -441,8 +475,7 @@ Example
             Log    ${z}
         END
     END
-''', data_only=True)
-        node = model.sections[0].body[0].body[0]
+'''
         expected = If(
             header=IfHeader([
                 Token(Token.IF, 'IF', 3, 4),
@@ -478,71 +511,309 @@ Example
                 Token(Token.END, 'END', 10, 4)
             ])
         )
-        assert_model(node, expected)
+        get_and_assert_model(data, expected)
 
     def test_invalid(self):
-        model = get_model('''\
+        data1 = '''
 *** Test Cases ***
 Example
-    IF    too    many
-    ELSE    ooops
-    ELSE IF
-    END    ooops
-
     IF
-''', data_only=True)
-        if1, if2 = model.sections[0].body[0].body
+    ELSE    ooops
+        # Empty
+    ELSE IF
+
+    END    ooops
+'''
+        data2 = '''
+*** Test Cases ***
+Example
+    IF
+'''
         expected1 = If(
             header=IfHeader(
-                tokens=[Token(Token.IF, 'IF', 3, 4),
-                        Token(Token.ARGUMENT, 'too', 3, 10),
-                        Token(Token.ARGUMENT, 'many', 3, 17)],
-                errors=('IF has more than one condition.',)
+                tokens=[Token(Token.IF, 'IF', 3, 4)],
+                errors=('IF must have a condition.',)
             ),
             orelse=If(
                 header=ElseHeader(
                     tokens=[Token(Token.ELSE, 'ELSE', 4, 4),
                             Token(Token.ARGUMENT, 'ooops', 4, 12)],
-                    errors=('ELSE has condition.',)
+                    errors=("ELSE does not accept arguments, got 'ooops'.",)
                 ),
                 orelse=If(
                     header=ElseIfHeader(
-                        tokens=[Token(Token.ELSE_IF, 'ELSE IF', 5, 4)],
-                        errors=('ELSE IF has no condition.',)
+                        tokens=[Token(Token.ELSE_IF, 'ELSE IF', 6, 4)],
+                        errors=('ELSE IF must have a condition.',)
                     ),
-                    errors=('ELSE IF has empty body.',)
+                    errors=('ELSE IF branch cannot be empty.',)
                 ),
-                errors=('ELSE has empty body.',)
+                errors=('ELSE branch cannot be empty.',)
             ),
             end=End(
-                tokens=[Token(Token.END, 'END', 6, 4),
-                        Token(Token.ARGUMENT, 'ooops', 6, 11)],
-                errors=('END does not accept arguments.',)
+                tokens=[Token(Token.END, 'END', 8, 4),
+                        Token(Token.ARGUMENT, 'ooops', 8, 11)],
+                errors=("END does not accept arguments, got 'ooops'.",)
             ),
-            errors=('IF has empty body.',
-                    'ELSE IF after ELSE.')
+            errors=('IF branch cannot be empty.',
+                    'ELSE IF not allowed after ELSE.')
         )
         expected2 = If(
             header=IfHeader(
-                tokens=[Token(Token.IF, 'IF', 8, 4)],
-                errors=('IF has no condition.',)
+                tokens=[Token(Token.IF, 'IF', 3, 4)],
+                errors=('IF must have a condition.',)
             ),
-            errors=('IF has empty body.',
-                    'IF has no closing END.')
+            errors=('IF branch cannot be empty.',
+                    'IF must have closing END.')
         )
-        assert_model(if1, expected1)
-        assert_model(if2, expected2)
+        get_and_assert_model(data1, expected1)
+        get_and_assert_model(data2, expected2)
+
+
+class TestInlineIf(unittest.TestCase):
+
+    def test_if(self):
+        data = '''
+*** Test Cases ***
+Example
+    IF    True    Keyword
+'''
+        expected = If(
+            header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 4),
+                                   Token(Token.ARGUMENT, 'True', 3, 10)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'Keyword', 3, 18)])],
+            end=End([Token(Token.END, '', 3, 25)])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_if_else_if_else(self):
+        data = '''
+*** Test Cases ***
+Example
+    IF    True    K1    ELSE IF    False    K2    ELSE    K3
+'''
+        expected = If(
+            header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 4),
+                                   Token(Token.ARGUMENT, 'True', 3, 10)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'K1', 3, 18)])],
+            orelse=If(
+                header=ElseIfHeader([Token(Token.ELSE_IF, 'ELSE IF', 3, 24),
+                                     Token(Token.ARGUMENT, 'False', 3, 35)]),
+                body=[KeywordCall([Token(Token.KEYWORD, 'K2', 3, 44)])],
+                orelse=If(
+                    header=ElseHeader([Token(Token.ELSE, 'ELSE', 3, 50)]),
+                    body=[KeywordCall([Token(Token.KEYWORD, 'K3', 3, 58)])],
+                )
+            ),
+            end=End([Token(Token.END, '', 3, 60)])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_nested(self):
+        data = '''
+*** Test Cases ***
+Example
+    IF    ${x}    IF    ${y}    K1    ELSE    IF    ${z}    K2
+'''
+        expected = If(
+            header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 4),
+                                   Token(Token.ARGUMENT, '${x}', 3, 10)]),
+            body=[If(
+                header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 18),
+                                       Token(Token.ARGUMENT, '${y}', 3, 24)]),
+                body=[KeywordCall([Token(Token.KEYWORD, 'K1', 3, 32)])],
+                orelse=If(
+                    header=ElseHeader([Token(Token.ELSE, 'ELSE', 3, 38)]),
+                    body=[If(
+                        header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 46),
+                                               Token(Token.ARGUMENT, '${z}', 3, 52)]),
+                        body=[KeywordCall([Token(Token.KEYWORD, 'K2', 3, 60)])],
+                        end=End([Token(Token.END, '', 3, 62)]),
+                    )],
+                ),
+                errors=('Inline IF cannot be nested.',),
+            )],
+            errors=('Inline IF cannot be nested.',),
+        )
+        get_and_assert_model(data, expected)
+
+    def test_assign(self):
+        data = '''
+*** Test Cases ***
+Example
+    ${x} =    IF    True    K1    ELSE    K2
+'''
+        expected = If(
+            header=InlineIfHeader([Token(Token.ASSIGN, '${x} =', 3, 4),
+                                   Token(Token.INLINE_IF, 'IF', 3, 14),
+                                   Token(Token.ARGUMENT, 'True', 3, 20)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'K1', 3, 28)])],
+            orelse=If(
+                header=ElseHeader([Token(Token.ELSE, 'ELSE', 3, 34)]),
+                body=[KeywordCall([Token(Token.KEYWORD, 'K2', 3, 42)])],
+            ),
+            end=End([Token(Token.END, '', 3, 44)])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_assign_only_inside(self):
+        data = '''
+*** Test Cases ***
+Example
+    IF    ${cond}    ${assign}
+'''
+        expected = If(
+            header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 4),
+                                   Token(Token.ARGUMENT, '${cond}', 3, 10)]),
+            body=[KeywordCall([Token(Token.ASSIGN, '${assign}', 3, 21)])],
+            end=End([Token(Token.END, '', 3, 30)]),
+            errors=('Inline IF branches cannot contain assignments.',)
+        )
+        get_and_assert_model(data, expected)
+
+    def test_invalid(self):
+        data1 = '''
+*** Test Cases ***
+Example
+    ${x} =    ${y}    IF    ELSE    ooops    ELSE IF
+'''
+        data2 = '''
+*** Test Cases ***
+Example
+    IF    e    K    ELSE
+'''
+        expected1 = If(
+            header=InlineIfHeader([Token(Token.ASSIGN, '${x} =', 3, 4),
+                                   Token(Token.ASSIGN, '${y}', 3, 14),
+                                   Token(Token.INLINE_IF, 'IF', 3, 22),
+                                   Token(Token.ARGUMENT, 'ELSE', 3, 28)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'ooops', 3, 36)])],
+            orelse=If(
+                header=ElseIfHeader([Token(Token.ELSE_IF, 'ELSE IF', 3, 45)],
+                                    errors=('ELSE IF must have a condition.',)),
+                errors=('ELSE IF branch cannot be empty.',),
+            ),
+            end=End([Token(Token.END, '', 3, 52)])
+        )
+        expected2 = If(
+            header=InlineIfHeader([Token(Token.INLINE_IF, 'IF', 3, 4),
+                                   Token(Token.ARGUMENT, 'e', 3, 10)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'K', 3, 15)])],
+            orelse=If(
+                header=ElseHeader([Token(Token.ELSE, 'ELSE', 3, 20)]),
+                errors=('ELSE branch cannot be empty.',),
+            ),
+            end=End([Token(Token.END, '', 3, 24)])
+        )
+        get_and_assert_model(data1, expected1)
+        get_and_assert_model(data2, expected2)
+
+
+class TestTry(unittest.TestCase):
+
+    def test_try_except_else_finally(self):
+        data = '''
+*** Test Cases ***
+Example
+    TRY
+        Fail    Oh no!
+    EXCEPT    does not match
+        No operation
+    EXCEPT    AS    ${exp}
+        Log    Catch
+    ELSE
+        No operation
+    FINALLY
+        Log    finally here!
+    END
+'''
+        expected = Try(
+            header=TryHeader([Token(Token.TRY, 'TRY', 3, 4)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'Fail', 4, 8),
+                               Token(Token.ARGUMENT, 'Oh no!', 4, 16)])],
+            next=Try(
+                header=ExceptHeader([Token(Token.EXCEPT, 'EXCEPT', 5, 4),
+                                     Token(Token.ARGUMENT, 'does not match', 5, 14)]),
+                body=[KeywordCall((Token(Token.KEYWORD, 'No operation', 6, 8),))],
+                next=Try(
+                    header=ExceptHeader((Token(Token.EXCEPT, 'EXCEPT', 7, 4),
+                                         Token(Token.AS, 'AS', 7, 14),
+                                         Token(Token.VARIABLE, '${exp}', 7, 20))),
+                    body=[KeywordCall((Token(Token.KEYWORD, 'Log', 8, 8),
+                                       Token(Token.ARGUMENT, 'Catch', 8, 15)))],
+                    next=Try(
+                        header=ElseHeader((Token(Token.ELSE, 'ELSE', 9, 4),)),
+                        body=[KeywordCall((Token(Token.KEYWORD, 'No operation', 10, 8),))],
+                        next=Try(
+                            header=FinallyHeader((Token(Token.FINALLY, 'FINALLY', 11, 4),)),
+                            body=[KeywordCall((Token(Token.KEYWORD, 'Log', 12, 8),
+                                               Token(Token.ARGUMENT, 'finally here!', 12, 15)))]
+                        )
+                    )
+                )
+            ),
+            end=End([Token(Token.END, 'END', 13, 4)])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_invalid(self):
+        data = '''
+*** Test Cases ***
+Example
+    TRY             invalid
+    ELSE            invalid
+
+    FINALLY         invalid
+    #
+    EXCEPT    AS    invalid
+'''
+        expected = Try(
+            header=TryHeader(
+                tokens=[Token(Token.TRY, 'TRY', 3, 4),
+                        Token(Token.ARGUMENT, 'invalid', 3, 20)],
+                errors=("TRY does not accept arguments, got 'invalid'.",)
+            ),
+            next=Try(
+                header=ElseHeader(
+                    tokens=[Token(Token.ELSE, 'ELSE', 4, 4),
+                            Token(Token.ARGUMENT, 'invalid', 4, 20)],
+                    errors=("ELSE does not accept arguments, got 'invalid'.",)
+                ),
+                errors=('ELSE branch cannot be empty.',),
+                next=Try(
+                    header=FinallyHeader(
+                        tokens=[Token(Token.FINALLY, 'FINALLY', 6, 4),
+                                Token(Token.ARGUMENT, 'invalid', 6, 20)],
+                        errors=("FINALLY does not accept arguments, got 'invalid'.",)
+                    ),
+                    errors=('FINALLY branch cannot be empty.',),
+                    next=Try(
+                        header=ExceptHeader(
+                            tokens=[Token(Token.EXCEPT, 'EXCEPT', 8, 4),
+                                    Token(Token.AS, 'AS', 8, 14),
+                                    Token(Token.VARIABLE, 'invalid', 8, 20)],
+                            errors=("EXCEPT's AS variable 'invalid' is invalid.",)
+                        ),
+                        errors=('EXCEPT branch cannot be empty.',)
+                    )
+                ),
+            ),
+            errors=('TRY branch cannot be empty.',
+                    'EXCEPT not allowed after ELSE.',
+                    'EXCEPT not allowed after FINALLY.',
+                    'TRY must have closing END.')
+        )
+        get_and_assert_model(data, expected)
 
 
 class TestVariables(unittest.TestCase):
 
     def test_valid(self):
-        model = get_model('''\
+        data = '''
 *** Variables ***
 ${x}      value
 @{y}=     two    values
 &{z} =    one=item
-''', data_only=True)
+'''
         expected = VariableSection(
             header=SectionHeader(
                 tokens=[Token(Token.VARIABLE_HEADER, '*** Variables ***', 1, 0)]
@@ -557,10 +828,10 @@ ${x}      value
                           Token(Token.ARGUMENT, 'one=item', 4, 10)]),
             ]
         )
-        assert_model(model.sections[0], expected)
+        get_and_assert_model(data, expected, depth=0)
 
     def test_invalid(self):
-        model = get_model('''\
+        data = '''
 *** Variables ***
 Ooops     I did it again
 ${}       invalid
@@ -568,7 +839,7 @@ ${x}==    invalid
 ${not     closed
           invalid
 &{dict}   invalid    ${invalid}
-''', data_only=True)
+'''
         expected = VariableSection(
             header=SectionHeader(
                 tokens=[Token(Token.VARIABLE_HEADER, '*** Variables ***', 1, 0)]
@@ -587,7 +858,7 @@ ${not     closed
                 Variable(
                     tokens=[Token(Token.VARIABLE, '${x}==', 4, 0),
                             Token(Token.ARGUMENT, 'invalid', 4, 10)],
-                    errors = ("Invalid variable name '${x}=='.",)
+                    errors=("Invalid variable name '${x}=='.",)
                 ),
                 Variable(
                     tokens=[Token(Token.VARIABLE, '${not', 5, 0),
@@ -610,47 +881,104 @@ ${not     closed
                 ),
             ]
         )
-        assert_model(model.sections[0], expected)
+        get_and_assert_model(data, expected, depth=0)
 
 
 class TestKeyword(unittest.TestCase):
 
     def test_invalid_arg_spec(self):
-        model = get_model('''\
+        data = '''
 *** Keywords ***
 Invalid
     [Arguments]    ooops    ${optional}=default    ${required}
     ...    @{too}    @{many}    &{notlast}    ${x}
-''', data_only=True)
-        expected = KeywordSection(
-            header=SectionHeader(
-                tokens=[Token(Token.KEYWORD_HEADER, '*** Keywords ***', 1, 0)]
+'''
+        expected = Keyword(
+            header=KeywordName(
+                tokens=[Token(Token.KEYWORD_NAME, 'Invalid', 2, 0)]
             ),
             body=[
-                Keyword(
-                    header=KeywordName(
-                        tokens=[Token(Token.KEYWORD_NAME, 'Invalid', 2, 0)]
-                    ),
-                    body=[
-                        Arguments(
-                            tokens=[Token(Token.ARGUMENTS, '[Arguments]', 3, 4),
-                                    Token(Token.ARGUMENT, 'ooops', 3, 19),
-                                    Token(Token.ARGUMENT, '${optional}=default', 3, 28),
-                                    Token(Token.ARGUMENT, '${required}', 3, 51),
-                                    Token(Token.ARGUMENT, '@{too}', 4, 11),
-                                    Token(Token.ARGUMENT, '@{many}', 4, 21),
-                                    Token(Token.ARGUMENT, '&{notlast}', 4, 32),
-                                    Token(Token.ARGUMENT, '${x}', 4, 46)],
-                            errors=("Invalid argument syntax 'ooops'.",
-                                    'Non-default argument after default arguments.',
-                                    'Cannot have multiple varargs.',
-                                    'Only last argument can be kwargs.')
-                        )
-                    ],
+                Arguments(
+                    tokens=[Token(Token.ARGUMENTS, '[Arguments]', 3, 4),
+                            Token(Token.ARGUMENT, 'ooops', 3, 19),
+                            Token(Token.ARGUMENT, '${optional}=default', 3, 28),
+                            Token(Token.ARGUMENT, '${required}', 3, 51),
+                            Token(Token.ARGUMENT, '@{too}', 4, 11),
+                            Token(Token.ARGUMENT, '@{many}', 4, 21),
+                            Token(Token.ARGUMENT, '&{notlast}', 4, 32),
+                            Token(Token.ARGUMENT, '${x}', 4, 46)],
+                    errors=("Invalid argument syntax 'ooops'.",
+                            'Non-default argument after default arguments.',
+                            'Cannot have multiple varargs.',
+                            'Only last argument can be kwargs.')
                 )
-            ]
+            ],
         )
-        assert_model(model.sections[0], expected)
+        get_and_assert_model(data, expected, depth=1)
+
+
+class TestControlStatements(unittest.TestCase):
+
+    def test_return(self):
+        data = '''
+*** Keywords ***
+Name
+    Return    RETURN
+    RETURN    RETURN
+'''
+        expected = Keyword(
+            header=KeywordName(
+                tokens=[Token(Token.KEYWORD_NAME, 'Name', 2, 0)]
+            ),
+            body=[
+                KeywordCall([Token(Token.KEYWORD, 'Return', 3, 4),
+                             Token(Token.ARGUMENT, 'RETURN', 3, 14)]),
+                ReturnStatement([Token(Token.RETURN_STATEMENT, 'RETURN', 4, 4),
+                                 Token(Token.ARGUMENT, 'RETURN', 4, 14)])
+            ],
+        )
+        get_and_assert_model(data, expected, depth=1)
+
+    def test_break(self):
+        data = '''
+*** Keywords ***
+Name
+    WHILE    True
+        Break    BREAK
+        BREAK
+    END
+'''
+        expected = While(
+            header=WhileHeader([Token(Token.WHILE, 'WHILE', 3, 4),
+                                Token(Token.ARGUMENT, 'True', 3, 13)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'Break', 4, 8),
+                               Token(Token.ARGUMENT, 'BREAK', 4, 17)]),
+                  Break([Token(Token.BREAK, 'BREAK', 5, 8)])],
+            end=End([Token(Token.END, 'END', 6, 4)])
+        )
+        get_and_assert_model(data, expected)
+
+    def test_continue(self):
+        data = '''
+*** Keywords ***
+Name
+    FOR    ${x}    IN    @{stuff}
+        Continue    CONTINUE
+        CONTINUE
+    END
+'''
+        expected = For(
+            header=ForHeader([Token(Token.FOR, 'FOR', 3, 4),
+                              Token(Token.VARIABLE, '${x}', 3, 11),
+                              Token(Token.FOR_SEPARATOR, 'IN', 3, 19),
+                              Token(Token.ARGUMENT, '@{stuff}', 3, 25)]),
+            body=[KeywordCall([Token(Token.KEYWORD, 'Continue', 4, 8),
+                               Token(Token.ARGUMENT, 'CONTINUE', 4, 20)]),
+                  Continue([Token(Token.CONTINUE, 'CONTINUE', 5, 8)])],
+            end=End([Token(Token.END, 'END', 6, 4)])
+        )
+        get_and_assert_model(data, expected)
+
 
 class TestError(unittest.TestCase):
 
@@ -834,7 +1162,8 @@ class TestModelVisitors(unittest.TestCase):
         assert_equal(visitor.statements,
                      ['EOL', 'TESTCASE HEADER', 'EOL', 'TESTCASE NAME',
                       'COMMENT', 'KEYWORD', 'EOL', 'EOL', 'KEYWORD HEADER',
-                      'COMMENT', 'KEYWORD NAME', 'ARGUMENTS', 'KEYWORD'])
+                      'COMMENT', 'KEYWORD NAME', 'ARGUMENTS', 'KEYWORD',
+                      'RETURN STATEMENT'])
 
     def test_ast_NodeTransformer(self):
 
@@ -934,6 +1263,63 @@ Example
                 ]
             )
         ])
+        assert_model(model, expected)
+
+
+class TestLanguageConfig(unittest.TestCase):
+
+    def test_config(self):
+        model = get_model('''\
+language: fi
+language: bad
+language: bad    but ignored
+language: de     # ok
+*** Einstellungen ***
+Dokumentaatio    Header is de and setting is fi.
+''')
+        expected = File(
+            languages=('fi', 'de'),
+            sections=[
+                CommentSection(body=[
+                    Config([
+                        Token('CONFIG', 'language: fi', 1, 0),
+                        Token('EOL', '\n', 1, 12)
+                    ]),
+                    Error([
+                        Token('ERROR', 'language: bad', 2, 0,
+                              "Invalid language configuration: Language 'bad' "
+                              "not found nor importable as a language module."),
+                        Token('EOL', '\n', 2, 13)
+                    ]),
+                    Comment([
+                        Token('COMMENT', 'language: bad', 3, 0),
+                        Token('SEPARATOR', '    ', 3, 13),
+                        Token('COMMENT', 'but ignored', 3, 17),
+                        Token('EOL', '\n', 3, 28)
+                    ]),
+                    Config([
+                        Token('CONFIG', 'language: de', 4, 0),
+                        Token('SEPARATOR', '     ', 4, 12),
+                        Token('COMMENT', '# ok', 4, 17),
+                        Token('EOL', '\n', 4, 21)
+                    ]),
+                ]),
+                SettingSection(
+                    header=SectionHeader([
+                        Token('SETTING HEADER', '*** Einstellungen ***', 5, 0),
+                        Token('EOL', '\n', 5, 21)
+                    ]),
+                    body=[
+                        Documentation([
+                            Token('DOCUMENTATION', 'Dokumentaatio', 6, 0),
+                            Token('SEPARATOR', '    ', 6, 13),
+                            Token('ARGUMENT', 'Header is de and setting is fi.', 6, 17),
+                            Token('EOL', '\n', 6, 48)
+                        ])
+                    ]
+                )
+            ]
+        )
         assert_model(model, expected)
 
 

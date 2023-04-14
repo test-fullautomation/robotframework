@@ -14,46 +14,35 @@
 #  limitations under the License.
 
 import time
-from collections import OrderedDict
-
-from robot.utils import IRONPYTHON, PY_VERSION
 
 from .stringcache import StringIndex
 
-# http://ironpython.codeplex.com/workitem/31549
-if IRONPYTHON and PY_VERSION < (2, 7, 2):
-    int = long
 
-
-class JsExecutionResult(object):
+class JsExecutionResult:
 
     def __init__(self, suite, statistics, errors, strings, basemillis=None,
                  split_results=None, min_level=None, expand_keywords=None):
         self.suite = suite
         self.strings = strings
         self.min_level = min_level
-        self.data = self._get_data(statistics, errors, basemillis or 0,
-                                   expand_keywords)
+        self.data = self._get_data(statistics, errors, basemillis or 0, expand_keywords)
         self.split_results = split_results or []
 
     def _get_data(self, statistics, errors, basemillis, expand_keywords):
-        return OrderedDict([
-            ('stats', statistics),
-            ('errors', errors),
-            ('baseMillis', basemillis),
-            ('generated', int(time.time() * 1000) - basemillis),
-            ('expand_keywords', expand_keywords)
-        ])
+        return {'stats': statistics,
+                'errors': errors,
+                'baseMillis': basemillis,
+                'generated': int(time.time() * 1000) - basemillis,
+                'expand_keywords': expand_keywords}
 
     def remove_data_not_needed_in_report(self):
         self.data.pop('errors')
         remover = _KeywordRemover()
         self.suite = remover.remove_keywords(self.suite)
-        self.suite, self.strings \
-                = remover.remove_unused_strings(self.suite, self.strings)
+        self.suite, self.strings = remover.remove_unused_strings(self.suite, self.strings)
 
 
-class _KeywordRemover(object):
+class _KeywordRemover:
 
     def remove_keywords(self, suite):
         return self._remove_keywords_from_suite(suite)

@@ -16,7 +16,7 @@
 from robot.errors import ExecutionFailed, ExecutionStatus, DataError, PassExecution
 from robot.model import SuiteVisitor, TagPatterns
 from robot.result import TestSuite, Result
-from robot.utils import get_timestamp, is_list_like, NormalizedDict, unic, test_or_task
+from robot.utils import get_timestamp, is_list_like, NormalizedDict, test_or_task
 from robot.variables import VariableScopes
 
 from .bodyrunner import BodyRunner, KeywordRunner
@@ -36,14 +36,19 @@ class SuiteRunner(SuiteVisitor):
         self._variables = VariableScopes(settings)
         self._suite = None
         self._suite_status = None
-        self._executed_tests = None
-        self._skipped_tags = TagPatterns(settings.skipped_tags)
+        self._executed = [NormalizedDict(ignore='_')]
+        self._skipped_tags = TagPatterns(settings.skip)
 
     @property
     def _context(self):
         return EXECUTION_CONTEXTS.current
 
     def start_suite(self, suite):
+        if suite.name in self._executed[-1] and suite.parent.source:
+            self._output.warn(f"Multiple suites with name '{suite.name}' executed in "
+                              f"suite '{suite.parent.longname}'.")
+        self._executed[-1][suite.name] = True
+        self._executed.append(NormalizedDict(ignore='_'))
         self._output.library_listeners.new_suite_scope()
         result = TestSuite(source=suite.source,
                            name=suite.name,
@@ -62,7 +67,7 @@ class SuiteRunner(SuiteVisitor):
                                          self._settings.exit_on_failure,
                                          self._settings.exit_on_error,
                                          self._settings.skip_teardown_on_exit)
-        ns = Namespace(self._variables, result, suite.resource)
+        ns = Namespace(self._variables, result, suite.resource, self._settings.languages)
         ns.start_suite()
         ns.variables.set_from_variable_table(suite.resource.variables)
         EXECUTION_CONTEXTS.start_suite(result, ns, self._output,
@@ -84,7 +89,6 @@ class SuiteRunner(SuiteVisitor):
                                                test_count=suite.test_count))
         self._output.register_error_listener(self._suite_status.error_occurred)
         self._run_setup(suite.setup, self._suite_status)
-        self._executed_tests = NormalizedDict(ignore='_')
 
     def _resolve_setting(self, value):
         if is_list_like(value):
@@ -99,74 +103,79 @@ class SuiteRunner(SuiteVisitor):
             failure = self._run_teardown(suite.teardown, self._suite_status)
             if failure:
                 if failure.skip:
-                    self._suite.suite_teardown_skipped(unic(failure))
+                    self._suite.suite_teardown_skipped(str(failure))
                 else:
-                    self._suite.suite_teardown_failed(unic(failure))
+                    self._suite.suite_teardown_failed(str(failure))
         self._suite.endtime = get_timestamp()
         self._suite.message = self._suite_status.message
         self._context.end_suite(ModelCombiner(suite, self._suite))
+        self._executed.pop()
         self._suite = self._suite.parent
         self._suite_status = self._suite_status.parent
         self._output.library_listeners.discard_suite_scope()
 
     def visit_test(self, test):
-        if test.name in self._executed_tests:
-            self._output.warn("Multiple test cases with name '%s' executed in "
-                              "test suite '%s'." % (test.name, self._suite.longname))
-        self._executed_tests[test.name] = True
-        result = self._suite.tests.create(name=self._resolve_setting(test.name),
-                                          doc=self._resolve_setting(test.doc),
-                                          tags=self._resolve_setting(test.tags),
-                                          starttime=get_timestamp(),
-                                          timeout=self._get_timeout(test))
+        settings = self._settings
+        if test.tags.robot('exclude'):
+            return
+        if test.name in self._executed[-1]:
+            self._output.warn(
+                test_or_task(f"Multiple {{test}}s with name '{test.name}' executed in "
+                             f"suite '{test.parent.longname}'.", settings.rpa))
+        self._executed[-1][test.name] = True
+        result = self._suite.tests.create(self._resolve_setting(test.name),
+                                          self._resolve_setting(test.doc),
+                                          self._resolve_setting(test.tags),
+                                          self._get_timeout(test),
+                                          test.lineno,
+                                          starttime=get_timestamp())
         self._context.start_test(result)
         self._output.start_test(ModelCombiner(test, result))
-        status = TestStatus(self._suite_status, result,
-                            self._settings.skip_on_failure,
-                            self._settings.critical_tags,
-                            self._settings.rpa)
+        status = TestStatus(self._suite_status, result, settings.skip_on_failure,
+                            settings.rpa)
         if status.exit:
             status.failure.unknown = True
             self._add_exit_combine()
             result.tags.add('robot:exit')
-        if self._skipped_tags.match(test.tags):
-            status.test_skipped(
-                test_or_task(
-                    "{Test} skipped with '--skip' command line option.",
-                    self._settings.rpa))
-        if not status.failed and not test.name:
-            status.test_failed(
-                test_or_task('{Test} case name cannot be empty.',
-                             self._settings.rpa))
-        if not status.failed and not test.body:
-            status.test_failed(
-                test_or_task('{Test} case contains no keywords.',
-                             self._settings.rpa))
+        if status.passed:
+            if not test.name:
+                status.test_failed(
+                    test_or_task('{Test} name cannot be empty.', settings.rpa))
+            elif not test.body:
+                status.test_failed(
+                    test_or_task('{Test} contains no keywords.', settings.rpa))
+            elif test.tags.robot('skip'):
+                status.test_skipped(
+                    test_or_task("{Test} skipped using 'robot:skip' tag.",
+                                 settings.rpa))
+            elif self._skipped_tags.match(test.tags):
+                status.test_skipped(
+                    test_or_task("{Test} skipped using '--skip' command line option.",
+                                 settings.rpa))
         self._run_setup(test.setup, status, result)
-        try:
-            if not status.failed and not status.unknown:
+        if status.passed:
+            try:
                 BodyRunner(self._context, templated=bool(test.template)).run(test.body)
-            else:
-                if status.skipped:
-                    status.test_skipped(status.message)
+            except PassExecution as exception:
+                err = exception.earlier_failures
+                if err:
+                    status.test_failed(error=err)
                 else:
-                    status.test_failed(status.message)
-        except PassExecution as exception:
-            err = exception.earlier_failures
-            if err:
-                status.test_failed(err)
-            else:
-                result.message = exception.message
-        except ExecutionStatus as err:
-            status.test_failed(err)
+                    result.message = exception.message
+            except ExecutionStatus as err:
+                status.test_failed(error=err)
+        elif status.skipped:
+            status.test_skipped(status.message)
+        else:
+            status.test_failed(status.message)
         result.status = status.status
         result.message = status.message or result.message
         with self._context.test_teardown(result):
             self._run_teardown(test.teardown, status, result)
-        if not status.failed and result.timeout and result.timeout.timed_out():
+        if status.passed and result.timeout and result.timeout.timed_out():
             status.test_failed(result.timeout.get_message())
             result.message = status.message
-        if status.skip_if_needed():
+        if status.skip_on_failure_after_tag_changes:
             result.message = status.message or result.message
         result.status = status.status
         result.endtime = get_timestamp()
@@ -187,14 +196,13 @@ class SuiteRunner(SuiteVisitor):
         return TestTimeout(test.timeout, self._variables, rpa=test.parent.rpa)
 
     def _run_setup(self, setup, status, result=None):
-        if not status.failed and not status.unknown:
+        if status.passed:
             exception = self._run_setup_or_teardown(setup)
             status.setup_executed(exception)
             if result and isinstance(exception, PassExecution):
                 result.message = exception.message
-        else:
-            if status.parent and status.parent.skipped:
-                status.skipped = True
+        elif status.parent and status.parent.skipped:
+            status.skipped = True
 
     def _run_teardown(self, teardown, status, result=None):
         if status.teardown_allowed:

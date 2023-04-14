@@ -34,6 +34,10 @@ Save Non-ASCII XML Using Custom Encoding
     Save XML    ${NON-ASCII}    ${OUTPUT}    ISO-8859-1
     XML Content Should Be    ${NON-ASCII}    ISO-8859-1
 
+Save to `pathlib.Path`
+    Save XML    ${SIMPLE}    ${{pathlib.Path($OUTPUT)}}
+    XML Content Should Be    ${SIMPLE}
+
 Save to Invalid File
     [Documentation]    FAIL REGEXP: (IOError|IsADirectoryError|PermissionError): .*
     Save XML    ${SIMPLE}    %{TEMPDIR}
@@ -42,11 +46,7 @@ Save Using Invalid Encoding
     [Documentation]    FAIL STARTS: LookupError:
     Save XML    ${SIMPLE}    ${OUTPUT}    encoding=invalid
 
-Save Non-ASCII Using ASCII On Python 2
-    [Documentation]    FAIL STARTS: UnicodeEncodeError:
-    Save XML    ${NON-ASCII}    ${OUTPUT}    ASCII
-
-Save Non-ASCII Using ASCII On Python 3
+Save Non-ASCII Using ASCII
     Save XML    ${NON-ASCII}    ${OUTPUT}    ASCII
     XML Content Should Be    ${NON-ASCII SAVED}    ASCII
 

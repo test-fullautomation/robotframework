@@ -1,7 +1,7 @@
 from robot.api.deco import keyword
 
 
-class UnknownType(object):
+class UnknownType:
     pass
 
 
@@ -31,11 +31,6 @@ def E_non_type_annotations(arg, *varargs):
     pass
 
 
-try:
-    exec('''
 @keyword(types={'kwo': int, 'with_default': str})
 def F_kw_only_args(*, kwo, with_default='value'):
-    pass
-''')
-except SyntaxError:
     pass

@@ -29,12 +29,12 @@ except ImportError:
 from robot.api import logger
 from robot.api.deco import keyword
 from robot.utils import (ConnectionCache, is_bytes, is_string, is_truthy,
-                         is_unicode, secs_to_timestr, seq2str, timestr_to_secs)
+                         secs_to_timestr, seq2str, timestr_to_secs)
 from robot.version import get_version
 
 
-class Telnet(object):
-    """A test library providing communication over Telnet connections.
+class Telnet:
+    """A library providing communication over Telnet connections.
 
     ``Telnet`` is Robot Framework's standard library that makes it possible to
     connect to Telnet servers and execute commands on the opened connections.
@@ -144,7 +144,7 @@ class Telnet(object):
 
     Notice that when writing to the connection, only Unicode strings are
     encoded using the defined encoding. Byte strings are expected to be already
-    encoded correctly. Notice also that normal text in test data is passed to
+    encoded correctly. Notice also that normal text in data is passed to
     the library as Unicode and you need to use variables to use bytes.
 
     It is also possible to configure the error handler to use if encoding or
@@ -275,7 +275,7 @@ class Telnet(object):
     Considering string ``NONE`` false is new in Robot Framework 3.0.3 and
     considering also ``OFF`` and ``0`` false is new in Robot Framework 3.1.
     """
-    ROBOT_LIBRARY_SCOPE = 'TEST_SUITE'
+    ROBOT_LIBRARY_SCOPE = 'SUITE'
     ROBOT_LIBRARY_VERSION = get_version()
 
     def __init__(self, timeout='3 seconds', newline='CRLF',
@@ -472,7 +472,7 @@ class Telnet(object):
 
         If multiple connections are opened, this keyword should be used in
         a test or suite teardown to make sure that all connections are closed.
-        It is not an error is some of the connections have already been closed
+        It is not an error if some of the connections have already been closed
         by `Close Connection`.
 
         After this keyword, new indexes returned by `Open Connection`
@@ -576,8 +576,7 @@ class TelnetConnection(telnetlib.Telnet):
         See the documentation of
         [http://docs.python.org/library/re.html|Python re module]
         for more information about the supported regular expression syntax.
-        Notice that possible backslashes need to be escaped in Robot Framework
-        test data.
+        Notice that possible backslashes need to be escaped in Robot Framework data.
 
         See `Configuration` section for more information about global and
         connection specific configuration.
@@ -932,7 +931,7 @@ class TelnetConnection(telnetlib.Telnet):
         self._verify_connection()
         if self._terminal_emulator:
             return self._terminal_read_until_regexp(expected)
-        expected = [self._encode(exp) if is_unicode(exp) else exp
+        expected = [self._encode(exp) if is_string(exp) else exp
                     for exp in expected]
         return self._telnet_read_until_regexp(expected)
 
@@ -985,8 +984,7 @@ class TelnetConnection(telnetlib.Telnet):
         See the documentation of
         [http://docs.python.org/library/re.html|Python re module]
         for more information about the supported regular expression syntax.
-        Notice that possible backslashes need to be escaped in Robot Framework
-        test data.
+        Notice that possible backslashes need to be escaped in Robot Framework data.
 
         Examples:
         | `Read Until Regexp` | (#|$) |
@@ -1155,7 +1153,7 @@ class TelnetConnection(telnetlib.Telnet):
                                 newline=self._newline)
 
 
-class TerminalEmulator(object):
+class TerminalEmulator:
 
     def __init__(self, window_size=None, newline="\r\n"):
         self._rows, self._columns = window_size or (200, 200)

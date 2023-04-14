@@ -2,8 +2,7 @@ import unittest
 import os
 import os.path
 
-from robot.utils import (abspath, normpath, get_link_path, unicode,
-                         JYTHON, PY_VERSION, WINDOWS)
+from robot.utils import abspath, normpath, get_link_path, WINDOWS
 from robot.utils.robotpath import CASE_INSENSITIVE_FILESYSTEM
 from robot.utils.asserts import assert_equal, assert_true
 
@@ -15,11 +14,11 @@ class TestAbspathNormpath(unittest.TestCase):
             exp = os.path.abspath(exp)
             path = abspath(inp)
             assert_equal(path, exp, inp)
-            assert_true(isinstance(path, unicode), inp)
+            assert_true(isinstance(path, str), inp)
             exp = exp.lower() if CASE_INSENSITIVE_FILESYSTEM else exp
             path = abspath(inp, case_normalize=True)
             assert_equal(path, exp, inp)
-            assert_true(isinstance(path, unicode), inp)
+            assert_true(isinstance(path, str), inp)
 
     def test_abspath_when_cwd_is_non_ascii(self):
         orig = abspath('.')
@@ -56,11 +55,11 @@ class TestAbspathNormpath(unittest.TestCase):
         for inp, exp in self._get_inputs():
             path = normpath(inp)
             assert_equal(path, exp, inp)
-            assert_true(isinstance(path, unicode), inp)
+            assert_true(isinstance(path, str), inp)
             exp = exp.lower() if CASE_INSENSITIVE_FILESYSTEM else exp
             path = normpath(inp, case_normalize=True)
             assert_equal(path, exp, inp)
-            assert_true(isinstance(path, unicode), inp)
+            assert_true(isinstance(path, str), inp)
 
     def _get_inputs(self):
         inputs = self._windows_inputs if WINDOWS else self._posix_inputs
@@ -131,10 +130,8 @@ class TestGetLinkPath(unittest.TestCase):
     def test_non_existing_paths(self):
         assert_equal(get_link_path('/nonex/target', '/nonex/base'), '../target')
         assert_equal(get_link_path('/nonex/t.ext', '/nonex/b.ext'), '../t.ext')
-        buggy_jython = WINDOWS and JYTHON and PY_VERSION > (2, 7, 0)
-        if not buggy_jython:
-            assert_equal(get_link_path('/nonex', __file__),
-                         os.path.relpath('/nonex', os.path.dirname(__file__)).replace(os.sep, '/'))
+        assert_equal(get_link_path('/nonex', __file__),
+                     os.path.relpath('/nonex', os.path.dirname(__file__)).replace(os.sep, '/'))
 
     def test_non_ascii_paths(self):
         assert_equal(get_link_path(u'\xe4\xf6.txt', ''), '%C3%A4%C3%B6.txt')

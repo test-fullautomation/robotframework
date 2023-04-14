@@ -7,5 +7,7 @@ Tilde in path
     Check testcase    ${TESTNAME}
 
 Tilde and username in path
-    [Tags]    no-jython
     Check testcase    ${TESTNAME}
+
+Path as `pathlib.Path`
+    Check Test Case    ${TESTNAME}

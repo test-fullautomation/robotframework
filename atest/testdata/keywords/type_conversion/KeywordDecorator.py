@@ -1,23 +1,14 @@
-try:
-    from collections import abc
-except ImportError:
-    import collections as abc
+from collections import abc
 from datetime import datetime, date, timedelta
 from decimal import Decimal
-try:
-    from enum import Flag, Enum, IntFlag, IntEnum
-except ImportError:  # Python 2
-    try:
-        from enum import Enum, IntEnum
-    except ImportError:  # no enum34 installed
-        Flag = Enum = IntFlag = IntEnum = object
-    else:
-        Flag, IntFlag = Enum, IntEnum
+from enum import Flag, Enum, IntFlag, IntEnum
 from fractions import Fraction    # Needed by `eval()` in `_validate_type()`.
 from numbers import Integral, Real
+from os import PathLike
+from pathlib import Path, PurePath
+from typing import Union
 
 from robot.api.deco import keyword
-from robot.utils import PY2, PY3, unicode
 
 
 class MyEnum(Enum):
@@ -43,7 +34,7 @@ class MyIntFlag(IntFlag):
     X = 1
 
 
-class Unknown(object):
+class Unknown:
     pass
 
 
@@ -77,7 +68,7 @@ def boolean(argument, expected=None):
     _validate_type(argument, expected)
 
 
-@keyword(types={'argument': unicode})
+@keyword(types={'argument': str})
 def string(argument, expected=None):
     _validate_type(argument, expected)
 
@@ -109,6 +100,21 @@ def date_(argument, expected=None):
 
 @keyword(types={'argument': timedelta})
 def timedelta_(argument, expected=None):
+    _validate_type(argument, expected)
+
+
+@keyword(types={'argument': Path})
+def path(argument, expected=None):
+    _validate_type(argument, expected)
+
+
+@keyword(types={'argument': PurePath})
+def pure_path(argument, expected=None):
+    _validate_type(argument, expected)
+
+
+@keyword(types={'argument': PathLike})
+def path_like(argument, expected=None):
     _validate_type(argument, expected)
 
 
@@ -218,12 +224,9 @@ def kwargs(expected=None, **argument):
     _validate_type(argument, expected)
 
 
-if PY3:
-    exec('''
 @keyword(types={'argument': float})
 def kwonly(*, argument, expected=None):
     _validate_type(argument, expected)
-''')
 
 
 @keyword(types='invalid')
@@ -256,14 +259,9 @@ def type_and_default_3(argument=0, expected=None):
     _validate_type(argument, expected)
 
 
-if PY3:
-    exec('''
-from typing import Union
-
 @keyword(types={'argument': Union[int, None, float]})
 def multiple_types_using_union(argument, expected=None):
     _validate_type(argument, expected)
-''')
 
 
 @keyword(types={'argument': (int, None, float)})
@@ -272,9 +270,7 @@ def multiple_types_using_tuple(argument, expected=None):
 
 
 def _validate_type(argument, expected):
-    if isinstance(expected, unicode):
-        if PY2 and expected[0] in '\'"' and expected[0] == expected[-1]:
-            expected = 'u' + expected
+    if isinstance(expected, str):
         expected = eval(expected)
     if argument != expected or type(argument) != type(expected):
         raise AssertionError('%r (%s) != %r (%s)'

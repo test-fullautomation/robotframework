@@ -14,10 +14,10 @@
 #  limitations under the License.
 
 from ..lexer import Token
-from ..model import TestCase, Keyword, For, If, Thread  # cuongnht add thread
+from ..model import TestCase, Keyword, For, If, Try, While
 
 
-class Parser(object):
+class Parser:
     """Base class for parsers."""
 
     def __init__(self, model):
@@ -36,7 +36,13 @@ class BlockParser(Parser):
 
     def __init__(self, model):
         Parser.__init__(self, model)
-        self.nested_parsers = {Token.FOR: ForParser, Token.IF: IfParser, Token.THREAD: ThreadParser}  # cuongnht add thread
+        self.nested_parsers = {
+            Token.FOR: ForParser,
+            Token.IF: IfParser,
+            Token.INLINE_IF: IfParser,
+            Token.TRY: TryParser,
+            Token.WHILE: WhileParser
+        }
 
     def handles(self, statement):
         return statement.type not in self.unhandled_tokens
@@ -66,7 +72,8 @@ class KeywordParser(BlockParser):
 class NestedBlockParser(BlockParser):
 
     def handles(self, statement):
-        return BlockParser.handles(self, statement) and not self.model.end
+        return BlockParser.handles(self, statement) and \
+               not getattr(self.model, 'end', False)
 
     def parse(self, statement):
         if statement.type == Token.END:
@@ -81,27 +88,45 @@ class ForParser(NestedBlockParser):
         NestedBlockParser.__init__(self, For(header))
 
 
-# cuongnht add thread
-class ThreadParser(NestedBlockParser):
-
-    def __init__(self, header):
-        NestedBlockParser.__init__(self, Thread(header))
-
-
 class IfParser(NestedBlockParser):
 
-    def __init__(self, header):
-        NestedBlockParser.__init__(self, If(header))
+    def __init__(self, header, handle_end=True):
+        super().__init__(If(header))
+        self.handle_end = handle_end
 
     def parse(self, statement):
         if statement.type in (Token.ELSE_IF, Token.ELSE):
-            parser = OrElseParser(statement)
+            parser = IfParser(statement, handle_end=False)
             self.model.orelse = parser.model
             return parser
         return NestedBlockParser.parse(self, statement)
 
+    def handles(self, statement):
+        if statement.type == Token.END and not self.handle_end:
+            return False
+        return super().handles(statement)
 
-class OrElseParser(IfParser):
+
+class TryParser(NestedBlockParser):
+
+    def __init__(self, header, handle_end=True):
+        super().__init__(Try(header))
+        self.handle_end = handle_end
+
+    def parse(self, statement):
+        if statement.type in (Token.EXCEPT, Token.ELSE, Token.FINALLY):
+            parser = TryParser(statement, handle_end=False)
+            self.model.next = parser.model
+            return parser
+        return super().parse(statement)
 
     def handles(self, statement):
-        return IfParser.handles(self, statement) and statement.type != Token.END
+        if statement.type == Token.END and not self.handle_end:
+            return False
+        return super().handles(statement)
+
+
+class WhileParser(NestedBlockParser):
+
+    def __init__(self, header):
+        super().__init__(While(header))

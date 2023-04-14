@@ -16,16 +16,14 @@
 import os.path
 
 from robot.errors import DataError
-from robot.utils import (Importer, is_string, py3to2, split_args_from_name_or_path,
-                         type_name)
+from robot.utils import Importer, is_string, split_args_from_name_or_path, type_name
 
 from .listenermethods import ListenerMethods, LibraryListenerMethods
 from .loggerhelper import AbstractLoggerProxy, IsLogged
 from .logger import LOGGER
 
 
-@py3to2
-class Listeners(object):
+class Listeners:
     _method_names = ('start_suite', 'end_suite', 'start_test', 'end_test',
                      'start_keyword', 'end_keyword', 'log_message', 'message',
                      'output_file', 'report_file', 'log_file', 'debug_file',
@@ -46,11 +44,11 @@ class Listeners(object):
         self._is_logged.set_level(level)
 
     def start_keyword(self, kw):
-        if kw.type != kw.IF_ELSE_ROOT:
+        if kw.type not in (kw.IF_ELSE_ROOT, kw.TRY_EXCEPT_ROOT):
             self._start_keyword(kw)
 
     def end_keyword(self, kw):
-        if kw.type != kw.IF_ELSE_ROOT:
+        if kw.type not in (kw.IF_ELSE_ROOT, kw.TRY_EXCEPT_ROOT):
             self._end_keyword(kw)
 
     def log_message(self, msg):
@@ -70,7 +68,7 @@ class Listeners(object):
                    for method in self.__dict__.values())
 
 
-class LibraryListeners(object):
+class LibraryListeners:
     _method_names = ('start_suite', 'end_suite', 'start_test', 'end_test',
                      'start_keyword', 'end_keyword', 'log_message', 'message',
                      'close')

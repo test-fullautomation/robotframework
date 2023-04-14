@@ -6,9 +6,10 @@ from xmlschema import XMLSchema
 from robot import utils
 from robot.api import logger
 from robot.utils.asserts import assert_equal
-from robot.result import (ExecutionResultBuilder, For, If, ForIteration, Keyword,
-                          Result, ResultVisitor, TestCase, TestSuite)
-from robot.result.model import Body, ForIterations, IfBranches, IfBranch
+from robot.result import (ExecutionResultBuilder, Result, ResultVisitor,
+                          For, ForIteration, While, WhileIteration, Return, Break, Continue,
+                          If, IfBranch, Try, TryBranch, Keyword, TestCase, TestSuite)
+from robot.result.model import Body, Iterations
 from robot.libraries.BuiltIn import BuiltIn
 
 
@@ -20,7 +21,27 @@ class NoSlotsFor(For):
     pass
 
 
+class NoSlotsWhile(While):
+    pass
+
+
 class NoSlotsIf(If):
+    pass
+
+
+class NoSlotsTry(Try):
+    pass
+
+
+class NoSlotsReturn(Return):
+    pass
+
+
+class NoSlotsBreak(Break):
+    pass
+
+
+class NoSlotsContinue(Continue):
     pass
 
 
@@ -28,28 +49,40 @@ class NoSlotsBody(Body):
     keyword_class = NoSlotsKeyword
     for_class = NoSlotsFor
     if_class = NoSlotsIf
+    try_class = NoSlotsTry
+    while_class = NoSlotsWhile
+    return_class = NoSlotsReturn
+    break_class = NoSlotsBreak
+    continue_class = NoSlotsContinue
 
 
 class NoSlotsIfBranch(IfBranch):
     body_class = NoSlotsBody
 
 
-class NoSlotsIfBranches(IfBranches):
-    if_branch_class = NoSlotsIfBranch
+class NoSlotsTryBranch(TryBranch):
+    body_class = NoSlotsBody
 
 
 class NoSlotsForIteration(ForIteration):
     body_class = NoSlotsBody
 
 
-class NoSlotsForIterations(ForIterations):
-    for_iteration_class = NoSlotsForIteration
+class NoSlotsWhileIteration(WhileIteration):
+    body_class = NoSlotsBody
+
+
+class NoSlotsIterations(Iterations):
     keyword_class = NoSlotsKeyword
 
 
-NoSlotsKeyword.body_class = NoSlotsBody
-NoSlotsFor.body_class = NoSlotsForIterations
-NoSlotsIf.body_class = NoSlotsIfBranches
+NoSlotsKeyword.body_class = NoSlotsReturn.body_class = NoSlotsBreak.body_class \
+    = NoSlotsContinue.body_class = NoSlotsBody
+NoSlotsFor.iterations_class = NoSlotsWhile.iterations_class =NoSlotsIterations
+NoSlotsFor.iteration_class = NoSlotsForIteration
+NoSlotsWhile.iteration_class = NoSlotsWhileIteration
+NoSlotsIf.branch_class = NoSlotsIfBranch
+NoSlotsTry.branch_class = NoSlotsTryBranch
 
 
 class NoSlotsTestCase(TestCase):
@@ -66,7 +99,7 @@ class TestCheckerLibrary:
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
 
     def __init__(self):
-        self.schema = XMLSchema('doc/schema/robot.02.xsd')
+        self.schema = XMLSchema('doc/schema/robot.xsd')
 
     def process_output(self, path, validate=None):
         set_suite_variable = BuiltIn().set_suite_variable
@@ -107,7 +140,7 @@ class TestCheckerLibrary:
         with open(path, encoding='UTF-8') as f:
             for line in f:
                 if line.startswith('<robot'):
-                    return re.search('schemaversion="(\d+)"', line).group(1)
+                    return re.search(r'schemaversion="(\d+)"', line).group(1)
 
     def get_test_case(self, name):
         suite = BuiltIn().get_variable_value('${SUITE}')
@@ -166,16 +199,15 @@ class TestCheckerLibrary:
         if test.exp_status != test.status:
             if test.exp_status == 'PASS':
                 if test.status == 'FAIL':
-                    msg = ("Test '%s' was expected to PASS but it FAILED.\n\n"
-                           "Error message:\n%s" % (test.name, test.message))
+                    msg = f"Error message:\n{test.message}"
                 else:
-                    msg = ("Test '%s' was expected to PASS but it was SKIPPED.\n\n"
-                           "Test message:\n%s" % (test.name, test.message))
+                    msg = f"Test message:\n{test.message}"
             else:
-                msg = ("Test '%s' was expected to %s but it %sED.\n\n"
-                       "Expected message:\n%s" % (test.name, test.exp_status,
-                                                  test.status, test.exp_message))
-            raise AssertionError(msg)
+                msg = f"Expected message:\n{test.exp_message}"
+            raise AssertionError(
+                f"Status of '{test.name}' should have been {test.exp_status} "
+                f"but it was {test.status}.\n\n{msg}"
+            )
         if test.exp_message == test.message:
             return
         if test.exp_message.startswith('REGEXP:'):
@@ -284,10 +316,15 @@ class TestCheckerLibrary:
         self.should_contain_keywords(test.body[kw_index], *kw_names)
         return test
 
-    def check_log_message(self, item, msg, level='INFO', html=False, pattern=False):
+    def check_log_message(self, item, expected, level='INFO', html=False, pattern=False, traceback=False):
+        message = item.message.rstrip()
+        if traceback:
+            # Remove `^^^` lines added by Python 3.11+.
+            message = '\n'.join(line for line in message.splitlines()
+                                if '^' not in line or line.strip('^ '))
         b = BuiltIn()
         matcher = b.should_match if pattern else b.should_be_equal
-        matcher(item.message.rstrip(), msg.rstrip(), 'Wrong log message')
+        matcher(message, expected.rstrip(), 'Wrong log message')
         b.should_be_equal(item.level, 'INFO' if level == 'HTML' else level, 'Wrong log level')
         b.should_be_equal(str(item.html), str(html or level == 'HTML'), 'Wrong HTML status')
 
@@ -310,6 +347,11 @@ class ProcessResults(ResultVisitor):
         self._add_kws_and_msgs(kw)
 
     def _add_kws_and_msgs(self, item):
+        # TODO: Consider not setting these special attributes:
+        # - Using normal `body` instead of special `kws` in tests would be better.
+        # - `msgs` isn't that much shorter than normal `messages`.
+        # - Counts likely not needed often enough. There are other ways to get them.
+        # - No need to construct "NoSlots" variants for all model objects.
         item.kws = item.body.filter(messages=False)
         item.msgs = item.body.filter(messages=True)
         item.keyword_count = item.kw_count = len(item.kws)
@@ -326,6 +368,12 @@ class ProcessResults(ResultVisitor):
 
     def start_if_branch(self, branch):
         self._add_kws_and_msgs(branch)
+
+    def start_while(self, while_):
+        self._add_kws_and_msgs(while_)
+
+    def start_while_iteration(self, iteration):
+        self._add_kws_and_msgs(iteration)
 
     def visit_errors(self, errors):
         errors.msgs = errors.messages

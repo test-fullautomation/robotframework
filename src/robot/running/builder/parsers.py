@@ -21,12 +21,12 @@ from robot.output import LOGGER
 from robot.parsing import get_model, get_resource_model, get_init_model, Token
 from robot.utils import FileReader, read_rest_data
 
-from .testsettings import TestDefaults
+from .settings import Defaults
 from .transformers import SuiteBuilder, SettingsBuilder, ResourceBuilder
 from ..model import TestSuite, ResourceFile
 
 
-class BaseParser(object):
+class BaseParser:
 
     def parse_init_file(self, source, defaults=None):
         raise NotImplementedError
@@ -40,7 +40,8 @@ class BaseParser(object):
 
 class RobotParser(BaseParser):
 
-    def __init__(self, process_curdir=True):
+    def __init__(self, lang=None, process_curdir=True):
+        self.lang = lang
         self.process_curdir = process_curdir
 
     def parse_init_file(self, source, defaults=None):
@@ -59,10 +60,10 @@ class RobotParser(BaseParser):
 
     def _build(self, suite, source, defaults, model=None, get_model=get_model):
         if defaults is None:
-            defaults = TestDefaults()
+            defaults = Defaults()
         if model is None:
             model = get_model(self._get_source(source), data_only=True,
-                              curdir=self._get_curdir(source))
+                              curdir=self._get_curdir(source), lang=self.lang)
         ErrorReporter(source).visit(model)
         SettingsBuilder(suite, defaults).visit(model)
         SuiteBuilder(suite, defaults).visit(model)
@@ -79,7 +80,7 @@ class RobotParser(BaseParser):
 
     def parse_resource_file(self, source):
         model = get_resource_model(self._get_source(source), data_only=True,
-                                   curdir=self._get_curdir(source))
+                                   curdir=self._get_curdir(source), lang=self.lang)
         resource = ResourceFile(source=source)
         ErrorReporter(source).visit(model)
         ResourceBuilder(resource).visit(model)
@@ -109,7 +110,10 @@ class NoInitFileDirectoryParser(BaseParser):
 
 def format_name(source):
     def strip_possible_prefix_from_name(name):
-        return name.split('__', 1)[-1]
+        result = name.split('__', 1)[-1]
+        if result:
+            return result
+        return name
 
     def format_name(name):
         name = strip_possible_prefix_from_name(name)
@@ -138,5 +142,4 @@ class ErrorReporter(NodeVisitor):
             LOGGER.error(self._format_message(error))
 
     def _format_message(self, token):
-        return ("Error in file '%s' on line %s: %s"
-                % (self.source, token.lineno, token.error))
+        return f"Error in file '{self.source}' on line {token.lineno}: {token.error}"

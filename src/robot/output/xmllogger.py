@@ -13,41 +13,20 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from robot.utils import XmlWriter, NullMarkupWriter, get_timestamp, unic, ThreadSafeDict    # cuongnht add thread
+from robot.utils import get_timestamp, NullMarkupWriter, safe_str, XmlWriter
 from robot.version import get_full_version
 from robot.result.visitor import ResultVisitor
 
 from .loggerhelper import IsLogged
-import os, threading  # cuongnht add thread
 
 
 class XmlLogger(ResultVisitor):
 
-    thread_writer_dict = ThreadSafeDict()  # cuongnht add thread
-
     def __init__(self, path, log_level='TRACE', rpa=False, generator='Robot'):
         self._log_message_is_logged = IsLogged(log_level)
         self._error_message_is_logged = IsLogged('WARN')
-        self._get_writer(path, rpa, generator)
+        self._writer = self._get_writer(path, rpa, generator)
         self._errors = []
-		# cuongnht add thread
-        self.path = path
-        self.rpa = rpa
-        self.generator = generator
-
-	# cuongnht add thread
-    @property
-    def _writer(self):
-        thread_name = threading.current_thread().name
-        if thread_name not in XmlLogger.thread_writer_dict:
-            filename, file_extension = os.path.splitext(self.path)
-            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + '.' + file_extension, write_empty=False, usage='output')
-            XmlLogger.thread_writer_dict[thread_name].start('thread', {'name': thread_name,
-                                                                       'generator': get_full_version(self.generator),
-                                                                       'generated': get_timestamp(),
-                                                                       'rpa': 'true' if self.rpa else 'false',
-                                                                       'schemaversion': '2'})
-        return XmlLogger.thread_writer_dict[threading.current_thread().name]
 
     def _get_writer(self, path, rpa, generator):
         if not path:
@@ -56,8 +35,7 @@ class XmlLogger(ResultVisitor):
         writer.start('robot', {'generator': get_full_version(generator),
                                'generated': get_timestamp(),
                                'rpa': 'true' if rpa else 'false',
-                               'schemaversion': '2'})
-        XmlLogger.thread_writer_dict['MainThread'] = writer  # cuongnht add thread
+                               'schemaversion': '3'})
         return writer
 
     def close(self):
@@ -93,14 +71,14 @@ class XmlLogger(ResultVisitor):
             attrs['sourcename'] = kw.sourcename
         self._writer.start('kw', attrs)
         self._write_list('var', kw.assign)
-        self._write_list('arg', [unic(a) for a in kw.args])
+        self._write_list('arg', [safe_str(a) for a in kw.args])
         self._write_list('tag', kw.tags)
         # Must be after tags to allow adding message when using --flattenkeywords.
         self._writer.element('doc', kw.doc)
 
     def end_keyword(self, kw):
         if kw.timeout:
-            self._writer.element('timeout', attrs={'value': unic(kw.timeout)})
+            self._writer.element('timeout', attrs={'value': str(kw.timeout)})
         self._write_status(kw)
         self._writer.end('kw')
 
@@ -133,28 +111,6 @@ class XmlLogger(ResultVisitor):
         self._write_status(for_)
         self._writer.end('for')
 
-    # cuongnht add thread
-    def start_thread(self, thread_):
-        main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
-        main_thread_writer.start('thread', {'name': thread_.name,
-                                      'daemon': str(thread_.daemon)})
-        # self._writer.element('name', thread_.name)
-        # self._writer.element('daemon', thread_.daemon)
-        thread_.result.status = thread_.PASS
-        # self._get_thread_writer(thread_.name)
-        attrs = {'status': thread_.PASS, 'starttime': thread_.starttime or 'N/A',
-                 'endtime': thread_.endtime or 'N/A'}
-        if not (thread_.starttime and thread_.endtime):
-            attrs['elapsedtime'] = str(thread_.elapsedtime)
-        main_thread_writer.element('status', thread_.message, attrs)
-        # self._write_status(thread_)
-        main_thread_writer.element('doc', thread_.doc)
-        main_thread_writer.end('thread')
-
-    def end_thread(self, thread_):
-        self._write_status(thread_)
-        self._writer.end('thread')
-
     def start_for_iteration(self, iteration):
         self._writer.start('iter')
         for name, value in iteration.variables.items():
@@ -165,14 +121,78 @@ class XmlLogger(ResultVisitor):
         self._write_status(iteration)
         self._writer.end('iter')
 
+    def start_try(self, root):
+        self._writer.start('try')
+
+    def end_try(self, root):
+        self._write_status(root)
+        self._writer.end('try')
+
+    def start_try_branch(self, branch):
+        if branch.type == branch.EXCEPT:
+            self._writer.start('branch', attrs={
+                'type': 'EXCEPT', 'variable': branch.variable,
+                'pattern_type': branch.pattern_type
+            })
+            self._write_list('pattern', branch.patterns)
+        else:
+            self._writer.start('branch', attrs={'type': branch.type})
+
+    def end_try_branch(self, branch):
+        self._write_status(branch)
+        self._writer.end('branch')
+
+    def start_while(self, while_):
+        self._writer.start('while', attrs={
+            'condition': while_.condition,
+            'limit': while_.limit
+        })
+        self._writer.element('doc', while_.doc)
+
+    def end_while(self, while_):
+        self._write_status(while_)
+        self._writer.end('while')
+
+    def start_while_iteration(self, iteration):
+        self._writer.start('iter')
+        self._writer.element('doc', iteration.doc)
+
+    def end_while_iteration(self, iteration):
+        self._write_status(iteration)
+        self._writer.end('iter')
+
+    def start_return(self, return_):
+        self._writer.start('return')
+        for value in return_.values:
+            self._writer.element('value', value)
+
+    def end_return(self, return_):
+        self._write_status(return_)
+        self._writer.end('return')
+
+    def start_continue(self, continue_):
+        self._writer.start('continue')
+
+    def end_continue(self, continue_):
+        self._write_status(continue_)
+        self._writer.end('continue')
+
+    def start_break(self, break_):
+        self._writer.start('break')
+
+    def end_break(self, break_):
+        self._write_status(break_)
+        self._writer.end('break')
+
     def start_test(self, test):
-        self._writer.start('test', {'id': test.id, 'name': test.name})
+        self._writer.start('test', {'id': test.id, 'name': test.name,
+                                    'line': str(test.lineno or '')})
 
     def end_test(self, test):
         self._writer.element('doc', test.doc)
         self._write_list('tag', test.tags)
         if test.timeout:
-            self._writer.element('timeout', attrs={'value': unic(test.timeout)})
+            self._writer.element('timeout', attrs={'value': str(test.timeout)})
         self._write_status(test)
         self._writer.end('test')
 

@@ -5,11 +5,11 @@ Resource          builtin_resource.robot
 *** Test Cases ***
 Basics
     ${tc}=    Check test case    ${TESTNAME}
-    Verify argument type message    ${tc.kws[0].msgs[0]}    unicode    unicode
-    Verify argument type message    ${tc.kws[1].msgs[0]}    unicode    unicode
+    Verify argument type message    ${tc.kws[0].msgs[0]}
+    Verify argument type message    ${tc.kws[1].msgs[0]}
     Verify argument type message    ${tc.kws[2].msgs[0]}    float      int
     Verify argument type message    ${tc.kws[3].msgs[0]}    bytes      bytes
-    Verify argument type message    ${tc.kws[4].msgs[0]}    unicode    unicode
+    Verify argument type message    ${tc.kws[4].msgs[0]}
 
 Case-insensitive
     Check Test Case     ${TESTNAME}
@@ -52,12 +52,7 @@ Multiline comparison without including values
 formatter=repr
     Check test case    ${TESTNAME}
 
-formatter=repr/ascii with non-ASCII characters on Python 2
-    [Tags]    require-py2
-    Check test case    ${TESTNAME}
-
-formatter=repr/ascii with non-ASCII characters on Python 3
-    [Tags]    require-py3
+formatter=repr/ascii with non-ASCII characters
     Check test case    ${TESTNAME}
 
 formatter=repr with multiline
@@ -69,14 +64,7 @@ formatter=repr with multiline and different line endings
     Check Log Message    ${tc.kws[0].msgs[1]}    1\n2\n3\n\n!=\n\n1\n2\n3
     Check Log Message    ${tc.kws[1].msgs[1]}    1\n2\n3\n\n!=\n\n1\n2\n3
 
-formatter=repr/ascii with multiline and non-ASCII characters on Python 2
-    [Tags]    require-py2
-    ${tc} =    Check test case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].msgs[1]}    Å\nÄ\n\Ö\n\n!=\n\nÅ\nÄ\n\Ö
-    Check Log Message    ${tc.kws[1].msgs[1]}    Å\nÄ\n\Ö\n\n!=\n\nÅ\nÄ\n\Ö
-
-formatter=repr/ascii with multiline and non-ASCII characters on Python 3
-    [Tags]    require-py3
+formatter=repr/ascii with multiline and non-ASCII characters
     ${tc} =    Check test case    ${TESTNAME}
     Check Log Message    ${tc.kws[0].msgs[1]}    Å\nÄ\n\Ö\n\n!=\n\nÅ\nÄ\n\Ö
     Check Log Message    ${tc.kws[1].msgs[1]}    Å\nÄ\n\Ö\n\n!=\n\nÅ\nÄ\n\Ö
@@ -97,17 +85,17 @@ Bytes containing non-ascii characters
 
 Unicode and bytes with non-ascii characters
     ${tc}=    Check test case    ${TESTNAME}
-    Verify argument type message    ${tc.kws[0].msgs[0]}    bytes    unicode
+    Verify argument type message    ${tc.kws[0].msgs[0]}    bytes    str
 
 Types info is added if string representations are same
     ${tc}=    Check test case    ${TESTNAME}
-    Verify argument type message    ${tc.kws[0].msgs[0]}    unicode    int
+    Verify argument type message    ${tc.kws[0].msgs[0]}    str    int
 
 Should Not Be Equal
     ${tc}=    Check test case    ${TESTNAME}
-    Verify argument type message    ${tc.kws[0].msgs[0]}    unicode    unicode
-    Verify argument type message    ${tc.kws[1].msgs[0]}    unicode    int
-    Verify argument type message    ${tc.kws[2].msgs[0]}    unicode    unicode
+    Verify argument type message    ${tc.kws[0].msgs[0]}    str    str
+    Verify argument type message    ${tc.kws[1].msgs[0]}    str    int
+    Verify argument type message    ${tc.kws[2].msgs[0]}    str    str
 
 Should Not Be Equal case-insensitive
     Check Test Case     ${TESTNAME}
@@ -130,5 +118,5 @@ Should Not Be Equal and collapse spaces
 Should Not Be Equal with bytes containing non-ascii characters
     ${tc}=    Check test case    ${TESTNAME}
     Verify argument type message    ${tc.kws[0].msgs[0]}    bytes    bytes
-    Verify argument type message    ${tc.kws[1].msgs[0]}    bytes    unicode
+    Verify argument type message    ${tc.kws[1].msgs[0]}    bytes    str
     Verify argument type message    ${tc.kws[2].msgs[0]}    bytes    bytes

@@ -78,9 +78,9 @@ Get File with 'replace' Error Handler
     ${LATIN-1 FILE}    replace    Hyv\ufffd\ufffd \ufffd\ufffdt\ufffd
 
 Get file converts CRLF to LF
-    Create Binary File    ${TESTFILE}    .\r.\n.\r\n
+    Create Binary File    ${TESTFILE}    1\r\n2\r\n
     ${file}=    Get File    ${TESTFILE}
-    Should Be Equal    ${file}    .\r.\n.\n
+    Should Be Equal    ${file}    1\n2\n
 
 Log File
     Create File    ${TESTFILE}    hello world\nwith two lines
@@ -123,6 +123,19 @@ Grep File
     ????        foo bar\nA Foo
     foo bar     foo bar
 
+Grep File with regexp
+    [Template]    Grep And Check File
+    ${EMPTY}    foo\nbar\nfoo bar\n\nA Foo    regexp=True
+    f\\wo       foo\nfoo bar                regexp=True
+    foo.        foo bar                     regexp=True
+    .foo        ${EMPTY}                    regexp=True
+    .oo         foo\nfoo bar\nA Foo         regexp=True
+    [Ff]oo      foo\nfoo bar\nA Foo         regexp=True
+    f.*a        foo bar                     regexp=True
+    .           foo\nbar\nfoo bar\nA Foo    regexp=True
+    ....        foo bar\nA Foo              regexp=True
+    foo\\sbar   foo bar                     regexp=True
+
 Grep File with empty file
     Create File    ${TESTFILE}    ${EMPTY}
     Grep And Check File    *    ${EMPTY}    ${TESTFILE}
@@ -133,6 +146,13 @@ Grep File non Ascii
     fää     fää        ${TESTFILE}
     ö       föö bär    ${TESTFILE}
     A       A Fåå      ${TESTFILE}
+
+Grep File non Ascii with regexp
+    [Setup]    Create File    ${TESTFILE}    fää\nbär\nföö bär\n\nA Fåå
+    [Template]    Grep And Check File
+    f\\wä    fää        ${TESTFILE}    regexp=True
+    ö        föö bär    ${TESTFILE}    regexp=yes
+    A        A Fåå      ${TESTFILE}    regexp=${True}
 
 Grep File with UTF-16 files
     [Template]    Verify Grep File With UTF-16 files
@@ -161,6 +181,14 @@ Grep File with 'replace' Error Handler
 
 Grep File With Windows line endings
     Grep And Check File    f*a    foo bar    ${UTF-8 WINDOWS FILE}
+    Grep And Check File    f.*a    foo bar    ${UTF-8 WINDOWS FILE}    regexp=${True}
+
+Path as `pathlib.Path`
+    Create File    ${BASE}/file.txt    content\nthree\nlines
+    ${content} =    Get File    ${PATH/'file.txt'}
+    Should Be Equal    ${content}    content\nthree\nlines
+    ${content} =    Grep File    ${PATH/'file.txt'}    t
+    Should Be Equal    ${content}    content\nthree
 
 *** Keywords ***
 Get And Check File
@@ -169,8 +197,8 @@ Get And Check File
     Should Be Equal    ${content}    ${expected}
 
 Grep And Check File
-    [Arguments]    ${pattern}    ${expected}    ${test FILE}=${UTF-8 LONG FILE}
-    ${content} =    Grep File    ${test FILE}    ${pattern}
+    [Arguments]    ${pattern}    ${expected}    ${test FILE}=${UTF-8 LONG FILE}    &{config}
+    ${content} =    Grep File    ${test FILE}    ${pattern}    &{config}
     Should Be Equal    ${content}    ${expected}
 
 Verify Get File with error handler

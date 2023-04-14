@@ -1,13 +1,15 @@
 import unittest
 
-from robot.model import For, If, IfBranch, TestCase
-from robot.utils import PY2, unicode
+from robot.model import For, If, IfBranch, TestCase, Try, TryBranch
 from robot.utils.asserts import assert_equal
 
 
 IF = If.IF
 ELSE_IF = If.ELSE_IF
 ELSE = If.ELSE
+TRY = Try.TRY
+EXCEPT = Try.EXCEPT
+FINALLY = Try.FINALLY
 
 
 class TestFor(unittest.TestCase):
@@ -27,10 +29,8 @@ class TestFor(unittest.TestCase):
              u'FOR    ${\xfc}    IN    f\xf6\xf6',
              u"For(variables=[%r], flavor='IN', values=[%r])" % (u'${\xfc}', u'f\xf6\xf6'))
         ]:
-            assert_equal(unicode(for_), exp_str)
+            assert_equal(str(for_), exp_str)
             assert_equal(repr(for_), 'robot.model.' + exp_repr)
-            if PY2:
-                assert_equal(str(for_), unicode(for_).encode('UTF-8'))
 
 
 class TestIf(unittest.TestCase):
@@ -64,6 +64,14 @@ class TestIf(unittest.TestCase):
         assert_equal(root.body.create_branch().id, 't1-k1')
         assert_equal(root.body.create_branch().id, 't1-k2')
 
+    def test_branch_id_when_parent_has_setup(self):
+        tc = TestCase()
+        assert_equal(tc.setup.config(name='X').id, 't1-k1')
+        assert_equal(tc.body.create_keyword().id, 't1-k2')
+        assert_equal(tc.body.create_if().body.create_branch().id, 't1-k3')
+        assert_equal(tc.body.create_keyword().id, 't1-k4')
+        assert_equal(tc.body.create_if().body.create_branch().id, 't1-k5')
+
     def test_string_reprs(self):
         for if_, exp_str, exp_repr in [
             (IfBranch(),
@@ -82,10 +90,80 @@ class TestIf(unittest.TestCase):
              u'IF    $x == "\xe4iti"',
              u"IfBranch(type='IF', condition=%r)" % u'$x == "\xe4iti"'),
         ]:
-            assert_equal(unicode(if_), exp_str)
+            assert_equal(str(if_), exp_str)
             assert_equal(repr(if_), 'robot.model.' + exp_repr)
-            if PY2:
-                assert_equal(str(if_), unicode(if_).encode('UTF-8'))
+
+
+class TestTry(unittest.TestCase):
+
+    def test_type(self):
+        assert_equal(TryBranch().type, TRY)
+        assert_equal(TryBranch(type=EXCEPT).type, EXCEPT)
+        assert_equal(TryBranch(type=ELSE).type, ELSE)
+        assert_equal(TryBranch(type=FINALLY).type, FINALLY)
+
+    def test_type_with_nested_Try(self):
+        branch = TryBranch()
+        branch.body.create_try()
+        assert_equal(branch.body[0].body.create_branch().type, TRY)
+        assert_equal(branch.body[0].body.create_branch(type=EXCEPT).type, EXCEPT)
+        assert_equal(branch.body[0].body.create_branch(type=ELSE).type, ELSE)
+        assert_equal(branch.body[0].body.create_branch(type=FINALLY).type, FINALLY)
+
+    def test_root_id(self):
+        assert_equal(Try().id, None)
+        assert_equal(TestCase().body.create_try().id, None)
+
+    def test_branch_id_without_parent(self):
+        assert_equal(TryBranch().id, 'k1')
+
+    def test_branch_id_with_only_root(self):
+        root = Try()
+        assert_equal(root.body.create_branch().id, 'k1')
+        assert_equal(root.body.create_branch().id, 'k2')
+
+    def test_branch_id_with_real_parent(self):
+        root = TestCase().body.create_try()
+        assert_equal(root.body.create_branch().id, 't1-k1')
+        assert_equal(root.body.create_branch().id, 't1-k2')
+
+    def test_branch_id_when_parent_has_setup(self):
+        tc = TestCase()
+        assert_equal(tc.setup.config(name='X').id, 't1-k1')
+        assert_equal(tc.body.create_keyword().id, 't1-k2')
+        assert_equal(tc.body.create_try().body.create_branch().id, 't1-k3')
+        assert_equal(tc.body.create_keyword().id, 't1-k4')
+        assert_equal(tc.body.create_try().body.create_branch().id, 't1-k5')
+
+    def test_string_reprs(self):
+        for try_, exp_str, exp_repr in [
+            (TryBranch(),
+             'TRY',
+             "TryBranch(type='TRY')"),
+            (TryBranch(EXCEPT),
+             'EXCEPT',
+             "TryBranch(type='EXCEPT', patterns=(), pattern_type=None, variable=None)"),
+            (TryBranch(EXCEPT, ('Message',)),
+             'EXCEPT    Message',
+             "TryBranch(type='EXCEPT', patterns=('Message',), pattern_type=None, variable=None)"),
+            (TryBranch(EXCEPT, ('M', 'S', 'G', 'S')),
+             'EXCEPT    M    S    G    S',
+             "TryBranch(type='EXCEPT', patterns=('M', 'S', 'G', 'S'), pattern_type=None, variable=None)"),
+            (TryBranch(EXCEPT, (), None, '${x}'),
+             'EXCEPT    AS    ${x}',
+             "TryBranch(type='EXCEPT', patterns=(), pattern_type=None, variable='${x}')"),
+            (TryBranch(EXCEPT, ('Message',), 'glob', '${x}'),
+             'EXCEPT    Message    type=glob    AS    ${x}',
+             "TryBranch(type='EXCEPT', patterns=('Message',), pattern_type='glob', variable='${x}')"),
+            (TryBranch(ELSE),
+             'ELSE',
+             "TryBranch(type='ELSE')"),
+            (TryBranch(FINALLY),
+             'FINALLY',
+             "TryBranch(type='FINALLY')"),
+        ]:
+            assert_equal(str(try_), exp_str)
+            assert_equal(repr(try_), 'robot.model.' + exp_repr)
 
 
 if __name__ == '__main__':

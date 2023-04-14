@@ -19,21 +19,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ 'ubuntu-latest', 'windows-latest' ]
-        python-version: [ '2.7', '3.5', '3.6', '3.7', '3.8', '3.9', 'pypy2', 'pypy3' ]
+        python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11', 'pypy-3.8' ]
         exclude:
           - os: windows-latest
-            python-version: 'pypy2'
-          - os: windows-latest
-            python-version: 'pypy3'
+            python-version: 'pypy-3.8'
 
     runs-on: ${{ matrix.os }}
 
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2.2.2
+        uses: actions/setup-python@v4.4.0
         with:
           python-version: ${{ matrix.python-version }}
           architecture: 'x64'
@@ -49,7 +47,7 @@ jobs:
           python -m coverage xml -i
         if: always()
 
-      - uses: codecov/codecov-action@29386c70ef20e286228c72b668a06fd0e8399192
+      - uses: codecov/codecov-action@d9f34f8cd5cb3b3eb79b3e4b5dae3a16df499a70
         with:
           name: ${{ matrix.python-version }}-${{ matrix.os }}
         if: always()

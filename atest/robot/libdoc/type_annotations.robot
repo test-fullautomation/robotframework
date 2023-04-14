@@ -1,6 +1,5 @@
 *** Settings ***
 Suite Setup       Run Libdoc And Parse Output    ${TESTDATADIR}/Annotations.py
-Force Tags        require-py3
 Resource          libdoc_resource.robot
 
 *** Test Cases ***
@@ -23,7 +22,7 @@ Varargs and kwargs
     Keyword Arguments Should Be     4    *varargs: int    **kwargs: bool
 
 Unknown types
-    Keyword Arguments Should Be     5    unknown: UnknownType    unrecognized: Ellipsis
+    Keyword Arguments Should Be     5    unknown: UnknownType    unrecognized: ...
 
 Non-type annotations
     Keyword Arguments Should Be     6    arg: One of the usages in PEP-3107
@@ -31,3 +30,12 @@ Non-type annotations
 
 Drop `typing.` prefix
     Keyword Arguments Should Be     7    a: Any    b: List    c: Any | List
+
+Union from typing
+    Keyword Arguments Should Be     8    a: int | str | list | tuple
+    Keyword Arguments Should Be     9    a: int | str | list | tuple | None = None
+
+Union syntax
+    [Tags]    require-py3.10
+    Keyword Arguments Should Be     10   a: int | str | list | tuple
+    Keyword Arguments Should Be     11   a: int | str | list | tuple | None = None

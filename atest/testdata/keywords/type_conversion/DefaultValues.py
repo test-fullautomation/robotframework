@@ -1,17 +1,9 @@
-try:
-    from enum import Flag, Enum, IntFlag, IntEnum
-except ImportError:  # Python 2
-    try:
-        from enum import Enum, IntEnum
-    except ImportError:  # no enum34 installed
-        Flag = Enum = IntFlag = IntEnum = object
-    else:
-        Flag, IntFlag = Enum, IntEnum
+from enum import Flag, Enum, IntFlag, IntEnum
 from datetime import datetime, date, timedelta
 from decimal import Decimal
+from pathlib import Path, PurePath    # Path needed by `eval()` in `_validate_type()`.
 
 from robot.api.deco import keyword
-from robot.utils import unicode
 
 
 class MyEnum(Enum):
@@ -35,7 +27,7 @@ class MyIntFlag(IntFlag):
     X = 1
 
 
-class Unknown(object):
+class Unknown:
     pass
 
 
@@ -59,10 +51,6 @@ def string(argument='', expected=None):
     _validate_type(argument, expected)
 
 
-def unicode_(argument=u'', expected=None):
-    _validate_type(argument, expected)
-
-
 def bytes_(argument=b'', expected=None):
     _validate_type(argument, expected)
 
@@ -80,6 +68,14 @@ def date_(argument=date.today(), expected=None):
 
 
 def timedelta_(argument=timedelta(), expected=None):
+    _validate_type(argument, expected)
+
+
+def path(argument=Path(), expected=None):
+    _validate_type(argument, expected)
+
+
+def pure_path(argument=PurePath(), expected=None):
     _validate_type(argument, expected)
 
 
@@ -127,13 +123,8 @@ def unknown(argument=Unknown(), expected=None):
     _validate_type(argument, expected)
 
 
-try:
-    exec('''
 def kwonly(*, argument=0.0, expected=None):
     _validate_type(argument, expected)
-''')
-except SyntaxError:
-    pass
 
 
 @keyword(types={'argument': timedelta})
@@ -157,7 +148,7 @@ def keyword_deco_alone_does_not_override(argument=0, expected=None):
 
 
 def _validate_type(argument, expected):
-    if isinstance(expected, unicode):
+    if isinstance(expected, str):
         expected = eval(expected)
     if argument != expected or type(argument) != type(expected):
         raise AssertionError('%r (%s) != %r (%s)'

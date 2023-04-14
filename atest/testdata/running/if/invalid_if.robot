@@ -1,32 +1,34 @@
 *** Test Cases ***
 IF without condition
-    [Documentation]    FAIL    IF has no condition.
+    [Documentation]    FAIL    IF must have a condition.
     IF
         Fail    Should not be run
     END
 
-IF with ELSE without condition
-    [Documentation]    FAIL    IF has no condition.
+IF without condition with ELSE
+    [Documentation]    FAIL    IF must have a condition.
     IF
         Fail    Should not be run
     ELSE
         Fail    Should not be run
     END
 
-IF with many conditions
-    [Documentation]    FAIL    IF has more than one condition.
-    IF    '1' == '1'    '2' == '2'    '3' == '3'
-        Fail    Should not be run
-    END
-
 IF with invalid condition
-    [Documentation]    FAIL STARTS: Evaluating expression ''123'=123' failed: SyntaxError:
+    [Documentation]    FAIL STARTS: Evaluating IF condition failed: Evaluating expression ''123'=123' failed: SyntaxError:
     IF    '123'=${123}
         Fail    Should not be run
     END
 
-IF with ELSE with invalid condition
-    [Documentation]    FAIL Evaluating expression 'ooops' failed: NameError: name 'ooops' is not defined nor importable as module
+IF condition with non-existing variable
+    [Documentation]    FAIL Evaluating IF condition failed: Variable '\${ooop}' not found.
+    IF    ${ooop}
+        Fail    Should not be run
+    ELSE IF    ${not evaluated}
+        Not run
+    END
+
+IF with invalid condition with ELSE
+    [Documentation]    FAIL Evaluating IF condition failed: Evaluating expression 'ooops' failed: NameError: name 'ooops' is not defined nor importable as module
     IF    ooops
         Fail    Should not be run
     ELSE
@@ -34,7 +36,7 @@ IF with ELSE with invalid condition
     END
 
 ELSE IF with invalid condition
-    [Documentation]    FAIL STARTS: Evaluating expression '1/0' failed: ZeroDivisionError:
+    [Documentation]    FAIL STARTS: Evaluating ELSE IF condition failed: Evaluating expression '1/0' failed: ZeroDivisionError:
     IF    False
         Fail    Should not be run
     ELSE IF    False
@@ -48,12 +50,12 @@ ELSE IF with invalid condition
     END
 
 IF without END
-    [Documentation]    FAIL    IF has no closing END.
+    [Documentation]    FAIL    IF must have closing END.
     IF    ${True}
         Fail    Should not be run
 
 Invalid END
-    [Documentation]    FAIL    END does not accept arguments.
+    [Documentation]    FAIL    END does not accept arguments, got 'this', 'is' and 'invalid'.
     IF    True
         Fail    Should not be run
     END    this    is    invalid
@@ -65,7 +67,7 @@ IF with wrong case
     END
 
 ELSE IF without condition
-    [Documentation]    FAIL    ELSE IF has no condition.
+    [Documentation]    FAIL    ELSE IF must have a condition.
     IF    'mars' == 'mars'
         Fail    Should not be run
     ELSE IF
@@ -75,17 +77,17 @@ ELSE IF without condition
     END
 
 ELSE IF with multiple conditions
-    [Documentation]    FAIL    ELSE IF has more than one condition.
+    [Documentation]    FAIL    ELSE IF cannot have more than one condition.
     IF    'maa' == 'maa'
         Fail    Should not be run
-    ELSE IF    ${False}    ${True}
+    ELSE IF    ${False}    ooops    ${True}
         Fail    Should not be run
     ELSE
         Fail    Should not be run
     END
 
 ELSE with condition
-    [Documentation]    FAIL    ELSE has condition.
+    [Documentation]    FAIL    ELSE does not accept arguments, got '\${True}'.
     IF    'venus' != 'mars'
         Fail    Should not be run
     ELSE    ${True}
@@ -93,19 +95,19 @@ ELSE with condition
     END
 
 IF with empty body
-    [Documentation]    FAIL    IF has empty body.
+    [Documentation]    FAIL    IF branch cannot be empty.
     IF    'jupiter' == 'saturnus'
     END
 
 ELSE with empty body
-    [Documentation]    FAIL    ELSE has empty body.
+    [Documentation]    FAIL    ELSE branch cannot be empty.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
     END
 
 ELSE IF with empty body
-    [Documentation]    FAIL    ELSE IF has empty body.
+    [Documentation]    FAIL    ELSE IF branch cannot be empty.
     IF    'mars' == 'maa'
         Fail    Should not be run
     ELSE IF    ${False}
@@ -114,7 +116,7 @@ ELSE IF with empty body
     END
 
 ELSE after ELSE
-    [Documentation]    FAIL    Multiple ELSE branches.
+    [Documentation]    FAIL    Only one ELSE allowed.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
@@ -124,7 +126,7 @@ ELSE after ELSE
     END
 
 ELSE IF after ELSE
-    [Documentation]    FAIL    ELSE IF after ELSE.
+    [Documentation]    FAIL    ELSE IF not allowed after ELSE.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
@@ -134,7 +136,7 @@ ELSE IF after ELSE
     END
 
 Invalid IF inside FOR
-    [Documentation]    FAIL    ELSE IF after ELSE.
+    [Documentation]    FAIL    ELSE IF not allowed after ELSE.
     FOR    ${value}    IN    1    2    3
         IF    ${value} == 1
             Fail    Should not be run
@@ -148,20 +150,76 @@ Invalid IF inside FOR
 Multiple errors
     [Documentation]    FAIL
     ...    Multiple errors:
-    ...    - IF has no condition.
-    ...    - IF has empty body.
-    ...    - ELSE IF after ELSE.
-    ...    - Multiple ELSE branches.
-    ...    - IF has no closing END.
-    ...    - ELSE IF has more than one condition.
-    ...    - ELSE IF has empty body.
-    ...    - ELSE has condition.
-    ...    - ELSE has empty body.
-    ...    - ELSE IF has no condition.
-    ...    - ELSE IF has empty body.
-    ...    - ELSE has empty body.
+    ...    - IF must have a condition.
+    ...    - IF branch cannot be empty.
+    ...    - ELSE IF not allowed after ELSE.
+    ...    - Only one ELSE allowed.
+    ...    - IF must have closing END.
+    ...    - ELSE IF cannot have more than one condition.
+    ...    - ELSE IF branch cannot be empty.
+    ...    - ELSE does not accept arguments, got 'oops'.
+    ...    - ELSE branch cannot be empty.
+    ...    - ELSE IF must have a condition.
+    ...    - ELSE IF branch cannot be empty.
+    ...    - ELSE branch cannot be empty.
     IF
     ELSE IF    too    many
     ELSE    oops
     ELSE IF
     ELSE
+
+Invalid data causes syntax error
+    [Documentation]    FAIL    IF branch cannot be empty.
+    TRY
+        IF    True
+        END
+    EXCEPT
+        Fail    Syntax error cannot be caught
+    END
+
+Invalid condition causes normal error
+    [Documentation]    FAIL    Teardown failed:
+    ...    Several failures occurred:
+    ...
+    ...    1) Evaluating IF condition failed: Evaluating expression 'bad in teardown' failed: NameError: name 'bad' is not defined nor importable as module
+    ...
+    ...    2) Should be run in teardown
+    TRY
+        IF    bad
+            Fail    Should not be run
+        END
+    EXCEPT    Evaluating IF condition failed: Evaluating expression 'bad' failed: NameError: name 'bad' is not defined nor importable as module
+        No Operation
+    END
+    [Teardown]    Invalid condition
+
+Non-existing variable in condition causes normal error
+    [Documentation]    FAIL    Teardown failed:
+    ...    Several failures occurred:
+    ...
+    ...    1) Evaluating IF condition failed: Variable '\${bad}' not found.
+    ...
+    ...    2) Should be run in teardown
+    TRY
+        IF    ${bad}
+            Fail    Should not be run
+        END
+    EXCEPT    Evaluating IF condition failed: Variable '\${bad}' not found.
+        No Operation
+    END
+    [Teardown]    Non-existing variable in condition
+
+*** Keywords ***
+Invalid condition
+    IF    bad in teardown
+        Fail    Should not be run
+    ELSE
+        Fail    Sould not be run either
+    END
+    Fail    Should be run in teardown
+
+Non-existing variable in condition
+    IF    ${bad}
+        Fail    Should not be run
+    END
+    Fail    Should be run in teardown

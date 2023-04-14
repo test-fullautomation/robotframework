@@ -49,22 +49,6 @@ robot.libdocpkg.htmlwriter module
    :undoc-members:
    :show-inheritance:
 
-robot.libdocpkg.java9builder module
------------------------------------
-
-.. automodule:: robot.libdocpkg.java9builder
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-robot.libdocpkg.javabuilder module
-----------------------------------
-
-.. automodule:: robot.libdocpkg.javabuilder
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 robot.libdocpkg.jsonbuilder module
 ----------------------------------
 
@@ -105,10 +89,10 @@ robot.libdocpkg.robotbuilder module
    :undoc-members:
    :show-inheritance:
 
-robot.libdocpkg.specbuilder module
-----------------------------------
+robot.libdocpkg.standardtypes module
+------------------------------------
 
-.. automodule:: robot.libdocpkg.specbuilder
+.. automodule:: robot.libdocpkg.standardtypes
    :members:
    :undoc-members:
    :show-inheritance:
@@ -117,6 +101,14 @@ robot.libdocpkg.writer module
 -----------------------------
 
 .. automodule:: robot.libdocpkg.writer
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+robot.libdocpkg.xmlbuilder module
+---------------------------------
+
+.. automodule:: robot.libdocpkg.xmlbuilder
    :members:
    :undoc-members:
    :show-inheritance:

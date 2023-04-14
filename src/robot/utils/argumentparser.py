@@ -13,13 +13,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import getopt     # optparse was not supported by Jython 2.2
+import getopt
+import glob
 import os
 import re
 import shlex
 import sys
-import glob
 import string
+import warnings
 
 from robot.errors import DataError, Information, FrameworkError
 from robot.version import get_full_version
@@ -27,16 +28,10 @@ from robot.version import get_full_version
 from .encoding import console_decode, system_decode
 from .filereader import FileReader
 from .misc import plural_or_not
-from .platform import PY2
-from .robottypes import is_falsy, is_integer, is_string, is_unicode
+from .robottypes import is_falsy, is_integer, is_string
 
 
 def cmdline2list(args, escaping=False):
-    if PY2 and is_unicode(args):
-        args = args.encode('UTF-8')
-        decode = lambda item: item.decode('UTF-8')
-    else:
-        decode = lambda item: item
     lexer = shlex.shlex(args, posix=True)
     if is_falsy(escaping):
         lexer.escape = ''
@@ -44,12 +39,12 @@ def cmdline2list(args, escaping=False):
     lexer.commenters = ''
     lexer.whitespace_split = True
     try:
-        return [decode(token) for token in lexer]
+        return list(lexer)
     except ValueError as err:
         raise ValueError("Parsing '%s' failed: %s" % (args, err))
 
 
-class ArgumentParser(object):
+class ArgumentParser:
     _opt_line_re = re.compile(r'''
     ^\s{1,4}      # 1-4 spaces in the beginning of the line
     ((-\S\s)*)    # all possible short options incl. spaces (group 1)
@@ -60,7 +55,7 @@ class ArgumentParser(object):
 
     def __init__(self, usage, name=None, version=None, arg_limits=None,
                  validator=None, env_options=None, auto_help=True,
-                 auto_version=True, auto_pythonpath=True,
+                 auto_version=True, auto_pythonpath='DEPRECATED',
                  auto_argumentfile=True):
         """Available options and tool name are read from the usage.
 
@@ -76,6 +71,12 @@ class ArgumentParser(object):
         self._validator = validator
         self._auto_help = auto_help
         self._auto_version = auto_version
+        # TODO: Change DeprecationWarning to more loud UserWarning in RF 6.1.
+        if auto_pythonpath == 'DEPRECATED':
+            auto_pythonpath = False
+        else:
+            warnings.warn("ArgumentParser option 'auto_pythonpath' is deprecated "
+                          "since Robot Framework 5.0.", DeprecationWarning)
         self._auto_pythonpath = auto_pythonpath
         self._auto_argumentfile = auto_argumentfile
         self._env_options = env_options
@@ -119,6 +120,7 @@ class ArgumentParser(object):
         stdin instead of a file.
 
         --pythonpath can be used to add extra path(s) to sys.path.
+        This functionality was deprecated in Robot Framework 5.0.
 
         --help and --version automatically generate help and version messages.
         Version is generated based on the tool name and version -- see __init__
@@ -309,7 +311,7 @@ class ArgumentParser(object):
         raise FrameworkError("Option '%s' multiple times in usage" % opt)
 
 
-class ArgLimitValidator(object):
+class ArgLimitValidator:
 
     def __init__(self, arg_limits):
         self._min_args, self._max_args = self._parse_arg_limits(arg_limits)
@@ -338,7 +340,7 @@ class ArgLimitValidator(object):
         raise DataError("Expected %s, got %d." % (expectation, arg_count))
 
 
-class ArgFileParser(object):
+class ArgFileParser:
 
     def __init__(self, options):
         self._options = options

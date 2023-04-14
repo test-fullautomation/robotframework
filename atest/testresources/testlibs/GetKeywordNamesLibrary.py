@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from robot.api.deco import keyword
 
 
@@ -24,7 +22,7 @@ class GetKeywordNamesLibrary:
         other = ['Get Keyword That Passes', 'Get Keyword That Fails',
                  'keyword_in_library_itself', '_starting_with_underscore_is_ok',
                  'Non-existing attribute', 'not_method_or_function',
-                 'Unexpected error getting attribute']
+                 'Unexpected error getting attribute', '__init__']
         return marked + other
 
     def __getattr__(self, name):

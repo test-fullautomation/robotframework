@@ -36,9 +36,9 @@ Many steps are automated using the generic `Invoke <http://pyinvoke.org>`_
 tool with a help by our `rellu <https://github.com/robotframework/rellu>`_
 utilities, but also other tools and modules are needed. A pre-condition is
 installing all these, and that's easiest done using `pip
-<http://pip-installer.org>`_ and the provided `<requirements-build.txt>`_ file::
+<http://pip-installer.org>`_ and the provided `<requirements-dev.txt>`_ file::
 
-    pip install -r requirements-build.txt
+    pip install -r requirements-dev.txt
 
 Using Invoke
 ~~~~~~~~~~~~
@@ -147,14 +147,13 @@ __ https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-gith
 Set version
 -----------
 
-1. Set version information in `<src/robot/version.py>`_, `<setup.py>`_ and
-   `<pom.xml>`_::
+1. Set version information in `<src/robot/version.py>`_ and `<setup.py>`_::
 
       invoke set-version $VERSION
 
 2. Commit and push changes::
 
-      git commit -m "Updated version to $VERSION" src/robot/version.py setup.py pom.xml
+      git commit -m "Updated version to $VERSION" src/robot/version.py setup.py
       git push
 
 Tagging
@@ -183,10 +182,10 @@ Creating distributions
 
       invoke clean
 
-3. Create and validate source distribution in zip format and universal (i.e.
-   Python 2 and 3 compatible) `wheel <http://pythonwheels.com>`_::
+3. Create and validate source distribution in zip format and
+   `wheel <https://pythonwheels.com>`_::
 
-      python setup.py sdist --formats zip bdist_wheel --universal
+      python setup.py sdist --formats zip bdist_wheel
       ls -l dist
       twine check dist/*
 
@@ -203,58 +202,13 @@ Creating distributions
 
       pip install --pre --upgrade robotframework
 
-7. JAR distribution
+7. Documentation
 
-   - Create::
-
-       invoke jar
-
-   - Test that JAR is not totally broken::
-
-       java -jar dist/robotframework-$VERSION.jar --version
-       java -jar dist/robotframework-$VERSION.jar atest/testdata/misc/pass_and_fail.robot
-
-   - To create a JAR with a custom name for testing::
-
-       invoke jar --jar-name=example
-       java -jar dist/example.jar --version
-
-8. Upload JAR to Sonatype
-
-   - Sonatype offers a service where users can upload JARs and they will be synced
-     to the maven central repository. Below are the instructions to upload the JAR.
-
-   - Prequisites:
-
-      - Install maven
-      - Create a `Sonatype account`__
-      - Add these lines (filled with the Sonatype account information) to your ``settings.xml``::
-
-            <servers>
-                <server>
-                    <id>sonatype-nexus-staging</id>
-                    <username></username>
-                    <password></password>
-                </server>
-            </servers>
-
-      - Create `a PGP key`__
-      - Apply for `publish rights`__ to org.robotframework project. This will
-        take some time from them to accept.
-
-
-   - Run command::
-
-        mvn gpg:sign-and-deploy-file -Dfile=dist/robotframework-$VERSION.jar -DpomFile=pom.xml -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2/ -DrepositoryId=sonatype-nexus-staging
-
-   - Go to https://oss.sonatype.org/index.html#welcome, log in with Sonatype credentials, find the staging repository and do close & release
-   - After that, the released JAR is synced to Maven central within an hour.
-
-__ https://issues.sonatype.org/secure/Dashboard.jspa
-__ https://central.sonatype.org/pages/working-with-pgp-signatures.html
-__ https://docs.sonatype.org/display/Repository/Sonatype+OSS+Maven+Repository+Usage+Guide
-
-9. Documentation
+   - For a reproducible build, set the ``SOURCE_DATE_EPOCH``
+     environment variable to a constant value, corresponding to the
+     date in seconds since the Epoch (also known as Epoch time).  For
+     more information regarding this environment variable, see
+     https://reproducible-builds.org/docs/source-date-epoch/.
 
    - Generate library documentation::
 
@@ -280,7 +234,7 @@ Post actions
 2. Set dev version based on the previous version::
 
       invoke set-version dev
-      git commit -m "Back to dev version" src/robot/version.py setup.py pom.xml
+      git commit -m "Back to dev version" src/robot/version.py setup.py
       git push
 
    For example, ``1.2.3`` is changed to ``1.2.4.dev1`` and ``2.0.1a1``

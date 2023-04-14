@@ -3,6 +3,10 @@ Test Template     Run And Check Include And Exclude
 Resource          atest_resource.robot
 
 *** Variables ***
+# Note: The test case Robot-exclude in
+# atest\testdata\tags\include_and_exclude.robot
+# should always be automatically excluded since it
+# uses the robot:exclude tag
 ${DATA SOURCES}   tags/include_and_exclude.robot
 @{INCL_ALL}       Incl-1    Incl-12    Incl-123
 @{EXCL_ALL}       excl-1    Excl-12    Excl-123
@@ -11,6 +15,9 @@ ${DATA SOURCES}   tags/include_and_exclude.robot
 *** Test Cases ***
 No Includes Or Excludes
     ${EMPTY}    @{ALL}
+
+Empty iclude and exclude are ignored
+    --include= --exclude=    @{ALL}
 
 One Include
     --include incl1    @{INCL_ALL}
@@ -78,12 +85,10 @@ Include and Exclude with NOT
 
 Select tests without any tags
     [Setup]    Set Test Variable    ${DATA SOURCES}    tags/no_force_no_default_tags.robot
-    # Using just '*' won't work with Jython on Windows due to its auto-globbing
     --exclude *ORwhatever    No Own Tags No Force Nor Default    Own Tags Empty No Force Nor Default
 
 Select tests with any tag
     [Setup]    Set Test Variable    ${DATA SOURCES}    tags/no_force_no_default_tags.robot
-    # Using just '*' won't work with Jython on Windows due to its auto-globbing
     --include *AND*    Own Tags No Force Nor Default
 
 Non Matching Include

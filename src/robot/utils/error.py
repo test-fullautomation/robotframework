@@ -14,23 +14,15 @@
 #  limitations under the License.
 
 import os
-import re
 import sys
 import traceback
 
 from robot.errors import RobotError
 
-from .encoding import system_decode
-from .platform import JYTHON, PY3, PY_VERSION, RERAISED_EXCEPTIONS
-from .unic import unic
+from .platform import RERAISED_EXCEPTIONS
 
 
 EXCLUDE_ROBOT_TRACES = not os.getenv('ROBOT_INTERNAL_TRACES')
-if JYTHON:
-    from java.io import StringWriter, PrintWriter
-    from java.lang import Throwable, OutOfMemoryError
-else:
-    Throwable = ()
 
 
 def get_error_message():
@@ -43,37 +35,30 @@ def get_error_message():
     return ErrorDetails().message
 
 
-def get_error_details(exclude_robot_traces=EXCLUDE_ROBOT_TRACES):
+def get_error_details(full_traceback=True, exclude_robot_traces=EXCLUDE_ROBOT_TRACES):
     """Returns error message and details of the last occurred exception."""
-    details = ErrorDetails(exclude_robot_traces=exclude_robot_traces)
+    details = ErrorDetails(full_traceback=full_traceback,
+                           exclude_robot_traces=exclude_robot_traces)
     return details.message, details.traceback
 
 
-def ErrorDetails(exc_info=None, exclude_robot_traces=EXCLUDE_ROBOT_TRACES):
-    """This factory returns an object that wraps the last occurred exception
+class ErrorDetails:
+    """Object wrapping the last occurred exception.
 
-    It has attributes `message`, `traceback` and `error`, where `message`
-    contains type and message of the original error, `traceback` contains the
-    traceback/stack trace and `error` contains the original error instance.
+    It has attributes `message`, `traceback`, and `error`, where `message` contains
+    the message with possible generic exception name removed, `traceback` contains
+    the traceback and `error` contains the original error instance.
     """
-    exc_type, exc_value, exc_traceback = exc_info or sys.exc_info()
-    if exc_type in RERAISED_EXCEPTIONS:
-        raise exc_value
-    details = PythonErrorDetails \
-            if not isinstance(exc_value, Throwable) else JavaErrorDetails
-    return details(exc_type, exc_value, exc_traceback, exclude_robot_traces)
+    _generic_names = frozenset(('AssertionError', 'Error', 'Exception', 'RuntimeError'))
 
-
-class _ErrorDetails(object):
-    _generic_exception_names = ('AssertionError', 'AssertionFailedError',
-                                'Exception', 'Error', 'RuntimeError',
-                                'RuntimeException')
-
-    def __init__(self, exc_type, exc_value, exc_traceback,
-                 exclude_robot_traces=True):
-        self.error = exc_value
-        self._exc_type = exc_type
-        self._exc_traceback = exc_traceback
+    def __init__(self, error=None, full_traceback=True,
+                 exclude_robot_traces=EXCLUDE_ROBOT_TRACES):
+        if not error:
+            error = sys.exc_info()[1]
+        if isinstance(error, RERAISED_EXCEPTIONS):
+            raise error
+        self.error = error
+        self._full_traceback = full_traceback
         self._exclude_robot_traces = exclude_robot_traces
         self._message = None
         self._traceback = None
@@ -81,155 +66,64 @@ class _ErrorDetails(object):
     @property
     def message(self):
         if self._message is None:
-            self._message = self._get_message()
+            self._message = self._format_message(self.error)
         return self._message
-
-    def _get_message(self):
-        raise NotImplementedError
 
     @property
     def traceback(self):
         if self._traceback is None:
-            self._traceback = self._get_details()
+            self._traceback = self._format_traceback(self.error)
         return self._traceback
 
-    def _get_details(self):
-        raise NotImplementedError
+    def _format_traceback(self, error):
+        if isinstance(error, RobotError):
+            return error.details
+        if self._exclude_robot_traces:
+            self._remove_robot_traces(error)
+        lines = self._get_traceback_lines(type(error), error, error.__traceback__)
+        return ''.join(lines).rstrip()
 
-    def _get_name(self, exc_type):
-        try:
-            return exc_type.__name__
-        except AttributeError:
-            return unic(exc_type)
+    def _remove_robot_traces(self, error):
+        tb = error.__traceback__
+        while tb and self._is_robot_traceback(tb):
+            tb = tb.tb_next
+        error.__traceback__ = tb
+        if error.__context__:
+            self._remove_robot_traces(error.__context__)
+        if error.__cause__:
+            self._remove_robot_traces(error.__cause__)
 
-    def _format_message(self, name, message):
-        message = unic(message or '')
-        message = self._clean_up_message(message, name)
-        name = name.split('.')[-1]  # Use only last part of the name
+    def _is_robot_traceback(self, tb):
+        module = tb.tb_frame.f_globals.get('__name__')
+        return module and module.startswith('robot.')
+
+    def _get_traceback_lines(self, etype, value, tb):
+        prefix = 'Traceback (most recent call last):\n'
+        empty_tb = [prefix, '  None\n']
+        if self._full_traceback:
+            if tb or value.__context__ or value.__cause__:
+                return traceback.format_exception(etype, value, tb)
+            else:
+                return empty_tb + traceback.format_exception_only(etype, value)
+        else:
+            if tb:
+                return [prefix] + traceback.format_tb(tb)
+            else:
+                return empty_tb
+
+    def _format_message(self, error):
+        name = type(error).__name__.split('.')[-1]  # Use only the last part
+        message = str(error)
         if not message:
             return name
-        if self._is_generic_exception(name):
+        if self._suppress_name(name, error):
             return message
         if message.startswith('*HTML*'):
             name = '*HTML* ' + name
             message = message.split('*', 2)[-1].lstrip()
         return '%s: %s' % (name, message)
 
-    def _is_generic_exception(self, name):
-        return (name in self._generic_exception_names or
-                isinstance(self.error, RobotError) or
-                getattr(self.error, 'ROBOT_SUPPRESS_NAME', False))
-
-    def _clean_up_message(self, message, name):
-        return message
-
-
-class PythonErrorDetails(_ErrorDetails):
-
-    def _get_message(self):
-        name = self._get_name(self._exc_type)
-        return self._format_message(name, unic(self.error))
-
-    def _get_details(self):
-        if isinstance(self.error, RobotError):
-            return self.error.details
-        return 'Traceback (most recent call last):\n' + self._get_traceback()
-
-    def _get_traceback(self):
-        tb = self._exc_traceback
-        while tb and self._is_excluded_traceback(tb):
-            tb = tb.tb_next
-        if not tb:
-            return '  None'
-        if PY3:
-            # Everything is Unicode so we can simply use `format_tb`.
-            formatted = traceback.format_tb(tb)
-        else:
-            # Entries are bytes and may even have different encoding.
-            entries = [self._decode_entry(e) for e in traceback.extract_tb(tb)]
-            formatted = traceback.format_list(entries)
-        return ''.join(formatted).rstrip()
-
-    def _is_excluded_traceback(self, traceback):
-        if not self._exclude_robot_traces:
-            return False
-        module = traceback.tb_frame.f_globals.get('__name__')
-        return module and module.startswith('robot.')
-
-    def _decode_entry(self, traceback_entry):
-        path, lineno, func, text = traceback_entry
-        # Traceback entries in Python 2 use bytes using different encodings.
-        # path: system encoding (except on Jython 2.7.0 where it's latin1)
-        # line: integer
-        # func: always ASCII on Python 2
-        # text: depends on source encoding; UTF-8 is an ASCII compatible guess
-        buggy_jython = JYTHON and PY_VERSION < (2, 7, 1)
-        if not buggy_jython:
-            path = system_decode(path)
-        else:
-            path = path.decode('latin1', 'replace')
-        if text is not None:
-            text = text.decode('UTF-8', 'replace')
-        return path, lineno, func, text
-
-
-class JavaErrorDetails(_ErrorDetails):
-    _java_trace_re = re.compile(r'^\s+at (\w.+)')
-    _ignored_java_trace = ('org.python.', 'robot.running.', 'robot$py.',
-                           'sun.reflect.', 'java.lang.reflect.')
-
-    def _get_message(self):
-        exc_name = self._get_name(self._exc_type)
-        # OOME.getMessage and even toString seem to throw NullPointerException
-        if not self._is_out_of_memory_error(self._exc_type):
-            exc_msg = self.error.getMessage()
-        else:
-            exc_msg = str(self.error)
-        return self._format_message(exc_name, exc_msg)
-
-    def _is_out_of_memory_error(self, exc_type):
-        return exc_type is OutOfMemoryError
-
-    def _get_details(self):
-        # OOME.printStackTrace seems to throw NullPointerException
-        if self._is_out_of_memory_error(self._exc_type):
-            return ''
-        output = StringWriter()
-        self.error.printStackTrace(PrintWriter(output))
-        details = '\n'.join(line for line in output.toString().splitlines()
-                            if not self._is_ignored_stack_trace_line(line))
-        msg = unic(self.error.getMessage() or '')
-        if msg:
-            details = details.replace(msg, '', 1)
-        return details
-
-    def _is_ignored_stack_trace_line(self, line):
-        if not line:
-            return True
-        res = self._java_trace_re.match(line)
-        if res is None:
-            return False
-        location = res.group(1)
-        for entry in self._ignored_java_trace:
-            if location.startswith(entry):
-                return True
-        return False
-
-    def _clean_up_message(self, msg, name):
-        msg = self._remove_stack_trace_lines(msg)
-        return self._remove_exception_name(msg, name).strip()
-
-    def _remove_stack_trace_lines(self, msg):
-        lines = msg.splitlines()
-        while lines:
-            if self._java_trace_re.match(lines[-1]):
-                lines.pop()
-            else:
-                break
-        return '\n'.join(lines)
-
-    def _remove_exception_name(self, msg, name):
-        tokens = msg.split(':', 1)
-        if len(tokens) == 2 and tokens[0] == name:
-            msg = tokens[1]
-        return msg
+    def _suppress_name(self, name, error):
+        return (name in self._generic_names
+                or isinstance(error, RobotError)
+                or getattr(error, 'ROBOT_SUPPRESS_NAME', False))

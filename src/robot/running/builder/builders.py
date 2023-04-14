@@ -20,10 +20,10 @@ from robot.output import LOGGER
 from robot.parsing import SuiteStructureBuilder, SuiteStructureVisitor
 
 from .parsers import RobotParser, NoInitFileDirectoryParser, RestParser
-from .testsettings import TestDefaults
+from .settings import Defaults
 
 
-class TestSuiteBuilder(object):
+class TestSuiteBuilder:
     """Builder to construct ``TestSuite`` objects based on data on the disk.
 
     The :meth:`build` method constructs executable
@@ -32,7 +32,7 @@ class TestSuiteBuilder(object):
 
     - Execute the created suite by using its
       :meth:`~robot.running.model.TestSuite.run` method. The suite can be
-      can be modified before execution if needed.
+      modified before execution if needed.
 
     - Inspect the suite to see, for example, what tests it has or what tags
       tests have. This can be more convenient than using the lower level
@@ -47,28 +47,33 @@ class TestSuiteBuilder(object):
     """
 
     def __init__(self, included_suites=None, included_extensions=('robot',),
-                 rpa=None, allow_empty_suite=False, process_curdir=True):
+                 rpa=None, lang=None, allow_empty_suite=False,
+                 process_curdir=True):
         """
         :param include_suites:
-            List of suite names to include. If ``None`` or an empty list,
-            all suites are included. Same as using :option:`--suite` on
-            the command line.
+            List of suite names to include. If ``None`` or an empty list, all
+            suites are included. Same as using `--suite` on the command line.
         :param included_extensions:
-            List of extensions of files to parse. Same as :option:`--extension`.
-            This parameter was named ``extension`` before RF 3.2.
+            List of extensions of files to parse. Same as `--extension`.
         :param rpa: Explicit test execution mode. ``True`` for RPA and
-           ``False`` for test automation. By default mode is got from test
-           data headers and possible conflicting headers cause an error.
-           Same as :option:`--rpa` or :option:`--norpa`.
+            ``False`` for test automation. By default, mode is got from data file
+            headers and possible conflicting headers cause an error.
+            Same as `--rpa` or `--norpa`.
+        :param lang: Additional languages to be supported during parsing.
+            Can be a string matching any of the supported language codes or names,
+            an initialized :class:`~robot.conf.languages.Language` subsclass,
+            a list containing such strings or instances, or a
+            :class:`~robot.conf.languages.Languages` instance.
         :param allow_empty_suite:
             Specify is it an error if the built suite contains no tests.
-            Same as :option:`--runemptysuite`. New in RF 3.2.
+            Same as `--runemptysuite`.
         :param process_curdir:
             Control processing the special ``${CURDIR}`` variable. It is
             resolved already at parsing time by default, but that can be
-            changed by giving this argument ``False`` value. New in RF 3.2.
+            changed by giving this argument ``False`` value.
         """
         self.rpa = rpa
+        self.lang = lang
         self.included_suites = included_suites
         self.included_extensions = included_extensions
         self.allow_empty_suite = allow_empty_suite
@@ -82,7 +87,7 @@ class TestSuiteBuilder(object):
         structure = SuiteStructureBuilder(self.included_extensions,
                                           self.included_suites).build(paths)
         parser = SuiteStructureParser(self.included_extensions,
-                                      self.rpa, self.process_curdir)
+                                      self.rpa, self.lang, self.process_curdir)
         suite = parser.parse(structure)
         if not self.included_suites and not self.allow_empty_suite:
             self._validate_test_counts(suite, multisource=len(paths) > 1)
@@ -92,8 +97,7 @@ class TestSuiteBuilder(object):
     def _validate_test_counts(self, suite, multisource=False):
         def validate(suite):
             if not suite.has_tests:
-                raise DataError("Suite '%s' contains no tests or tasks."
-                                % suite.name)
+                raise DataError(f"Suite '{suite.name}' contains no tests or tasks.")
         if not multisource:
             validate(suite)
         else:
@@ -103,16 +107,16 @@ class TestSuiteBuilder(object):
 
 class SuiteStructureParser(SuiteStructureVisitor):
 
-    def __init__(self, included_extensions, rpa=None, process_curdir=True):
+    def __init__(self, included_extensions, rpa=None, lang=None, process_curdir=True):
         self.rpa = rpa
         self._rpa_given = rpa is not None
         self.suite = None
         self._stack = []
-        self.parsers = self._get_parsers(included_extensions, process_curdir)
+        self.parsers = self._get_parsers(included_extensions, lang, process_curdir)
 
-    def _get_parsers(self, extensions, process_curdir):
-        robot_parser = RobotParser(process_curdir)
-        rest_parser = RestParser(process_curdir)
+    def _get_parsers(self, extensions, lang, process_curdir):
+        robot_parser = RobotParser(lang, process_curdir)
+        rest_parser = RestParser(lang, process_curdir)
         parsers = {
             None: NoInitFileDirectoryParser(),
             'robot': robot_parser,
@@ -136,7 +140,7 @@ class SuiteStructureParser(SuiteStructureVisitor):
         return self.suite
 
     def visit_file(self, structure):
-        LOGGER.info("Parsing file '%s'." % structure.source)
+        LOGGER.info(f"Parsing file '{structure.source}'.")
         suite, _ = self._build_suite(structure)
         if self._stack:
             self._stack[-1][0].suites.append(suite)
@@ -145,7 +149,7 @@ class SuiteStructureParser(SuiteStructureVisitor):
 
     def start_directory(self, structure):
         if structure.source:
-            LOGGER.info("Parsing directory '%s'." % structure.source)
+            LOGGER.info(f"Parsing directory '{structure.source}'.")
         suite, defaults = self._build_suite(structure)
         if self.suite is None:
             self.suite = suite
@@ -161,7 +165,7 @@ class SuiteStructureParser(SuiteStructureVisitor):
     def _build_suite(self, structure):
         parent_defaults = self._stack[-1][-1] if self._stack else None
         source = structure.source
-        defaults = TestDefaults(parent_defaults)
+        defaults = Defaults(parent_defaults)
         parser = self._get_parser(structure.extension)
         try:
             if structure.is_directory:
@@ -169,10 +173,10 @@ class SuiteStructureParser(SuiteStructureVisitor):
             else:
                 suite = parser.parse_suite_file(source, defaults)
                 if not suite.tests:
-                    LOGGER.info("Data source '%s' has no tests or tasks." % source)
+                    LOGGER.info(f"Data source '{source}' has no tests or tasks.")
             self._validate_execution_mode(suite)
         except DataError as err:
-            raise DataError("Parsing '%s' failed: %s" % (source, err.message))
+            raise DataError(f"Parsing '{source}' failed: {err.message}")
         return suite, defaults
 
     def _validate_execution_mode(self, suite):
@@ -184,28 +188,29 @@ class SuiteStructureParser(SuiteStructureVisitor):
             self.rpa = suite.rpa
         elif self.rpa is not suite.rpa:
             this, that = ('tasks', 'tests') if suite.rpa else ('tests', 'tasks')
-            raise DataError("Conflicting execution modes. File has %s "
-                            "but files parsed earlier have %s. Fix headers "
-                            "or use '--rpa' or '--norpa' options to set the "
-                            "execution mode explicitly." % (this, that))
+            raise DataError(f"Conflicting execution modes. File has {this} "
+                            f"but files parsed earlier have {that}. Fix headers "
+                            f"or use '--rpa' or '--norpa' options to set the "
+                            f"execution mode explicitly.")
 
 
-class ResourceFileBuilder(object):
+class ResourceFileBuilder:
 
-    def __init__(self, process_curdir=True):
+    def __init__(self, lang=None, process_curdir=True):
+        self.lang = lang
         self.process_curdir = process_curdir
 
     def build(self, source):
-        LOGGER.info("Parsing resource file '%s'." % source)
+        LOGGER.info(f"Parsing resource file '{source}'.")
         resource = self._parse(source)
         if resource.imports or resource.variables or resource.keywords:
-            LOGGER.info("Imported resource file '%s' (%d keywords)."
-                        % (source, len(resource.keywords)))
+            LOGGER.info(f"Imported resource file '{source}' ({len(resource.keywords)} "
+                        f"keywords).")
         else:
-            LOGGER.warn("Imported resource file '%s' is empty." % source)
+            LOGGER.warn(f"Imported resource file '{source}' is empty.")
         return resource
 
     def _parse(self, source):
         if os.path.splitext(source)[1].lower() in ('.rst', '.rest'):
-            return RestParser(self.process_curdir).parse_resource_file(source)
-        return RobotParser(self.process_curdir).parse_resource_file(source)
+            return RestParser(self.lang, self.process_curdir).parse_resource_file(source)
+        return RobotParser(self.lang, self.process_curdir).parse_resource_file(source)

@@ -26,7 +26,7 @@ from robot.utils import (get_error_message, is_dict_like, is_list_like,
                          is_string, seq2str2, type_name, DotDict, Importer)
 
 
-class VariableFileSetter(object):
+class VariableFileSetter:
 
     def __init__(self, store):
         self._store = store
@@ -57,7 +57,7 @@ class VariableFileSetter(object):
             self._store.add(name, value, overwrite)
 
 
-class YamlImporter(object):
+class YamlImporter:
 
     def import_variables(self, path, args=None):
         if args:
@@ -85,14 +85,16 @@ class YamlImporter(object):
 
     def _dot_dict(self, value):
         if is_dict_like(value):
-            value = DotDict((n, self._dot_dict(v)) for n, v in value.items())
+            return DotDict((k, self._dot_dict(v)) for k, v in value.items())
+        if is_list_like(value):
+            return [self._dot_dict(v) for v in value]
         return value
 
 
-class PythonImporter(object):
+class PythonImporter:
 
     def import_variables(self, path, args=None):
-        importer = Importer('variable file', LOGGER).import_class_or_module_by_path
+        importer = Importer('variable file', LOGGER).import_class_or_module
         var_file = importer(path, instantiate_with_args=())
         return self._get_variables(var_file, args)
 

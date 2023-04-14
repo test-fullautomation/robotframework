@@ -17,6 +17,7 @@ import ast
 
 from robot.utils import file_writer, is_pathlike, is_string
 
+from .statements import Comment, EmptyLine
 from .visitor import ModelVisitor
 from ..lexer import Token
 
@@ -49,17 +50,33 @@ class Block(ast.AST):
     def validate_model(self):
         ModelValidator().visit(self)
 
-    def validate(self):
+    def validate(self, context):
         pass
+
+    def _body_is_empty(self):
+        for node in self.body:
+            if not isinstance(node, (EmptyLine, Comment)):
+                return False
+        return True
+
+
+class HeaderAndBody(Block):
+    _fields = ('header', 'body')
+
+    def __init__(self, header, body=None, errors=()):
+        self.header = header
+        self.body = body or []
+        self.errors = errors
 
 
 class File(Block):
     _fields = ('sections',)
-    _attributes = ('source',) + Block._attributes
+    _attributes = ('source', 'languages') + Block._attributes
 
-    def __init__(self, sections=None, source=None):
+    def __init__(self, sections=None, source=None, languages=()):
         self.sections = sections or []
         self.source = source
+        self.languages = languages
 
     def save(self, output=None):
         """Save model to the given ``output`` or to the original source file.
@@ -91,11 +108,12 @@ class VariableSection(Section):
     pass
 
 
+# FIXME: should there be a separate TaskSection?
 class TestCaseSection(Section):
 
     @property
     def tasks(self):
-        return self.header.name.upper() in ('TASKS', 'TASK')
+        return self.header.type == Token.TASK_HEADER
 
 
 class KeywordSection(Section):
@@ -133,7 +151,8 @@ class Keyword(Block):
 class If(Block):
     """Represents IF structures in the model.
 
-    Used with IF, ELSE_IF and ELSE nodes. The :attr:`type` attribute specifies the type.
+    Used with IF, Inline IF, ELSE IF and ELSE nodes. The :attr:`type` attribute
+    specifies the type.
     """
     _fields = ('header', 'body', 'orelse', 'end')
 
@@ -152,15 +171,23 @@ class If(Block):
     def condition(self):
         return self.header.condition
 
-    def validate(self):
+    @property
+    def assign(self):
+        return self.header.assign
+
+    def validate(self, context):
         self._validate_body()
         if self.type == Token.IF:
             self._validate_structure()
             self._validate_end()
+        if self.type == Token.INLINE_IF:
+            self._validate_structure()
+            self._validate_inline_if()
 
     def _validate_body(self):
-        if not self.body:
-            self.errors += ('%s has empty body.' % self.type,)
+        if self._body_is_empty():
+            type = self.type if self.type != Token.INLINE_IF else 'IF'
+            self.errors += (f'{type} branch cannot be empty.',)
 
     def _validate_structure(self):
         orelse = self.orelse
@@ -168,15 +195,32 @@ class If(Block):
         while orelse:
             if else_seen:
                 if orelse.type == Token.ELSE:
-                    self.errors += ('Multiple ELSE branches.',)
+                    error = 'Only one ELSE allowed.'
                 else:
-                    self.errors += ('ELSE IF after ELSE.',)
+                    error = 'ELSE IF not allowed after ELSE.'
+                if error not in self.errors:
+                    self.errors += (error,)
             else_seen = else_seen or orelse.type == Token.ELSE
             orelse = orelse.orelse
 
     def _validate_end(self):
         if not self.end:
-            self.errors += ('IF has no closing END.',)
+            self.errors += ('IF must have closing END.',)
+
+    def _validate_inline_if(self):
+        branch = self
+        assign = branch.assign
+        while branch:
+            if branch.body:
+                item = branch.body[0]
+                if assign and item.type != Token.KEYWORD:
+                    self.errors += ('Inline IF with assignment can only contain '
+                                    'keyword calls.',)
+                if getattr(item, 'assign', None):
+                    self.errors += ('Inline IF branches cannot contain assignments.',)
+                if item.type == Token.INLINE_IF:
+                    self.errors += ('Inline IF cannot be nested.',)
+            branch = branch.orelse
 
 
 class For(Block):
@@ -200,15 +244,88 @@ class For(Block):
     def flavor(self):
         return self.header.flavor
 
-    def validate(self):
-        if not self.body:
-            self.errors += ('FOR loop has empty body.',)
+    def validate(self, context):
+        if self._body_is_empty():
+            self.errors += ('FOR loop cannot be empty.',)
         if not self.end:
-            self.errors += ('FOR loop has no closing END.',)
+            self.errors += ('FOR loop must have closing END.',)
 
 
-# cuongnht add thread
-class Thread(Block):
+class Try(Block):
+    _fields = ('header', 'body', 'next', 'end')
+
+    def __init__(self, header, body=None, next=None, end=None, errors=()):
+        self.header = header
+        self.body = body or []
+        self.next = next
+        self.end = end
+        self.errors = errors
+
+    @property
+    def type(self):
+        return self.header.type
+
+    @property
+    def patterns(self):
+        return getattr(self.header, 'patterns', ())
+
+    @property
+    def pattern_type(self):
+        return getattr(self.header, 'pattern_type', None)
+
+    @property
+    def variable(self):
+        return getattr(self.header, 'variable', None)
+
+    def validate(self, context):
+        self._validate_body()
+        if self.type == Token.TRY:
+            self._validate_structure()
+            self._validate_end()
+
+    def _validate_body(self):
+        if self._body_is_empty():
+            self.errors += (f'{self.type} branch cannot be empty.',)
+
+    def _validate_structure(self):
+        else_count = 0
+        finally_count = 0
+        except_count = 0
+        empty_except_count = 0
+        branch = self.next
+        while branch:
+            if branch.type == Token.EXCEPT:
+                if else_count:
+                    self.errors += ('EXCEPT not allowed after ELSE.',)
+                if finally_count:
+                    self.errors += ('EXCEPT not allowed after FINALLY.',)
+                if branch.patterns and empty_except_count:
+                    self.errors += ('EXCEPT without patterns must be last.',)
+                if not branch.patterns:
+                    empty_except_count += 1
+                except_count += 1
+            if branch.type == Token.ELSE:
+                if finally_count:
+                    self.errors += ('ELSE not allowed after FINALLY.',)
+                else_count += 1
+            if branch.type == Token.FINALLY:
+                finally_count += 1
+            branch = branch.next
+        if finally_count > 1:
+            self.errors += ('Only one FINALLY allowed.',)
+        if else_count > 1:
+            self.errors += ('Only one ELSE allowed.',)
+        if empty_except_count > 1:
+            self.errors += ('Only one EXCEPT without patterns allowed.',)
+        if not (except_count or finally_count):
+            self.errors += ('TRY structure must have EXCEPT or FINALLY branch.',)
+
+    def _validate_end(self):
+        if not self.end:
+            self.errors += ('TRY must have closing END.',)
+
+
+class While(Block):
     _fields = ('header', 'body', 'end')
 
     def __init__(self, header, body=None, end=None, errors=()):
@@ -218,18 +335,18 @@ class Thread(Block):
         self.errors = errors
 
     @property
-    def name(self):
-        return self.header.name
+    def condition(self):
+        return self.header.condition
 
     @property
-    def daemon(self):
-        return self.header.daemon
+    def limit(self):
+        return self.header.limit
 
-    def validate(self):
-        if not self.body:
-            self.errors += ('THREAD has empty body.',)
+    def validate(self, context):
+        if self._body_is_empty():
+            self.errors += ('WHILE loop cannot be empty.',)
         if not self.end:
-            self.errors += ('THREAD has no closing END.',)
+            self.errors += ('WHILE loop must have closing END.',)
 
 
 class ModelWriter(ModelVisitor):
@@ -256,13 +373,49 @@ class ModelWriter(ModelVisitor):
 
 class ModelValidator(ModelVisitor):
 
+    def __init__(self):
+        self._context = ValidationContext()
+
     def visit_Block(self, node):
-        node.validate()
+        self._context.start_block(node)
+        node.validate(self._context)
         ModelVisitor.generic_visit(self, node)
+        self._context.end_block()
+
+    def visit_Try(self, node):
+        if node.header.type == Token.FINALLY:
+            self._context.in_finally = True
+        self.visit_Block(node)
+        self._context.in_finally = False
 
     def visit_Statement(self, node):
-        node.validate()
+        node.validate(self._context)
         ModelVisitor.generic_visit(self, node)
+
+
+class ValidationContext:
+
+    def __init__(self):
+        self.roots = []
+        self.in_finally = False
+
+    def start_block(self, node):
+        self.roots.append(node)
+
+    def end_block(self):
+        self.roots.pop()
+
+    @property
+    def in_keyword(self):
+        return Keyword in [type(r) for r in self.roots]
+
+    @property
+    def in_for(self):
+        return For in [type(r) for r in self.roots]
+
+    @property
+    def in_while(self):
+        return While in [type(r) for r in self.roots]
 
 
 class FirstStatementFinder(ModelVisitor):

@@ -13,12 +13,11 @@ Varargs and kwargs
     Keyword Arguments Should Be     2    *varargs: int    **kwargs: bool
 
 Unknown types
-    Keyword Arguments Should Be     3    unknown: UnknownType    unrecognized: Ellipsis
+    Keyword Arguments Should Be     3    unknown: UnknownType    unrecognized: ...
 
 Non-type annotations
     Keyword Arguments Should Be     4    arg: One of the usages in PEP-3107
     ...                                  *varargs: But surely feels odd...
 
 Keyword-only arguments
-    [Tags]    require-py3
     Keyword Arguments Should Be     5    *    kwo: int    with_default: str = value

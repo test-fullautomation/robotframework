@@ -16,42 +16,15 @@
 import os
 import os.path
 import sys
+from urllib.request import pathname2url as path_to_url
 
 from robot.errors import DataError
 
 from .encoding import system_decode
-from .platform import IRONPYTHON, JYTHON, PY_VERSION, PY2, WINDOWS
-from .robottypes import is_unicode
-from .unic import unic
+from .platform import WINDOWS
+from .robottypes import is_string
+from .unic import safe_str
 
-
-if IRONPYTHON and PY_VERSION == (2, 7, 8):
-    # https://github.com/IronLanguages/ironpython2/issues/371
-    def _abspath(path):
-        if os.path.isabs(path):
-            if not os.path.splitdrive(path)[0]:
-                drive = os.path.splitdrive(os.getcwd())[0]
-                return drive + path
-            return path
-        return os.path.abspath(path)
-elif WINDOWS and JYTHON and PY_VERSION > (2, 7, 0):
-    # https://bugs.jython.org/issue2824
-    def _abspath(path):
-        path = os.path.abspath(path)
-        if path[:1] == '\\' and path[:2] != '\\\\':
-            drive = os.getcwd()[:2]
-            path = drive + path
-        return path
-else:
-    _abspath = os.path.abspath
-
-if PY2:
-    from urllib import pathname2url
-
-    def path_to_url(path):
-        return pathname2url(path.encode('UTF-8'))
-else:
-    from urllib.request import pathname2url as path_to_url
 
 if WINDOWS:
     CASE_INSENSITIVE_FILESYSTEM = True
@@ -71,9 +44,9 @@ def normpath(path, case_normalize=False):
        That includes Windows and also OSX in default configuration.
     4. Turn ``c:`` into ``c:\\`` on Windows instead of keeping it as ``c:``.
     """
-    if not is_unicode(path):
+    if not is_string(path):
         path = system_decode(path)
-    path = unic(path)  # Handles NFC normalization on OSX
+    path = safe_str(path)  # Handles NFC normalization on OSX
     path = os.path.normpath(path)
     if case_normalize and CASE_INSENSITIVE_FILESYSTEM:
         path = path.lower()
@@ -91,7 +64,7 @@ def abspath(path, case_normalize=False):
     3. Turn ``c:`` into ``c:\\`` on Windows instead of ``c:\\current\\path``.
     """
     path = normpath(path, case_normalize)
-    return normpath(_abspath(path), case_normalize)
+    return normpath(os.path.abspath(path), case_normalize)
 
 
 def get_link_path(target, base):
@@ -163,7 +136,7 @@ def find_file(path, basedir='.', file_type=None):
     if ret:
         return ret
     default = file_type or 'File'
-    file_type = {'Library': 'Test library',
+    file_type = {'Library': 'Library',
                  'Variables': 'Variable file',
                  'Resource': 'Resource file'}.get(file_type, default)
     raise DataError("%s '%s' does not exist." % (file_type, path))
@@ -179,7 +152,7 @@ def _find_relative_path(path, basedir):
     for base in [basedir] + sys.path:
         if not (base and os.path.isdir(base)):
             continue
-        if not is_unicode(base):
+        if not is_string(base):
             base = system_decode(base)
         ret = os.path.abspath(os.path.join(base, path))
         if _is_valid_file(ret):

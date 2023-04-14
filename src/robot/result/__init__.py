@@ -42,6 +42,7 @@ __ http://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#
 """
 
 from .executionresult import Result
-from .model import For, If, IfBranch, ForIteration, Keyword, Message, TestCase, TestSuite, Thread  # cuongnht add thread
+from .model import (For, ForIteration, While, WhileIteration, If, IfBranch, Keyword,
+                    Message, TestCase, TestSuite, Try, TryBranch, Return, Continue, Break)
 from .resultbuilder import ExecutionResult, ExecutionResultBuilder
 from .visitor import ResultVisitor

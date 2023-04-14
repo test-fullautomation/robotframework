@@ -33,7 +33,6 @@ ${RUNNER DEFAULTS}
 ...               --ConsoleMarkers OFF
 ...               --PYTHONPATH "${CURDIR}${/}..${/}testresources${/}testlibs"
 ...               --PYTHONPATH "${CURDIR}${/}..${/}testresources${/}listeners"
-${u}              ${{'' if $INTERPRETER.is_py3 or $INTERPRETER.is_ironpython else 'u'}}
 
 *** Keywords ***
 Run Tests
@@ -70,9 +69,8 @@ Execute
     [Arguments]    ${executor}    ${options}    ${sources}    ${default options}=
     Set Execution Environment
     @{arguments} =    Get Execution Arguments    ${options}    ${sources}    ${default options}
-    ${encoding} =    Set Variable If    ${INTERPRETER.is_ironpython}    CONSOLE    SYSTEM
     ${result} =    Run Process    @{executor}    @{arguments}
-    ...    stdout=${STDOUTFILE}    stderr=${STDERRFILE}    output_encoding=${encoding}
+    ...    stdout=${STDOUTFILE}    stderr=${STDERRFILE}    output_encoding=SYSTEM
     ...    timeout=5min    on_timeout=terminate
     [Return]    ${result}
 
@@ -86,9 +84,10 @@ Get Execution Arguments
 Set Execution Environment
     Remove Directory    ${OUTDIR}    recursive
     Create Directory    ${OUTDIR}
-    Return From Keyword If    not ${SET SYSLOG}
-    Set Environment Variable    ROBOT_SYSLOG_FILE    ${SYSLOG FILE}
-    Set Environment Variable    ROBOT_SYSLOG_LEVEL    ${SYSLOG LEVEL}
+    IF    ${SET SYSLOG}
+        Set Environment Variable    ROBOT_SYSLOG_FILE    ${SYSLOG FILE}
+        Set Environment Variable    ROBOT_SYSLOG_LEVEL    ${SYSLOG LEVEL}
+    END
 
 Copy Previous Outfile
     Copy File    ${OUTFILE}    ${OUTFILE COPY}
@@ -96,7 +95,8 @@ Copy Previous Outfile
 Check Test Suite
     [Arguments]    ${name}    ${message}    ${status}=${None}
     ${suite} =    Get Test Suite    ${name}
-    Run Keyword If    $status is not None    Should Be Equal    ${suite.status}    ${status}
+    IF    $status is not None
+    ...    Should Be Equal    ${suite.status}    ${status}
     Should Be Equal    ${suite.full_message}    ${message}
     [Return]    ${suite}
 
@@ -123,22 +123,28 @@ Check Keyword Data
     Should Be Equal    ${kw.type}                    ${type}
 
 Test And All Keywords Should Have Passed
-    [Arguments]    ${name}=${TESTNAME}
+    [Arguments]    ${name}=${TESTNAME}    ${allow not run}=False
     ${tc} =    Check Test Case    ${name}
-    All Keywords Should Have Passed    ${tc}
+    All Keywords Should Have Passed    ${tc}    ${allow not run}
 
 All Keywords Should Have Passed
-    [Arguments]    ${tc or kw}
-    FOR    ${kw}    IN    @{tc or kw.kws}
-        Should Be Equal    ${kw.status}    PASS
-        All Keywords Should Have Passed    ${kw}
+    [Arguments]    ${tc_or_kw}    ${allow not run}=False
+    IF    hasattr($tc_or_kw, 'kws')
+        FOR    ${index}    ${kw}    IN ENUMERATE    @{tc_or_kw.kws}
+            IF    ${allow not run} and (${index} > 0 or $kw.type in ['IF', 'ELSE', 'EXCEPT', 'BREAK'])
+                Should Be True    $kw.status in ['PASS', 'NOT RUN']
+            ELSE
+                Log    ${kw.type}
+                Should Be Equal    ${kw.status}    PASS
+            END
+            All Keywords Should Have Passed    ${kw}    ${allow not run}
+        END
     END
 
 Get Output File
     [Arguments]    ${path}
     [Documentation]    Output encoding avare helper
-    ${encoding} =    Set Variable If    ${INTERPRETER.is_ironpython}    CONSOLE    SYSTEM
-    ${encoding} =    Set Variable If    r'${path}' in [r'${STDERR FILE}',r'${STDOUT FILE}']    ${encoding}    UTF-8
+    ${encoding} =    Set Variable If    r'${path}' in [r'${STDERR FILE}', r'${STDOUT FILE}']    SYSTEM    UTF-8
     ${file} =    Get File    ${path}    ${encoding}
     [Return]    ${file}
 
@@ -301,7 +307,7 @@ Elapsed Time Should Be Valid
     Should Be True    isinstance($time, int)    Not valid elapsed time: ${time}
     # On CI elapsed time has sometimes been negative. We cannot control system time there,
     # so better to log a warning than fail the test in that case.
-    Run Keyword If    $time < 0
+    IF    $time < 0
     ...    Log    Negative elapsed time '${time}'. Someone messing with system time?    WARN
 
 Previous test should have passed
@@ -339,17 +345,13 @@ Set PYTHONPATH
     [Arguments]    @{values}
     ${value} =    Catenate    SEPARATOR=${:}    @{values}
     Set Environment Variable    PYTHONPATH    ${value}
-    Set Environment Variable    JYTHONPATH    ${value}
-    Set Environment Variable    IRONPYTHONPATH    ${value}
 
 Reset PYTHONPATH
     Remove Environment Variable    PYTHONPATH
-    Remove Environment Variable    JYTHONPATH
-    Remove Environment Variable    IRONPYTHONPATH
 
 Error in file
     [Arguments]    ${index}    ${path}    ${lineno}    @{message}    ${traceback}=
-    ...    ${stacktrace}=    ${pattern}=True
+    ...    ${stacktrace}=    ${pattern}=True    ${level}=ERROR
     ${path} =    Join Path    ${DATADIR}    ${path}
     ${message} =    Catenate    @{message}
     ${error} =    Set Variable    Error in file '${path}' on line ${lineno}: ${message}
@@ -359,7 +361,7 @@ Error in file
     ${error} =    Set Variable If    $stacktrace
     ...    ${error}\n*${stacktrace}*
     ...    ${error}
-    Check Log Message    ${ERRORS}[${index}]    ${error}    level=ERROR    pattern=${pattern}
+    Check Log Message    ${ERRORS}[${index}]    ${error}    level=${level}    pattern=${pattern}
 
 Error in library
     [Arguments]    ${name}    @{message}    ${pattern}=False    ${index}=0
@@ -375,3 +377,12 @@ Setup Should Not Be Defined
 Teardown Should Not Be Defined
     [Arguments]    ${model_object}
     Should Not Be True     ${model_object.teardown}
+
+Traceback Should Be
+    [Arguments]    ${msg}    @{entries}    ${error}
+    ${exp} =    Set Variable    Traceback (most recent call last):
+    FOR    ${path}    ${func}    ${text}    IN    @{entries}
+        ${path} =    Normalize Path    ${DATADIR}/${path}
+        ${exp} =    Set Variable    ${exp}\n${SPACE*2}File "${path}", line *, in ${func}\n${SPACE*4}${text}
+    END
+    Check Log Message    ${msg}    ${exp}\n${error}    DEBUG    pattern=True    traceback=True

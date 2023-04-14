@@ -13,24 +13,22 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import ctypes
 import os
+import signal as signal_module
 import subprocess
 import time
 from tempfile import TemporaryFile
-import signal as signal_module
 
 from robot.utils import (abspath, cmdline2list, ConnectionCache, console_decode,
-                         console_encode, IRONPYTHON, JYTHON, is_list_like, is_string,
-                         is_unicode, is_truthy, NormalizedDict, PY2, py3to2,
-                         secs_to_timestr, system_decode, system_encode, timestr_to_secs,
-                         WINDOWS)
+                         console_encode, is_list_like, is_pathlike, is_string,
+                         is_truthy, NormalizedDict, secs_to_timestr, system_decode,
+                         system_encode, timestr_to_secs, WINDOWS)
 from robot.version import get_version
 from robot.api import logger
 
 
-class Process(object):
-    """Robot Framework test library for running processes.
+class Process:
+    """Robot Framework library for running processes.
 
     This library utilizes Python's
     [http://docs.python.org/library/subprocess.html|subprocess]
@@ -116,8 +114,8 @@ class Process(object):
 
     == Current working directory ==
 
-    By default the child process will be executed in the same directory
-    as the parent process, the process running tests, is executed. This
+    By default, the child process will be executed in the same directory
+    as the parent process, the process running Robot Framework, is executed. This
     can be changed by giving an alternative location using the ``cwd`` argument.
     Forward slashes in the given path are automatically converted to
     backslashes on Windows.
@@ -148,8 +146,7 @@ class Process(object):
     By default processes are run so that their standard output and standard
     error streams are kept in the memory. This works fine normally,
     but if there is a lot of output, the output buffers may get full and
-    the program can hang. Additionally on Jython, everything written to
-    these in-memory buffers can be lost if the process is terminated.
+    the program can hang.
 
     To avoid the above mentioned problems, it is possible to use ``stdout``
     and ``stderr`` arguments to specify files on the file system where to
@@ -246,16 +243,15 @@ class Process(object):
 
     = Active process =
 
-    The test library keeps record which of the started processes is currently
-    active. By default it is latest process started with `Start Process`,
-    but `Switch Process` can be used to select a different one. Using
+    The library keeps record which of the started processes is currently active.
+    By default it is the latest process started with `Start Process`,
+    but `Switch Process` can be used to activate a different process. Using
     `Run Process` does not affect the active process.
 
     The keywords that operate on started processes will use the active process
     by default, but it is possible to explicitly select a different process
-    using the ``handle`` argument. The handle can be the identifier returned by
-    `Start Process` or an ``alias`` explicitly given to `Start Process` or
-    `Run Process`.
+    using the ``handle`` argument. The handle can be an ``alias`` explicitly
+    given to `Start Process` or the process object returned by it.
 
     = Result object =
 
@@ -375,25 +371,50 @@ class Process(object):
         for more information about the arguments, and `Run Process` keyword
         for related examples.
 
-        Makes the started process new `active process`. Returns an identifier
-        that can be used as a handle to activate the started process if needed.
+        Makes the started process new `active process`. Returns the created
+        [https://docs.python.org/3/library/subprocess.html#popen-constructor |
+        subprocess.Popen] object which can be be used later to active this
+        process. ``Popen`` attributes like ``pid`` can also be accessed directly.
 
         Processes are started so that they create a new process group. This
-        allows sending signals to and terminating also possible child
-        processes. This is not supported on Jython.
+        allows terminating and sending signals to possible child processes.
+
+        Examples:
+
+        Start process and wait for it to end later using alias:
+        | `Start Process` | ${command} | alias=example |
+        | # Other keywords |
+        | ${result} = | `Wait For Process` | example |
+
+        Use returned ``Popen`` object:
+        | ${process} = | `Start Process` | ${command} |
+        | `Log` | PID: ${process.pid} |
+        | # Other keywords |
+        | ${result} = | `Terminate Process` | ${process} |
+
+        Use started process in a pipeline with another process:
+        | ${process} = | `Start Process` | python | -c | print('Hello, world!') |
+        | ${result} = | `Run Process` | python | -c | import sys; print(sys.stdin.read().upper().strip()) | stdin=${process.stdout} |
+        | `Wait For Process` | ${process} |
+        | `Should Be Equal` | ${result.stdout} | HELLO, WORLD! |
+
+        Returning a ``subprocess.Popen`` object is new in Robot Framework 5.0.
+        Earlier versions returned a generic handle and getting the process object
+        required using `Get Process Object` separately.
         """
         conf = ProcessConfiguration(**configuration)
         command = conf.get_command(command, list(arguments))
         self._log_start(command, conf)
         process = subprocess.Popen(command, **conf.popen_config)
         self._results[process] = ExecutionResult(process, **conf.result_config)
-        return self._processes.register(process, alias=conf.alias)
+        self._processes.register(process, alias=conf.alias)
+        return self._processes.current
 
     def _log_start(self, command, config):
         if is_list_like(command):
             command = self.join_command_line(command)
-        logger.info(u'Starting process:\n%s' % system_decode(command))
-        logger.debug(u'Process configuration:\n%s' % config)
+        logger.info('Starting process:\n%s' % system_decode(command))
+        logger.debug('Process configuration:\n%s' % config)
 
     def is_process_running(self, handle=None):
         """Checks is the process running or not.
@@ -534,9 +555,6 @@ class Process(object):
         | Terminate Process           | myproc            | kill=true |
 
         Limitations:
-        - Graceful termination is not supported on Windows when using Jython.
-          Process is killed instead.
-        - Stopping the whole process group is not supported when using Jython.
         - On Windows forceful kill only stops the main process, not possible
           child processes.
         """
@@ -569,12 +587,7 @@ class Process(object):
         if hasattr(os, 'killpg'):
             os.killpg(process.pid, signal_module.SIGTERM)
         elif hasattr(signal_module, 'CTRL_BREAK_EVENT'):
-            if IRONPYTHON:
-                # https://ironpython.codeplex.com/workitem/35020
-                ctypes.windll.kernel32.GenerateConsoleCtrlEvent(
-                    signal_module.CTRL_BREAK_EVENT, process.pid)
-            else:
-                process.send_signal(signal_module.CTRL_BREAK_EVENT)
+            process.send_signal(signal_module.CTRL_BREAK_EVENT)
         else:
             process.terminate()
         if not self._process_is_stopped(process, self.TERMINATE_TIMEOUT):
@@ -621,8 +634,7 @@ class Process(object):
         does the shell propagate the signal to the actual started process.
 
         To send the signal to the whole process group, ``group`` argument can
-        be set to any true value (see `Boolean arguments`). This is not
-        supported by Jython, however.
+        be set to any true value (see `Boolean arguments`).
         """
         if os.sep == '\\':
             raise RuntimeError('This keyword does not work on Windows.')
@@ -655,8 +667,9 @@ class Process(object):
 
         If ``handle`` is not given, uses the current `active process`.
 
-        Notice that the pid is not the same as the handle returned by
-        `Start Process` that is used internally by this library.
+        Starting from Robot Framework 5.0, it is also possible to directly access
+        the ``pid`` attribute of the ``subprocess.Popen`` object returned by
+        `Start Process` like ``${process.pid}``.
         """
         return self._processes[handle].pid
 
@@ -664,6 +677,10 @@ class Process(object):
         """Return the underlying ``subprocess.Popen`` object.
 
         If ``handle`` is not given, uses the current `active process`.
+
+        Starting from Robot Framework 5.0, `Start Process` returns the created
+        ``subprocess.Popen`` object, not a generic handle, making this keyword
+        mostly redundant.
         """
         return self._processes[handle]
 
@@ -782,7 +799,7 @@ class Process(object):
         return subprocess.list2cmdline(args)
 
 
-class ExecutionResult(object):
+class ExecutionResult:
 
     def __init__(self, process, stdout, stderr, stdin=None, rc=None,
                  output_encoding=None):
@@ -827,8 +844,8 @@ class ExecutionResult(object):
             return ''
         try:
             content = stream.read()
-        except IOError:  # http://bugs.jython.org/issue2218
-            return ''
+        except IOError:
+            content = ''
         finally:
             if stream_path:
                 stream.close()
@@ -838,7 +855,7 @@ class ExecutionResult(object):
         return stream and not stream.closed
 
     def _format_output(self, output):
-        output = console_decode(output, self._output_encoding, force=True)
+        output = console_decode(output, self._output_encoding)
         output = output.replace('\r\n', '\n')
         if output.endswith('\n'):
             output = output[:-1]
@@ -862,12 +879,11 @@ class ExecutionResult(object):
         return '<result object with rc %d>' % self.rc
 
 
-@py3to2
-class ProcessConfiguration(object):
+class ProcessConfiguration:
 
     def __init__(self, cwd=None, shell=False, stdout=None, stderr=None, stdin='PIPE',
                  output_encoding='CONSOLE', alias=None, env=None, **rest):
-        self.cwd = self._get_cwd(cwd)
+        self.cwd = os.path.normpath(cwd) if cwd else abspath('.')
         self.shell = is_truthy(shell)
         self.alias = alias
         self.output_encoding = output_encoding
@@ -875,11 +891,6 @@ class ProcessConfiguration(object):
         self.stderr_stream = self._get_stderr(stderr, stdout, self.stdout_stream)
         self.stdin_stream = self._get_stdin(stdin)
         self.env = self._construct_env(env, rest)
-
-    def _get_cwd(self, cwd):
-        if cwd:
-            return cwd.replace('/', os.sep)
-        return abspath('.')
 
     def _new_stream(self, name):
         if name == 'DEVNULL':
@@ -897,19 +908,19 @@ class ProcessConfiguration(object):
         return self._new_stream(stderr)
 
     def _get_stdin(self, stdin):
-        if not is_string(stdin):
+        if is_pathlike(stdin):
+            stdin = str(stdin)
+        elif not is_string(stdin):
             return stdin
-        if stdin.upper() == 'NONE':
+        elif stdin.upper() == 'NONE':
             return None
-        if stdin == 'PIPE':
+        elif stdin == 'PIPE':
             return subprocess.PIPE
         path = os.path.normpath(os.path.join(self.cwd, stdin))
         if os.path.isfile(path):
             return open(path)
         stdin_file = TemporaryFile()
-        if is_unicode(stdin):
-            stdin = console_encode(stdin, self.output_encoding, force=True)
-        stdin_file.write(stdin)
+        stdin_file.write(console_encode(stdin, self.output_encoding, force=True))
         stdin_file.seek(0)
         return stdin_file
 
@@ -958,8 +969,7 @@ class ProcessConfiguration(object):
         # https://github.com/robotframework/robotframework/issues/2794
         if not WINDOWS:
             config['close_fds'] = True
-        if not JYTHON:
-            self._add_process_group_config(config)
+        self._add_process_group_config(config)
         return config
 
     def _add_process_group_config(self, config):

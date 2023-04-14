@@ -8,8 +8,7 @@ Variables         vars.py    name    value
 Variables         vars.py
 Resource          resource that does not exist and fails
 Library           LibraryThatDoesNotExist
-Variables         variables which dont exist
-Library           ExampleJavaLibrary
+Variables         variables which dont exist.py
 
 *** Test Cases ***
 Dynamic imports

@@ -1,10 +1,10 @@
+from io import StringIO
 import unittest
 
 from robot.output import LOGGER
 from robot.reporting.resultwriter import ResultWriter, Results
 from robot.result.executionerrors import ExecutionErrors
 from robot.result import TestSuite, Result
-from robot.utils import StringIO
 from robot.utils.asserts import assert_true, assert_equal
 
 
@@ -120,7 +120,7 @@ class TestReporting(unittest.TestCase):
         assert_true(self.EXPECTED_ERROR_MESSAGE not in content)
 
 
-class StubSettings(object):
+class StubSettings:
     log = None
     log_config = {}
     split_log = False
@@ -138,7 +138,7 @@ class StubSettings(object):
         self.__dict__.update(settings)
 
 
-class ClosableOutput(object):
+class ClosableOutput:
 
     def __init__(self, path):
         self._output = StringIO()
