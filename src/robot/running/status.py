@@ -87,7 +87,7 @@ class _ExecutionStatus:
 
     @property
     def passed(self):
-        return not self.failed
+        return not self.failed and not self.unknown
 
     def setup_executed(self, error=None):
         if error and not isinstance(error, PassExecution):
