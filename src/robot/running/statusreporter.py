@@ -14,7 +14,7 @@
 #  limitations under the License.
 
 from robot.errors import (ExecutionFailed, ExecutionStatus, DataError,
-                          HandlerExecutionFailed)
+                          HandlerExecutionFailed, KeywordError, VariableError, UnknownAssertionError)
 from robot.utils import ErrorDetails, get_timestamp
 
 from .modelcombiner import ModelCombiner
@@ -74,14 +74,16 @@ class StatusReporter:
             return exc_value
         if isinstance(exc_value, DataError):
             msg = exc_value.message
-            context.fail(msg)
-            return ExecutionFailed(msg, syntax=exc_value.syntax)
+            context.unknown(msg)
+            return ExecutionFailed(msg, syntax=exc_value.syntax, unknown=True)
         error = ErrorDetails(exc_value)
         failure = HandlerExecutionFailed(error)
         if failure.timeout:
             context.timeout_occurred = True
         if failure.skip:
             context.skip(error.message)
+        elif failure.unknown:
+            context.unknown(error.message)
         else:
             context.fail(error.message)
         if error.traceback:

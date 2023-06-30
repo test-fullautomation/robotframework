@@ -51,7 +51,26 @@ class FrameworkError(RobotError):
     """
 
 
-class DataError(RobotError):
+class UnknownAssertionError(RobotError):
+    ROBOT_SUPPRESS_NAME = True
+
+    def __init__(self, msg=None, details=''):
+        self.msg = msg
+        self.details = details
+        RobotError.__init__(self, self._get_message(), self.msg)
+
+    def _get_message(self):
+        list_msg = []
+        if (not self.msg) and (not self.details):
+            list_msg.append("Exception occurred.")
+        if self.msg:
+            list_msg.append(f"{self.msg}")
+        if self.details:
+            list_msg.append(f"Details: {self.details}")
+        return "\n".join(list_msg)
+
+
+class DataError(UnknownAssertionError):
     """Used when the provided test data is invalid.
 
     DataErrors are not caught by keywords that run other keywords
@@ -108,7 +127,7 @@ class ExecutionStatus(RobotError):
 
     def __init__(self, message, test_timeout=False, keyword_timeout=False,
                  syntax=False, exit=False, continue_on_failure=False,
-                 skip=False, return_value=None):
+                 skip=False, return_value=None, unknown=False):
         if '\r\n' in message:
             message = message.replace('\r\n', '\n')
         from robot.utils import cut_long_message
@@ -119,6 +138,7 @@ class ExecutionStatus(RobotError):
         self.exit = exit
         self._continue_on_failure = continue_on_failure
         self.skip = skip
+        self.unknown = unknown
         self.return_value = return_value
 
     @property
@@ -158,7 +178,7 @@ class ExecutionStatus(RobotError):
 
     @property
     def status(self):
-        return 'FAIL' if not self.skip else 'SKIP'
+        return ('FAIL' if not self.unknown else 'UNKNOWN') if not self.skip else 'SKIP' 
 
 
 class ExecutionFailed(ExecutionStatus):
@@ -170,6 +190,7 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutError)
+        unknown = isinstance(error, UnknownAssertionError) or type(error) == Exception
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = isinstance(error, DataError) and error.syntax
@@ -177,7 +198,7 @@ class HandlerExecutionFailed(ExecutionFailed):
         continue_on_failure = self._get(error, 'CONTINUE_ON_FAILURE')
         skip = self._get(error, 'SKIP_EXECUTION')
         super().__init__(details.message, test_timeout, keyword_timeout, syntax,
-                         exit_on_failure, continue_on_failure, skip)
+                         exit_on_failure, continue_on_failure, skip, unknown=unknown)
 
     def _get(self, error, attr):
         return bool(getattr(error, 'ROBOT_' + attr, False))
@@ -226,7 +247,8 @@ class ExecutionFailures(ExecutionFailed):
             'syntax': any(e.syntax for e in errors),
             'exit': any(e.exit for e in errors),
             'continue_on_failure': all(e.continue_on_failure for e in errors),
-            'skip': any(e.skip for e in errors)
+            'skip': any(e.skip for e in errors),
+            'unknown': any(e.unknown for e in errors) 
         }
 
     def get_errors(self):

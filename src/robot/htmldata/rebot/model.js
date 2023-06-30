@@ -233,15 +233,17 @@ window.stats = (function () {
     }
 
     function statElem(stat) {
-        stat.total = stat.pass + stat.fail + stat.skip;
-        var percents = calculatePercents(stat.total, stat.pass, stat.fail, stat.skip);
+        stat.total = stat.pass + stat.fail + stat.skip + stat.unknown; 
+        var percents = calculatePercents(stat.total, stat.pass, stat.fail, stat.skip, stat.unknown); 
         stat.passPercent = percents[0];
         stat.skipPercent = percents[1];
         stat.failPercent = percents[2];
-        var widths = calculateWidths(stat.passPercent, stat.skipPercent, stat.failPercent);
+        stat.unknownPercent = percents[3];
+        var widths = calculateWidths(stat.passPercent, stat.skipPercent, stat.failPercent, stat.unknownPercent);
         stat.passWidth = widths[0];
         stat.skipWidth = widths[1];
         stat.failWidth = widths[2];
+        stat.unknownWidth = widths[3];
         return stat;
     }
 
@@ -273,32 +275,38 @@ window.stats = (function () {
             });
     }
 
-    function calculatePercents(total, passed, failed, skipped) {
+    function calculatePercents(total, passed, failed, skipped, unknown) { //nhtcuong
         if (total == 0) {
-            return [0.0, 0.0, 0.0];
+            return [0.0, 0.0, 0.0, 0.0];
         }
 
         var pass = 100.0 * passed / total;
         var skip = 100.0 * skipped / total;
         var fail = 100.0 * failed / total;
+        var unknow = 100.0 * unknown / total;
         if (pass > 0 && pass < 0.1)
             pass = 0.1
         if (fail > 0 && fail < 0.1)
             fail = 0.1
         if (skip > 0 && skip < 0.1)
             skip = 0.1
+        if (unknow > 0 && unknow < 0.1)
+            unknow = 0.1
         if (pass > 99.95 && pass < 100)
             pass = 99.9
         if (fail > 99.95 && fail < 100)
             fail = 99.9
         if (skip > 99.95 && skip < 100)
             skip = 99.9
-        return [Math.round(pass*10)/10, Math.round(skip*10)/10, Math.round(fail*10)/10];
+        if (unknow > 99.95 && unknow < 100)
+            unknow = 99.9
+            
+        return [Math.round(pass*10)/10, Math.round(skip*10)/10, Math.round(fail*10)/10, Math.round(unknow*10)/10];
     }
 
-    function calculateWidths(num1, num2, num3) {
-        if (num1 + num2 + num3 === 0)
-            return [0.0, 0.0, 0.0];
+    function calculateWidths(num1, num2, num3, num4) { 
+        if (num1 + num2 + num3 + num4 === 0)
+            return [0.0, 0.0, 0.0, 0.0];
         // Make small percentages better visible
         if (num1 > 0 && num1 < 1)
             num1 = 1
@@ -306,15 +314,18 @@ window.stats = (function () {
             num2 = 1
         if (num3 > 0 && num3 < 1)
             num3 = 1
-
+        if (num4 > 0 && num4 < 1)
+            num4 = 1
         // Handle situation where some are rounded up
-        while (num1 + num2 + num3 > 100) {
-            if (num1 > num2 && num1 > num3)
+        while (num1 + num2 + num3 + num4 > 100) {
+            if (num1 > num2 && num1 > num3 && num1 > num4)
                 num1 -= 0.1;
-            else if (num2 > num1 && num2 > num3)
+            else if (num2 > num1 && num2 > num3 && num2 > num4)
                 num2 -= 0.1;
-            else if (num3 > num1 && num3 > num2)
+            else if (num3 > num1 && num3 > num2 && num3 > num4)
                 num3 -= 0.1;
+            else if (num4 > num1 && num4 > num2 && num4 > num3)
+                num4 -= 0.1;
             else if (num1 > num3 && num1 == num2) {
                 num1 -= 0.1;
                 num2 -= 0.1;
@@ -328,7 +339,7 @@ window.stats = (function () {
                 num3 -= 0.1;
             }
         }
-        return [Math.ceil(num1*10)/10, Math.ceil(num2*10)/10, Math.ceil(num3*10)/10];
+        return [Math.ceil(num1*10)/10, Math.ceil(num2*10)/10, Math.ceil(num3*10)/10, Math.ceil(num4*10)/10];
     }
 
     return {
