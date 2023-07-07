@@ -19,6 +19,7 @@ import asyncio
 from contextlib import contextmanager
 
 from robot.errors import DataError
+from robot.utils import ThreadSafeDict, PriorityQueue  
 
 
 class Asynchronous:
@@ -107,6 +108,8 @@ class _ExecutionContext:
         self.steps = []
         self.user_keywords = []
         self.asynchronous = asynchronous
+        self.thread_message_queue_dict = ThreadSafeDict() 
+        self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
 
     @contextmanager
     def suite_teardown(self):

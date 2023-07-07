@@ -72,6 +72,8 @@ from .text import (cut_assign_value, cut_long_message, format_assign_message,
                    split_tags_from_doc, split_args_from_name_or_path)
 from .typehints import copy_signature, KnownAtRuntime
 from .unic import prepr, safe_str
+from .threadsafedict import ThreadSafeDict  
+from .priorityqueue import PriorityQueue  
 
 
 def read_rest_data(rstfile):

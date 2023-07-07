@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from robot.result.model import ForIteration, WhileIteration
     from robot.running.model import UserKeyword, ResourceFile
     from .control import (Break, Continue, Error, For, If, IfBranch, Return,
-                          Try, TryBranch, While)
+                          Try, TryBranch, While, Thread)
     from .keyword import Keyword
     from .message import Message
     from .testcase import TestCase
@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 BodyItemParent = Union['TestSuite', 'TestCase', 'UserKeyword', 'For', 'ForIteration',
                        'If', 'IfBranch', 'Try', 'TryBranch', 'While', 'WhileIteration',
-                       'Keyword', 'Return', 'Continue', 'Break', 'Error', None]
+                       'Keyword', 'Return', 'Continue', 'Break', 'Error', 'Thread', None]
 BI = TypeVar('BI', bound='BodyItem')
 KW = TypeVar('KW', bound='Keyword')
 F = TypeVar('F', bound='For')
@@ -48,6 +48,7 @@ B = TypeVar('B', bound='Break')
 M = TypeVar('M', bound='Message')
 E = TypeVar('E', bound='Error')
 IT = TypeVar('IT', bound='IfBranch|TryBranch')
+TH = TypeVar('TH', bound='Thread')
 
 
 class BodyItem(ModelObject):
@@ -70,6 +71,7 @@ class BodyItem(ModelObject):
     BREAK = 'BREAK'
     ERROR = 'ERROR'
     MESSAGE = 'MESSAGE'
+    THREAD = 'THREAD'  
     type = None
     __slots__ = ['parent']
 
@@ -111,7 +113,7 @@ class BodyItem(ModelObject):
         raise NotImplementedError
 
 
-class BaseBody(ItemList[BodyItem], Generic[KW, F, W, I, T, R, C, B, M, E]):
+class BaseBody(ItemList[BodyItem], Generic[KW, F, W, I, T, R, C, B, M, E, TH]):
     """Base class for Body and Branches objects."""
     __slots__ = []
     # Set using 'BaseBody.register' when these classes are created.
@@ -125,6 +127,7 @@ class BaseBody(ItemList[BodyItem], Generic[KW, F, W, I, T, R, C, B, M, E]):
     break_class: Type[B] = KnownAtRuntime
     message_class: Type[M] = KnownAtRuntime
     error_class: Type[E] = KnownAtRuntime
+    thread_class: Type[TH] = KnownAtRuntime
 
     def __init__(self, parent: BodyItemParent = None,
                  items: 'Iterable[BodyItem|DataDict]' = ()):
@@ -176,6 +179,10 @@ class BaseBody(ItemList[BodyItem], Generic[KW, F, W, I, T, R, C, B, M, E]):
     @copy_signature(if_class)
     def create_if(self, *args, **kwargs) -> if_class:
         return self._create(self.if_class, 'create_if', args, kwargs)
+
+    @copy_signature(thread_class)
+    def create_thread(self, *args, **kwargs) -> thread_class:
+        return self._create(self.thread_class, 'create_thread', args, kwargs)
 
     @copy_signature(try_class)
     def create_try(self, *args, **kwargs) -> try_class:

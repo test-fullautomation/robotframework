@@ -51,7 +51,7 @@ from robot.result import (Break as BreakResult, Continue as ContinueResult,
                           Error as ErrorResult, Return as ReturnResult)
 from robot.utils import setter
 
-from .bodyrunner import ForRunner, IfRunner, KeywordRunner, TryRunner, WhileRunner
+from .bodyrunner import ForRunner, IfRunner, KeywordRunner, TryRunner, WhileRunner, ThreadRunner 
 from .randomizer import Randomizer
 from .statusreporter import StatusReporter
 
@@ -140,6 +140,24 @@ class For(model.For, WithSource):
 
     def run(self, context, run=True, templated=False):
         return ForRunner(context, self.flavor, run, templated).run(self)
+
+
+@Body.register
+class Thread(model.Thread):
+    __slots__ = ['lineno', 'error']
+    body_class = Body
+
+    def __init__(self, name, daemon, parent=None, lineno=None, error=None):
+        super().__init__(name, daemon, parent)
+        self.lineno = lineno
+        self.error = error
+
+    @property
+    def source(self):
+        return self.parent.source if self.parent is not None else None
+
+    def run(self, context, run=True, templated=False):
+        return ThreadRunner(context, run, templated).run(self)
 
 
 @Body.register

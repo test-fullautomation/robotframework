@@ -23,15 +23,15 @@ from robot.errors import (BreakLoop, ContinueLoop, DataError, ExecutionFailed,
                           ExecutionFailures, ExecutionPassed, ExecutionStatus)
 from robot.result import (For as ForResult, While as WhileResult, If as IfResult,
                           IfBranch as IfBranchResult, Try as TryResult,
-                          TryBranch as TryBranchResult)
+                          TryBranch as TryBranchResult, Thread as ThreadResult)
 from robot.output import librarylogger as logger
 from robot.utils import (cut_assign_value, frange, get_error_message, get_timestamp,
                          is_list_like, is_number, plural_or_not as s, secs_to_timestr,
-                         seq2str, split_from_equals, type_name, Matcher, timestr_to_secs)
+                         seq2str, split_from_equals, type_name, Matcher, timestr_to_secs, PriorityQueue)
 from robot.variables import is_dict_variable, evaluate_expression
 
 from .statusreporter import StatusReporter
-
+import threading
 
 DEFAULT_WHILE_LIMIT = 10_000
 
@@ -514,6 +514,29 @@ class IfRunner:
         except Exception:
             msg = get_error_message()
             raise DataError(f'Invalid {branch.type} condition: {msg}')
+
+
+# cuongnht add thread
+class ThreadRunner(object):
+    _dry_run_stack = []
+
+    def __init__(self, context, run=True, templated=False):
+        self._context = context
+        self._run = run
+        self._templated = templated
+
+    def run(self, data):
+        thread_worker = threading.Thread(target=self.run_worker, args=(data,))
+        thread_worker.name = data.name
+        thread_worker.setDaemon(data.daemon)
+        self._context.thread_message_queue_dict[thread_worker.name] = PriorityQueue(queue_type='FIFO')
+        thread_worker.start()
+
+    def run_worker(self, data):
+        runner = BodyRunner(self._context, self._run, self._templated)
+        thread_result = ThreadResult(data.name, data.daemon)
+        with StatusReporter(data, thread_result, self._context, self._run):
+            runner.run(data.body)
 
 
 class TryRunner:

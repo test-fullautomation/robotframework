@@ -27,7 +27,7 @@ This package is considered stable.
 
 from .body import BaseBody, Body, BodyItem, BaseBranches
 from .configurer import SuiteConfigurer
-from .control import Break, Continue, Error, For, If, IfBranch, Return, Try, TryBranch, While
+from .control import Break, Continue, Error, For, If, IfBranch, Return, Try, TryBranch, While, Thread
 from .fixture import create_fixture
 from .itemlist import ItemList
 from .keyword import Keyword, Keywords

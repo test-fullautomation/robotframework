@@ -250,6 +250,8 @@ class TestCaseBuilder(NodeVisitor):
         self.test.body.create_keyword(name=node.keyword, args=node.args,
                                       assign=node.assign, lineno=node.lineno)
 
+    def visit_Thread(self, node):
+        ThreadBuilder(self.test).build(node)
     def visit_ReturnStatement(self, node):
         self.test.body.create_return(node.values, lineno=node.lineno,
                                      error=format_error(node.errors))
@@ -330,6 +332,8 @@ class KeywordBuilder(NodeVisitor):
     def visit_If(self, node):
         IfBuilder(self.kw).build(node)
 
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
     def visit_Try(self, node):
         TryBuilder(self.kw).build(node)
 
@@ -376,6 +380,8 @@ class ForBuilder(NodeVisitor):
     def visit_If(self, node):
         IfBuilder(self.model).build(node)
 
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
     def visit_Try(self, node):
         TryBuilder(self.model).build(node)
 
@@ -536,6 +542,44 @@ class TryBuilder(NodeVisitor):
     def visit_Error(self, node):
         self.model.body.create_error(lineno=node.lineno,
                                      values=node.values, error=format_error(node.errors))
+
+
+class ThreadBuilder(NodeVisitor):
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.model = None
+
+    def build(self, node):
+        error = format_error(self._get_errors(node))
+        self.model = self.parent.body.create_thread(
+            node.name, node.daemon, lineno=node.lineno, error=error
+        )
+        for step in node.body:
+            self.visit(step)
+        return self.model
+
+    def _get_errors(self, node):
+        errors = node.header.errors + node.errors
+        if node.end:
+            errors += node.end.errors
+        return errors
+
+    def visit_KeywordCall(self, node):
+        self.model.body.create_keyword(name=node.keyword, args=node.args,
+                                       assign=node.assign, lineno=node.lineno)
+
+    def visit_TemplateArguments(self, node):
+        self.model.body.create_keyword(args=node.args, lineno=node.lineno)
+
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
+
+    def visit_For(self, node):
+        ForBuilder(self.model).build(node)
+
+    def visit_If(self, node):
+        IfBuilder(self.model).build(node)
 
 
 class WhileBuilder(NodeVisitor):

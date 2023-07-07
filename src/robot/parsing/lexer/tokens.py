@@ -95,6 +95,9 @@ class Token:
     INLINE_IF = 'INLINE IF'
     ELSE_IF = 'ELSE IF'
     ELSE = 'ELSE'
+    THREAD = 'THREAD'
+    THREAD_NAME = 'THREAD NAME'
+    THREAD_DAEMON = 'THREAD DAEMON'
     TRY = 'TRY'
     EXCEPT = 'EXCEPT'
     FINALLY = 'FINALLY'
@@ -170,7 +173,7 @@ class Token:
         if value is None:
             value = {
                 Token.IF: 'IF', Token.INLINE_IF: 'IF', Token.ELSE_IF: 'ELSE IF',
-                Token.ELSE: 'ELSE', Token.FOR: 'FOR', Token.WHILE: 'WHILE',
+                Token.ELSE: 'ELSE', Token.FOR: 'FOR', Token.WHILE: 'WHILE', Token.THREAD: "THREAD",
                 Token.TRY: 'TRY', Token.EXCEPT: 'EXCEPT', Token.FINALLY: 'FINALLY',
                 Token.END: 'END', Token.CONTINUE: 'CONTINUE', Token.BREAK: 'BREAK',
                 Token.RETURN_STATEMENT: 'RETURN', Token.CONTINUATION: '...',

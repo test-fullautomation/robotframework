@@ -321,6 +321,50 @@ class WhileIteration(BodyItem, StatusMixin, DeprecatedAttributesMixin):
         return ''
 
 
+class ThreadBranch(model.IfBranch, StatusMixin, DeprecatedAttributesMixin):
+    body_class = Body
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, type: str = BodyItem.IF,
+                 condition: 'str|None' = None,
+                 status: str = 'FAIL',
+                 starttime: 'str|None' = None,
+                 endtime: 'str|None' = None,
+                 doc: str = '',
+                 parent: BodyItemParent = None):
+        super().__init__(type, condition, parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+    @property
+    @deprecated
+    def name(self) -> str:
+        return self.condition or ''
+
+
+@Body.register
+class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
+    branch_class = ThreadBranch
+    branches_class = Branches[branch_class]
+    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+
+    def __init__(self, name='ROBOT_THREAD1',  daemon=True, status='PASS',
+                 starttime=None, endtime=None, doc='', parent=None):
+        super().__init__(name, daemon, parent)
+        self.status = status
+        self.starttime = starttime
+        self.endtime = endtime
+        self.doc = doc
+
+    # @property
+    # @deprecated
+    # def name(self):
+    #     return '%s %s [ %s ]' % (' | '.join(self.variables), self.flavor,
+    #                              ' | '.join(self.values))
+
+
 @Body.register
 class While(model.While, StatusMixin, DeprecatedAttributesMixin):
     iteration_class = WhileIteration

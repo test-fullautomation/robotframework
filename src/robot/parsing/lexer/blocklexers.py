@@ -30,7 +30,7 @@ from .statementlexers import (BreakLexer, CommentLexer, CommentSectionHeaderLexe
                               SettingSectionHeaderLexer, SyntaxErrorLexer,
                               TaskSectionHeaderLexer, TestCaseSectionHeaderLexer,
                               TestCaseSettingLexer, TryHeaderLexer, VariableLexer,
-                              VariableSectionHeaderLexer, WhileHeaderLexer)
+                              VariableSectionHeaderLexer, WhileHeaderLexer, ThreadHeaderLexer)
 from .tokens import StatementTokens, Token
 
 
@@ -201,7 +201,7 @@ class TestCaseLexer(TestOrKeywordLexer):
 
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
         return (TestCaseSettingLexer, ForLexer, InlineIfLexer, IfLexer,
-                TryLexer, WhileLexer, SyntaxErrorLexer, KeywordCallLexer)
+                TryLexer, WhileLexer, ThreadLexer, SyntaxErrorLexer, KeywordCallLexer )
 
 
 class KeywordLexer(TestOrKeywordLexer):
@@ -211,7 +211,7 @@ class KeywordLexer(TestOrKeywordLexer):
         super().__init__(ctx.keyword_context())
 
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
-        return (KeywordSettingLexer, ForLexer, InlineIfLexer, IfLexer, ReturnLexer,
+        return (KeywordSettingLexer, ForLexer, ThreadLexer, InlineIfLexer, IfLexer, ReturnLexer,
                 TryLexer, WhileLexer, SyntaxErrorLexer, KeywordCallLexer)
 
 
@@ -229,7 +229,7 @@ class NestedBlockLexer(BlockLexer, ABC):
         super().input(statement)
         lexer = self.lexers[-1]
         if isinstance(lexer, (ForHeaderLexer, IfHeaderLexer, TryHeaderLexer,
-                              WhileHeaderLexer)):
+                              WhileHeaderLexer, ThreadHeaderLexer)):
             self._block_level += 1
         if isinstance(lexer, EndLexer):
             self._block_level -= 1
@@ -275,6 +275,15 @@ class IfLexer(NestedBlockLexer):
         return (InlineIfLexer, IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
                 ForLexer, TryLexer, WhileLexer, EndLexer, ReturnLexer, ContinueLexer,
                 BreakLexer, SyntaxErrorLexer, KeywordCallLexer)
+
+
+class ThreadLexer(NestedBlockLexer):
+
+    def handles(self, statement):
+        return ThreadHeaderLexer(self.ctx).handles(statement)
+
+    def lexer_classes(self):
+        return ThreadHeaderLexer, IfLexer, EndLexer, KeywordCallLexer
 
 
 class InlineIfLexer(NestedBlockLexer):
