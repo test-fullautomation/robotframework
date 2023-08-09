@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 
 from ..lexer import Token
 from ..model import (Block, Container, End, For, If, Keyword, NestedBlock,
-                     Statement, TestCase, Try, While)
+                     Statement, TestCase, Try, While, Thread)
 
 
 class Parser(ABC):
@@ -47,7 +47,8 @@ class BlockParser(Parser, ABC):
             Token.IF: IfParser,
             Token.INLINE_IF: IfParser,
             Token.TRY: TryParser,
-            Token.WHILE: WhileParser
+            Token.WHILE: WhileParser,
+			   Token.THREAD: ThreadParser
         }
 
     def handles(self, statement: Statement) -> bool:
@@ -95,6 +96,10 @@ class NestedBlockParser(BlockParser, ABC):
 
 class ForParser(NestedBlockParser):
     model: For
+
+
+class ThreadParser(NestedBlockParser):
+    model: Thread
 
 
 class WhileParser(NestedBlockParser):

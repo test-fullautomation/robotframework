@@ -906,6 +906,35 @@ class TemplateArguments(Statement):
 
 
 @Statement.register
+class ThreadHeader(Statement):
+    type = Token.THREAD
+
+    @classmethod
+    def from_params(cls, name, daemon, indent=FOUR_SPACES, separator=FOUR_SPACES, eol=EOL):
+        return cls([
+            Token(Token.SEPARATOR, indent),
+            Token(Token.THREAD),
+            Token(Token.SEPARATOR, separator),
+            Token(Token.THREAD_NAME, name),
+            Token(Token.SEPARATOR, separator),
+            Token(Token.THREAD_DAEMON, daemon),
+            Token(Token.EOL, eol)
+        ])
+
+    @property
+    def name(self):
+        return self.get_value(Token.THREAD_NAME)
+
+    @property
+    def daemon(self):
+        return bool(self.get_value(Token.THREAD_DAEMON))
+
+    def validate(self, ctx: 'ValidationContext'):
+        if not str(self.daemon).lower() in ("yes", "true", "t", "1"):
+            self.errors += ('%s has invalid daemon setting.' % self.type,)
+
+
+@Statement.register
 class ForHeader(Statement):
     type = Token.FOR
 

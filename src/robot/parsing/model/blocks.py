@@ -285,6 +285,30 @@ class For(NestedBlock):
             self.errors += ('FOR loop must have closing END.',)
 
 
+class Thread(NestedBlock):
+    _fields = ('header', 'body', 'end')
+
+    def __init__(self, header, body=None, end=None, errors=()):
+        self.header = header
+        self.body = body or []
+        self.end = end
+        self.errors = errors
+
+    @property
+    def name(self):
+        return self.header.name
+
+    @property
+    def daemon(self):
+        return self.header.daemon
+
+    def validate(self, ctx: 'ValidationContext'):
+        if not self.body:
+            self.errors += ('THREAD has empty body.',)
+        if not self.end:
+            self.errors += ('THREAD has no closing END.',)
+
+
 class Try(NestedBlock):
     _fields = ('header', 'body', 'next', 'end')
     header: 'TryHeader|ExceptHeader|ElseHeader|FinallyHeader'

@@ -258,7 +258,8 @@ class LoggerProxy(AbstractLoggerProxy):
         'Return': 'start_return',
         'Continue': 'start_continue',
         'Break': 'start_break',
-        'Error': 'start_error'
+        'Error': 'start_error',
+        'Thread': 'start_thread'
     }
     _end_keyword_methods = {
         'For': 'end_for',
@@ -272,7 +273,8 @@ class LoggerProxy(AbstractLoggerProxy):
         'Return': 'end_return',
         'Continue': 'end_continue',
         'Break': 'end_break',
-        'Error': 'end_error'
+        'Error': 'end_error',
+        'Thread': 'end_thread'
     }
 
     def start_keyword(self, kw):

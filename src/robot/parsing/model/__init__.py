@@ -16,6 +16,6 @@
 from .blocks import (Block, CommentSection, Container, File, For, If,
                      ImplicitCommentSection, InvalidSection, Keyword,
                      KeywordSection, NestedBlock, Section, SettingSection,
-                     TestCase, TestCaseSection, Try, VariableSection, While)
+                     TestCase, TestCaseSection, Try, VariableSection, While, Thread)
 from .statements import Config, End, Statement
 from .visitor import ModelTransformer, ModelVisitor

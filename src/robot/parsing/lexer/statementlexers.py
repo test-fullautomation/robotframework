@@ -230,6 +230,18 @@ class ForHeaderLexer(StatementLexer):
             self._lex_options('mode=', 'fill=')
 
 
+class ThreadHeaderLexer(StatementLexer):
+    token_type = Token.THREAD
+
+    def handles(self, statement):
+        return statement[0].value == 'THREAD'
+
+    def lex(self):
+        self.statement[0].type = Token.THREAD
+        self.statement[1].type = Token.THREAD_NAME
+        self.statement[2].type = Token.THREAD_DAEMON
+
+
 class IfHeaderLexer(TypeAndArguments):
     token_type = Token.IF
 

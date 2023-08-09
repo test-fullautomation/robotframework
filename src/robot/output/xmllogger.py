@@ -13,20 +13,40 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from robot.utils import get_timestamp, NullMarkupWriter, safe_str, XmlWriter
+from robot.utils import get_timestamp, NullMarkupWriter, safe_str, XmlWriter, ThreadSafeDict
 from robot.version import get_full_version
 from robot.result.visitor import ResultVisitor
 
 from .loggerhelper import IsLogged
+import threading
+import os
 
 
 class XmlLogger(ResultVisitor):
 
+    thread_writer_dict = ThreadSafeDict() 
+
     def __init__(self, path, log_level='TRACE', rpa=False, generator='Robot'):
         self._log_message_is_logged = IsLogged(log_level)
         self._error_message_is_logged = IsLogged('WARN')
-        self._writer = self._get_writer(path, rpa, generator)
+        self._get_writer(path, rpa, generator)
         self._errors = []
+        self.path = path
+        self.rpa = rpa
+        self.generator = generator
+
+    @property
+    def _writer(self):
+        thread_name = threading.current_thread().name
+        if thread_name not in XmlLogger.thread_writer_dict:
+            filename, file_extension = os.path.splitext(self.path)
+            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + '.' + file_extension, write_empty=False, usage='output')
+            XmlLogger.thread_writer_dict[thread_name].start('thread', {'name': thread_name,
+                                                                       'generator': get_full_version(self.generator),
+                                                                       'generated': get_timestamp(),
+                                                                       'rpa': 'true' if self.rpa else 'false',
+                                                                       'schemaversion': '4'})
+        return XmlLogger.thread_writer_dict[threading.current_thread().name]
 
     def _get_writer(self, path, rpa, generator):
         if not path:
@@ -36,6 +56,7 @@ class XmlLogger(ResultVisitor):
                                'generated': get_timestamp(),
                                'rpa': 'true' if rpa else 'false',
                                'schemaversion': '4'})
+        XmlLogger.thread_writer_dict['MainThread'] = writer  # cuongnht add thread
         return writer
 
     def close(self):
@@ -113,6 +134,26 @@ class XmlLogger(ResultVisitor):
     def end_for(self, for_):
         self._write_status(for_)
         self._writer.end('for')
+    def start_thread(self, thread_):
+        main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
+        main_thread_writer.start('thread', {'name': thread_.name,
+                                      'daemon': str(thread_.daemon)})
+        # self._writer.element('name', thread_.name)
+        # self._writer.element('daemon', thread_.daemon)
+        thread_.result.status = thread_.PASS
+        # self._get_thread_writer(thread_.name)
+        attrs = {'status': thread_.PASS, 'starttime': thread_.starttime or 'N/A',
+                 'endtime': thread_.endtime or 'N/A'}
+        if not (thread_.starttime and thread_.endtime):
+            attrs['elapsedtime'] = str(thread_.elapsedtime)
+        main_thread_writer.element('status', thread_.message, attrs)
+        # self._write_status(thread_)
+        main_thread_writer.element('doc', thread_.doc)
+        main_thread_writer.end('thread')
+
+    def end_thread(self, thread_):
+        self._write_status(thread_)
+        self._writer.end('thread')
 
     def start_for_iteration(self, iteration):
         self._writer.start('iter')

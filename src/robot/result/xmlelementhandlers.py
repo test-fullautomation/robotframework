@@ -106,7 +106,7 @@ class TestHandler(ElementHandler):
     tag = 'test'
     # 'tags' is for RF < 4 compatibility.
     children = frozenset(('doc', 'tags', 'tag', 'timeout', 'status', 'kw', 'if', 'for',
-                          'try', 'while', 'return', 'break', 'continue', 'error', 'msg'))
+                          'try', 'while', 'return', 'break', 'continue', 'error', 'msg', 'thread'))
 
     def start(self, elem, result):
         lineno = elem.get('line')
@@ -121,7 +121,7 @@ class KeywordHandler(ElementHandler):
     # 'arguments', 'assign' and 'tags' are for RF < 4 compatibility.
     children = frozenset(('doc', 'arguments', 'arg', 'assign', 'var', 'tags', 'tag',
                           'timeout', 'status', 'msg', 'kw', 'if', 'for', 'try',
-                          'while', 'return', 'break', 'continue', 'error'))
+                          'while', 'return', 'break', 'continue', 'error', 'thread'))
 
     def start(self, elem, result):
         elem_type = elem.get('type')
@@ -169,6 +169,15 @@ class KeywordHandler(ElementHandler):
         return result.body.create_keyword(kwname=elem.get('name'), type='ITERATION')
 
     _create_iteration = _create_foritem
+
+
+@ElementHandler.register
+class ThreadHandler(ElementHandler):
+    tag = 'thread'
+    children = frozenset(('var', 'value', 'doc', 'status', 'msg', 'kw'))
+
+    def start(self, elem, result):
+        return result.body.create_thread(elem.get('name'), elem.get('daemon'))
 
 
 @ElementHandler.register
