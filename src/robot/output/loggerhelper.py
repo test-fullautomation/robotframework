@@ -21,7 +21,8 @@ from robot.utils import get_timestamp, is_string, safe_str, console_encode
 
 
 LEVELS = {
-  'NONE'  : 7,
+  'NONE'  : 8,
+  'UNKNOWN' : 7, #nhtcuong
   'SKIP'  : 6,
   'FAIL'  : 5,
   'ERROR' : 4,
@@ -74,6 +75,14 @@ class AbstractLogger:
             html = True
             msg = msg[6:].lstrip()
         self.write(msg, 'SKIP', html)
+
+    # nhtcuong
+    def unknown(self, msg):
+        html = False
+        if msg.startswith("*HTML*"):
+            html = True
+            msg = msg[6:].lstrip()
+        self.write(msg, 'UNKNOWN', html)
 
     def error(self, msg):
         self.write(msg, 'ERROR')

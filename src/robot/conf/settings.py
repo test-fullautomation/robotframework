@@ -54,7 +54,8 @@ class _BaseSettings:
                  'TimestampOutputs' : ('timestampoutputs', False),
                  'LogTitle'         : ('logtitle', None),
                  'ReportTitle'      : ('reporttitle', None),
-                 'ReportBackground' : ('reportbackground', ('#9e9', '#f66', '#fed84f')),
+                 'ReportBackground' : ('reportbackground',
+                                       ('#9e9', '#f66', '#fed84f', '#66c7ff')), #nhtcuong
                  'SuiteStatLevel'   : ('suitestatlevel', -1),
                  'TagStatInclude'   : ('tagstatinclude', []),
                  'TagStatExclude'   : ('tagstatexclude', []),
@@ -258,12 +259,15 @@ class _BaseSettings:
         return self._split_from_colon(value)
 
     def _process_report_background(self, colors):
-        if colors.count(':') not in [1, 2]:
-            self._raise_invalid('ReportBackground', f"Expected format 'pass:fail:skip' "
+        if colors.count(':') not in [1, 3]:
+            self._raise_invalid('ReportBackground', f"Expected format 'pass:fail:unknown:skip' "
+				               									f"or 'pass:fail:unknown' "
                                                     f"or 'pass:fail', got '{colors}'.")
         colors = colors.split(':')
         if len(colors) == 2:
-            return colors[0], colors[1], '#fed84f'
+            return colors[0], colors[1], '#66c7ff', '#fed84f'
+        elif len(colors) == 3:
+            return colors[0], colors[1], colors[2], '#fed84f'
         return tuple(colors)
 
     def _process_tag_stat_combine(self, pattern):
@@ -719,7 +723,7 @@ class RebotSettings(_BaseSettings):
 
     def _resolve_background_colors(self):
         colors = self['ReportBackground']
-        return {'pass': colors[0], 'fail': colors[1], 'skip': colors[2]}
+        return {'pass': colors[0], 'fail': colors[1], 'skip': colors[2], 'unknown': colors[3]} #nhtcuong
 
     @property
     def merge(self):
