@@ -22,7 +22,7 @@ from robot.api import logger, SkipExecution
 from robot.api.deco import keyword
 from robot.errors import (BreakLoop, ContinueLoop, DataError, ExecutionFailed,
                           ExecutionFailures, ExecutionPassed, PassExecution,
-                          ReturnFromKeyword, VariableError)
+                          ReturnFromKeyword, VariableError, UnknownAssertionError)
 from robot.running import Keyword, RUN_KW_REGISTER
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.running.usererrorhandler import UserErrorHandler
@@ -528,6 +528,32 @@ class _Verify(_BuiltInBase):
         """
         self._set_and_remove_tags(tags)
         raise AssertionError(msg) if msg else AssertionError()
+
+    def unknown(self, msg=None, *tags):
+        """Unknown the test with the given message and optionally alters its tags.
+
+        The error message is specified using the ``msg`` argument.
+        It is possible to use HTML in the given error message, similarly
+        as with any other keyword accepting an error message, by prefixing
+        the error with ``*HTML*``.
+
+        It is possible to modify tags of the current test case by passing tags
+        after the message. Tags starting with a hyphen (e.g. ``-regression``)
+        are removed and others added. Tags are modified using `Set Tags` and
+        `Remove Tags` internally, and the semantics setting and removing them
+        are the same as with these keywords.
+
+        Examples:
+        | Unknown | Test not ready   |             | | # Unknown with the given message.    |
+        | Unknown | *HTML*<b>Test not ready</b> | | | # Unknown using HTML in the message. |
+        | Unknown | Test not ready   | not-ready   | | # Unknown and adds 'not-ready' tag.  |
+        | Unknown | OS not supported | -regression | | # Removes tag 'regression'.        |
+        | Unknown | My message       | tag    | -t*  | # Removes all tags starting with 't' except the newly added 'tag'. |
+
+        See `Fatal Error` if you need to stop the whole test execution.
+        """
+        self._set_and_remove_tags(tags)
+        raise UnknownAssertionError(msg) if msg else UnknownAssertionError()
 
     def fatal_error(self, msg=None):
         """Stops the whole test execution.

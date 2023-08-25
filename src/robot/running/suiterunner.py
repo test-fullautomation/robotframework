@@ -74,8 +74,11 @@ class SuiteRunner(SuiteVisitor):
                                        self._settings.dry_run)
         self._context.set_suite_variables(result)
         if not self._suite_status.failed:
-            ns.handle_imports()
+            ret_import = ns.handle_imports()
             ns.variables.resolve_delayed()
+            if ret_import != 0:
+                self._suite_status.failure.unknown = True
+
         result.doc = self._resolve_setting(result.doc)
         result.metadata = [(self._resolve_setting(n), self._resolve_setting(v))
                            for n, v in result.metadata.items()]
@@ -142,6 +145,7 @@ class SuiteRunner(SuiteVisitor):
         status = TestStatus(self._suite_status, result, settings.skip_on_failure,
                             settings.rpa)
         if status.exit:
+            status.failure.unknown = True
             self._add_exit_combine()
             result.tags.add('robot:exit')
         if status.passed:
@@ -189,9 +193,9 @@ class SuiteRunner(SuiteVisitor):
             result.message = status.message or result.message
         result.status = status.status
         result.endtime = get_timestamp()
-        failed_before_listeners = result.failed
+        failed_before_listeners = result.failed or result.unknown
         self._output.end_test(ModelCombiner(test, result))
-        if result.failed and not failed_before_listeners:
+        if (result.failed or result.unknown) and not failed_before_listeners:
             status.failure_occurred()
         self._context.end_test(result)
 

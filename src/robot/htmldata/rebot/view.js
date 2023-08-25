@@ -77,8 +77,9 @@ function addStatistics() {
         '<th class="stats-col-stat">Pass</th>' +
         '<th class="stats-col-stat">Fail</th>' +
         '<th class="stats-col-stat">Skip</th>' +
+        '<th class="stats-col-stat">Unknown</th>' +
         '<th class="stats-col-elapsed">Elapsed</th>' +
-        '<th class="stats-col-graph">Pass / Fail / Skip</th>';
+        '<th class="stats-col-graph">Pass / Fail / Skip / Unknown</th>';
     var statTable =
         '<h2>{Test} Statistics</h2>' +
         '<table class="statistics" id="total-stats"><thead><tr>' +
@@ -140,6 +141,7 @@ function renderNoTagStatTable() {
         '<td class="stats-col-stat"></td>' +
         '<td class="stats-col-stat"></td>' +
         '<td class="stats-col-stat"></td>' +
+        '<td class="stats-col-stat"></td>' +
         '<td class="stats-col-elapsed"></td>' +
         '<td class="stats-col-graph">' +
           '<div class="empty-graph"></div>' +
@@ -161,6 +163,7 @@ $.template('statColumnsTemplate',
     '<td class="stats-col-stat">${pass}</td>' +
     '<td class="stats-col-stat">${fail}</td>' +
     '<td class="stats-col-stat">${skip}</td>' +
+    '<td class="stats-col-stat">${unknown}</td>' +
     '<td class="stats-col-elapsed">${elapsed}</td>' +
     '<td class="stats-col-graph">' +
       '{{if total}}' +
@@ -168,6 +171,7 @@ $.template('statColumnsTemplate',
         '<div class="pass-bar" style="width: ${passWidth}%" title="${passPercent}%"></div>' +
         '<div class="fail-bar" style="width: ${failWidth}%" title="${failPercent}%"></div>' +
         '<div class="skip-bar" style="width: ${skipWidth}%" title="${skipPercent}%"></div>' +
+        '<div class="unknown-bar" style="width: ${unknownWidth}%" title="${unknownPercent}%"></div>' +
       '</div>' +
       '{{else}}' +
       '<div class="empty-graph"></div>' +
@@ -177,7 +181,7 @@ $.template('statColumnsTemplate',
 
 $.template('suiteStatusMessageTemplate',
     '${total} {{= testOrTask("{test}")}}{{if total != 1}}s{{/if}} total, ' +
-    '${pass} passed, ${fail} failed, ${skip} skipped'
+    '${pass} passed, ${fail} failed, ${skip} skipped, ${unknow} unknown'
 );
 
 // For complete cross-browser experience..

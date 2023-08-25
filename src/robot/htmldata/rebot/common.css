@@ -79,6 +79,9 @@ h2 {
 .pass {
     color: #098a09 !important;
 }
+.unknown {
+    color: #339 !important;
+}
 .skip {
     color: #927201 !important;
     font-weight: bold;
@@ -95,7 +98,7 @@ h2 {
 .label.debug, .label.trace, .label.error, .label.keyword {
     letter-spacing: 0;
 }
-.label.pass, .label.fail, .label.error, .label.skip, .label.warn {
+.label.pass, .label.fail, .label.error, .label.skip, .label.warn, .label.unknown {
     font-weight: bold;
 }
 .label.pass {
@@ -104,6 +107,11 @@ h2 {
 }
 .label.fail, .label.error {
     background-color: #ce3e01;
+    color: #fff !important;
+}
+
+.label.unknown {
+    background-color: #0080fe;
     color: #fff !important;
 }
 .label.skip, .label.warn {
@@ -199,7 +207,7 @@ th.stats-col-graph:hover {
 .empty-graph {
     background: #eee;
 }
-.pass-bar, .fail-bar, .skip-bar {
+.pass-bar, .fail-bar, .skip-bar, .unknown-bar {
     float: left;
     height: 100%;
 }
@@ -210,7 +218,10 @@ th.stats-col-graph:hover {
     background: #97bd61;
 }
 .skip-bar {
-    background: #fed84f;
+    background:  #fed84f;
+}
+.unknown-bar {
+    background:  #4f58fe;
 }
 /* Tablesorter - adapted from provided Blue Skin */
 .tablesorter-header {

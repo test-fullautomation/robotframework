@@ -270,3 +270,7 @@ class _ExecutionContext:
 
     def skip(self, message):
         self.output.skip(message)
+
+    # cuongnht - add unknown state
+    def unknown(self, message):
+        self.output.unknown(message)
