@@ -5,64 +5,64 @@ Resource          atest_resource.robot
 
 *** Test Cases ***
 IF without condition
-    FAIL
+    UNKNOWN
 
 IF without condition with ELSE
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 IF with invalid condition
-    FAIL
+    UNKNOWN
 
 IF with invalid condition with ELSE
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 IF condition with non-existing ${variable}
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 IF condition with non-existing $variable
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 ELSE IF with invalid condition
-    NOT RUN    NOT RUN    FAIL    NOT RUN    NOT RUN
+    NOT RUN    NOT RUN    UNKNOWN    NOT RUN    NOT RUN
 
 Recommend $var syntax if invalid condition contains ${var}
-    FAIL    index=1
+    UNKNOWN    index=1
 
 IF without END
-    FAIL
+    UNKNOWN
 
 Invalid END
-    FAIL
+    UNKNOWN
 
 IF with wrong case
     [Template]    NONE
     Check Test Case    ${TEST NAME}
 
 ELSE IF without condition
-    FAIL    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN
 
 ELSE IF with multiple conditions
     [Template]    NONE
-    ${tc} =    Branch statuses should be    FAIL    NOT RUN    NOT RUN
+    ${tc} =    Branch statuses should be    UNKNOWN    NOT RUN    NOT RUN
     Should Be Equal    ${tc.body[0].body[1].condition}    \${False}, ooops, \${True}
 
 ELSE with condition
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 IF with empty body
-    FAIL
+    UNKNOWN
 
 ELSE with empty body
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 ELSE IF with empty body
-    FAIL    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN
 
 ELSE after ELSE
-    FAIL    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN
 
 ELSE IF after ELSE
-    FAIL    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN
 
 Dangling ELSE
     [Template]    Check Test Case
@@ -93,10 +93,10 @@ Dangling ELSE IF inside TRY
     ${TEST NAME}
 
 Invalid IF inside FOR
-    FAIL
+    UNKNOWN
 
 Multiple errors
-    FAIL    NOT RUN    NOT RUN    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN    NOT RUN    NOT RUN
 
 Invalid data causes syntax error
     [Template]    Check Test Case
@@ -115,7 +115,7 @@ Branch statuses should be
     [Arguments]    @{statuses}    ${index}=0
     ${tc} =    Check Test Case    ${TESTNAME}
     ${if} =    Set Variable    ${tc.body}[${index}]
-    Should Be Equal    ${if.status}    FAIL
+    Should Be Equal    ${if.status}    UNKNOWN
     FOR    ${branch}    ${status}    IN ZIP    ${if.body}    ${statuses}    mode=STRICT
         Should Be Equal    ${branch.status}    ${status}
     END

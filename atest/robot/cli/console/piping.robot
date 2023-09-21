@@ -14,7 +14,7 @@ ${TARGET}         ${CURDIR}${/}piping.py
 *** Test Cases ***
 Pipe to command consuming all data
     Run with pipe and validate results    read_all
-    Should Be Equal    ${STDOUT}    17 lines with 'FAIL' found!
+    Should Be Equal    ${STDOUT}    14 lines with 'FAIL' found!
 
 Pipe to command consuming some data
     Run with pipe and validate results    read_some

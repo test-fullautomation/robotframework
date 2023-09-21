@@ -50,7 +50,7 @@ Failed due to error
 Skipped due to error
     [Arguments]    @{tests}
     FOR    ${name}    IN    @{tests}
-        ${tc} =    Check Test Case    ${name}    FAIL    ${MESSAGE}
+        ${tc} =    Check Test Case    ${name}    UNKNOWN    ${MESSAGE}
         Should Contain    ${tc.tags}    robot:exit
     END
 
@@ -58,7 +58,7 @@ Teardowns not executed
     [Arguments]    ${name}
     ${suite} =    Get Test Suite    ${name}
     Teardown Should Not Be Defined    ${suite}
-    ${tc} =    Check Test Case    ${name}    FAIL    ${MESSAGE}
+    ${tc} =    Check Test Case    ${name}    UNKNOWN    ${MESSAGE}
     Teardown Should Not Be Defined    ${tc}
 
 Teardowns executed

@@ -6,11 +6,11 @@ ${LOG KW}                Log
 
 *** Test Cases ***
 Run Keyword With Keyword with Invalid Number of Arguments
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     Run Keyword    Log
 
 Run Keyword With Missing Keyword
-    [Documentation]  FAIL No keyword with name 'Missing' found.
+    [Documentation]  UNKNOWN No keyword with name 'Missing' found.
     Run Keyword    Missing
 
 Keywords with variable in name are ignored
@@ -27,7 +27,7 @@ Run Keyword With UK
     Run Keyword  UK
 
 Run Keyword With Failing UK
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     Run Keyword  Failing UK
 
 Comment
@@ -64,11 +64,11 @@ Run Keywords When All Keywords Pass
     Run Keywords  Fail  No Operation  UK
 
 Run Keywords When One Keyword Fails
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     Run Keywords  Fail  No Operation  Log  UK
 
 Run Keywords When Multiple Keyword Fails
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  2) No keyword with name 'Missing' found.
     Run Keywords  Fail  No Operation  Log  UK  Missing
@@ -77,13 +77,13 @@ Run Keywords With Arguments When All Keywords Pass
     Run Keywords  Log Many  this  is  valid  AND  No Operation
 
 Run Keywords With Arguments When One Keyword Fails
-    [Documentation]  FAIL  ${LOG GOT WRONG ARGS} 12.
+    [Documentation]  UNKNOWN  ${LOG GOT WRONG ARGS} 12.
     Run Keywords  Log  valid  AND  Log  1  2  3  4  5  6  7  8  9  10  11  12
 
 Run Keywords With Arguments When Multiple Keyword Fails
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 8.\n\n
-    ...  2) No keyword with name 'Unknown Keyword' found.
+    ...  2) No keyword with name 'Unknown Keyword' found. Did you try using keyword 'BuiltIn.Unknown' and forgot to use enough whitespace between keyword and arguments?
     Run Keywords
     ...    Log    msg    DEBUG    and    too    many    args    we    have
     ...    AND
@@ -98,7 +98,7 @@ Run Keyword in For Loop Pass
     END
 
 Run Keyword in For Loop Fail
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     FOR    ${i}    IN RANGE    5
         Run Keyword    Log
     END
@@ -107,18 +107,18 @@ Wait Until Keyword Succeeds Pass
     Wait Until Keyword Succeeds  30 seconds  1 second  No Operation
 
 Wait Until Keyword Succeeds Fail
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     Wait Until Keyword Succeeds  30 seconds  1 second  Log
 
 Run Keyword If Pass
     Run Keyword If  ${TRUE}  No Operation
 
 Run Keyword If Fail
-    [Documentation]  FAIL ${LOG GOT WRONG ARGS} 0.
+    [Documentation]  UNKNOWN ${LOG GOT WRONG ARGS} 0.
     Run Keyword If  ${FALSE}  Log
 
 Run Keyword If with ELSE
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  2) ${UK GOT WRONG ARGS} 1.\n\n
     ...  3) No keyword with name 'Non Existing' found.\n\n
@@ -129,7 +129,7 @@ Run Keyword If with ELSE
     RUN_KEYWORD_IF    expression    Non Existing    ELSE    Log    1    2    3    4    5    6    7    8
 
 Run Keyword If with ELSE IF
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  2) ${UK GOT WRONG ARGS} 1.\n\n
     ...  3) No keyword with name 'Non Existing' found.\n\n
@@ -140,7 +140,7 @@ Run Keyword If with ELSE IF
     Run Keyword If    expr    Non Existing    ELSE IF    expr    Log    1    2    3    4    5    6    7    8
 
 Run Keyword If with ELSE IF and ELSE
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  2) ${UK GOT WRONG ARGS} 2.\n\n
     ...  3) No keyword with name 'not found kw' found.\n\n
@@ -151,7 +151,7 @@ Run Keyword If with ELSE IF and ELSE
     ...    ELSE    Log    1    2    3    4    5    6    7    8    9    10
 
 Run Keyword If with ELSE IF and ELSE without keywords
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) Invalid 'Run Keyword If' usage.\n\n
     ...  2) Invalid 'Run Keyword If' usage.\n\n
     ...  3) Invalid 'Run Keyword If' usage.\n\n
@@ -182,7 +182,7 @@ Run Keyword If with ELSE IF and ELSE without keywords
     Run Keyword If    True    ELSE
 
 Run Keyword If with escaped or non-caps ELSE IF and ELSE
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 8.\n\n
     ...  2) ${LOG GOT WRONG ARGS} 7.
      Run Keyword If    expr    Log    \ELSE IF    INFO    and    too    many    args    we    have
@@ -191,7 +191,7 @@ Run Keyword If with escaped or non-caps ELSE IF and ELSE
      Run Keyword If    expr    Log    else    too    many    args    again    here    is
 
 Run Keyword If with list variable in ELSE IF and ELSE
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 9.\n\n
     ...  2) ${LOG GOT WRONG ARGS} 8.
     Run Keyword If    @{list}
@@ -207,7 +207,7 @@ Run Keyword If with list variable in ELSE IF and ELSE
     ...  ELSE    @{list}
 
 Test Teardown Related Run Keyword Variants
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...  1) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  2) ${LOG GOT WRONG ARGS} 0.\n\n
     ...  3) ${LOG GOT WRONG ARGS} 0.
@@ -216,7 +216,7 @@ Test Teardown Related Run Keyword Variants
     Run Keyword If Timeout Occurred  Log
 
 Given/When/Then
-    [Documentation]  FAIL  Several failures occurred:\n\n
+    [Documentation]  UNKNOWN  Several failures occurred:\n\n
     ...    1) No keyword with name 'Nonex' found.\n\n
     ...    2) Keyword 'BuiltIn.Convert To Integer' expected 1 to 2 arguments, got 0.
     Given run keyword if    True    Log     This is really strange usage.....

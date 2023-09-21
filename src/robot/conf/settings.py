@@ -55,7 +55,7 @@ class _BaseSettings:
                  'LogTitle'         : ('logtitle', None),
                  'ReportTitle'      : ('reporttitle', None),
                  'ReportBackground' : ('reportbackground',
-                                       ('#9e9', '#f66', '#fed84f', '#66c7ff')), #nhtcuong
+                                       ('#9e9', '#f66', '#66c7ff', '#fed84f')), #nhtcuong
                  'SuiteStatLevel'   : ('suitestatlevel', -1),
                  'TagStatInclude'   : ('tagstatinclude', []),
                  'TagStatExclude'   : ('tagstatexclude', []),
@@ -723,7 +723,7 @@ class RebotSettings(_BaseSettings):
 
     def _resolve_background_colors(self):
         colors = self['ReportBackground']
-        return {'pass': colors[0], 'fail': colors[1], 'skip': colors[2], 'unknown': colors[3]} #nhtcuong
+        return {'pass': colors[0], 'fail': colors[1], 'unknown': colors[2], 'skip': colors[3]} #nhtcuong
 
     @property
     def merge(self):

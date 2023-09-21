@@ -41,7 +41,7 @@ Non-ASCII Failure in Keyword Teardown
     Non-ASCII Failure in Keyword Teardown
 
 Keyword cannot have only teardown
-    [Documentation]  FAIL User keyword cannot be empty.
+    [Documentation]  UNKNOWN User keyword cannot be empty.
     Keyword cannot have only teardown
 
 Replacing Variables in Keyword Teardown Fails

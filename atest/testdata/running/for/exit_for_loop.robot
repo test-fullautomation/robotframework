@@ -15,7 +15,7 @@ Exit For Loop In `Run Keyword`
     Should Be Equal    ${var}    two
 
 Exit For Loop is not supported in user keyword
-    [Documentation]    FAIL 'Exit For Loop' can only be used inside a loop.
+    [Documentation]    UNKNOWN 'Exit For Loop' can only be used inside a loop.
     FOR    ${var}    IN    one    two
         With Only Exit For Loop
         Fail    Should not be executed
@@ -37,7 +37,7 @@ Exit For Loop In User Keyword With Loop Within Loop
     Should Be Equal    ${x}    two-extra
 
 Exit For Loop In User Keyword Calling User Keyword With Exit For Loop
-    [Documentation]    FAIL 'Exit For Loop' can only be used inside a loop.
+    [Documentation]    UNKNOWN 'Exit For Loop' can only be used inside a loop.
     FOR    ${var}    IN    one    two
         With Keyword For Loop Calling Keyword With Exit For Loop
         ${x} =    Set Variable    ${var}-extra
@@ -45,11 +45,11 @@ Exit For Loop In User Keyword Calling User Keyword With Exit For Loop
     Should Be Equal    ${x}    two-extra
 
 Exit For Loop Without For Loop Should Fail
-   [Documentation]    FAIL 'Exit For Loop' can only be used inside a loop.
+   [Documentation]    UNKNOWN 'Exit For Loop' can only be used inside a loop.
    Exit For Loop
 
 Exit For Loop In User Keyword Without For Loop Should Fail
-   [Documentation]    FAIL 'Exit For Loop' can only be used inside a loop.
+   [Documentation]    UNKNOWN 'Exit For Loop' can only be used inside a loop.
    With Only Exit For Loop
 
 Exit For Loop In Test Teardown
@@ -60,7 +60,7 @@ Exit For Loop In Keyword Teardown
     Exit For Loop In Keyword Teardown
 
 Invalid Exit For Loop In User Keyword Teardown
-    [Documentation]    FAIL Keyword teardown failed:
+    [Documentation]    UNKNOWN Keyword teardown failed:
     ...                'Exit For Loop' can only be used inside a loop.
     FOR    ${var}    IN    one   two
         Invalid Exit For Loop In User Keyword Teardown

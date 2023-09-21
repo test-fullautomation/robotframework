@@ -76,7 +76,7 @@ class SuiteRunner(SuiteVisitor):
         if not self._suite_status.failed:
             ret_import = ns.handle_imports()
             ns.variables.resolve_delayed()
-            if ret_import != 0:
+            if ret_import != 0 and not self._settings.dry_run:
                 self._suite_status.failure.unknown = True
 
         result.doc = self._resolve_setting(result.doc)
@@ -115,6 +115,8 @@ class SuiteRunner(SuiteVisitor):
             if failure:
                 if failure.skip:
                     self._suite.suite_teardown_skipped(str(failure))
+                elif failure.unknown:
+                    self._suite.suite_teardown_unknown(str(failure))
                 else:
                     self._suite.suite_teardown_failed(str(failure))
         self._suite.endtime = get_timestamp()

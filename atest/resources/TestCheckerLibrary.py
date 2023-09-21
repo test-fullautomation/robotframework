@@ -333,7 +333,7 @@ class TestCheckerLibrary:
 class ProcessResults(ResultVisitor):
 
     def start_test(self, test):
-        for status in 'FAIL', 'SKIP', 'PASS':
+        for status in 'FAIL', 'SKIP', 'PASS', 'UNKNOWN':
             if status in test.doc:
                 test.exp_status = status
                 test.exp_message = test.doc.split(status, 1)[1].lstrip()

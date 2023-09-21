@@ -172,7 +172,7 @@ Assign inside loop
 
 Invalid assign inside loop
     ${tc} =    Check test case    ${TEST NAME}
-    Should be FOR loop    ${tc.kws[0]}    1    FAIL
+    Should be FOR loop    ${tc.kws[0]}    1    UNKNOWN
 
 Loop with non-existing keyword
     Check test case    ${TEST NAME}
