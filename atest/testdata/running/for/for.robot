@@ -197,7 +197,7 @@ Assign inside loop
     Should Be True     ${list} == ['v1', 'v2', 'vZ', 'Z']
 
 Invalid assign inside loop
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Cannot set variables: Expected list-like value, got string.
     FOR    ${i}    IN    1    2    3
         ${x}    ${y} =    Set Variable    Only one value
@@ -206,21 +206,21 @@ Invalid assign inside loop
     Fail    Not executed
 
 Loop with non-existing keyword
-    [Documentation]    FAIL     No keyword with name 'Non Existing' found.
+    [Documentation]    UNKNOWN     No keyword with name 'Non Existing' found.
     FOR    ${i}    IN    1    2    3
         Non Existing
     END
     Fail    Not Executed
 
 Loop with non-existing variable
-    [Documentation]    FAIL     Variable '\${nonexisting}' not found.
+    [Documentation]    UNKNOWN     Variable '\${nonexisting}' not found.
     FOR    ${i}    IN    1    2    3
         Log    ${nonexisting}
     END
     Fail    Not Executed
 
 Loop value with non-existing variable
-    [Documentation]    FAIL     Variable '\${nonexisting}' not found.
+    [Documentation]    UNKNOWN     Variable '\${nonexisting}' not found.
     FOR    ${i}    IN    1    2    ${nonexisting}
             Fail    Not Executed
     END
@@ -240,14 +240,14 @@ Multiple loop variables
     Should Be Equal    ${a}${b}${c}${d}${e}    12345
 
 Wrong number of loop variables 1
-    [Documentation]    FAIL     ${WRONG VALUES} Got 3 variables but 5 values.
+    [Documentation]    UNKNOWN     ${WRONG VALUES} Got 3 variables but 5 values.
     FOR    ${a}    ${b}    ${c}    IN    @{NUMS}
         Fail    Not executed
     END
     Fail    Not executed
 
 Wrong number of loop variables 2
-    [Documentation]    FAIL     ${WRONG VALUES} Got 4 variables but 3 values.
+    [Documentation]    UNKNOWN     ${WRONG VALUES} Got 4 variables but 3 values.
     FOR    ${a}    ${b}    ${c}    ${d}    IN    a     b    c
         Fail    Not executed
     END
@@ -275,7 +275,7 @@ Characters that are illegal in XML
     END
 
 Old :FOR syntax is not supported
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Support for the old FOR loop syntax has been removed. Replace ':FOR' with 'FOR', end the loop with 'END', and remove escaping backslashes.
     :FOR    ${x}    IN    a    b    c
        Fail    Should not be executed
@@ -283,7 +283,7 @@ Old :FOR syntax is not supported
     Fail    Should not be executed
 
 Escaping with backslash is not supported
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    No keyword with name '\\' found. If it is used inside a for loop, remove escaping backslashes and end the loop with 'END'.
     FOR    ${var}    IN    one    two
     \    Fail    Should not be executed
@@ -291,135 +291,135 @@ Escaping with backslash is not supported
     Fail    Should not be executed
 
 FOR is case and space sensitive 1
-    [Documentation]    FAIL    ${INVALID FOR}
+    [Documentation]    UNKNOWN    ${INVALID FOR}
     For    ${var}    IN    one    two
         Fail    Should not be executed
     END
 
 FOR is case and space sensitive 2
-    [Documentation]    FAIL    ${INVALID FOR}
+    [Documentation]    UNKNOWN    ${INVALID FOR}
     F O R    ${var}    IN    one    two
         Fail    Should not be executed
     END
 
 Invalid END usage 1
-    [Documentation]    FAIL    ${INVALID END}
+    [Documentation]    UNKNOWN    ${INVALID END}
     Log    No for loop here...
     END
 
 Invalid END usage 2
-    [Documentation]    FAIL    ${INVALID END}
+    [Documentation]    UNKNOWN    ${INVALID END}
     Invalid END usage in UK
 
 Empty body
-    [Documentation]    FAIL    FOR loop cannot be empty.
+    [Documentation]    UNKNOWN    FOR loop cannot be empty.
     FOR    ${var}    IN    one    two
     END
     Fail    Not executed
 
 No END
-    [Documentation]    FAIL    FOR loop must have closing END.
+    [Documentation]    UNKNOWN    FOR loop must have closing END.
     FOR    ${var}    IN    one    two
     Fail    Not executed
 
 Invalid END
-    [Documentation]    FAIL    END does not accept arguments, got 'ooops'.
+    [Documentation]    UNKNOWN    END does not accept arguments, got 'ooops'.
     FOR    ${var}    IN    one    two
         Fail    Not executed
     END    ooops
 
 No loop values
-    [Documentation]    FAIL    FOR loop has no loop values.
+    [Documentation]    UNKNOWN    FOR loop has no loop values.
     FOR    ${var}    IN
         Fail    Not Executed
     END
     Fail    Not Executed
 
 No loop variables
-    [Documentation]    FAIL    FOR loop has no loop variables.
+    [Documentation]    UNKNOWN    FOR loop has no loop variables.
     FOR    IN    one    two
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 1
-    [Documentation]    FAIL    FOR loop has invalid loop variable 'ooops'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable 'ooops'.
     FOR    ooops    IN    a    b    c
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 2
-    [Documentation]    FAIL    FOR loop has invalid loop variable 'ooops'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable 'ooops'.
     FOR    ${var}    ooops    IN    a    b    c
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 3
-    [Documentation]    FAIL    FOR loop has invalid loop variable '\@{ooops}'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable '\@{ooops}'.
     FOR    @{ooops}    IN    a    b    c
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 4
-    [Documentation]    FAIL    FOR loop has invalid loop variable '\&{ooops}'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable '\&{ooops}'.
     FOR    &{ooops}    IN    a    b    c
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 5
-    [Documentation]    FAIL    FOR loop has invalid loop variable '$var'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable '$var'.
     FOR    $var    IN    one    two
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid loop variable 6
-    [Documentation]    FAIL    FOR loop has invalid loop variable '\${not closed'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable '\${not closed'.
     FOR    ${not closed    IN    one    two    three
         Fail    Not Executed
     END
     Fail    Not Executed
 
 Invalid separator
-    [Documentation]    FAIL    FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN    FOR loop has no 'IN' or other valid separator.
     FOR    ${i}    IN INVALID    Mr. Fancypants
         Fail    This shouldn't ever execute.
     END
 
 Separator is case- and space-sensitive 1
-    [Documentation]    FAIL    FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN    FOR loop has no 'IN' or other valid separator.
     FOR    ${x}    in    a    b    c
         Fail    Should not be executed
     END
     Fail    Should not be executed
 
 Separator is case- and space-sensitive 2
-    [Documentation]    FAIL    FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN    FOR loop has no 'IN' or other valid separator.
     FOR    ${x}    IN RANG E    a    b    c
         Fail    Should not be executed
     END
     Fail    Should not be executed
 
 Separator is case- and space-sensitive 3
-    [Documentation]    FAIL    FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN    FOR loop has no 'IN' or other valid separator.
     FOR    ${x}    IN Enumerate    a    b    c
         Fail    Should not be executed
     END
     Fail    Should not be executed
 
 Separator is case- and space-sensitive 4
-    [Documentation]    FAIL    FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN    FOR loop has no 'IN' or other valid separator.
     FOR    ${x}    INZIP    a    b    c
         Fail    Should not be executed
     END
     Fail    Should not be executed
 
 FOR without any paramenters
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple errors:
     ...    - FOR loop has no loop variables.
     ...    - FOR loop has no 'IN' or other valid separator.
@@ -429,7 +429,7 @@ FOR without any paramenters
     Fail    Not Executed
 
 Syntax error in nested loop 1
-    [Documentation]    FAIL    FOR loop has invalid loop variable 'y'.
+    [Documentation]    UNKNOWN    FOR loop has invalid loop variable 'y'.
     FOR    ${x}    IN    ok
         FOR    y    IN    nok
             Fail    Should not be executed
@@ -437,7 +437,7 @@ Syntax error in nested loop 1
     END
 
 Syntax error in nested loop 2
-    [Documentation]    FAIL    FOR loop must have closing END.
+    [Documentation]    UNKNOWN    FOR loop must have closing END.
     FOR    ${x}    IN    end    missing
         FOR    ${y}    IN    ok
             Fail    Should not be executed
@@ -463,7 +463,7 @@ Unexecuted
     ...    Variable Should Not Exist    ${y}
 
 Header at the end of file
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple errors:
     ...    - FOR loop cannot be empty.
     ...    - FOR loop must have closing END.

@@ -56,7 +56,7 @@ from .configurer import SuiteConfigurer
 from .messagefilter import MessageFilter
 from .modeldeprecation import deprecated, DeprecatedAttributesMixin
 from .keywordremover import KeywordRemover
-from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandler
+from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandler, SuiteTeardownUnknown
 
 IT = TypeVar('IT', bound='IfBranch|TryBranch')
 FW = TypeVar('FW', bound='ForIteration|WhileIteration')
@@ -919,7 +919,7 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
         """
         stats = self.statistics  # Local variable avoids recreating stats.
         if stats.unknown:
-            return  self.UNKNOWN
+            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:
@@ -1007,6 +1007,10 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
     def suite_teardown_failed(self, message: str):
         """Internal usage only."""
         self.visit(SuiteTeardownFailed(message))
+
+    def suite_teardown_unknown(self, message: str):
+        """Internal usage only."""
+        self.visit(SuiteTeardownUnknown(message))
 
     def suite_teardown_skipped(self, message: str):
         """Internal usage only."""

@@ -13,7 +13,7 @@ Check test and failed loop
     Length Should Be    ${loop.body}    2
     Should Be Equal     ${loop.body[0].type}    ITERATION
     Should Be Equal     ${loop.body[1].type}    MESSAGE
-    Run Keyword    Should Be ${type} loop    ${loop}    1    FAIL    &{config}
+    Run Keyword    Should Be ${type} loop    ${loop}    1    UNKNOWN    &{config}
 
 Should be FOR loop
     [Arguments]    ${loop}    ${iterations}    ${status}=PASS    ${flavor}=IN

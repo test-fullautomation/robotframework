@@ -7,7 +7,7 @@ Expected
 ==============================================================================
 Run suite 'Suites' with 13 tests in *.
 
-FAILED
-13 tests, 1 passed, 12 failed
+UNKNOWNED
+13 tests, 1 passed, 1 failed, 11 unknown
 
 Output: *.xml

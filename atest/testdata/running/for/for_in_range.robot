@@ -83,21 +83,21 @@ Multiple variables
     Should Be True    ${result} == ['-1-0-1', '2-3-4', '5-6-7', '8-9-10']
 
 Too many arguments
-    [Documentation]    FAIL    FOR IN RANGE expected 1-3 values, got 4.
+    [Documentation]    UNKNOWN    FOR IN RANGE expected 1-3 values, got 4.
     FOR    ${i}    IN RANGE    1    2    3    4
         Fail    Not executed
     END
     Fail    Not executed
 
 No arguments
-    [Documentation]    FAIL    FOR loop has no loop values.
+    [Documentation]    UNKNOWN    FOR loop has no loop values.
     FOR    ${i}    IN RANGE
         Fail    Not executed
     END
     Fail    Not executed
 
 Non-number arguments 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    STARTS: Converting FOR IN RANGE values failed: SyntaxError:
     FOR    ${i}    IN RANGE    not a number
         Fail    Not executed
@@ -105,7 +105,7 @@ Non-number arguments 1
     Fail    Not executed
 
 Non-number arguments 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    STARTS: Converting FOR IN RANGE values failed: TypeError:
     FOR    ${i}    IN RANGE    0     ${NONE}
         Fail    Not executed
@@ -113,7 +113,7 @@ Non-number arguments 2
     Fail    Not executed
 
 Wrong number of variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop values should be multiple of its variables. \
     ...    Got 2 variables but 11 values.
     FOR    ${x}    ${y}    IN RANGE    11
@@ -122,7 +122,7 @@ Wrong number of variables
     Fail    Not executed
 
 Non-existing variables in arguments
-    [Documentation]    FAIL    Variable '\@{non existing}' not found.
+    [Documentation]    UNKNOWN    Variable '\@{non existing}' not found.
     FOR    ${i}    IN RANGE    @{non existing}
         Fail    Not executed
     END

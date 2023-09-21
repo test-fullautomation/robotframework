@@ -2546,6 +2546,20 @@ class _RunKeyword(_BuiltInBase):
         if suite.statistics.failed > 0:
             return self.run_keyword(name, *args)
 
+    @run_keyword_variant(resolve=0, dry_run=True)
+    def run_keyword_if_any_tests_unknown(self, name, *args):
+        """Runs the given keyword with the given arguments, if one or more tests unknown.
+
+        This keyword can only be used in a suite teardown. Trying to use it
+        anywhere else results in an error.
+
+        Otherwise, this keyword works exactly like `Run Keyword`, see its
+        documentation for more details.
+        """
+        suite = self._get_suite_in_teardown('Run Keyword If Any Tests Unknown')
+        if suite.statistics.unknown > 0:
+            return self.run_keyword(name, *args)
+
     def _get_suite_in_teardown(self, kwname):
         if not self._context.in_suite_teardown:
             raise RuntimeError("Keyword '%s' can only be used in suite teardown."

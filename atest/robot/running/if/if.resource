@@ -11,6 +11,8 @@ Check IF/ELSE Status
     Should Be Equal    ${root.type}    IF/ELSE ROOT
     IF    'FAIL' in ${statuses}
         Should Be Equal    ${root.status}    FAIL
+    ELSE IF    'UNKNOWN' in ${statuses}
+        Should Be Equal    ${root.status}    UNKNOWN
     ELSE IF    ${run}
         Should Be Equal    ${root.status}    PASS
     ELSE

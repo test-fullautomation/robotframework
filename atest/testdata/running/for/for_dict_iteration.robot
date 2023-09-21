@@ -18,7 +18,7 @@ FOR loop with two variables
     Should be true    ${result} == ['a:1', 'b:2', 'c:3']
 
 FOR loop with more than two variables is invalid
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop variables must be 1 or 2 when iterating over dictionaries, got 3.
     FOR    ${too}    ${many}    ${variables}    IN    &{DICT}
         Fail    Not executed
@@ -57,7 +57,7 @@ FOR IN ENUMERATE loop with start
     Should be true    ${result} == ['42:a:1', '43:b:2', '44:c:3']
 
 FOR IN ENUMERATE loop with more than three variables is invalid
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR IN ENUMERATE loop variables must be 1-3 when iterating over dictionaries, got 4.
     FOR    ${too}    ${many}    ${variables}    ${here}    IN ENUMERATE    &{DICT}
         Fail    Not executed
@@ -65,7 +65,7 @@ FOR IN ENUMERATE loop with more than three variables is invalid
     Fail    Not executed
 
 FOR IN RANGE loop doesn't support dict iteration
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    FOR IN RANGE loops do not support iterating over dictionaries.
     FOR    ${x}    IN RANGE    &{DICT}
         Fail    Not executed
@@ -73,7 +73,7 @@ FOR IN RANGE loop doesn't support dict iteration
     Fail    Not executed
 
 FOR IN ZIP loop doesn't support dict iteration
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    FOR IN ZIP loops do not support iterating over dictionaries.
     FOR    ${x}    IN ZIP   &{DICT}
         Fail    Not executed
@@ -126,7 +126,7 @@ Non-string keys
     Should be true    ${result} == ['1:one', '2:two']
 
 Invalid key
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    STARTS: Invalid dictionary item '\${{[]}}=ooops': TypeError:
     FOR    ${x}    IN    ${{[]}}=ooops    &{EMPTY}
         Fail    Not executed
@@ -134,7 +134,7 @@ Invalid key
     Fail    Not executed
 
 Invalid dict 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Value of variable '\&{TEST NAME}' is not dictionary or dictionary-like.
     FOR    ${x}    IN    &{TEST NAME}
         Fail    Not executed
@@ -142,7 +142,7 @@ Invalid dict 1
     Fail    Not executed
 
 Invalid dict 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    STARTS: Resolving variable '\&{{{[]: 'ooops'}}}' failed: \
     ...    Evaluating expression '{[]: 'ooops'}' failed: TypeError:
     FOR    ${x}    IN    &{{{[]: 'ooops'}}}
@@ -151,21 +151,21 @@ Invalid dict 2
     Fail    Not executed
 
 Non-existing variable 1
-    [Documentation]    FAIL Variable '\&{NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\&{NON EXISTING}' not found.
     FOR    ${x}    IN    &{NON EXISTING}
         Fail    Not executed
     END
     Fail    Not executed
 
 Non-existing variable 2
-    [Documentation]    FAIL Variable '\${non existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non existing}' not found.
     FOR    ${x}    IN    &{EMPTY}    key=${non existing}
         Fail    Not executed
     END
     Fail    Not executed
 
 Dict variables and invalid values 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid FOR loop value 'ååps'. When iterating over dictionaries, \
     ...    values must be '\&{dict}' variables or use 'key=value' syntax.
     FOR    ${x}    IN    &{DICT}    ååps    b=x
@@ -174,7 +174,7 @@ Dict variables and invalid values 1
     Fail    Not executed
 
 Dict variables and invalid values 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid FOR loop value '\${{'='}}'. When iterating over dictionaries, \
     ...    values must be '\&{dict}' variables or use 'key=value' syntax.
     FOR    ${i}    IN    &{DICT}    ${{'='}}
@@ -183,7 +183,7 @@ Dict variables and invalid values 2
     Fail    Not executed
 
 Dict variables and invalid values 3
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid FOR loop value 'invalid'. When iterating over dictionaries, \
     ...    values must be '\&{dict}' variables or use 'key=value' syntax.
     FOR    ${i}    IN    invalid    &{DICT}

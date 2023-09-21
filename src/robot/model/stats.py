@@ -81,7 +81,7 @@ class Stat(Sortable):
             self.passed += 1
         elif test.skipped:
             self.skipped += 1
-        elif test.unknown: #: nhtcuong Number of unknown tests.
+        elif test.unknown:  #: nhtcuong Number of unknown tests.
             self.unknown += 1
         else:
             self.failed += 1

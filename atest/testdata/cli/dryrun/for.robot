@@ -3,7 +3,7 @@ Resource        resource.robot
 
 *** Test Cases ***
 FOR
-    [Documentation]    FAIL    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
     FOR    ${i}    IN    a    b    c
         Log    ${i}
         Simple UK
@@ -15,7 +15,7 @@ FOR
     This is validated
 
 FOR IN RANGE
-    [Documentation]    FAIL    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
     FOR    ${i}    IN RANGE    10
         Log    ${i}
         Simple UK
@@ -26,7 +26,7 @@ FOR IN RANGE
     This is validated
 
 FOR IN ENUMERATE
-    [Documentation]    FAIL    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
     FOR    ${i}    IN ENUMERATE    a    b    c
         Log    ${i}
         Simple UK
@@ -37,7 +37,7 @@ FOR IN ENUMERATE
     This is validated
 
 FOR IN ZIP
-    [Documentation]    FAIL    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
     FOR    ${i}    IN ZIP    ${x}    ${y}
         Log    ${i}
         Simple UK

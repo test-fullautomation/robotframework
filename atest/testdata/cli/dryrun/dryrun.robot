@@ -88,7 +88,7 @@ Non-existing variable in user keyword return value
     This is validated
 
 Test Setup And Teardown
-    [Documentation]    FAIL    No keyword with name 'Does not exist' found.\n\n
+    [Documentation]    UNKNOWN    No keyword with name 'Does not exist' found.\n\n
     ...    Also teardown failed:\n
     ...    No keyword with name 'Does not exist' found.
     [Setup]  Log  Hello Setup
@@ -97,7 +97,7 @@ Test Setup And Teardown
     [Teardown]  Does not exist
 
 Keyword Teardown
-    [Documentation]    FAIL    Keyword teardown failed:
+    [Documentation]    UNKNOWN    Keyword teardown failed:
     ...    No keyword with name 'Does not exist' found.
     Keyword with Teardown
     This is validated
@@ -111,17 +111,17 @@ Keyword teardown with existing variable is resolved and executed
     This is validated
 
 Non-existing keyword name
-    [Documentation]    FAIL    No keyword with name 'Does not exist' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Does not exist' found.
     Does not exist
     This is validated
 
 Invalid syntax in UK
-    [Documentation]    FAIL    Invalid argument specification: Invalid argument syntax '${arg'.
+    [Documentation]    UNKNOWN    Invalid argument specification: Invalid argument syntax '${arg'.
     Invalid Syntax UK
     This is validated
 
 Multiple Failures
-    [Documentation]    FAIL    Several failures occurred:\n\n
+    [Documentation]    UNKNOWN    Several failures occurred:\n\n
     ...    1) Keyword 'BuiltIn.Should Be Equal' expected 2 to 8 arguments, got 1.\n\n
     ...    2) Invalid argument specification: Invalid argument syntax '${arg'.\n\n
     ...    3) Keyword 'Some Return Value' expected 2 arguments, got 3.\n\n
