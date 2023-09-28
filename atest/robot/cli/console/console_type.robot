@@ -71,7 +71,7 @@ Dotted does not show details for skipped after fatal error
     Stdout Should Be    dotted_exitonfailure_empty_test.txt
     Stderr Should Be    dotted_exitonfailure_empty_test_stderr.txt
     Check test tags    ${EMPTY}
-    ${tc} =    Check test case    Empty Test Case    FAIL
+    ${tc} =    Check test case    Empty Test Case    UNKNOWN
     ...    Failure occurred and exit-on-failure mode is in use.
     Should contain    ${tc.tags}    robot:exit
 

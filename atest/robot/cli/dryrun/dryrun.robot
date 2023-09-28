@@ -78,16 +78,16 @@ User keyword return value
 Non-existing variable in user keyword return value
     Check Test Case    ${TESTNAME}
 
-Test Setup and Teardown
+Test Setup And Teardown
     ${tc}=    Check Test Case    ${TESTNAME}
     Length Should Be      ${tc.kws}         2
     Check Keyword Data    ${tc.setup}       BuiltIn.Log    args=Hello Setup    status=NOT RUN    type=SETUP
-    Check Keyword Data    ${tc.teardown}    Does not exist    status=FAIL    type=TEARDOWN
+    Check Keyword Data    ${tc.teardown}    Does not exist    status=UNKNOWN    type=TEARDOWN
 
 Keyword Teardown
     ${tc}=    Check Test Case    ${TESTNAME}
     Length Should Be      ${tc.kws}              2
-    Check Keyword Data    ${tc.kws[0].teardown}   Does not exist    status=FAIL    type=TEARDOWN
+    Check Keyword Data    ${tc.kws[0].teardown}   Does not exist    status=UNKNOWN    type=TEARDOWN
 
 Keyword teardown with non-existing variable is ignored
     Check Test Case    ${TESTNAME}

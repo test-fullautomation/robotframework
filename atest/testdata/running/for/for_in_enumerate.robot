@@ -34,19 +34,19 @@ Escape start
     Should Be True    ${result} == [0, 1]
 
 Invalid start
-    [Documentation]    FAIL    Invalid start value: Start value must be an integer, got 'invalid'.
+    [Documentation]    UNKNOWN    Invalid start value: Start value must be an integer, got 'invalid'.
     FOR    ${index}    ${item}    IN ENUMERATE    xxx    start=invalid
         Fail    Should not be executed
     END
 
 Invalid variable in start
-    [Documentation]    FAIL    Invalid start value: Variable '\${invalid}' not found.
+    [Documentation]    UNKNOWN    Invalid start value: Variable '\${invalid}' not found.
     FOR    ${index}    ${item}    IN ENUMERATE    xxx    start=${invalid}
         Fail    Should not be executed
     END
 
 Start multiple times
-    [Documentation]    FAIL    Option 'start' allowed only once, got values '1', '2' and '3'.
+    [Documentation]    UNKNOWN    Option 'start' allowed only once, got values '1', '2' and '3'.
     FOR    ${index}    ${item}    IN ENUMERATE    xxx    start=1    start=2    start=3
         Fail    Should not be executed
     END
@@ -81,7 +81,7 @@ One variable only
     Should Be True    ${result} == ['0:a', '1:b', '2:c']
 
 Wrong number of variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR IN ENUMERATE loop values should be multiple of its \
     ...    variables (excluding the index). Got 3 variables but 4 values.
     FOR    ${index}    ${item1}    ${item2}    ${item3}    IN ENUMERATE    @{VALUES}
@@ -89,13 +89,13 @@ Wrong number of variables
     END
 
 No values
-    [Documentation]    FAIL    FOR loop has no loop values.
+    [Documentation]    UNKNOWN    FOR loop has no loop values.
     FOR    ${index}    ${item}    IN ENUMERATE
         Fail    Should not be executed.
     END
 
 No values with start
-    [Documentation]    FAIL    FOR loop has no loop values.
+    [Documentation]    UNKNOWN    FOR loop has no loop values.
     FOR    ${index}    ${item}    IN ENUMERATE    start=0
         Fail    Should not be executed.
     END

@@ -56,7 +56,7 @@ from .configurer import SuiteConfigurer
 from .messagefilter import MessageFilter
 from .modeldeprecation import deprecated, DeprecatedAttributesMixin
 from .keywordremover import KeywordRemover
-from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandler
+from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandler, SuiteTeardownUnknown
 
 IT = TypeVar('IT', bound='IfBranch|TryBranch')
 FW = TypeVar('FW', bound='ForIteration|WhileIteration')
@@ -107,6 +107,7 @@ class StatusMixin:
     PASS = 'PASS'
     FAIL = 'FAIL'
     SKIP = 'SKIP'
+    UNKNOWN = "UNKNOWN"  # cuongnht - add unknown state
     NOT_RUN = 'NOT RUN'
     NOT_SET = 'NOT SET'
     starttime: 'str|None'
@@ -188,7 +189,16 @@ class StatusMixin:
         self.status = self.FAIL if failed else self.PASS
 
     @property
-    def skipped(self) -> bool:
+    def unknown(self):
+        """``True`` when :attr:`status` is 'UNKNOWN', ``False`` otherwise."""
+        return self.status == self.UNKNOWN
+
+    @unknown.setter
+    def unknown(self, unknown):
+        self.status = self.UNKNOWN if unknown else self.PASS
+
+    @property
+    def skipped(self):
         """``True`` when :attr:`status` is 'SKIP', ``False`` otherwise.
 
         Setting to ``False`` value is ambiguous and raises an exception.
@@ -908,6 +918,8 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
           the case when all tests have been skipped and when there are no tests.
         """
         stats = self.statistics  # Local variable avoids recreating stats.
+        if stats.unknown:
+            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:
@@ -995,6 +1007,10 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
     def suite_teardown_failed(self, message: str):
         """Internal usage only."""
         self.visit(SuiteTeardownFailed(message))
+
+    def suite_teardown_unknown(self, message: str):
+        """Internal usage only."""
+        self.visit(SuiteTeardownUnknown(message))
 
     def suite_teardown_skipped(self, message: str):
         """Internal usage only."""

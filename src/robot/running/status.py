@@ -27,11 +27,12 @@ class Failure:
         self.setup_skipped = None
         self.test_skipped = None
         self.teardown_skipped = None
+        self.unknown = None # cuongnht - add unknown state
 
     def __bool__(self):
         return bool(
             self.setup or self.test or self.teardown or
-            self.setup_skipped or self.test_skipped or self.teardown_skipped
+            self.setup_skipped or self.test_skipped or self.teardown_skipped or self.unknown
         )
 
 
@@ -75,11 +76,17 @@ class _ExecutionStatus:
 
     @property
     def failed(self):
-        return bool(self.parent and self.parent.failed or self.failure or self.exit)
+        return bool(self.parent and self.parent.failed or
+                    (self.failure and not self.failure.unknown) or self.exit)  # cuongnht - add unknown state
+
+    @property
+    def unknown(self):
+        return bool(self.parent and self.parent.unknown or
+                    (self.failure and self.failure.unknown))
 
     @property
     def passed(self):
-        return not self.failed
+        return not self.failed and not self.unknown
 
     def setup_executed(self, error=None):
         if error and not isinstance(error, PassExecution):
@@ -91,6 +98,8 @@ class _ExecutionStatus:
                 self.failure.test = self._skip_on_fail_msg(f'Setup failed:\n{msg}')
                 self.skipped = True
             else:
+                if hasattr(error, 'unknown'):
+                    self.failure.unknown = error.unknown
                 self.failure.setup = msg
                 self.exit.failure_occurred(error.exit)
         self._teardown_allowed = True
@@ -105,6 +114,8 @@ class _ExecutionStatus:
                 self.failure.test = self._skip_on_fail_msg(f'Teardown failed:\n{msg}')
                 self.skipped = True
             else:
+                if hasattr(error, 'unknown'):
+                    self.failure.unknown = error.unknown
                 self.failure.teardown = msg
                 self.exit.failure_occurred(error.exit)
 
@@ -122,6 +133,8 @@ class _ExecutionStatus:
     def status(self):
         if self.skipped or (self.parent and self.parent.skipped):
             return 'SKIP'
+        if self.unknown:
+            return 'UNKNOWN' #nhtcuong
         if self.failed:
             return 'FAIL'
         return 'PASS'
@@ -182,6 +195,8 @@ class TestStatus(_ExecutionStatus):
             self.failure.test = self._skip_on_fail_msg(message)
             self.skipped = True
         else:
+            if hasattr(error, 'unknown'):
+                self.failure.unknown = error.unknown
             self.failure.test = message
             self.exit.failure_occurred(fatal)
 
@@ -214,6 +229,7 @@ class TestStatus(_ExecutionStatus):
 
 class _Message:
     setup_message = NotImplemented
+    setup_message_unknown = NotImplemented
     setup_skipped_message = NotImplemented
     teardown_skipped_message = NotImplemented
     teardown_message = NotImplemented
@@ -233,8 +249,12 @@ class _Message:
             return self._format_setup_or_teardown_message(
                 self.setup_skipped_message, self.failure.setup_skipped)
         if self.failure.setup:
+            setup_msg = self.setup_message
+            if hasattr(self.failure, 'unknown'):
+                if self.failure.unknown is True:
+                    setup_msg = self.setup_message_unknown
             return self._format_setup_or_teardown_message(
-                self.setup_message, self.failure.setup)
+                setup_msg, self.failure.setup)
         return self.failure.test_skipped or self.failure.test or ''
 
     def _format_setup_or_teardown_message(self, prefix, message):
@@ -269,6 +289,7 @@ class _Message:
 
 class TestMessage(_Message):
     setup_message = 'Setup failed:\n%s'
+    setup_message_unknown = 'Setup unknown:\n%s'
     teardown_message = 'Teardown failed:\n%s'
     setup_skipped_message = '%s'
     teardown_skipped_message = '%s'
@@ -299,6 +320,7 @@ class TestMessage(_Message):
 
 class SuiteMessage(_Message):
     setup_message = 'Suite setup failed:\n%s'
+    setup_message_unknown = 'Suite setup unknown:\n%s'
     setup_skipped_message = 'Skipped in suite setup:\n%s'
     teardown_skipped_message = 'Skipped in suite teardown:\n%s'
     teardown_message = 'Suite teardown failed:\n%s'
@@ -308,6 +330,7 @@ class SuiteMessage(_Message):
 
 class ParentMessage(SuiteMessage):
     setup_message = 'Parent suite setup failed:\n%s'
+    setup_message_unknown = 'Parent suite setup unknown:\n%s'
     setup_skipped_message = 'Skipped in parent suite setup:\n%s'
     teardown_skipped_message = 'Skipped in parent suite teardown:\n%s'
     teardown_message = 'Parent suite teardown failed:\n%s'

@@ -10,15 +10,15 @@ Valid positional args
     Normal and varargs and kwargs   1    2    3    4
 
 Too few arguments
-    [Documentation]  FAIL Keyword 'BuiltIn.Should Be Equal' expected 2 to 8 arguments, got 1.
+    [Documentation]  UNKNOWN Keyword 'BuiltIn.Should Be Equal' expected 2 to 8 arguments, got 1.
     Should Be Equal    1
 
 Too few arguments for UK
-    [Documentation]  FAIL Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 1.
+    [Documentation]  UNKNOWN Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 1.
     Anarchy in the UK    foo
 
 Too many arguments
-    [Documentation]  FAIL  Keyword 'BuiltIn.No Operation' expected 0 arguments, got 2.
+    [Documentation]  UNKNOWN  Keyword 'BuiltIn.No Operation' expected 0 arguments, got 2.
     No Operation    ${foo}    bar
 
 Valid named args
@@ -37,7 +37,7 @@ Valid named args
     Normal and varargs and kwargs    d=4    c=3    b=2    a=1
 
 Invalid named args
-    [Documentation]  FAIL Several failures occurred:\n\n
+    [Documentation]  UNKNOWN Several failures occurred:\n\n
     ...  1) Keyword 'Library.Normal Args' got unexpected named argument 'c'.\n\n
     ...  2) Keyword 'Library.Normal Args' got positional argument after named arguments.\n\n
     ...  3) Keyword 'Library.Normal Args' got unexpected named argument 'c'.\n\n

@@ -37,6 +37,8 @@ class XmlLogger(ResultVisitor):
 
     @property
     def _writer(self):
+        if not self.path:
+            return NullMarkupWriter()
         thread_name = threading.current_thread().name
         if thread_name not in XmlLogger.thread_writer_dict:
             filename, file_extension = os.path.splitext(self.path)

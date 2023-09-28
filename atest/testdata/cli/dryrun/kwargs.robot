@@ -3,7 +3,7 @@ Library    Library.py
 
 *** Test Cases ***
 Normal and kwargs
-    [Documentation]    FAIL Keyword 'Library.Normal And Kwargs' expected 1 non-named argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'Library.Normal And Kwargs' expected 1 non-named argument, got 0.
     Normal and kwargs    arg
     Normal and kwargs    arg    a=1    b=2
     Normal and kwargs    a=1
@@ -23,5 +23,5 @@ Kwargs
     Kwargs    @{EMPTY}
 
 Invalid kwargs
-    [Documentation]    FAIL Keyword 'Library.Varargs And Kwargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Library.Varargs And Kwargs' got positional argument after named arguments.
     Varargs and kwargs    a=1    @{EMPTY}    invalid

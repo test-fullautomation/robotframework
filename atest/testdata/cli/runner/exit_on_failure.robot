@@ -32,8 +32,8 @@ Test skipped-on-failure in teardown does not initiate exit-on-failure
     [Teardown]    Fail    Does not initiate exit-on-failure
 
 Failing test initiates exit-on-failure
-    [Documentation]    FAIL Initiates exit-on-failure
-    Fail    Initiates exit-on-failure
+    [Documentation]    UNKNOWN Initiates exit-on-failure
+    Unknown    Initiates exit-on-failure
 
 Not executed
     Fail    Not executed

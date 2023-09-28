@@ -73,11 +73,11 @@ List variable with iterables can be empty
 Strict mode
     ${tc} =    Check Test Case    ${TEST NAME}
     Should be IN ZIP loop      ${tc.body[0]}    3   PASS    mode=STRICT
-    Should be IN ZIP loop      ${tc.body[2]}    1   FAIL    mode=strict
+    Should be IN ZIP loop      ${tc.body[2]}    1   UNKNOWN    mode=strict
 
 Strict mode requires items to have length
     ${tc} =    Check Test Case    ${TEST NAME}
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=STRICT
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=STRICT
 
 Shortest mode
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -100,21 +100,21 @@ Longest mode with custom fill value
 
 Invalid mode
     ${tc} =    Check Test Case    ${TEST NAME}
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=bad
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=bad
 
 Config more than once
     ${tc} =    Check Test Case    ${TEST NAME} 1
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=longest, shortest
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=longest, shortest
     ${tc} =    Check Test Case    ${TEST NAME} 2
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=longest    fill=x, y, z
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=longest    fill=x, y, z
 
 Non-existing variable in mode
     ${tc} =    Check Test Case    ${TEST NAME}
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=\${bad}    fill=\${ignored}
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=\${bad}    fill=\${ignored}
 
 Non-existing variable in fill value
     ${tc} =    Check Test Case    ${TEST NAME}
-    Should be IN ZIP loop      ${tc.body[0]}    1   FAIL    mode=longest    fill=\${bad}
+    Should be IN ZIP loop      ${tc.body[0]}    1   UNKNOWN    mode=longest    fill=\${bad}
 
 Not iterable value
     Check test and failed loop    ${TEST NAME}    IN ZIP

@@ -1,10 +1,10 @@
 *** Test Cases ***
 For
-    [Documentation]    FAIL    'For' is a reserved keyword. It must be an upper case 'FOR' when used as a marker.
+    [Documentation]    UNKNOWN    'For' is a reserved keyword. It must be an upper case 'FOR' when used as a marker.
     For    ${x}    IN    invalid
 
 Valid END after For
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) 'For' is a reserved keyword. It must be an upper case 'FOR' when used as a marker.
@@ -15,19 +15,19 @@ Valid END after For
     END
 
 If
-    [Documentation]    FAIL    'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
     If    invalid
 
 Else If
-    [Documentation]    FAIL    'Else If' is a reserved keyword. It must be an upper case 'ELSE IF' and follow an opening 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'Else If' is a reserved keyword. It must be an upper case 'ELSE IF' and follow an opening 'IF' when used as a marker.
     Else If    invalid
 
 Else
-    [Documentation]    FAIL    'Else' is a reserved keyword. It must be an upper case 'ELSE' and follow an opening 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'Else' is a reserved keyword. It must be an upper case 'ELSE' and follow an opening 'IF' when used as a marker.
     Else
 
 Else inside valid IF
-    [Documentation]    FAIL    'Else' is a reserved keyword. It must be an upper case 'ELSE' and follow an opening 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'Else' is a reserved keyword. It must be an upper case 'ELSE' and follow an opening 'IF' when used as a marker.
     IF    False
         No operation
     Else
@@ -35,7 +35,7 @@ Else inside valid IF
     END
 
 Else If inside valid IF
-    [Documentation]    FAIL    'Else If' is a reserved keyword. It must be an upper case 'ELSE IF' and follow an opening 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'Else If' is a reserved keyword. It must be an upper case 'ELSE IF' and follow an opening 'IF' when used as a marker.
     IF    False
         No operation
     Else If    invalid
@@ -43,29 +43,29 @@ Else If inside valid IF
     END
 
 End
-    [Documentation]    FAIL    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
+    [Documentation]    UNKNOWN    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
     End
 
 End after valid FOR header
-    [Documentation]    FAIL    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
+    [Documentation]    UNKNOWN    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
     FOR    ${x}   IN    whatever
         Log    ${x}
     End
 
 End after valid If header
-    [Documentation]    FAIL    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
+    [Documentation]    UNKNOWN    'End' is a reserved keyword. It must be an upper case 'END' when used as a marker to close a block.
     IF    True
         No operation
     End
 
 Reserved inside FOR
-    [Documentation]    FAIL    'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
+    [Documentation]    UNKNOWN    'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
     FOR    ${x}    IN    whatever
         If    ${x}
     END
 
 Reserved inside IF
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) 'For' is a reserved keyword. It must be an upper case 'FOR' when used as a marker.

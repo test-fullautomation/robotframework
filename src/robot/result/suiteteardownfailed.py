@@ -23,6 +23,8 @@ class SuiteTeardownFailureHandler(SuiteVisitor):
         # Both 'PASS' and 'NOT RUN' statuses are OK.
         if teardown and teardown.status == teardown.FAIL:
             suite.suite_teardown_failed(teardown.message)
+        if teardown.status == teardown.UNKNOWN:
+            suite.suite_teardown_unknown(teardown.message)
         if teardown and teardown.status == teardown.SKIP:
             suite.suite_teardown_skipped(teardown.message)
 
@@ -52,6 +54,39 @@ class SuiteTeardownFailed(SuiteVisitor):
     def _suite_teardown_failed(self, test):
         if not test.skipped:
             test.status = test.FAIL
+        prefix = self._also_msg if test.message else self._normal_msg
+        test.message += prefix % self.message
+
+    def _suite_teardown_skipped(self, test):
+        test.status = test.SKIP
+        if test.message:
+            test.message = self._also_skip_msg % (self.message, test.message)
+        else:
+            test.message = self._normal_skip_msg % self.message
+
+    def visit_keyword(self, keyword):
+        pass
+
+
+class SuiteTeardownUnknown(SuiteVisitor):
+    _normal_msg = 'Parent suite teardown unknown:\n%s'
+    _also_msg = '\n\nAlso parent suite teardown unknown:\n%s'
+    _normal_skip_msg = 'Skipped in parent suite teardown:\n%s'
+    _also_skip_msg = 'Skipped in parent suite teardown:\n%s\n\nEarlier message:\n%s'
+
+    def __init__(self, message, skipped=False):
+        self.message = message
+        self.skipped = skipped
+
+    def visit_test(self, test):
+        if not self.skipped:
+            self._suite_teardown_unknown(test)
+        else:
+            self._suite_teardown_skipped(test)
+
+    def _suite_teardown_unknown(self, test):
+        if not test.skipped:
+            test.status = test.UNKNOWN
         prefix = self._also_msg if test.message else self._normal_msg
         test.message += prefix % self.message
 

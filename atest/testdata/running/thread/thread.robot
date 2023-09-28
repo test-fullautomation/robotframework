@@ -36,3 +36,4 @@ Thread wait for thread notification timeout
     END
     ${var}=     wait_thread_notification       thread notify      2
     LOG TO CONSOLE      ${var}
+

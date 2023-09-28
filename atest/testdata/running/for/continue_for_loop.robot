@@ -15,7 +15,7 @@ Continue For Loop In `Run Keyword`
     Should Be Equal    ${text}     onethree
 
 Continue For Loop is not supported in user keyword
-    [Documentation]    FAIL 'Continue For Loop' can only be used inside a loop.
+    [Documentation]    UNKNOWN 'Continue For Loop' can only be used inside a loop.
     FOR    ${var}    IN    one    two
         With Only Continue For Loop
         Fail    Should not be executed
@@ -44,11 +44,11 @@ Continue For Loop In User Keyword Calling User Keyword With Continue For Loop
     Should Be Equal    ${x}    two-extra
 
 Continue For Loop Without For Loop Should Fail
-   [Documentation]    FAIL 'Continue For Loop' can only be used inside a loop.
+   [Documentation]    UNKNOWN 'Continue For Loop' can only be used inside a loop.
    Continue For Loop
 
 Continue For Loop In User Keyword Without For Loop Should Fail
-   [Documentation]    FAIL 'Continue For Loop' can only be used inside a loop.
+   [Documentation]    UNKNOWN 'Continue For Loop' can only be used inside a loop.
    With Only Continue For Loop
 
 Continue For Loop In Test Teardown
@@ -59,7 +59,7 @@ Continue For Loop In Keyword Teardown
     Continue For Loop In Keyword Teardown
 
 Invalid Continue For Loop In User Keyword Teardown
-    [Documentation]    FAIL Keyword teardown failed:
+    [Documentation]    UNKNOWN Keyword teardown failed:
     ...                'Continue For Loop' can only be used inside a loop.
     FOR    ${var}    IN    one   two
         Invalid Continue For Loop In User Keyword Teardown
