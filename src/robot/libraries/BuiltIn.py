@@ -16,6 +16,7 @@
 import difflib
 import re
 import time
+import threading, queue
 from collections import OrderedDict
 
 from robot.api import logger, SkipExecution
@@ -32,7 +33,7 @@ from robot.utils import (DotDict, escape, format_assign_message, get_error_messa
                          normalize_whitespace, parse_re_flags, parse_time, prepr,
                          plural_or_not as s, RERAISED_EXCEPTIONS, safe_str,
                          secs_to_timestr, seq2str, split_from_equals,
-                         timestr_to_secs)
+                         timestr_to_secs, PriorityQueue, QueuedNotification)
 from robot.utils.asserts import assert_equal, assert_not_equal
 from robot.variables import (evaluate_expression, is_dict_variable,
                              is_list_variable, search_variable,
@@ -528,6 +529,54 @@ class _Verify(_BuiltInBase):
         """
         self._set_and_remove_tags(tags)
         raise AssertionError(msg) if msg else AssertionError()
+
+    def send_thread_notification(self, name, params):
+        """Send notification broadcast to others threads.
+
+        Examples:
+        | Send thread notification | Thread done   |  payloads           | | # Send message 'Thread done' with "payloads" data to others threads.    |
+        """
+        for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
+            if threading.current_thread().name != thread_name:
+                notification = QueuedNotification(name)
+                notification.params = params
+                thread_queue.put(notification)
+
+    def wait_thread_notification(self, name, timeout):
+        """Wait for notification from others threads.
+
+        Examples:
+        | Wait thread notification | Thread done   |             | | # Wait for message 'Thread done' from others threads.    |
+        """
+        is_receive = False
+        payloads = None
+        timeout = float(timeout)
+        max_time = time.time() + timeout
+        tmp_queue = PriorityQueue(queue_type="FIFO")
+        NQ = self._context.thread_message_queue_dict[threading.current_thread().name]
+        while time.time() < max_time:
+            try:
+                priority, notification = NQ.get(False)
+                if notification.name == name:
+                    is_receive = True
+                    payloads = notification.params
+                    break
+                else:
+                    tmp_queue.put(notification, priority)
+            except queue.Empty:
+                pass
+
+        while True:
+            try:
+                priority, notification = tmp_queue.get(False)
+                NQ.put(notification, priority)
+            except queue.Empty:
+                break
+
+        if not is_receive:
+            raise AssertionError("Unable to received thread notification '%s' in '%d' seconds." % (name, timeout))
+        else:
+            return payloads
 
     def fatal_error(self, msg=None):
         """Stops the whole test execution.

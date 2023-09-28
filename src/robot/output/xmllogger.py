@@ -40,7 +40,7 @@ class XmlLogger(ResultVisitor):
         thread_name = threading.current_thread().name
         if thread_name not in XmlLogger.thread_writer_dict:
             filename, file_extension = os.path.splitext(self.path)
-            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + '.' + file_extension, write_empty=False, usage='output')
+            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + file_extension, write_empty=False, usage='output')
             XmlLogger.thread_writer_dict[thread_name].start('thread', {'name': thread_name,
                                                                        'generator': get_full_version(self.generator),
                                                                        'generated': get_timestamp(),

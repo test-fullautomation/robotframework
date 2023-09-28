@@ -279,7 +279,7 @@ class IfLexer(NestedBlockLexer):
 
 class ThreadLexer(NestedBlockLexer):
 
-    def handles(self, statement):
+    def handles(self, statement: StatementTokens) -> bool:
         return ThreadHeaderLexer(self.ctx).handles(statement)
 
     def lexer_classes(self):
