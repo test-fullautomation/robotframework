@@ -238,8 +238,13 @@ class ThreadHeaderLexer(StatementLexer):
 
     def lex(self):
         self.statement[0].type = Token.THREAD
-        self.statement[1].type = Token.THREAD_NAME
-        self.statement[2].type = Token.THREAD_DAEMON
+        name_exist = False
+        for token in self.statement[1:]:
+            if not name_exist:
+               token.type = Token.THREAD_NAME
+               name_exist = True
+            else:
+               token.type = Token.THREAD_DAEMON
 
 
 class IfHeaderLexer(TypeAndArguments):

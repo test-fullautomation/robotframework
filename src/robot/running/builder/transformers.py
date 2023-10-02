@@ -252,6 +252,7 @@ class TestCaseBuilder(NodeVisitor):
 
     def visit_Thread(self, node):
         ThreadBuilder(self.test).build(node)
+
     def visit_ReturnStatement(self, node):
         self.test.body.create_return(node.values, lineno=node.lineno,
                                      error=format_error(node.errors))

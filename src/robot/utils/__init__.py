@@ -73,7 +73,7 @@ from .text import (cut_assign_value, cut_long_message, format_assign_message,
 from .typehints import copy_signature, KnownAtRuntime
 from .unic import prepr, safe_str
 from .threadsafedict import ThreadSafeDict  
-from .priorityqueue import PriorityQueue  
+from .priorityqueue import PriorityQueue, QueuedNotification
 
 
 def read_rest_data(rstfile):

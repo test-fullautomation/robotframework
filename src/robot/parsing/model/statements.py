@@ -923,15 +923,20 @@ class ThreadHeader(Statement):
 
     @property
     def name(self):
-        return self.get_value(Token.THREAD_NAME)
+        return self.get_value(Token.THREAD_NAME, "ROBOT_THREAD1")
 
     @property
     def daemon(self):
-        return bool(self.get_value(Token.THREAD_DAEMON))
+        return bool(self.get_value(Token.THREAD_DAEMON, "true"))
 
     def validate(self, ctx: 'ValidationContext'):
+        if not self.name:
+            self._add_error('no thread name')
         if not str(self.daemon).lower() in ("yes", "true", "t", "1"):
-            self.errors += ('%s has invalid daemon setting.' % self.type,)
+            self._add_error('invalid daemon setting')
+
+    def _add_error(self, error: str):
+        self.errors += (f'THREAD has {error}.',)
 
 
 @Statement.register

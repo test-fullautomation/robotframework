@@ -538,6 +538,18 @@ class ThreadRunner(object):
         with StatusReporter(data, thread_result, self._context, self._run):
             runner.run(data.body)
 
+    def _run_invalid(self, data):
+        error_reported = False
+        for branch in data.body:
+            result = ThreadResult(data.name, data.daemon)
+            with StatusReporter(branch, result, self._context, run=False, suppress=True):
+                runner = BodyRunner(self._context, run=False, templated=self._templated)
+                runner.run(branch.body)
+                if not error_reported:
+                    error_reported = True
+                    raise DataError(data.error, syntax=True)
+        raise ExecutionFailed(data.error, syntax=True)
+
 
 class TryRunner:
 

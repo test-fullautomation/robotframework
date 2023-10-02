@@ -1,6 +1,15 @@
 import queue
 
 
+class QueuedNotification:
+   def __init__(self, name=None):
+      self.params = {}
+      self.name = name
+
+   def __del__(self):
+      pass
+
+
 class PriorityQueue(queue.PriorityQueue, object):
    def __init__(self, queue_type="FIFO"):
       super(PriorityQueue, self).__init__()
