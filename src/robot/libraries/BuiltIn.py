@@ -530,17 +530,23 @@ class _Verify(_BuiltInBase):
         self._set_and_remove_tags(tags)
         raise AssertionError(msg) if msg else AssertionError()
 
-    def send_thread_notification(self, name, params):
-        """Send notification broadcast to others threads.
+    def send_thread_notification(self, name, params, dst_thread=None):
+        """Send notification broadcast to specific thread or the others threads.
 
         Examples:
-        | Send thread notification | Thread done   |  payloads           | | # Send message 'Thread done' with "payloads" data to others threads.    |
+        | Send thread notification | Thread done   |  payloads   | | # Send message 'Thread done' with "payloads" data to others threads.    |
+        | Send thread notification | Thread done   |  payloads   | destination_thread | # Send message 'Thread done' with "payloads" data to "destination_thread" thread.    |
         """
-        for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
-            if threading.current_thread().name != thread_name:
-                notification = QueuedNotification(name)
-                notification.params = params
-                thread_queue.put(notification)
+        if dst_thread is None:
+            for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
+                if threading.current_thread().name != thread_name:
+                    notification = QueuedNotification(name)
+                    notification.params = params
+                    thread_queue.put(notification)
+        elif dst_thread in self._context.thread_message_queue_dict:
+            notification = QueuedNotification(name)
+            notification.params = params
+            self._context.thread_message_queue_dict[dst_thread].put(notification)
 
     def wait_thread_notification(self, name, timeout):
         """Wait for notification from others threads.
