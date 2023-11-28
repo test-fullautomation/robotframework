@@ -20,7 +20,7 @@ from .logger import LOGGER
 from .loggerhelper import IsLogged
 
 
-def DebugFile(path):
+def DebugFile(path, log_level):
     if not path:
         LOGGER.info('No debug file')
         return None
@@ -31,18 +31,23 @@ def DebugFile(path):
         return None
     else:
         LOGGER.info('Debug file: %s' % path)
-        return _DebugFileWriter(outfile)
+        return _DebugFileWriter(outfile, log_level)
 
 
 class _DebugFileWriter:
     _separators = {'SUITE': '=', 'TEST': '-', 'KEYWORD': '~'}
 
-    def __init__(self, outfile):
+    def __init__(self, outfile, log_level):
         self._indent = 0
         self._kw_level = 0
         self._separator_written_last = False
         self._outfile = outfile
-        self._is_logged = IsLogged('DEBUG')
+
+        #qth2hi
+        if log_level == 'USER':
+            self._is_logged = IsLogged(log_level)
+        else:
+            self._is_logged = IsLogged('DEBUG')
 
     def start_suite(self, suite):
         self._separator('SUITE')
