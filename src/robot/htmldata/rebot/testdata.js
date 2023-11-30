@@ -3,7 +3,7 @@ window.testdata = function () {
     var elementsById = {};
     var idCounter = 0;
     var _statistics = null;
-    var LEVELS = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'FAIL', 'SKIP', 'UNKNOWN'];
+    var LEVELS = ['TRACE', 'DEBUG', 'INFO', 'USER', 'WARN', 'ERROR', 'FAIL', 'SKIP', 'UNKNOWN']; // qth2hi
     var STATUSES = ['FAIL', 'PASS', 'SKIP', 'NOT RUN', 'UNKNOWN'];
     var KEYWORD_TYPES = ['KEYWORD', 'SETUP', 'TEARDOWN', 'FOR', 'ITERATION', 'IF', 'ELSE IF', 'ELSE', 'RETURN',
                          'TRY', 'EXCEPT', 'FINALLY', 'WHILE', 'CONTINUE', 'BREAK', 'ERROR', 'THREAD'];

@@ -19,8 +19,10 @@ from robot.utils import get_timestamp, file_writer, seq2str2
 from .logger import LOGGER
 from .loggerhelper import IsLogged
 
+#qth2hi
+LOG_LEVEL_DEBUG_FILE = "INFO" # output caused by code in this file, depends on this trace level, compared against 'log_level'
 
-def DebugFile(path):
+def DebugFile(path, log_level):
     if not path:
         LOGGER.info('No debug file')
         return None
@@ -31,51 +33,100 @@ def DebugFile(path):
         return None
     else:
         LOGGER.info('Debug file: %s' % path)
-        return _DebugFileWriter(outfile)
+        return _DebugFileWriter(outfile, log_level)
 
 
 class _DebugFileWriter:
     _separators = {'SUITE': '=', 'TEST': '-', 'KEYWORD': '~'}
 
-    def __init__(self, outfile):
+    def __init__(self, outfile, log_level):
         self._indent = 0
         self._kw_level = 0
         self._separator_written_last = False
         self._outfile = outfile
-        self._is_logged = IsLogged('DEBUG')
+
+        #qth2hi
+        #previously hard coded level 'DEBUG' replaced by actual level 'log_level'
+        self._is_logged = IsLogged(log_level)
+
+
+    def get_level_from_kw_args(self, args=None): # qth2hi
+        # args expected to be a 'kw.args' tuple
+        supported_levels = ('ERROR', 'WARN', 'USER', 'INFO', 'DEBUG', 'TRACE') # not using LEVELS from loggerhelper.py here, because of more states inside there. A more strict separation is desired here.
+        identified_level = 'INFO' # the everywhere used default level 'INFO' is used as default here also
+        if args is None:
+            return identified_level
+        for arg in args:
+            if arg in supported_levels:
+                identified_level = arg
+                break
+        return identified_level
+
 
     def start_suite(self, suite):
-        self._separator('SUITE')
-        self._start('SUITE', suite.longname)
-        self._separator('SUITE')
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator('SUITE')
+            self._start('SUITE', suite.longname)
+            self._separator('SUITE')
 
     def end_suite(self, suite):
-        self._separator('SUITE')
-        self._end('SUITE', suite.longname, suite.elapsedtime)
-        self._separator('SUITE')
-        if self._indent == 0:
-            LOGGER.output_file('Debug', self._outfile.name)
-            self.close()
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator('SUITE')
+            self._end('SUITE', suite.longname, suite.elapsedtime)
+            self._separator('SUITE')
+            if self._indent == 0:
+                LOGGER.output_file('Debug', self._outfile.name)
+                self.close()
 
     def start_test(self, test):
-        self._separator('TEST')
-        self._start('TEST', test.name)
-        self._separator('TEST')
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator('TEST')
+            self._start('TEST', test.name)
+            self._separator('TEST')
 
     def end_test(self, test):
-        self._separator('TEST')
-        self._end('TEST', test.name, test.elapsedtime)
-        self._separator('TEST')
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator('TEST')
+            self._end('TEST', test.name, test.elapsedtime)
+            self._separator('TEST')
 
     def start_keyword(self, kw):
-        if self._kw_level == 0:
-            self._separator('KEYWORD')
-        self._start(kw.type, kw.name, kw.args)
-        self._kw_level += 1
+
+        log_kw_start = True
+
+        #qth2hi
+        if kw.name == 'BuiltIn.Log':
+            msg_level = self.get_level_from_kw_args(kw.args)
+            if self._is_logged(msg_level):
+                log_kw_start = True
+            else:
+                # suppress the logging of the start of a BuiltIn.Log keyword in case of no message is logged
+                # because of a trace level mismatch (to avoid useless content in debug log file)
+                log_kw_start = False
+
+        if log_kw_start is True:
+            if self._kw_level == 0:
+                self._separator('KEYWORD')
+            self._start(kw.type, kw.name, kw.args)
+            self._kw_level += 1
 
     def end_keyword(self, kw):
-        self._end(kw.type, kw.name, kw.elapsedtime)
-        self._kw_level -= 1
+
+        log_kw_end = True
+
+        #qth2hi
+        if kw.name == 'BuiltIn.Log':
+            msg_level = self.get_level_from_kw_args(kw.args)
+            if self._is_logged(msg_level):
+                log_kw_end = True
+            else:
+                # suppress the logging of the end of a BuiltIn.Log keyword in case of no message is logged
+                # because of a trace level mismatch (to avoid useless content in debug log file)
+                log_kw_end = False
+
+        if log_kw_end is True:
+            self._end(kw.type, kw.name, kw.elapsedtime)
+            self._kw_level -= 1
 
     def log_message(self, msg):
         if self._is_logged(msg.level):
@@ -87,12 +138,14 @@ class _DebugFileWriter:
 
     def _start(self, type_, name, args=''):
         args = ' ' + seq2str2(args)
-        self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
-        self._indent += 1
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
+            self._indent += 1
 
     def _end(self, type_, name, elapsed):
-        self._indent -= 1
-        self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._indent -= 1
+            self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
 
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)
