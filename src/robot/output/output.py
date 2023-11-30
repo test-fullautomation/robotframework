@@ -30,7 +30,7 @@ class Output(AbstractLogger):
         self._flat_xml_logger = None
         self.listeners = Listeners(settings.listeners, settings.log_level)
         self.library_listeners = LibraryListeners(settings.log_level)
-        self._register_loggers(DebugFile(settings.debug_file))
+        self._register_loggers(DebugFile(settings.debug_file, settings.log_level))
         self._settings = settings
         self._flatten_level = 0
 
