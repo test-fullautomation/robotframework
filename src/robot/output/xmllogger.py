@@ -39,7 +39,7 @@ class XmlLogger(ResultVisitor):
     def get_level_from_kw_args(self, args=None):
         # args expected to be a 'kw.args' tuple
         supported_levels = ('ERROR', 'WARN', 'USER', 'INFO', 'DEBUG', 'TRACE') # not using LEVELS from loggerhelper.py here, because of more states inside there. A more strict separation is desired here.
-        identified_level = 'INFO' # the everywhere used default level 'INFO' is used as default here also
+        identified_level = LOG_LEVEL_XML_FILE
         if args is None:
             return identified_level
         for arg in args:
