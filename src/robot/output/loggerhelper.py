@@ -27,7 +27,7 @@ LEVELS = {
    'FAIL'    : 6,
    'ERROR'   : 5,
    'WARN'    : 4,
-   'USER'    : 3, #qth2hi / has to fit to 'var LEVELS' in robot/htmldata/rebot/testdata.js / another 'var LEVELS' is defined in robot\htmldata\rebot\log.js (untouched)
+   'USER'    : 3, # has to fit to 'var LEVELS' in robot/htmldata/rebot/testdata.js
    'INFO'    : 2,
    'DEBUG'   : 1,
    'TRACE'   : 0,

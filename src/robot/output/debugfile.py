@@ -19,7 +19,6 @@ from robot.utils import get_timestamp, file_writer, seq2str2
 from .logger import LOGGER
 from .loggerhelper import IsLogged
 
-#qth2hi
 LOG_LEVEL_DEBUG_FILE = "INFO" # output caused by code in this file, depends on this trace level, compared against 'log_level'
 
 def DebugFile(path, log_level):
@@ -40,20 +39,17 @@ class _DebugFileWriter:
     _separators = {'SUITE': '=', 'TEST': '-', 'KEYWORD': '~'}
 
     def __init__(self, outfile, log_level):
-        self._indent = 0
-        self._kw_level = 0
+        self._indent                 = 0
+        self._kw_level               = 0
         self._separator_written_last = False
-        self._outfile = outfile
-
-        #qth2hi
-        #previously hard coded level 'DEBUG' replaced by actual level 'log_level'
-        self._is_logged = IsLogged(log_level)
+        self._outfile                = outfile
+        self._is_logged              = IsLogged(log_level) # previously hard coded level 'DEBUG' replaced by actual level 'log_level'
 
 
-    def get_level_from_kw_args(self, args=None): # qth2hi
+    def get_level_from_kw_args(self, args=None):
         # args expected to be a 'kw.args' tuple
         supported_levels = ('ERROR', 'WARN', 'USER', 'INFO', 'DEBUG', 'TRACE') # not using LEVELS from loggerhelper.py here, because of more states inside there. A more strict separation is desired here.
-        identified_level = 'INFO' # the everywhere used default level 'INFO' is used as default here also
+        identified_level = LOG_LEVEL_DEBUG_FILE
         if args is None:
             return identified_level
         for arg in args:
@@ -91,10 +87,7 @@ class _DebugFileWriter:
             self._separator('TEST')
 
     def start_keyword(self, kw):
-
         log_kw_start = True
-
-        #qth2hi
         if kw.name == 'BuiltIn.Log':
             msg_level = self.get_level_from_kw_args(kw.args)
             if self._is_logged(msg_level):
@@ -111,10 +104,7 @@ class _DebugFileWriter:
             self._kw_level += 1
 
     def end_keyword(self, kw):
-
         log_kw_end = True
-
-        #qth2hi
         if kw.name == 'BuiltIn.Log':
             msg_level = self.get_level_from_kw_args(kw.args)
             if self._is_logged(msg_level):
@@ -150,7 +140,7 @@ class _DebugFileWriter:
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)
 
-    def _write(self, text, separator=False, level='INFO', timestamp=None):
+    def _write(self, text, separator=False, level=LOG_LEVEL_DEBUG_FILE, timestamp=None):
         if separator and self._separator_written_last:
             return
         if not separator:
