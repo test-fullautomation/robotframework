@@ -45,15 +45,31 @@
 # ------------------------------------------
 
    "RELEASES"  : {
-                   "0.9." : [
-                              "Robotframework change 0.9 A",
-                              "Robotframework change 0.9 B",
-                              "Robotframework change 0.9 X"
-                            ],
                    "0.10." : [
-                               "Robotframework change 0.10 A",
-                               "Robotframework change 0.10 B",
-                               "Robotframework change 0.10 X"
+"
+**New log level USER**
+
+This release introduces a new log level **USER**. In the hierarchy of log levels, the level **USER** is located between **INFO** and **WARNING**.
+It can be used to have a better separation between user specific log output and standard INFO messages from Robot Framework itself.
+
+The default log level ist still **INFO**. Therefore the log level **USER** has to be set explicitely. This can be done in the following ways:
+
+* *In robot code*:
+
+   .. code::
+
+      log    my log message    USER
+
+* *In command line of test execution*: 
+
+   .. code::
+
+      python.exe -m robot --loglevel USER testfile.robot
+
+More details can be found in
+`RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_
+chapter \"Logging\".
+"
                              ]
                  }
 }
