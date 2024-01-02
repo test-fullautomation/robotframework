@@ -47,12 +47,12 @@
    "RELEASES"  : {
                    "0.10." : [
 "
-**New log level USER**
+**New log level** ``USER``
 
-This release introduces a new log level **USER**. In the hierarchy of log levels, the level **USER** is located between **INFO** and **WARNING**.
-It can be used to have a better separation between user specific log output and standard INFO messages from Robot Framework itself.
+This release introduces a new log level ``USER``. In the hierarchy of log levels, the level ``USER`` is located between ``INFO`` and ``WARNING``.
+It can be used to have a better separation between user specific log output and standard ``INFO`` messages from Robot Framework itself.
 
-The default log level ist still **INFO**. Therefore the log level **USER** has to be set explicitely. This can be done in the following ways:
+The default log level ist still ``INFO``. Therefore the log level ``USER`` has to be set explicitely. This can be done in the following ways:
 
 * *In robot code*:
 
