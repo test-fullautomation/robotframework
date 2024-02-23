@@ -44,34 +44,34 @@ Log Levels In Resource File
    # -- with explicite log level
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    ERROR
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    ERROR
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    WARN
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    WARN
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    USER
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    USER
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    INFO
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    INFO
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    DEBUG
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    DEBUG
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    TRACE
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}    TRACE
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    # -- without explicite log level (default log level assumed to be INFO)
 
    ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    DEFAULT
+   Should Be Equal    ${bAck}    ${True}    Failed to execute the log level resource file
    Log    ${log_message}
-   Should Be Equal    ${bAck}    ${True}    ${log_message}
 
 
 # **************************************************************************************************************

@@ -16,9 +16,11 @@
 #
 # **************************************************************************************************************
 #
-# ClogLevelTest.py.py
+# ClogLevelTest.py
 #
 # XC-HWP/ESW3-Queckenstedt
+#
+# 23.02.2024
 #
 # --------------------------------------------------------------------------------------------------------------
 
@@ -113,15 +115,15 @@ class ClogLevelTest():
     # eof def get_module_info(...):
 
     # --------------------------------------------------------------------------------------------------------------
-    #TM***
 
     @keyword
     def get_single_log_message(self, origin="UNKNOWN", log_level="UNKNOWN"):
         bAck, sMessage = self.__oLogData.get_single_log_message(origin, log_level)
+        if bAck is not True:
+            BuiltIn().log(sMessage, "ERROR")
         return bAck, sMessage
 
     # --------------------------------------------------------------------------------------------------------------
-    #TM***
 
     @keyword
     def execute_log_level_test_file(self, log_level=None):
@@ -305,19 +307,6 @@ class ClogLevelTest():
         return SUCCESS
 
     # eof def __CheckOutputFiles(self):
-
-    # --------------------------------------------------------------------------------------------------------------
-
-    # # # TODO: move to another Module
-    # # @keyword
-    # # def test_log(self, msg="test log line from Python library"):
-       # # BuiltIn().log(f"ERROR: {msg}", "ERROR")
-       # # BuiltIn().log(f"WARN: {msg}", "WARN")
-       # # BuiltIn().log(f"USER: {msg}", "USER")
-       # # BuiltIn().log(f"INFO: {msg}", "INFO")
-       # # BuiltIn().log(f"DEBUG: {msg}", "DEBUG")
-       # # BuiltIn().log(f"TRACE: {msg}", "TRACE")
-       # # BuiltIn().log(f"self.sMessageLevel: {self.sMessageLevel}: {msg}", self.sMessageLevel)
 
     # --------------------------------------------------------------------------------------------------------------
 

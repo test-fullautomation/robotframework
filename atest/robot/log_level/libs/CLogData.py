@@ -118,7 +118,7 @@ class CLogData():
         if file_type not in ("LOG", "XML"):
             return listExpectedContent
 
-        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE")
+        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE", "PYTHON_LIBRARY")
         tupleExpectedLevels = self.__dictExpectedLevels[log_level]
 
         for origin in tupleOrigins:
@@ -154,7 +154,7 @@ class CLogData():
         if file_type not in ("LOG", "XML"):
             return listDeclinedContent
 
-        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE")
+        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE", "PYTHON_LIBRARY")
         tupleDeclinedLevels = self.__dictDeclinedLevels[log_level]
 
         for origin in tupleOrigins:
