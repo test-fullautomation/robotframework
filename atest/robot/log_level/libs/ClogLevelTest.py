@@ -40,7 +40,7 @@ from CLogData import CLogData
 MODULE_NAME    = "ClogLevelTest.py"
 TEST_NAME      = "log level test"
 MODULE_VERSION = "0.1.0"
-MODULE_DATE    = "22.02.2024"
+MODULE_DATE    = "23.02.2024"
 THIS_MODULE    = f"{MODULE_NAME} v. {MODULE_VERSION} / {MODULE_DATE}"
 THIS_TEST      = f"{TEST_NAME} v. {MODULE_VERSION} / {MODULE_DATE}"
 #
@@ -117,7 +117,8 @@ class ClogLevelTest():
 
     @keyword
     def get_single_log_message(self, origin="UNKNOWN", log_level="UNKNOWN"):
-        return self.__oLogData.get_single_log_message(origin, log_level)
+        bAck, sMessage = self.__oLogData.get_single_log_message(origin, log_level)
+        return bAck, sMessage
 
     # --------------------------------------------------------------------------------------------------------------
     #TM***
@@ -250,6 +251,10 @@ class ClogLevelTest():
                file_type = "XML"
            listExpectedContent = self.__oLogData.get_expected_content_list(log_level, file_type)
 
+           # debug #
+           # for sExpectedContent in listExpectedContent:
+               # BuiltIn().log(f"sExpectedContent: '{sExpectedContent}'", "WARN")
+
            for sLine in listFileContent:
                for sExpectedContent in listExpectedContent:
                    if sExpectedContent in sLine:
@@ -274,6 +279,10 @@ class ClogLevelTest():
            elif sOutputFile.upper().endswith('.XML'):
                file_type = "XML"
            listDeclinedContent = self.__oLogData.get_declined_content_list(log_level, file_type)
+
+           # debug #
+           # for sDeclinedContent in listDeclinedContent:
+               # BuiltIn().log(f"sDeclinedContent: '{sDeclinedContent}'", "WARN")
 
            listFoundButDeclinedContent = []
            for sLine in listFileContent:

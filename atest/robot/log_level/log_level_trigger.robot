@@ -28,19 +28,16 @@ Library    Collections
 Library    BuiltIn
 Library    Process
 
-# 'ClogLevelTest' defines all required test settings, incl. versioning
 Library    ./libs/ClogLevelTest.py
 
 Documentation    "Log Level Trigger" test suite
 
-*** Variables ***
+# --------------------------------------------------------------------------------------------------------------
 
 *** Test Cases ***
 
-# **************************************************************************************************************
-
 Log Level Trigger
-   [Documentation]    Executes the "Log Level" test (log_level.robot) with different log levels
+   [Documentation]    Executes the "Log Level" test (log_level.robot) with all available log levels
 
    ${test_info}=    Get Test Info
    Log    === [LOG_LEVEL_TRIGGER_TEST] This is test '${test_info}'

@@ -16,71 +16,62 @@
 #
 # **************************************************************************************************************
 #
-# Test file log_level.robot with Log keyword calls for all available log levels.
+# Resource file log_level.resource with Log keyword calls for all available log levels.
 #
-# This file is executed by log_level_trigger.robot with all available log levels.
+# The keyword in this file is executed in log_level.robot.
 #
 # --------------------------------------------------------------------------------------------------------------
 
 *** Settings ***
 
-Library    Collections
-Library    BuiltIn
+Documentation     Log keyword calls for all available log levels.
 
-Library    ./libs/ClogLevelTest.py
+*** Settings ***
 
-Resource    ./log_level_addons/log_level.resource
-
-Documentation    "log_level" test suite
+Library    ../libs/ClogLevelTest.py
 
 # --------------------------------------------------------------------------------------------------------------
 
-*** Test Cases ***
-
-# TODO: Read from Python keyword library
+*** Keywords ***
 
 # Get Single Log Message:
 # * parameter 1: the origin of the 'Log' keyowrd; one of "ROBOT_FILE", "RESOURCE_FILE", "PYTHON_LIBRARY"
 # * parameter 2: the log level of the 'Log' keyowrd
 
-Log Level Test
+Log Levels In Resource File
    [Documentation]    Executes the "Log" keyword with all available log levels
 
    # -- with explicite log level
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    ERROR
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    ERROR
    Log    ${log_message}    ERROR
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    WARN
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    WARN
    Log    ${log_message}    WARN
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    USER
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    USER
    Log    ${log_message}    USER
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    INFO
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    INFO
    Log    ${log_message}    INFO
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    DEBUG
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    DEBUG
    Log    ${log_message}    DEBUG
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    TRACE
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    TRACE
    Log    ${log_message}    TRACE
    Should Be Equal    ${bAck}    ${True}    ${log_message}
 
    # -- without explicite log level (default log level assumed to be INFO)
 
-   ${bAck}    ${log_message}=    Get Single Log Message    ROBOT_FILE    DEFAULT
+   ${bAck}    ${log_message}=    Get Single Log Message    RESOURCE_FILE    DEFAULT
    Log    ${log_message}
    Should Be Equal    ${bAck}    ${True}    ${log_message}
-
-   # -- the same again, but now by keyword defined within an imported resource file
-
-   Log Levels In Resource File
 
 
 # **************************************************************************************************************

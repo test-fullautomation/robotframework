@@ -20,7 +20,7 @@
 #
 # XC-HWP/ESW3-Queckenstedt
 #
-# 22.02.2024
+# 23.02.2024
 #
 # --------------------------------------------------------------------------------------------------------------
 
@@ -88,8 +88,11 @@ class CLogData():
 
     # content used in Log keywords
     def get_single_log_message(self, origin="TEST", log_level="DEFAULT"):
+        if log_level not in self.__tupleLogLevels:
+            sMessage = f"Log level '{log_level}' not supported by this self test. Expected one of [" + ", ".join(self.__tupleLogLevels) + "]"
+            return False, sMessage
         dictLogMessages = self.get_log_messages(origin)
-        return dictLogMessages[log_level]
+        return True, dictLogMessages[log_level]
 
     # --------------------------------------------------------------------------------------------------------------
 
@@ -115,24 +118,27 @@ class CLogData():
         if file_type not in ("LOG", "XML"):
             return listExpectedContent
 
-        origin="ROBOT_FILE" # !!! TODO: loop over all origins !!!
-
-        dictLogMessages     = self.get_log_messages(origin)
+        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE")
         tupleExpectedLevels = self.__dictExpectedLevels[log_level]
-        for sLevel in tupleExpectedLevels:
-            # Put together the part from Robot Framework (the log level label)
-            # and the part from this test (the log messages).
-            # The format of the log level label in output files depends on the file type.
-            log_level_label = sLevel
-            if sLevel == "DEFAULT":
-                log_level_label = self.dictDefaultLogLevel[sLevel]
-            sExpectedContent = ""
-            if file_type == "LOG":
-                sExpectedContent = f"- {log_level_label} - {dictLogMessages[sLevel]}"
-            elif file_type == "XML":
-                sExpectedContent = f"level=\"{log_level_label}\">{dictLogMessages[sLevel]}"
-            listExpectedContent.append(sExpectedContent)
-        # eof for sLevel in tupleExpectedLevels:
+
+        for origin in tupleOrigins:
+            dictLogMessages = self.get_log_messages(origin)
+            for sLevel in tupleExpectedLevels:
+                # Put together the part from Robot Framework (the log level label)
+                # and the part from this test (the log messages).
+                # The format of the log level label in output files depends on the file type.
+                log_level_label = sLevel
+                if sLevel == "DEFAULT":
+                    log_level_label = self.dictDefaultLogLevel[sLevel]
+                sExpectedContent = ""
+                if file_type == "LOG":
+                    sExpectedContent = f"- {log_level_label} - {dictLogMessages[sLevel]}"
+                elif file_type == "XML":
+                    sExpectedContent = f"level=\"{log_level_label}\">{dictLogMessages[sLevel]}"
+                listExpectedContent.append(sExpectedContent)
+            # eof for sLevel in tupleExpectedLevels:
+        # eof for origin in tupleOrigins:
+
         return listExpectedContent
     # eof def get_expected_content_list(...):
 
@@ -148,27 +154,30 @@ class CLogData():
         if file_type not in ("LOG", "XML"):
             return listDeclinedContent
 
-        origin="ROBOT_FILE" # !!! TODO: loop over all origins !!!
-
-        dictLogMessages     = self.get_log_messages(origin)
+        tupleOrigins        = ("ROBOT_FILE", "RESOURCE_FILE")
         tupleDeclinedLevels = self.__dictDeclinedLevels[log_level]
-        for sLevel in tupleDeclinedLevels:
-            # Put together the part from Robot Framework (the log level label)
-            # and the part from this test (the log messages).
-            # The format of the log level label in output files depends on the file.
-            log_level_label = sLevel
-            if sLevel == "DEFAULT":
-                log_level_label = self.dictDefaultLogLevel[sLevel]
-            sDeclinedContent = ""
-            if file_type == "LOG":
-                sDeclinedContent = f"- {log_level_label} - {dictLogMessages[sLevel]}"
-                listDeclinedContent.append(sDeclinedContent)
-            elif file_type == "XML":
-                if sLevel not in ("ERROR", "WARN"):
-                    # errors and warnings are always content of XML file - and therefore not declined
-                    sDeclinedContent = f"level=\"{log_level_label}\">{dictLogMessages[sLevel]}"
+
+        for origin in tupleOrigins:
+            dictLogMessages = self.get_log_messages(origin)
+            for sLevel in tupleDeclinedLevels:
+                # Put together the part from Robot Framework (the log level label)
+                # and the part from this test (the log messages).
+                # The format of the log level label in output files depends on the file.
+                log_level_label = sLevel
+                if sLevel == "DEFAULT":
+                    log_level_label = self.dictDefaultLogLevel[sLevel]
+                sDeclinedContent = ""
+                if file_type == "LOG":
+                    sDeclinedContent = f"- {log_level_label} - {dictLogMessages[sLevel]}"
                     listDeclinedContent.append(sDeclinedContent)
-        # eof for sLevel in tupleDeclinedLevels:
+                elif file_type == "XML":
+                    if sLevel not in ("ERROR", "WARN"):
+                        # errors and warnings are always content of XML file - and therefore not declined
+                        sDeclinedContent = f"level=\"{log_level_label}\">{dictLogMessages[sLevel]}"
+                        listDeclinedContent.append(sDeclinedContent)
+            # eof for sLevel in tupleDeclinedLevels:
+        # eof for origin in tupleOrigins:
+
         return listDeclinedContent
     # eof def get_declined_content_list(...):
 
