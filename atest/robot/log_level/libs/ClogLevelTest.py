@@ -20,7 +20,7 @@
 #
 # XC-HWP/ESW3-Queckenstedt
 #
-# 23.02.2024
+# 26.02.2024
 #
 # --------------------------------------------------------------------------------------------------------------
 
@@ -33,6 +33,7 @@ from robot.libraries.BuiltIn import BuiltIn
 
 # -- import test specific Python modules
 from CLogData import CLogData
+from CComparison import CComparison
 
 # --------------------------------------------------------------------------------------------------------------
 #
@@ -42,7 +43,7 @@ from CLogData import CLogData
 MODULE_NAME    = "ClogLevelTest.py"
 TEST_NAME      = "log level test"
 MODULE_VERSION = "0.1.0"
-MODULE_DATE    = "23.02.2024"
+MODULE_DATE    = "26.02.2024"
 THIS_MODULE    = f"{MODULE_NAME} v. {MODULE_VERSION} / {MODULE_DATE}"
 THIS_TEST      = f"{TEST_NAME} v. {MODULE_VERSION} / {MODULE_DATE}"
 #
@@ -76,10 +77,12 @@ class ClogLevelTest():
         self.__oLogData = CLogData()
 
         # path and name of Robot Framework log files to check; file names depend on log level and counter value and will be computed later
-        self.__sOutputFile_XML    = None
-        self.__sOutputFile_LOG    = None
-        self.__sOutputFile_REPORT = None
-        self.__sOutputFile_DEBUG  = None
+        self.__sOutputFile_XML     = None
+        self.__sOutputFile_LOG     = None
+        self.__sOutputFile_REPORT  = None
+        self.__sOutputFile_DEBUG   = None
+        self.__sOutputFile_XML_REF = None
+        self.__sPatternFile_XML    = None
 
         # enable a sorted occurrence of log files in file explorer (sorted by log level); the numbers are part of the output file names
         self.__dictLevelNumber = {}
@@ -173,6 +176,18 @@ class ClogLevelTest():
         self.__sOutputFile_LOG    = f"{sOutputDir}/{sLevelNumber}.log_level_{log_level}_log.html"
         self.__sOutputFile_REPORT = f"{sOutputDir}/{sLevelNumber}.log_level_{log_level}_report.html"
         self.__sOutputFile_DEBUG  = f"{sOutputDir}/{sLevelNumber}.log_level_{log_level}_debug.log"
+
+        # reference log file corresponding to the current XML output file
+        self.__sOutputFile_XML_REF = f"{sSuiteSourceFolder}/referencelogfiles/{sLevelNumber}.log_level_{log_level}-REF.xml"
+        if os.path.isfile(self.__sOutputFile_XML_REF) is False:
+            BuiltIn().log(f"Missing reference file '{self.__sOutputFile_XML_REF}'", "ERROR")
+            return ERROR
+
+        # pattern file for comparison of XML log files
+        self.__sPatternFile_XML = f"{sSuiteSourceFolder}/referencelogfiles/log_level_pattern_XML.txt"
+        if os.path.isfile(self.__sPatternFile_XML) is False:
+            BuiltIn().log(f"Missing pattern file '{self.__sPatternFile_XML}'", "ERROR")
+            return ERROR
 
         # === test part 1: execute the 'log_level' test file
         nErrorLevel  = ERROR
@@ -303,7 +318,28 @@ class ClogLevelTest():
 
         # eof for sOutputFile in tupleFilesToCheck:
 
-        BuiltIn().log(f"Success: Content checked in output files", "INFO")
+        # ==================================
+        # ==== 3. XML outout file comparison
+        # ==================================
+
+        # In case of the XML file is affected, a simple string check like executed before, is not enough.
+        # Because of the string check searches everywhere in the log file and does not consider the XML structure.
+        # Messages can appear at two positions: at any position for logged Log keyword calls and within
+        # the errors section (<error> tag). To fill the gap we execute now a log file comparison.
+        # Based on a pattern file (log_level_pattern_XML.txt), the current XML output file is compared with a
+        # corresponding reference output file.
+
+        oComparison = CComparison()
+        bIdentical, bSuccess, sResult = oComparison.Compare(self.__sOutputFile_XML, self.__sOutputFile_XML_REF, self.__sPatternFile_XML)
+        if bSuccess is not True:
+            BuiltIn().log(sResult, "ERROR")
+            return ERROR
+        if bIdentical is False:
+            BuiltIn().log(sResult, "ERROR")
+            return ERROR
+        BuiltIn().log(f"XML file comparison successful. {sResult}", "INFO")
+
+        BuiltIn().log(f"Success: Content checked in output files successfully", "INFO")
         return SUCCESS
 
     # eof def __CheckOutputFiles(self):

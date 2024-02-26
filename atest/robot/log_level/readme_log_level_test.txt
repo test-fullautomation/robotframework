@@ -62,6 +62,9 @@ The robot file itself is called by another robot file with every available log l
 For every combination of log levels it is checked if all expected log messages can be found in the debug log file
 and in the XML report file. Additionally it is checked if all declined log messages are not present in these files.
 
+Additionally the XML report file is compared with a reference file (based on a pattern file). This is to consider the
+XML structure and the multiple occurrences of log messages also.
+
 Every deviation immediately stops the test.
 
 The log files of this "log level" self test can be found in a separate output folder 'log_level_logfiles'
@@ -131,6 +134,19 @@ Self test files:
 
   The log message strings defined in this module, are used twice: as Log keyword parameter
   and also as string to search for in output files.
+
+* libs/CComparison.py
+
+  Pure Python module containing the file comparison mechanism.
+  Origin: https://github.com/test-fullautomation/python-extensions-collection
+
+* referencelogfiles/*.xml
+
+  Reference files used for output file copmarison of XML report files
+
+* referencelogfiles/log_level_pattern_XML.txt
+
+  Pattern file with regular expressions used for output file comparison
 
 
 Self test execution:

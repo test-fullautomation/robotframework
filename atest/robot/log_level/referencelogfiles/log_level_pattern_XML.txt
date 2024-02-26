@@ -1,0 +1,4 @@
+<kw\sname="Log"
+(<msg\stimestamp=").+?("\slevel="\w+?">===\s\[LOG_LEVEL_TEST\]\s-\s\[\w+?\]\s-\s\[\w+?\]:\s\w+?\stest\sstring\s\w+?\stest\sstring\s\w+?\stest\sstring\s\w+?</msg>)
+<errors>
+</errors>
