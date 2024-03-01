@@ -83,16 +83,20 @@ Example:
    === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: "ERROR test string ERROR test string ERROR test string ERROR"
 
 * ``<unique identifier>``
+
   The ``<unique identifier>`` is ``LOG_LEVEL_TEST``. Every line contains this string.
 
 * ``<origin>``
+
   ``<origin>`` is one of (``ROBOT_FILE``, ``RESOURCE_FILE``, ``PYTHON_LIBRARY``) and belongs to the position of the ``Log`` keyword
   that produces this this line of output.
 
 * ``<log level>``
+
   ``<log level>`` is the log level, the message belongs to.
 
 * ``<test string>``
+
   ``<test string>`` is a simple test string with some dummy content and contains also the log level.
 
 With this naming convention every self test log message is individual and therefore can be detected in output files easily.
@@ -103,15 +107,15 @@ Self test files
 
 * ``log_level.robot``
 
-  Contains Log keyword calls for all available log levels and the keyword calls from resource file and Python keyword library.
+  Contains ``Log`` keyword calls for all available log levels and the keyword calls from resource file and Python keyword library.
 
 * ``log_level_addons/log_level.resource``
 
-  Contains Log keyword calls for all available log levels
+  Contains ``Log`` keyword calls for all available log levels
 
 * ``log_level_addons/log_level.py``
 
-  Contains Log keyword calls for all available log levels
+  Contains ``Log`` keyword calls for all available log levels
 
 * ``log_level_trigger.robot``
 
@@ -137,11 +141,9 @@ Self test files
 
   Pure Python module containing the file comparison mechanism.
 
-  Origin: `python-extensions-collection<https://github.com/test-fullautomation/python-extensions-collection>`_
-
 * ``referencelogfiles/*.xml``
 
-  Reference files used for output file copmarison of XML output files
+  Reference files used for output file comparison of XML output files
 
 * ``referencelogfiles/log_level_pattern_DEBUG_LOG.txt``
 
