@@ -1,0 +1,15 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.182 - ERROR - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.187 - WARN - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.191 - USER - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [USER]: USER test string USER test string USER test string USER
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.198 - ERROR - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.200 - WARN - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:23.201 - USER - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:23.206 - ERROR - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:23.207 - WARN - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:23.214 - USER - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [USER]: USER test string USER test string USER test string USER
