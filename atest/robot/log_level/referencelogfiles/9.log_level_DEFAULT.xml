@@ -1,0 +1,569 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 6.1 (Python 3.9.16 on win32)" generated="20240301 17:29:25.052" rpa="false" schemaversion="4">
+<suite id="s1" name="Log Level" source="D:\ROBFW\components\robotframework\atest\robot\log_level\log_level.robot">
+<test id="s1-t1" name="Log Level Test" line="54">
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>ERROR</arg>
+<msg timestamp="20240301 17:29:25.102" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.102" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<status status="PASS" starttime="20240301 17:29:25.102" endtime="20240301 17:29:25.102"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.103" endtime="20240301 17:29:25.103"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>ERROR</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.104" level="ERROR">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<status status="PASS" starttime="20240301 17:29:25.104" endtime="20240301 17:29:25.106"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.104" endtime="20240301 17:29:25.106"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.104" endtime="20240301 17:29:25.106"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.104" endtime="20240301 17:29:25.106"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.104" endtime="20240301 17:29:25.106"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>WARN</arg>
+<msg timestamp="20240301 17:29:25.106" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.106" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<status status="PASS" starttime="20240301 17:29:25.106" endtime="20240301 17:29:25.106"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.106" endtime="20240301 17:29:25.107"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>WARN</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.108" level="WARN">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<status status="PASS" starttime="20240301 17:29:25.107" endtime="20240301 17:29:25.108"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.107" endtime="20240301 17:29:25.108"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.107" endtime="20240301 17:29:25.109"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.107" endtime="20240301 17:29:25.109"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.107" endtime="20240301 17:29:25.109"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>USER</arg>
+<msg timestamp="20240301 17:29:25.109" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.109" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [USER]: USER test string USER test string USER test string USER</msg>
+<status status="PASS" starttime="20240301 17:29:25.109" endtime="20240301 17:29:25.109"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.109" endtime="20240301 17:29:25.110"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>USER</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.110" level="USER">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [USER]: USER test string USER test string USER test string USER</msg>
+<status status="PASS" starttime="20240301 17:29:25.110" endtime="20240301 17:29:25.111"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.110" endtime="20240301 17:29:25.111"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.110" endtime="20240301 17:29:25.111"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.110" endtime="20240301 17:29:25.111"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.110" endtime="20240301 17:29:25.111"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>INFO</arg>
+<msg timestamp="20240301 17:29:25.111" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.111" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO</msg>
+<status status="PASS" starttime="20240301 17:29:25.111" endtime="20240301 17:29:25.111"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.111" endtime="20240301 17:29:25.112"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>INFO</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.113" level="INFO">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO</msg>
+<status status="PASS" starttime="20240301 17:29:25.112" endtime="20240301 17:29:25.113"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.112" endtime="20240301 17:29:25.113"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.112" endtime="20240301 17:29:25.113"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.112" endtime="20240301 17:29:25.113"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.112" endtime="20240301 17:29:25.113"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>DEBUG</arg>
+<msg timestamp="20240301 17:29:25.113" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.113" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG</msg>
+<status status="PASS" starttime="20240301 17:29:25.113" endtime="20240301 17:29:25.113"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.114" endtime="20240301 17:29:25.114"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<status status="PASS" starttime="20240301 17:29:25.114" endtime="20240301 17:29:25.115"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.114" endtime="20240301 17:29:25.115"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.114" endtime="20240301 17:29:25.115"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.114" endtime="20240301 17:29:25.115"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>TRACE</arg>
+<msg timestamp="20240301 17:29:25.115" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.115" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [TRACE]: TRACE test string TRACE test string TRACE test string TRACE</msg>
+<status status="PASS" starttime="20240301 17:29:25.115" endtime="20240301 17:29:25.115"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.116" endtime="20240301 17:29:25.116"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<status status="PASS" starttime="20240301 17:29:25.116" endtime="20240301 17:29:25.117"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.116" endtime="20240301 17:29:25.117"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.116" endtime="20240301 17:29:25.117"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.116" endtime="20240301 17:29:25.117"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>ROBOT_FILE</arg>
+<arg>DEFAULT</arg>
+<msg timestamp="20240301 17:29:25.117" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.117" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<status status="PASS" starttime="20240301 17:29:25.117" endtime="20240301 17:29:25.117"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level robot file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.119" endtime="20240301 17:29:25.119"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.120" level="INFO">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<status status="PASS" starttime="20240301 17:29:25.120" endtime="20240301 17:29:25.120"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.120" endtime="20240301 17:29:25.120"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.120" endtime="20240301 17:29:25.120"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.119" endtime="20240301 17:29:25.120"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.119" endtime="20240301 17:29:25.120"/>
+</if>
+<kw name="Log Levels In Resource File" library="log_level">
+<doc>Executes the "Log" keyword with all available log levels</doc>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>ERROR</arg>
+<msg timestamp="20240301 17:29:25.121" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.121" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<status status="PASS" starttime="20240301 17:29:25.121" endtime="20240301 17:29:25.121"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.121" endtime="20240301 17:29:25.121"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>ERROR</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.122" level="ERROR">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<status status="PASS" starttime="20240301 17:29:25.122" endtime="20240301 17:29:25.123"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.122" endtime="20240301 17:29:25.123"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.122" endtime="20240301 17:29:25.123"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.121" endtime="20240301 17:29:25.123"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.121" endtime="20240301 17:29:25.123"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>WARN</arg>
+<msg timestamp="20240301 17:29:25.123" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.123" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<status status="PASS" starttime="20240301 17:29:25.123" endtime="20240301 17:29:25.123"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.124"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>WARN</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.125" level="WARN">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.127"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.127"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.127"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.127"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.124" endtime="20240301 17:29:25.127"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>USER</arg>
+<msg timestamp="20240301 17:29:25.128" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.128" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [USER]: USER test string USER test string USER test string USER</msg>
+<status status="PASS" starttime="20240301 17:29:25.128" endtime="20240301 17:29:25.128"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.128" endtime="20240301 17:29:25.128"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>USER</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.129" level="USER">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [USER]: USER test string USER test string USER test string USER</msg>
+<status status="PASS" starttime="20240301 17:29:25.129" endtime="20240301 17:29:25.129"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.129" endtime="20240301 17:29:25.129"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.129" endtime="20240301 17:29:25.129"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.129" endtime="20240301 17:29:25.129"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.129" endtime="20240301 17:29:25.129"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>INFO</arg>
+<msg timestamp="20240301 17:29:25.130" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.130" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO</msg>
+<status status="PASS" starttime="20240301 17:29:25.130" endtime="20240301 17:29:25.130"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.130" endtime="20240301 17:29:25.130"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<arg>INFO</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.131" level="INFO">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO</msg>
+<status status="PASS" starttime="20240301 17:29:25.131" endtime="20240301 17:29:25.131"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.131" endtime="20240301 17:29:25.131"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.130" endtime="20240301 17:29:25.131"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.130" endtime="20240301 17:29:25.131"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.130" endtime="20240301 17:29:25.131"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>DEBUG</arg>
+<msg timestamp="20240301 17:29:25.131" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.131" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG</msg>
+<status status="PASS" starttime="20240301 17:29:25.131" endtime="20240301 17:29:25.132"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.132" endtime="20240301 17:29:25.132"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<status status="PASS" starttime="20240301 17:29:25.132" endtime="20240301 17:29:25.132"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.132" endtime="20240301 17:29:25.132"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.132" endtime="20240301 17:29:25.133"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.132" endtime="20240301 17:29:25.133"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>TRACE</arg>
+<msg timestamp="20240301 17:29:25.133" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.133" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [TRACE]: TRACE test string TRACE test string TRACE test string TRACE</msg>
+<status status="PASS" starttime="20240301 17:29:25.133" endtime="20240301 17:29:25.133"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.133" endtime="20240301 17:29:25.133"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<status status="PASS" starttime="20240301 17:29:25.134" endtime="20240301 17:29:25.134"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.133" endtime="20240301 17:29:25.134"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.133" endtime="20240301 17:29:25.134"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.133" endtime="20240301 17:29:25.134"/>
+</if>
+<kw name="Get Single Log Message" library="ClogLevelTest">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<arg>RESOURCE_FILE</arg>
+<arg>DEFAULT</arg>
+<msg timestamp="20240301 17:29:25.134" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.135" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<status status="PASS" starttime="20240301 17:29:25.134" endtime="20240301 17:29:25.135"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the log level resource file</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.135"/>
+</kw>
+<if>
+<branch type="IF" condition="${True}">
+<for flavor="IN RANGE">
+<var>${index}</var>
+<value>0</value>
+<value>1</value>
+<iter>
+<var name="${index}">0</var>
+<kw name="Log" library="BuiltIn">
+<arg>${log_message}</arg>
+<doc>Logs the given message with the given level.</doc>
+<msg timestamp="20240301 17:29:25.135" level="INFO">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.136"/>
+</kw>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.136"/>
+</iter>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.136"/>
+</for>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.136"/>
+</branch>
+<status status="PASS" starttime="20240301 17:29:25.135" endtime="20240301 17:29:25.136"/>
+</if>
+<status status="PASS" starttime="20240301 17:29:25.120" endtime="20240301 17:29:25.136"/>
+</kw>
+<kw name="Log Levels In Python Library" library="log_level">
+<var>${bAck}</var>
+<var>${log_message}</var>
+<doc>Executes the "Log" keyword with all available log levels</doc>
+<msg timestamp="20240301 17:29:25.136" level="ERROR">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<msg timestamp="20240301 17:29:25.137" level="WARN">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<msg timestamp="20240301 17:29:25.141" level="USER">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [USER]: USER test string USER test string USER test string USER</msg>
+<msg timestamp="20240301 17:29:25.141" level="INFO">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [INFO]: INFO test string INFO test string INFO test string INFO</msg>
+<msg timestamp="20240301 17:29:25.142" level="INFO">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<msg timestamp="20240301 17:29:25.142" level="INFO">${bAck} = True</msg>
+<msg timestamp="20240301 17:29:25.142" level="INFO">${log_message} = === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT</msg>
+<status status="PASS" starttime="20240301 17:29:25.136" endtime="20240301 17:29:25.143"/>
+</kw>
+<kw name="Should Be Equal" library="BuiltIn">
+<arg>${bAck}</arg>
+<arg>${True}</arg>
+<arg>Failed to execute the Python keyword library</arg>
+<doc>Fails if the given objects are unequal.</doc>
+<status status="PASS" starttime="20240301 17:29:25.144" endtime="20240301 17:29:25.144"/>
+</kw>
+<doc>Executes the "Log" keyword with all available log levels</doc>
+<status status="PASS" starttime="20240301 17:29:25.101" endtime="20240301 17:29:25.145"/>
+</test>
+<doc>"log_level" test suite</doc>
+<status status="PASS" starttime="20240301 17:29:25.056" endtime="20240301 17:29:25.149"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="0" skip="0" unknown="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat pass="1" fail="0" skip="0" unknown="0" id="s1" name="Log Level">Log Level</stat>
+</suite>
+</statistics>
+<errors>
+<msg timestamp="20240301 17:29:25.104" level="ERROR">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<msg timestamp="20240301 17:29:25.108" level="WARN">=== [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<msg timestamp="20240301 17:29:25.122" level="ERROR">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<msg timestamp="20240301 17:29:25.125" level="WARN">=== [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+<msg timestamp="20240301 17:29:25.136" level="ERROR">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR</msg>
+<msg timestamp="20240301 17:29:25.137" level="WARN">=== [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [WARN]: WARN test string WARN test string WARN test string WARN</msg>
+</errors>
+</robot>

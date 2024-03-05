@@ -87,15 +87,20 @@ class _DebugFileWriter:
             self._separator('TEST')
 
     def start_keyword(self, kw):
+
+        # inits
         log_kw_start = True
+        msg_level = LOG_LEVEL_DEBUG_FILE
+
         if kw.name == 'BuiltIn.Log':
+            # this keyword has it's own log level
             msg_level = self.get_level_from_kw_args(kw.args)
-            if self._is_logged(msg_level):
-                log_kw_start = True
-            else:
-                # suppress the logging of the start of a BuiltIn.Log keyword in case of no message is logged
-                # because of a trace level mismatch (to avoid useless content in debug log file)
-                log_kw_start = False
+
+        if self._is_logged(msg_level):
+            log_kw_start = True
+        else:
+            # suppress the logging because the trace level does not match
+            log_kw_start = False
 
         if log_kw_start is True:
             if self._kw_level == 0:
@@ -104,15 +109,20 @@ class _DebugFileWriter:
             self._kw_level += 1
 
     def end_keyword(self, kw):
+
+        # inits
         log_kw_end = True
+        msg_level = LOG_LEVEL_DEBUG_FILE
+
         if kw.name == 'BuiltIn.Log':
+            # this keyword has it's own log level
             msg_level = self.get_level_from_kw_args(kw.args)
-            if self._is_logged(msg_level):
-                log_kw_end = True
-            else:
-                # suppress the logging of the end of a BuiltIn.Log keyword in case of no message is logged
-                # because of a trace level mismatch (to avoid useless content in debug log file)
-                log_kw_end = False
+
+        if self._is_logged(msg_level):
+            log_kw_end = True
+        else:
+            # suppress the logging because the trace level does not match
+            log_kw_end = False
 
         if log_kw_end is True:
             self._end(kw.type, kw.name, kw.elapsedtime)
