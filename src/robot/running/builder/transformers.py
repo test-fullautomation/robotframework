@@ -334,7 +334,8 @@ class KeywordBuilder(NodeVisitor):
         IfBuilder(self.kw).build(node)
 
     def visit_Thread(self, node):
-        ThreadBuilder(self.model).build(node)
+        ThreadBuilder(self.kw).build(node)
+
     def visit_Try(self, node):
         TryBuilder(self.kw).build(node)
 
