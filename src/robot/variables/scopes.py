@@ -123,7 +123,7 @@ class VariableScopes:
         current_scope = self.current.copy()
         thread_name = threading.current_thread().name
         self._thread_scopes[thread_name] = [current_scope]
-        self._scopes.append(current_scope)
+        # self._scopes.append(current_scope)
 
     def end_thread(self):
         """
@@ -132,7 +132,7 @@ class VariableScopes:
         thread_name = threading.current_thread().name
         if thread_name in self._thread_scopes:
             while self._thread_scopes[thread_name]:
-                self._scopes.remove(self._thread_scopes[thread_name].pop())
+                self._thread_scopes[thread_name].pop()
             del self._thread_scopes[thread_name]
 
     def __getitem__(self, name):
