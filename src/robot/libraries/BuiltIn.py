@@ -530,7 +530,7 @@ class _Verify(_BuiltInBase):
         self._set_and_remove_tags(tags)
         raise AssertionError(msg) if msg else AssertionError()
 
-    def send_thread_notification(self, name, params, dst_thread=None):
+    def send_thread_notification(self, name, params=None, dst_thread=None):
         """Send notification broadcast to specific thread or the others threads.
 
         Examples:
