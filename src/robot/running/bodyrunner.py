@@ -536,7 +536,9 @@ class ThreadRunner(object):
         runner = BodyRunner(self._context, self._run, self._templated)
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
+            self._context.variables.start_thread()
             runner.run(data.body)
+            self._context.variables.end_thread()
 
     def _run_invalid(self, data):
         error_reported = False
