@@ -233,17 +233,17 @@ class SuiteVisitor:
         self.end_body_item(for_)
 
     def visit_thread(self, thread_: 'Thread'):
-        """Implements traversing through FOR loops.
+        """Implements traversing through THREAD.
 
-        Can be overridden to allow modifying the passed in ``for_`` without
-        calling :meth:`start_for` or :meth:`end_for` nor visiting body.
+        Can be overridden to allow modifying the passed in ``thread_`` without
+        calling :meth:`start_thread` or :meth:`end_thread` nor visiting body.
         """
         if self.start_thread(thread_) is not False:
             thread_.body.visit(self)
             self.end_thread(thread_)
 
     def start_thread(self, thread_: 'Thread') -> 'bool|None':
-        """Called when a FOR loop starts.
+        """Called when a THREAD starts.
 
         By default, calls :meth:`start_body_item` which, by default, does nothing.
 
@@ -252,7 +252,7 @@ class SuiteVisitor:
         return self.start_body_item(thread_)
 
     def end_thread(self, thread_: 'Thread'):
-        """Called when a FOR loop ends.
+        """Called when a THREAD ends.
 
         By default, calls :meth:`end_body_item` which, by default, does nothing.
         """
