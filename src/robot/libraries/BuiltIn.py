@@ -547,6 +547,11 @@ class _Verify(_BuiltInBase):
             notification = QueuedNotification(name)
             notification.params = params
             self._context.thread_message_queue_dict[dst_thread].put(notification)
+        else:
+            current_threads = threading.enumerate()
+            log_message = f"Unable to send notification. Thread '{dst_thread}' does not exist. "
+            log_message += "Existing threads: " + ", ".join(thread.name for thread in current_threads)
+            AssertionError(log_message)
 
     def wait_thread_notification(self, name, timeout):
         """Wait for notification from others threads.
