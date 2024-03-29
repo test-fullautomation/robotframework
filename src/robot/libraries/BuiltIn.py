@@ -585,7 +585,7 @@ class _Verify(_BuiltInBase):
                 break
 
         if not is_receive:
-            raise AssertionError("Unable to received thread notification '%s' in '%d' seconds." % (name, timeout))
+            raise AssertionError(f"Did not receive thread notification '{name}' within '{timeout}' seconds.")
         else:
             return payloads
 
