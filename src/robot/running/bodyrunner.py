@@ -537,7 +537,14 @@ class ThreadRunner(object):
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
             self._context.variables.start_thread()
-            runner.run(data.body)
+            try:
+                runner.run(data.body)
+            except ExecutionFailed as failed:
+                # AssertionError(failed.get_errors())
+                self._context.warn(
+                    f" An exception occurred in '{data.name} thread. Exception: {failed.message}'"
+                )
+
             self._context.variables.end_thread()
         self._context.thread_message_queue_dict.pop(data.name)
 
