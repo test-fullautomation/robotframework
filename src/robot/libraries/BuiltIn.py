@@ -531,11 +531,27 @@ class _Verify(_BuiltInBase):
         raise AssertionError(msg) if msg else AssertionError()
 
     def send_thread_notification(self, name, params=None, dst_thread=None):
-        """Send notification broadcast to specific thread or the others threads.
+        """Sends a notification to other threads.
+
+        This keyword is used to send notifications to other threads within a multi-threaded environment.
+        Notifications can be used for signaling or passing data between threads.
+
+        The `name` parameter is mandatory and specifies the name of the notification to be sent.
+        This name is used by receiving threads to identify and respond to the notification.
+
+        The `params` parameter is optional and allows attaching payload to the notification.
+        The payload can be a string or any structured data. It is passed to the receiving thread as part of the notification.
+
+        The `dst_thread` parameter is optional and specifies the destination thread to which the notification should be sent.
+        If `dst_thread` is set to None, the notification is broadcasted to all threads.
+        When a specific thread is mentioned, the notification is targeted only to that thread.
 
         Examples:
-        | Send thread notification | Thread done   |  payloads   | | # Send message 'Thread done' with "payloads" data to others threads.    |
-        | Send thread notification | Thread done   |  payloads   | destination_thread | # Send message 'Thread done' with "payloads" data to "destination_thread" thread.    |
+        | Send Thread Notification | notification_name |
+        | Send Thread Notification | notification_name | params=some_data |
+        | Send Thread Notification | notification_name | params=some_data | dst_thread=thread_id |
+
+        This keyword is useful for communication and synchronization between different threads in a multi-threaded application, allowing for efficient and controlled data exchange.
         """
         if dst_thread is None:
             for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
@@ -553,39 +569,66 @@ class _Verify(_BuiltInBase):
             log_message += "Existing threads: " + ", ".join(thread.name for thread in current_threads)
             AssertionError(log_message)
 
-    def wait_thread_notification(self, name, timeout):
-        """Wait for notification from others threads.
+    def wait_thread_notification(self, name, condition=None, timeout=5):
+        """Waits for a notification from another thread.
+
+        This keyword is used to wait for a notification sent by another thread. The notification is identified by its name.
+
+        The `name` parameter is mandatory and specifies the name of the notification to wait for.
+
+        The `condition` parameter is optional and allows specifying a condition to evaluate the notification's payload.
+        If the condition is specified, only notifications whose payload satisfies the condition are considered.
+        The condition is a string that can be evaluated in Python syntax. For example, setting `condition='$payloads=="test"'` means that
+        the notification's payload should equal the string "test". The payloads are stored in a variable named `payloads`.
+
+        The `timeout` parameter is optional and specifies the maximum time to wait for a notification, in seconds. The default value is 5 seconds.
 
         Examples:
-        | Wait thread notification | Thread done   |             | | # Wait for message 'Thread done' from others threads.    |
+        | Wait Thread Notification | notification_name |
+        | Wait Thread Notification | notification_name | condition=$payloads=='test' | timeout=10 |
+
+        If a suitable notification is not received within the timeout period, the keyword will fail.
+
+        This keyword is particularly useful in multi-threaded environments where you need to synchronize or respond to events happening in different threads.
         """
         is_receive = False
         payloads = None
         timeout = float(timeout)
         max_time = time.time() + timeout
         tmp_queue = PriorityQueue(queue_type="FIFO")
-        NQ = self._context.thread_message_queue_dict[threading.current_thread().name]
+        notification_queue = None
+        # self._variables.set_test("${payloads}", None)
         while time.time() < max_time:
             try:
-                priority, notification = NQ.get(False)
+                notification_queue = self._context.thread_message_queue_dict[threading.current_thread().name]
+                priority, notification = notification_queue.get(False)
                 if notification.name == name:
-                    is_receive = True
                     payloads = notification.params
-                    break
-                else:
-                    tmp_queue.put(notification, priority)
+                    self._context.variables.set_test("${payloads}", payloads)
+                    if condition is None or self._is_true(condition):
+                        is_receive = True
+                        break
+
+                tmp_queue.put(notification, priority)
             except queue.Empty:
                 pass
+            except KeyError:
+                pass
 
-        while True:
+        while notification_queue and not tmp_queue.empty():
             try:
                 priority, notification = tmp_queue.get(False)
-                NQ.put(notification, priority)
+                notification_queue.put(notification, priority)
             except queue.Empty:
                 break
 
         if not is_receive:
-            raise AssertionError(f"Did not receive thread notification '{name}' within '{timeout}' seconds.")
+            err_msg = list()
+            err_msg.append(f"Did not receive thread notification '{name}'")
+            if condition:
+                err_msg.append(f"with condition '{condition}'")
+            err_msg.append(f"within '{timeout}' seconds.")
+            raise AssertionError(" ".join(err_msg))
         else:
             return payloads
 
