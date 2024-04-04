@@ -34,7 +34,7 @@ def write(msg, level, html=False):
     # https://github.com/robotframework/robotframework/issues/1505
     if callable(msg):
         msg = str(msg)
-    if level.upper() not in ('TRACE', 'DEBUG', 'INFO', 'HTML', 'WARN', 'ERROR'):
+    if level.upper() not in ('TRACE', 'DEBUG', 'INFO', 'HTML', 'WARN', 'ERROR', 'USER'):
         if level.upper() == 'CONSOLE':
             level = 'INFO'
             console(msg)
@@ -42,6 +42,10 @@ def write(msg, level, html=False):
             raise RuntimeError("Invalid log level '%s'." % level)
     if threading.current_thread().name in LOGGING_THREADS:
         LOGGER.log_message(Message(msg, level, html))
+
+
+def user(msg, html=False):
+    write(msg, 'USER', html)
 
 
 def trace(msg, html=False):

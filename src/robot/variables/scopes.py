@@ -15,6 +15,7 @@
 
 import os
 import tempfile
+import threading
 
 from robot.errors import VariableError
 from robot.model import Tags
@@ -32,10 +33,23 @@ class VariableScopes:
         self._suite = None
         self._test = None
         self._scopes = [self._global]
+        self._thread_scopes = {}
         self._variables_set = SetVariables()
+
+    def _current_thread_scope(self):
+        """
+        Returns the current scope of the active thread, or None if not in a thread.
+        """
+        thread_name = threading.current_thread().name
+        if thread_name in self._thread_scopes and self._thread_scopes[thread_name]:
+            return self._thread_scopes[thread_name][-1]
+        return None
 
     @property
     def current(self):
+        thread_scope = self._current_thread_scope()
+        if thread_scope is not None:
+            return thread_scope
         return self._scopes[-1]
 
     @property
@@ -78,14 +92,48 @@ class VariableScopes:
         self._variables_set.end_test()
 
     def start_keyword(self):
-        kw = self._suite.copy()
+        new_scope = self._suite.copy()  # Copy the current suite scope
         self._variables_set.start_keyword()
-        self._variables_set.update(kw)
-        self._scopes.append(kw)
+        self._variables_set.update(new_scope)
+
+        current_thread_scope = self._current_thread_scope()
+        if current_thread_scope is not None:
+            # If in a thread, add the new scope to the thread's scope stack
+            thread_name = threading.current_thread().name
+            self._thread_scopes[thread_name].append(new_scope)
+        else:
+            # If not in a thread, add the new scope to the general scope stack
+            self._scopes.append(new_scope)
 
     def end_keyword(self):
-        self._scopes.pop()
+        thread_name = threading.current_thread().name
+        if thread_name in self._thread_scopes and self._thread_scopes[thread_name]:
+            # If in a thread, pop from the thread's scope stack
+            self._thread_scopes[thread_name].pop()
+        else:
+            # If not in a thread, pop from the general scope stack
+            self._scopes.pop()
         self._variables_set.end_keyword()
+
+    def start_thread(self):
+        """
+        Start a new thread scope.
+        The new scope includes the current scope but is isolated from other threads.
+        """
+        current_scope = self.current.copy()
+        thread_name = threading.current_thread().name
+        self._thread_scopes[thread_name] = [current_scope]
+        # self._scopes.append(current_scope)
+
+    def end_thread(self):
+        """
+        End the thread scope.
+        """
+        thread_name = threading.current_thread().name
+        if thread_name in self._thread_scopes:
+            while self._thread_scopes[thread_name]:
+                self._thread_scopes[thread_name].pop()
+            del self._thread_scopes[thread_name]
 
     def __getitem__(self, name):
         return self.current[name]

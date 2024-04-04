@@ -24,6 +24,7 @@ from . import librarylogger
 LEVELS = {'TRACE': logging.NOTSET,
           'DEBUG': logging.DEBUG,
           'INFO': logging.INFO,
+          'USER': logging.INFO,
           'WARN': logging.WARNING,
           'ERROR': logging.ERROR}
 

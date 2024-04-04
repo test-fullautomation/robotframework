@@ -210,7 +210,7 @@ class WhileHandler(ElementHandler):
 class IterationHandler(ElementHandler):
     tag = 'iter'
     children = frozenset(('var', 'doc', 'status', 'kw', 'if', 'for', 'msg', 'try',
-                          'while', 'return', 'break', 'continue', 'error'))
+                          'while', 'return', 'break', 'continue', 'error', 'thread'))
 
     def start(self, elem, result):
         return result.body.create_iteration()

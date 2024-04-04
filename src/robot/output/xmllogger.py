@@ -21,12 +21,13 @@ from .loggerhelper import IsLogged
 import threading
 import os
 
+LOG_LEVEL_XML_FILE = "INFO" # output caused by code in this file, depends on this trace level
 
 class XmlLogger(ResultVisitor):
 
     thread_writer_dict = ThreadSafeDict() 
 
-    def __init__(self, path, log_level='TRACE', rpa=False, generator='Robot'):
+    def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot'):
         self._log_message_is_logged = IsLogged(log_level)
         self._error_message_is_logged = IsLogged('WARN')
         self._get_writer(path, rpa, generator)
@@ -34,6 +35,19 @@ class XmlLogger(ResultVisitor):
         self.path = path
         self.rpa = rpa
         self.generator = generator
+
+    def get_level_from_kw_args(self, args=None):
+        # args expected to be a 'kw.args' tuple
+        supported_levels = ('ERROR', 'WARN', 'USER', 'INFO', 'DEBUG', 'TRACE') # not using LEVELS from loggerhelper.py here, because of more states inside there. A more strict separation is desired here.
+        identified_level = LOG_LEVEL_XML_FILE
+        if args is None:
+            return identified_level
+        for arg in args:
+            if arg in supported_levels:
+                identified_level = arg
+                break
+        return identified_level
+
 
     @property
     def _writer(self):
@@ -87,55 +101,94 @@ class XmlLogger(ResultVisitor):
         self._writer.element('msg', msg.message, attrs)
 
     def start_keyword(self, kw):
-        attrs = {'name': kw.kwname, 'library': kw.libname}
-        if kw.type != 'KEYWORD':
-            attrs['type'] = kw.type
-        if kw.sourcename:
-            attrs['sourcename'] = kw.sourcename
-        self._writer.start('kw', attrs)
-        self._write_list('var', kw.assign)
-        self._write_list('arg', [safe_str(a) for a in kw.args])
-        self._write_list('tag', kw.tags)
-        # Must be after tags to allow adding message when using --flattenkeywords.
-        self._writer.element('doc', kw.doc)
+
+        # inits
+        log_kw_start = True
+        msg_level = LOG_LEVEL_XML_FILE
+
+        if kw.name == 'BuiltIn.Log':
+            # this keyword has it's own log level
+            msg_level = self.get_level_from_kw_args(kw.args)
+
+        if self._log_message_is_logged(msg_level):
+            log_kw_start = True
+        else:
+            # suppress the logging because the trace level does not match
+            log_kw_start = False
+
+        if log_kw_start is True:
+            attrs = {'name': kw.kwname, 'library': kw.libname}
+            if kw.type != 'KEYWORD':
+                attrs['type'] = kw.type
+            if kw.sourcename:
+                attrs['sourcename'] = kw.sourcename
+            self._writer.start('kw', attrs)
+            self._write_list('var', kw.assign)
+            self._write_list('arg', [safe_str(a) for a in kw.args])
+            self._write_list('tag', kw.tags)
+            # Must be after tags to allow adding message when using --flattenkeywords.
+            self._writer.element('doc', kw.doc)
 
     def end_keyword(self, kw):
-        if kw.timeout:
-            self._writer.element('timeout', attrs={'value': str(kw.timeout)})
-        self._write_status(kw)
-        self._writer.end('kw')
+
+        # inits
+        log_kw_end = True
+        msg_level = LOG_LEVEL_XML_FILE
+
+        if kw.name == 'BuiltIn.Log':
+            # this keyword has it's own log level
+            msg_level = self.get_level_from_kw_args(kw.args)
+
+        if self._log_message_is_logged(msg_level):
+            log_kw_end = True
+        else:
+            # suppress the logging because the trace level does not match
+            log_kw_end = False
+
+        if log_kw_end is True:
+            if kw.timeout:
+                self._writer.element('timeout', attrs={'value': str(kw.timeout)})
+            self._write_status(kw)
+            self._writer.end('kw')
 
     def start_if(self, if_):
-        self._writer.start('if')
-        self._writer.element('doc', if_.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('if')
+            self._writer.element('doc', if_.doc)
 
     def end_if(self, if_):
-        self._write_status(if_)
-        self._writer.end('if')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(if_)
+            self._writer.end('if')
 
     def start_if_branch(self, branch):
-        self._writer.start('branch', {'type': branch.type,
-                                      'condition': branch.condition})
-        self._writer.element('doc', branch.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('branch', {'type': branch.type,
+                                          'condition': branch.condition})
+            self._writer.element('doc', branch.doc)
 
     def end_if_branch(self, branch):
-        self._write_status(branch)
-        self._writer.end('branch')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(branch)
+            self._writer.end('branch')
 
     def start_for(self, for_):
-        self._writer.start('for', {'flavor': for_.flavor,
-                                   'start': for_.start,
-                                   'mode': for_.mode,
-                                   'fill': for_.fill})
-        for name in for_.variables:
-            self._writer.element('var', name)
-        for value in for_.values:
-            self._writer.element('value', value)
-        self._writer.element('doc', for_.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('for', {'flavor': for_.flavor,
+                                       'start': for_.start,
+                                       'mode': for_.mode,
+                                       'fill': for_.fill})
+            for name in for_.variables:
+                self._writer.element('var', name)
+            for value in for_.values:
+                self._writer.element('value', value)
+            self._writer.element('doc', for_.doc)
 
     def end_for(self, for_):
-        self._write_status(for_)
-        self._writer.end('for')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(for_)
+            self._writer.end('for')
+
     def start_thread(self, thread_):
         main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
         main_thread_writer.start('thread', {'name': thread_.name,
@@ -156,81 +209,100 @@ class XmlLogger(ResultVisitor):
     def end_thread(self, thread_):
         self._write_status(thread_)
         self._writer.end('thread')
+        thread_name = threading.current_thread().name
+        if thread_name in XmlLogger.thread_writer_dict:
+            XmlLogger.thread_writer_dict.pop(thread_name)
 
     def start_for_iteration(self, iteration):
-        self._writer.start('iter')
-        for name, value in iteration.variables.items():
-            self._writer.element('var', value, {'name': name})
-        self._writer.element('doc', iteration.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('iter')
+            for name, value in iteration.variables.items():
+                self._writer.element('var', value, {'name': name})
+            self._writer.element('doc', iteration.doc)
 
     def end_for_iteration(self, iteration):
-        self._write_status(iteration)
-        self._writer.end('iter')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(iteration)
+            self._writer.end('iter')
 
     def start_try(self, root):
-        self._writer.start('try')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('try')
 
     def end_try(self, root):
-        self._write_status(root)
-        self._writer.end('try')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(root)
+            self._writer.end('try')
 
     def start_try_branch(self, branch):
-        if branch.type == branch.EXCEPT:
-            self._writer.start('branch', attrs={
-                'type': 'EXCEPT', 'variable': branch.variable,
-                'pattern_type': branch.pattern_type
-            })
-            self._write_list('pattern', branch.patterns)
-        else:
-            self._writer.start('branch', attrs={'type': branch.type})
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            if branch.type == branch.EXCEPT:
+                self._writer.start('branch', attrs={
+                    'type': 'EXCEPT', 'variable': branch.variable,
+                    'pattern_type': branch.pattern_type
+                })
+                self._write_list('pattern', branch.patterns)
+            else:
+                self._writer.start('branch', attrs={'type': branch.type})
 
     def end_try_branch(self, branch):
-        self._write_status(branch)
-        self._writer.end('branch')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(branch)
+            self._writer.end('branch')
 
     def start_while(self, while_):
-        self._writer.start('while', attrs={
-            'condition': while_.condition,
-            'limit': while_.limit,
-            'on_limit': while_.on_limit,
-            'on_limit_message': while_.on_limit_message
-        })
-        self._writer.element('doc', while_.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('while', attrs={
+                'condition': while_.condition,
+                'limit': while_.limit,
+                'on_limit': while_.on_limit,
+                'on_limit_message': while_.on_limit_message
+            })
+            self._writer.element('doc', while_.doc)
 
     def end_while(self, while_):
-        self._write_status(while_)
-        self._writer.end('while')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(while_)
+            self._writer.end('while')
 
     def start_while_iteration(self, iteration):
-        self._writer.start('iter')
-        self._writer.element('doc', iteration.doc)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('iter')
+            self._writer.element('doc', iteration.doc)
 
     def end_while_iteration(self, iteration):
-        self._write_status(iteration)
-        self._writer.end('iter')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(iteration)
+            self._writer.end('iter')
 
     def start_return(self, return_):
-        self._writer.start('return')
-        for value in return_.values:
-            self._writer.element('value', value)
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('return')
+            for value in return_.values:
+                self._writer.element('value', value)
 
     def end_return(self, return_):
-        self._write_status(return_)
-        self._writer.end('return')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(return_)
+            self._writer.end('return')
 
     def start_continue(self, continue_):
-        self._writer.start('continue')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('continue')
 
     def end_continue(self, continue_):
-        self._write_status(continue_)
-        self._writer.end('continue')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(continue_)
+            self._writer.end('continue')
 
     def start_break(self, break_):
-        self._writer.start('break')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._writer.start('break')
 
     def end_break(self, break_):
-        self._write_status(break_)
-        self._writer.end('break')
+        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
+            self._write_status(break_)
+            self._writer.end('break')
 
     def start_error(self, error):
         self._writer.start('error')

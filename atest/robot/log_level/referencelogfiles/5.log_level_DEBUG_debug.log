@@ -1,0 +1,324 @@
+==============================================================================
+20240301 17:29:24.094 - INFO - + START SUITE: Log Level [ ]
+==============================================================================
+20240301 17:29:24.101 - INFO - +- START TEST: Log Level Test [ ]
+------------------------------------------------------------------------------
+20240301 17:29:24.102 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | ERROR ]
+20240301 17:29:24.103 - INFO - ${bAck} = True
+20240301 17:29:24.104 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:24.106 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.153 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.154 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.156 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (2)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.156 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.157 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.157 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.158 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.159 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} | ERROR ]
+20240301 17:29:24.159 - ERROR - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:24.163 - INFO - +------ END KEYWORD: BuiltIn.Log (5)
+20240301 17:29:24.163 - INFO - +----- END ITERATION: ${index} = 0 (5)
+20240301 17:29:24.163 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (6)
+20240301 17:29:24.163 - INFO - +--- END IF: ${True} (7)
+20240301 17:29:24.163 - INFO - +-- END IF/ELSE ROOT:  (7)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.164 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | WARN ]
+20240301 17:29:24.164 - INFO - ${bAck} = True
+20240301 17:29:24.164 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:24.164 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.164 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.165 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.165 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.165 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.165 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.165 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.166 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.166 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} | WARN ]
+20240301 17:29:24.166 - WARN - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:24.168 - INFO - +------ END KEYWORD: BuiltIn.Log (2)
+20240301 17:29:24.168 - INFO - +----- END ITERATION: ${index} = 0 (2)
+20240301 17:29:24.168 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (3)
+20240301 17:29:24.168 - INFO - +--- END IF: ${True} (3)
+20240301 17:29:24.168 - INFO - +-- END IF/ELSE ROOT:  (3)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.169 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | USER ]
+20240301 17:29:24.169 - INFO - ${bAck} = True
+20240301 17:29:24.169 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:24.169 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.169 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.169 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.170 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.170 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.170 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.170 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.170 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.170 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} | USER ]
+20240301 17:29:24.170 - USER - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:24.170 - INFO - +------ END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.170 - INFO - +----- END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.171 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (0)
+20240301 17:29:24.171 - INFO - +--- END IF: ${True} (1)
+20240301 17:29:24.171 - INFO - +-- END IF/ELSE ROOT:  (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.171 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | INFO ]
+20240301 17:29:24.171 - INFO - ${bAck} = True
+20240301 17:29:24.171 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO
+20240301 17:29:24.171 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.171 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.172 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.172 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.172 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.172 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.172 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.172 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.172 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} | INFO ]
+20240301 17:29:24.173 - INFO - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO
+20240301 17:29:24.173 - INFO - +------ END KEYWORD: BuiltIn.Log (1)
+20240301 17:29:24.173 - INFO - +----- END ITERATION: ${index} = 0 (1)
+20240301 17:29:24.173 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (1)
+20240301 17:29:24.173 - INFO - +--- END IF: ${True} (1)
+20240301 17:29:24.173 - INFO - +-- END IF/ELSE ROOT:  (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.173 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | DEBUG ]
+20240301 17:29:24.173 - INFO - ${bAck} = True
+20240301 17:29:24.173 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG
+20240301 17:29:24.174 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.174 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.174 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.174 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.175 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.175 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.175 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.175 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.175 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} | DEBUG ]
+20240301 17:29:24.175 - DEBUG - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG
+20240301 17:29:24.175 - INFO - +------ END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.175 - INFO - +----- END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.175 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (0)
+20240301 17:29:24.175 - INFO - +--- END IF: ${True} (0)
+20240301 17:29:24.176 - INFO - +-- END IF/ELSE ROOT:  (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.176 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | TRACE ]
+20240301 17:29:24.176 - INFO - ${bAck} = True
+20240301 17:29:24.176 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [TRACE]: TRACE test string TRACE test string TRACE test string TRACE
+20240301 17:29:24.176 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.176 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.176 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.177 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.177 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.177 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.177 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.177 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.177 - INFO - +----- END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.177 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (0)
+20240301 17:29:24.177 - INFO - +--- END IF: ${True} (0)
+20240301 17:29:24.178 - INFO - +-- END IF/ELSE ROOT:  (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.178 - INFO - +-- START KEYWORD: ClogLevelTest.Get Single Log Message [ ROBOT_FILE | DEFAULT ]
+20240301 17:29:24.178 - INFO - ${bAck} = True
+20240301 17:29:24.178 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.178 - INFO - +-- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.178 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level robot file ]
+20240301 17:29:24.179 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.179 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.179 - INFO - +-- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.179 - INFO - +--- START IF: ${True} [ ]
+20240301 17:29:24.179 - INFO - +---- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.179 - INFO - +----- START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.179 - INFO - +------ START KEYWORD: BuiltIn.Log [ ${log_message} ]
+20240301 17:29:24.180 - INFO - === [LOG_LEVEL_TEST] - [ROBOT_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.180 - INFO - +------ END KEYWORD: BuiltIn.Log (1)
+20240301 17:29:24.180 - INFO - +----- END ITERATION: ${index} = 0 (1)
+20240301 17:29:24.180 - INFO - +---- END FOR: ${index} IN RANGE [ 0 | 1 ] (1)
+20240301 17:29:24.180 - INFO - +--- END IF: ${True} (1)
+20240301 17:29:24.180 - INFO - +-- END IF/ELSE ROOT:  (1)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.180 - INFO - +-- START KEYWORD: log_level.Log Levels In Resource File [ ]
+20240301 17:29:24.180 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | ERROR ]
+20240301 17:29:24.181 - INFO - ${bAck} = True
+20240301 17:29:24.181 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:24.181 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (1)
+20240301 17:29:24.181 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.181 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.181 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (0)
+20240301 17:29:24.181 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.181 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.181 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.181 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.182 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} | ERROR ]
+20240301 17:29:24.182 - ERROR - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:24.183 - INFO - +------- END KEYWORD: BuiltIn.Log (1)
+20240301 17:29:24.183 - INFO - +------ END ITERATION: ${index} = 0 (2)
+20240301 17:29:24.183 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (2)
+20240301 17:29:24.183 - INFO - +---- END IF: ${True} (2)
+20240301 17:29:24.183 - INFO - +--- END IF/ELSE ROOT:  (2)
+20240301 17:29:24.183 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | WARN ]
+20240301 17:29:24.183 - INFO - ${bAck} = True
+20240301 17:29:24.183 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:24.183 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+20240301 17:29:24.184 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.184 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.184 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (0)
+20240301 17:29:24.184 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.184 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.184 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.184 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.184 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} | WARN ]
+20240301 17:29:24.185 - WARN - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:24.186 - INFO - +------- END KEYWORD: BuiltIn.Log (2)
+20240301 17:29:24.186 - INFO - +------ END ITERATION: ${index} = 0 (2)
+20240301 17:29:24.186 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (2)
+20240301 17:29:24.186 - INFO - +---- END IF: ${True} (2)
+20240301 17:29:24.186 - INFO - +--- END IF/ELSE ROOT:  (2)
+20240301 17:29:24.186 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | USER ]
+20240301 17:29:24.187 - INFO - ${bAck} = True
+20240301 17:29:24.187 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:24.187 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (1)
+20240301 17:29:24.187 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.187 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.187 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (0)
+20240301 17:29:24.187 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.187 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.187 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.187 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.188 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} | USER ]
+20240301 17:29:24.188 - USER - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:24.188 - INFO - +------- END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.188 - INFO - +------ END ITERATION: ${index} = 0 (1)
+20240301 17:29:24.188 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (1)
+20240301 17:29:24.188 - INFO - +---- END IF: ${True} (1)
+20240301 17:29:24.188 - INFO - +--- END IF/ELSE ROOT:  (1)
+20240301 17:29:24.188 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | INFO ]
+20240301 17:29:24.188 - INFO - ${bAck} = True
+20240301 17:29:24.188 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO
+20240301 17:29:24.188 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+20240301 17:29:24.189 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.189 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.189 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (1)
+20240301 17:29:24.189 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.189 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.189 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.189 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.189 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} | INFO ]
+20240301 17:29:24.189 - INFO - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [INFO]: INFO test string INFO test string INFO test string INFO
+20240301 17:29:24.189 - INFO - +------- END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.190 - INFO - +------ END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.190 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (1)
+20240301 17:29:24.190 - INFO - +---- END IF: ${True} (1)
+20240301 17:29:24.190 - INFO - +--- END IF/ELSE ROOT:  (1)
+20240301 17:29:24.190 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | DEBUG ]
+20240301 17:29:24.190 - INFO - ${bAck} = True
+20240301 17:29:24.190 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG
+20240301 17:29:24.190 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+20240301 17:29:24.190 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.190 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.190 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (0)
+20240301 17:29:24.190 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.191 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.191 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.191 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.191 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} | DEBUG ]
+20240301 17:29:24.191 - DEBUG - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG
+20240301 17:29:24.191 - INFO - +------- END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.191 - INFO - +------ END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.191 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (0)
+20240301 17:29:24.191 - INFO - +---- END IF: ${True} (1)
+20240301 17:29:24.191 - INFO - +--- END IF/ELSE ROOT:  (1)
+20240301 17:29:24.191 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | TRACE ]
+20240301 17:29:24.192 - INFO - ${bAck} = True
+20240301 17:29:24.192 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [TRACE]: TRACE test string TRACE test string TRACE test string TRACE
+20240301 17:29:24.192 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (1)
+20240301 17:29:24.192 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.192 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.192 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (0)
+20240301 17:29:24.192 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.192 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.192 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.192 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.193 - INFO - +------ END ITERATION: ${index} = 0 (1)
+20240301 17:29:24.193 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (1)
+20240301 17:29:24.193 - INFO - +---- END IF: ${True} (1)
+20240301 17:29:24.193 - INFO - +--- END IF/ELSE ROOT:  (1)
+20240301 17:29:24.193 - INFO - +--- START KEYWORD: ClogLevelTest.Get Single Log Message [ RESOURCE_FILE | DEFAULT ]
+20240301 17:29:24.193 - INFO - ${bAck} = True
+20240301 17:29:24.193 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.193 - INFO - +--- END KEYWORD: ClogLevelTest.Get Single Log Message (0)
+20240301 17:29:24.193 - INFO - +--- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the log level resource file ]
+20240301 17:29:24.193 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.194 - INFO - +--- END KEYWORD: BuiltIn.Should Be Equal (1)
+20240301 17:29:24.194 - INFO - +--- START IF/ELSE ROOT:  [ ]
+20240301 17:29:24.194 - INFO - +---- START IF: ${True} [ ]
+20240301 17:29:24.194 - INFO - +----- START FOR: ${index} IN RANGE [ 0 | 1 ] [ ]
+20240301 17:29:24.194 - INFO - +------ START ITERATION: ${index} = 0 [ ]
+20240301 17:29:24.194 - INFO - +------- START KEYWORD: BuiltIn.Log [ ${log_message} ]
+20240301 17:29:24.194 - INFO - === [LOG_LEVEL_TEST] - [RESOURCE_FILE] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.194 - INFO - +------- END KEYWORD: BuiltIn.Log (0)
+20240301 17:29:24.194 - INFO - +------ END ITERATION: ${index} = 0 (0)
+20240301 17:29:24.194 - INFO - +----- END FOR: ${index} IN RANGE [ 0 | 1 ] (0)
+20240301 17:29:24.195 - INFO - +---- END IF: ${True} (0)
+20240301 17:29:24.195 - INFO - +--- END IF/ELSE ROOT:  (1)
+20240301 17:29:24.195 - INFO - +-- END KEYWORD: log_level.Log Levels In Resource File (15)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.195 - INFO - +-- START KEYWORD: log_level.Log Levels In Python Library [ ]
+20240301 17:29:24.195 - ERROR - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [ERROR]: ERROR test string ERROR test string ERROR test string ERROR
+20240301 17:29:24.197 - WARN - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [WARN]: WARN test string WARN test string WARN test string WARN
+20240301 17:29:24.197 - USER - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [USER]: USER test string USER test string USER test string USER
+20240301 17:29:24.197 - INFO - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [INFO]: INFO test string INFO test string INFO test string INFO
+20240301 17:29:24.197 - DEBUG - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [DEBUG]: DEBUG test string DEBUG test string DEBUG test string DEBUG
+20240301 17:29:24.197 - INFO - === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.197 - INFO - ${bAck} = True
+20240301 17:29:24.197 - INFO - ${log_message} = === [LOG_LEVEL_TEST] - [PYTHON_LIBRARY] - [DEFAULT]: DEFAULT test string DEFAULT test string DEFAULT test string DEFAULT
+20240301 17:29:24.199 - INFO - +-- END KEYWORD: log_level.Log Levels In Python Library (3)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+20240301 17:29:24.199 - INFO - +-- START KEYWORD: BuiltIn.Should Be Equal [ ${bAck} | ${True} | Failed to execute the Python keyword library ]
+20240301 17:29:24.200 - DEBUG - Argument types are:
+<class 'bool'>
+<class 'bool'>
+20240301 17:29:24.200 - INFO - +-- END KEYWORD: BuiltIn.Should Be Equal (1)
+------------------------------------------------------------------------------
+20240301 17:29:24.201 - INFO - +- END TEST: Log Level Test (99)
+------------------------------------------------------------------------------
+20240301 17:29:24.207 - INFO - + END SUITE: Log Level (146)
+==============================================================================

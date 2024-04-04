@@ -21,15 +21,16 @@ from robot.utils import get_timestamp, is_string, safe_str, console_encode
 
 
 LEVELS = {
-  'NONE'  : 8,
-  'UNKNOWN' : 7, #nhtcuong
-  'SKIP'  : 6,
-  'FAIL'  : 5,
-  'ERROR' : 4,
-  'WARN'  : 3,
-  'INFO'  : 2,
-  'DEBUG' : 1,
-  'TRACE' : 0,
+   'NONE'    : 9,
+   'UNKNOWN' : 8, #nhtcuong
+   'SKIP'    : 7,
+   'FAIL'    : 6,
+   'ERROR'   : 5,
+   'WARN'    : 4,
+   'USER'    : 3, # has to fit to 'var LEVELS' in robot/htmldata/rebot/testdata.js
+   'INFO'    : 2,
+   'DEBUG'   : 1,
+   'TRACE'   : 0,
 }
 
 

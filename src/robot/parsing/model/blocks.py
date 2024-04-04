@@ -24,7 +24,7 @@ from .statements import (Break, Continue, ElseHeader, ElseIfHeader, End, ExceptH
                          Error, FinallyHeader, ForHeader, IfHeader, KeywordCall,
                          KeywordName, Node, ReturnSetting, ReturnStatement,
                          SectionHeader, Statement, TemplateArguments, TestCaseName,
-                         TryHeader, WhileHeader)
+                         TryHeader, WhileHeader, ThreadHeader)
 from .visitor import ModelVisitor
 from ..lexer import Token
 
@@ -287,6 +287,7 @@ class For(NestedBlock):
 
 class Thread(NestedBlock):
     _fields = ('header', 'body', 'end')
+    header: ThreadHeader
 
     def __init__(self, header, body=None, end=None, errors=()):
         self.header = header
