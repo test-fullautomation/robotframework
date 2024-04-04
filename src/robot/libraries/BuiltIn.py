@@ -549,7 +549,7 @@ class _Verify(_BuiltInBase):
         Examples:
         | Send Thread Notification | notification_name |
         | Send Thread Notification | notification_name | params=some_data |
-        | Send Thread Notification | notification_name | params=some_data | dst_thread=thread_id |
+        | Send Thread Notification | notification_name | params=some_data | dst_thread=thread_name |
 
         This keyword is useful for communication and synchronization between different threads in a multi-threaded application, allowing for efficient and controlled data exchange.
         """
