@@ -101,6 +101,9 @@ A new keyword, Wait Thread Notification, has been added to allow threads to wait
 
       Wait Thread Notification     notification_name     condition=$payloads=='expected_value'     timeout=10
 
+More details can be found in
+`RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_
+chapter \"Threading\".
 
 "
                              ]
