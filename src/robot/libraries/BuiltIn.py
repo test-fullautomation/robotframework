@@ -562,7 +562,10 @@ class _Verify(_BuiltInBase):
         elif dst_thread in self._context.thread_message_queue_dict:
             notification = QueuedNotification(name)
             notification.params = params
+            # for debug
+            # self.log_to_console(f"{threading.current_thread().name} put  {name} to {dst_thread}")
             self._context.thread_message_queue_dict[dst_thread].put(notification)
+            # self.log_to_console(f"DONE")
         else:
             current_threads = threading.enumerate()
             log_message = f"Unable to send notification. Thread '{dst_thread}' does not exist. "
@@ -601,6 +604,7 @@ class _Verify(_BuiltInBase):
         while time.time() < max_time:
             try:
                 notification_queue = self._context.thread_message_queue_dict[threading.current_thread().name]
+                # self.log_to_console(f"{threading.current_thread().name} has queue: {str(notification_queue)}")
                 priority, notification = notification_queue.get(False)
                 if notification.name == name:
                     payloads = notification.params
@@ -623,6 +627,10 @@ class _Verify(_BuiltInBase):
                 break
 
         if not is_receive:
+            # for debug
+            # self.log_to_console(f"{threading.current_thread().name} has queue size: {notification_queue.qsize()}")
+            # priority, notification = notification_queue.get(False)
+            # self.log_to_console(f"----> {notification.name}: {notification.params}")
             err_msg = list()
             err_msg.append(f"Did not receive thread notification '{name}'")
             if condition:

@@ -542,11 +542,13 @@ class ThreadRunner(object):
             except ExecutionFailed as failed:
                 # AssertionError(failed.get_errors())
                 self._context.warn(
-                    f" An exception occurred in '{data.name} thread. Exception: {failed.message}'"
+                    f" An exception occurred in '{data.name}' thread. Exception: {failed.message}'"
                 )
 
             self._context.variables.end_thread()
-        self._context.thread_message_queue_dict.pop(data.name)
+
+        if data.name in self._context.thread_message_queue_dict:
+            self._context.thread_message_queue_dict.pop(data.name)
 
     def _run_invalid(self, data):
         error_reported = False
