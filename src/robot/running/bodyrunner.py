@@ -529,14 +529,26 @@ class ThreadRunner(object):
         thread_worker = threading.Thread(target=self.run_worker, args=(data,))
         thread_worker.name = data.name
         thread_worker.setDaemon(data.daemon)
-        self._context.thread_message_queue_dict[thread_worker.name] = PriorityQueue(queue_type='FIFO')
         thread_worker.start()
 
     def run_worker(self, data):
+        self._context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type='FIFO')
         runner = BodyRunner(self._context, self._run, self._templated)
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
-            runner.run(data.body)
+            self._context.variables.start_thread()
+            try:
+                runner.run(data.body)
+            except ExecutionFailed as failed:
+                # AssertionError(failed.get_errors())
+                self._context.warn(
+                    f" An exception occurred in '{data.name}' thread. Exception: {failed.message}'"
+                )
+
+            self._context.variables.end_thread()
+
+        if data.name in self._context.thread_message_queue_dict:
+            self._context.thread_message_queue_dict.pop(data.name)
 
     def _run_invalid(self, data):
         error_reported = False

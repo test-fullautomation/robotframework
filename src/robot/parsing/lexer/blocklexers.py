@@ -242,7 +242,7 @@ class ForLexer(NestedBlockLexer):
 
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
         return (ForHeaderLexer, InlineIfLexer, IfLexer, TryLexer, WhileLexer, EndLexer,
-                ReturnLexer, ContinueLexer, BreakLexer, SyntaxErrorLexer, KeywordCallLexer)
+                ReturnLexer, ContinueLexer, BreakLexer, SyntaxErrorLexer, ThreadLexer, KeywordCallLexer)
 
 
 class WhileLexer(NestedBlockLexer):
@@ -252,7 +252,7 @@ class WhileLexer(NestedBlockLexer):
 
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
         return (WhileHeaderLexer, ForLexer, InlineIfLexer, IfLexer, TryLexer, EndLexer,
-                ReturnLexer, ContinueLexer, BreakLexer, SyntaxErrorLexer, KeywordCallLexer)
+                ReturnLexer, ContinueLexer, BreakLexer, SyntaxErrorLexer, ThreadLexer, KeywordCallLexer)
 
 
 class TryLexer(NestedBlockLexer):
@@ -263,7 +263,7 @@ class TryLexer(NestedBlockLexer):
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
         return (TryHeaderLexer, ExceptHeaderLexer, ElseHeaderLexer, FinallyHeaderLexer,
                 ForLexer, InlineIfLexer, IfLexer, WhileLexer, EndLexer, ReturnLexer,
-                BreakLexer, ContinueLexer, SyntaxErrorLexer, KeywordCallLexer)
+                BreakLexer, ContinueLexer, SyntaxErrorLexer, ThreadLexer, KeywordCallLexer)
 
 
 class IfLexer(NestedBlockLexer):
@@ -274,7 +274,7 @@ class IfLexer(NestedBlockLexer):
     def lexer_classes(self) -> 'tuple[type[Lexer], ...]':
         return (InlineIfLexer, IfHeaderLexer, ElseIfHeaderLexer, ElseHeaderLexer,
                 ForLexer, TryLexer, WhileLexer, EndLexer, ReturnLexer, ContinueLexer,
-                BreakLexer, SyntaxErrorLexer, KeywordCallLexer)
+                BreakLexer, SyntaxErrorLexer, ThreadLexer, KeywordCallLexer)
 
 
 class ThreadLexer(NestedBlockLexer):
@@ -283,7 +283,8 @@ class ThreadLexer(NestedBlockLexer):
         return ThreadHeaderLexer(self.ctx).handles(statement)
 
     def lexer_classes(self):
-        return ThreadHeaderLexer, IfLexer, EndLexer, KeywordCallLexer
+        return (ThreadHeaderLexer, ForLexer, WhileLexer, InlineIfLexer, IfLexer, TryLexer, EndLexer,
+                ReturnLexer, ContinueLexer, BreakLexer, SyntaxErrorLexer, KeywordCallLexer)
 
 
 class InlineIfLexer(NestedBlockLexer):

@@ -220,6 +220,8 @@ class _ExecutionContext:
         self.variables.set_test('${TEST_NAME}', test.name)
         self.variables.set_test('${TEST_DOCUMENTATION}', test.doc)
         self.variables.set_test('@{TEST_TAGS}', list(test.tags))
+        self.thread_message_queue_dict.clear()
+        self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
 
     def _add_timeout(self, timeout):
         if timeout:

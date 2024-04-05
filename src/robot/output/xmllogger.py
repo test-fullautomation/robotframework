@@ -209,6 +209,9 @@ class XmlLogger(ResultVisitor):
     def end_thread(self, thread_):
         self._write_status(thread_)
         self._writer.end('thread')
+        thread_name = threading.current_thread().name
+        if thread_name in XmlLogger.thread_writer_dict:
+            XmlLogger.thread_writer_dict.pop(thread_name)
 
     def start_for_iteration(self, iteration):
         if self._log_message_is_logged(LOG_LEVEL_XML_FILE):

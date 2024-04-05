@@ -334,7 +334,8 @@ class KeywordBuilder(NodeVisitor):
         IfBuilder(self.kw).build(node)
 
     def visit_Thread(self, node):
-        ThreadBuilder(self.model).build(node)
+        ThreadBuilder(self.kw).build(node)
+
     def visit_Try(self, node):
         TryBuilder(self.kw).build(node)
 
@@ -460,6 +461,9 @@ class IfBuilder(NodeVisitor):
 
     def visit_Try(self, node):
         TryBuilder(self.model).build(node)
+		
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
 
     def visit_ReturnStatement(self, node):
         self.model.body.create_return(node.values, lineno=node.lineno,
@@ -532,6 +536,9 @@ class TryBuilder(NodeVisitor):
     def visit_Break(self, node):
         self.model.body.create_break(lineno=node.lineno,
                                      error=format_error(node.errors))
+	
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
 
     def visit_KeywordCall(self, node):
         self.model.body.create_keyword(name=node.keyword, args=node.args,
@@ -581,6 +588,12 @@ class ThreadBuilder(NodeVisitor):
 
     def visit_If(self, node):
         IfBuilder(self.model).build(node)
+		
+    def visit_While(self, node):
+        WhileBuilder(self.model).build(node)
+	
+    def visit_Try(self, node):
+        TryBuilder(self.model).build(node)
 
 
 class WhileBuilder(NodeVisitor):
@@ -614,6 +627,9 @@ class WhileBuilder(NodeVisitor):
 
     def visit_For(self, node):
         ForBuilder(self.model).build(node)
+
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
 
     def visit_While(self, node):
         WhileBuilder(self.model).build(node)
