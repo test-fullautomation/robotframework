@@ -73,17 +73,17 @@ chapter \"Logging\".
                              ],
                    "0.11." : [
 "
-**Stabilize Threading Feature:**
+**Stabilized Threading Feature:**
 
 We have enhanced the stability of our threading feature, ensuring smoother performance and reliability in multi-threaded environments.
 
-**Bug Fix in Threading Feature:**
+**Bug Fixed in Threading Feature:**
 
 This release includes a fixes for a previously identified bugs in our threading feature. This fix enhances the functionality and reliability of thread-based operations.
 
 **Send Thread Notification:**
 
-A new keyword, Wait Thread Notification, has been added to allow threads to wait for specific notifications. This is vital for synchronized operations and responsive multi-threaded interactions.
+A new keyword, Send Thread Notification, has been added to allow threads to send specific notifications. This is vital for synchronized operations and responsive multi-threaded interactions.
 
 * *In robot code*:
 
