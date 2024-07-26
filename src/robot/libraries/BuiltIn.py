@@ -640,6 +640,72 @@ class _Verify(_BuiltInBase):
         else:
             return payloads
 
+    def thread_rlock_acquire(self, rlock_name, blocking=True, timeout=-1):
+        """Acquires a re-entrant lock (RLock) with the given name.
+
+        This keyword attempts to acquire a re-entrant lock specified by ``rlock_name``.
+        If the lock is already acquired by another thread, the behavior depends on the
+        ``blocking`` parameter. If ``blocking`` is set to True, the keyword will wait
+        until the lock is available or until the ``timeout`` is reached. If ``blocking``
+        is set to False, the keyword will return immediately, regardless of whether the
+        lock could be acquired.
+
+        Parameters:
+        - ``rlock_name``: The name of the re-entrant lock to acquire.
+        - ``blocking``: Whether to wait for the lock to become available. Default is True.
+        - ``timeout``: The maximum time to wait for the lock. Default is -1, which means
+        wait indefinitely.
+
+        The default behavior (blocking=True, timeout=-1) will cause the keyword to wait
+        indefinitely until the lock can be acquired.
+
+        Examples:
+        | Thread RLock Acquire | MyLock           |           |            |
+        | Thread RLock Acquire | MyLock           | blocking=False |  |
+        | Thread RLock Acquire | MyLock           | blocking=True  | timeout=5 |
+
+        If the lock could not be acquired within the given timeout or if ``blocking`` is
+        set to False and the lock is already held by another thread, this keyword will fail.
+
+        """
+        rlock_object = None
+        if rlock_name not in self._context.thread_rlock_dict:
+            self._context.thread_rlock_dict[rlock_name] = threading.RLock()
+        
+        rlock_object = self._context.thread_rlock_dict[rlock_name]        
+        if isinstance(rlock_object, type(threading.RLock())):
+            return rlock_object.acquire(blocking, timeout)
+        else:
+            raise AssertionError(f"Unable to acquire the rlock name '{rlock_name}'!!!")
+
+    def thread_rlock_release(self, rlock_name):
+        """Releases a re-entrant lock (RLock) with the given name.
+
+        This keyword releases a re-entrant lock specified by ``rlock_name``.
+        The lock must have been previously acquired by the same thread.
+
+        Parameters:
+        - ``rlock_name``: The name of the re-entrant lock to release.
+
+        The lock must be released by the same thread that acquired it. Releasing
+        a lock that is not currently held by the thread will result in an error.
+
+        Examples:
+        | Thread RLock Release | MyLock |
+
+        This keyword will fail if the lock cannot be released, for example, if it
+        was not acquired by the current thread or if it was never acquired.
+
+        """
+        rlock_object = None
+        if rlock_name not in self._context.thread_rlock_dict:
+            raise AssertionError(f"RLock '{rlock_name}' does not exist!!!")
+
+        rlock_object = self._context.thread_rlock_dict[rlock_name]
+        if isinstance(rlock_object, type(threading.RLock())):
+            rlock_object.release()
+        else:
+            raise AssertionError(f"Unable to release the rlock name '{rlock_name}'!!!")
     def unknown(self, msg=None, *tags):
         """Unknown the test with the given message and optionally alters its tags.
 

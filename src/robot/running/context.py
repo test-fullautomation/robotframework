@@ -110,6 +110,7 @@ class _ExecutionContext:
         self.asynchronous = asynchronous
         self.thread_message_queue_dict = ThreadSafeDict() 
         self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
+        self.thread_rlock_dict = ThreadSafeDict()
 
     @contextmanager
     def suite_teardown(self):
