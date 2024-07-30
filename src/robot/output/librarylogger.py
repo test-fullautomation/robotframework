@@ -49,6 +49,11 @@ def add_thread_logging(thread_name):
     LOGGING_THREADS += (thread_name,)
 
 
+def remove_thread_logging(thread_name):
+    global LOGGING_THREADS
+    LOGGING_THREADS = tuple(filter(lambda x: x != thread_name, LOGGING_THREADS))
+
+
 def user(msg, html=False):
     write(msg, 'USER', html)
 
