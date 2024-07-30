@@ -14,10 +14,12 @@
 #  limitations under the License.
 
 from robot.errors import DataError
-from robot.utils import get_timestamp, file_writer, seq2str2
+from robot.utils import get_timestamp, file_writer, seq2str2, ThreadSafeDict
 
 from .logger import LOGGER
 from .loggerhelper import IsLogged
+import threading
+
 
 LOG_LEVEL_DEBUG_FILE = "INFO" # output caused by code in this file, depends on this trace level, compared against 'log_level'
 
@@ -36,7 +38,11 @@ def DebugFile(path, log_level):
 
 
 class _DebugFileWriter:
-    _separators = {'SUITE': '=', 'TEST': '-', 'KEYWORD': '~'}
+    _separators = {'SUITE': '=', 'TEST': '-', 'KEYWORD': '~', 'THREAD': '`'}
+
+    thread_level_dict = ThreadSafeDict()
+    thread_indent_dict = ThreadSafeDict()
+    thread_log_info = ThreadSafeDict()
 
     def __init__(self, outfile, log_level):
         self._indent                 = 0
@@ -86,6 +92,24 @@ class _DebugFileWriter:
             self._end('TEST', test.name, test.elapsedtime)
             self._separator('TEST')
 
+    def start_thread(self, thread):
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            _DebugFileWriter.thread_log_info[thread.data.name] = ThreadSafeDict()
+            _DebugFileWriter.thread_log_info[thread.data.name]['level'] = 0
+            _DebugFileWriter.thread_log_info[thread.data.name]['indent'] = 0
+            self._separator('THREAD')
+            self._start('THREAD', thread.data.name)
+            self._separator('THREAD')
+
+
+    def end_thread(self, thread):
+        if self._is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator('THREAD')
+            self._end('THREAD', thread.data.name, thread.elapsedtime)
+            self._separator('THREAD')
+            if thread.data.name in _DebugFileWriter.thread_level_dict:
+                _DebugFileWriter.thread_log_info.pop(thread.data.name)
+
     def start_keyword(self, kw):
 
         # inits
@@ -103,10 +127,17 @@ class _DebugFileWriter:
             log_kw_start = False
 
         if log_kw_start is True:
-            if self._kw_level == 0:
-                self._separator('KEYWORD')
-            self._start(kw.type, kw.name, kw.args)
-            self._kw_level += 1
+            thread_name = threading.current_thread().name
+            if thread_name == 'MainThread':
+                if self._kw_level == 0:
+                    self._separator('KEYWORD')
+                self._start(kw.type, kw.name, kw.args)
+                self._kw_level += 1
+            else:
+                if _DebugFileWriter.thread_log_info[thread_name]['level'] == 0:
+                    self._separator('KEYWORD')
+                self._start(kw.type, kw.name, kw.args)
+                _DebugFileWriter.thread_log_info[thread_name]['level'] += 1
 
     def end_keyword(self, kw):
 
@@ -126,7 +157,11 @@ class _DebugFileWriter:
 
         if log_kw_end is True:
             self._end(kw.type, kw.name, kw.elapsedtime)
-            self._kw_level -= 1
+            thread_name = threading.current_thread().name
+            if thread_name == 'MainThread':
+                self._kw_level -= 1
+            else:
+                _DebugFileWriter.thread_log_info[thread_name]['level'] -= 1
 
     def log_message(self, msg):
         if self._is_logged(msg.level):
@@ -139,13 +174,23 @@ class _DebugFileWriter:
     def _start(self, type_, name, args=''):
         args = ' ' + seq2str2(args)
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
-            self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
-            self._indent += 1
+            thread_name = threading.current_thread().name
+            if thread_name == 'MainThread':
+                self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
+                self._indent += 1
+            else:
+                self._write('+%s START %s: %s>%s%s' % ('-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_, thread_name, name, args))
+                _DebugFileWriter.thread_log_info[thread_name]['indent'] += 1
 
     def _end(self, type_, name, elapsed):
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
-            self._indent -= 1
-            self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
+            thread_name = threading.current_thread().name
+            if thread_name == 'MainThread':
+                self._indent -= 1
+                self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
+            else:
+                _DebugFileWriter.thread_log_info[thread_name]['indent'] -= 1
+                self._write('+%s END %s: %s>%s (%s)' % ('-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_, thread_name, name, elapsed))
 
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)

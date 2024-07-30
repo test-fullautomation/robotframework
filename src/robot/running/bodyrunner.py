@@ -529,6 +529,7 @@ class ThreadRunner(object):
         thread_worker = threading.Thread(target=self.run_worker, args=(data,))
         thread_worker.name = data.name
         thread_worker.setDaemon(data.daemon)
+        logger.add_thread_logging(thread_worker.name)
         thread_worker.start()
 
     def run_worker(self, data):

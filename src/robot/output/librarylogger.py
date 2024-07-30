@@ -44,6 +44,11 @@ def write(msg, level, html=False):
         LOGGER.log_message(Message(msg, level, html))
 
 
+def add_thread_logging(thread_name):
+    global LOGGING_THREADS
+    LOGGING_THREADS += (thread_name,)
+
+
 def user(msg, html=False):
     write(msg, 'USER', html)
 
