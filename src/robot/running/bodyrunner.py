@@ -529,6 +529,7 @@ class ThreadRunner(object):
         thread_worker = threading.Thread(target=self.run_worker, args=(data,))
         thread_worker.name = data.name
         thread_worker.setDaemon(data.daemon)
+        logger.add_thread_logging(thread_worker.name)
         thread_worker.start()
 
     def run_worker(self, data):
@@ -549,6 +550,8 @@ class ThreadRunner(object):
 
         if data.name in self._context.thread_message_queue_dict:
             self._context.thread_message_queue_dict.pop(data.name)
+
+        logger.remove_thread_logging(data.name)
 
     def _run_invalid(self, data):
         error_reported = False
