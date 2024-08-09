@@ -101,7 +101,6 @@ class _DebugFileWriter:
             self._start('THREAD', thread.data.name)
             self._separator('THREAD')
 
-
     def end_thread(self, thread):
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
             self._separator('THREAD')
@@ -176,21 +175,27 @@ class _DebugFileWriter:
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
             thread_name = threading.current_thread().name
             if thread_name == 'MainThread':
-                self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
+                thread_id = ''
+                if len(threading.enumerate()) > 1:
+                    thread_id = f"{thread_name}> "
+                self._write('%s+%s START %s: %s%s' % (thread_id, '-'*self._indent, type_, name, args))
                 self._indent += 1
             else:
-                self._write('+%s START %s: %s>%s%s' % ('-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_, thread_name, name, args))
+                self._write('%s> +%s START %s: %s%s' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, args))
                 _DebugFileWriter.thread_log_info[thread_name]['indent'] += 1
 
     def _end(self, type_, name, elapsed):
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
             thread_name = threading.current_thread().name
             if thread_name == 'MainThread':
+                thread_id = ''
+                if len(threading.enumerate()) > 1:
+                    thread_id = f"{thread_name}> "
                 self._indent -= 1
-                self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
+                self._write('%s+%s END %s: %s (%s)' % (thread_id, '-'*self._indent, type_, name, elapsed))
             else:
                 _DebugFileWriter.thread_log_info[thread_name]['indent'] -= 1
-                self._write('+%s END %s: %s>%s (%s)' % ('-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_, thread_name, name, elapsed))
+                self._write('%s> +%s END %s: %s (%s)' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, elapsed))
 
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)
