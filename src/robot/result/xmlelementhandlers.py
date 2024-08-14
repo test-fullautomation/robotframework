@@ -84,7 +84,7 @@ class RobotHandler(ElementHandler):
 class SuiteHandler(ElementHandler):
     tag = 'suite'
     # 'metadata' is for RF < 4 compatibility.
-    children = frozenset(('doc', 'metadata', 'meta', 'status', 'kw', 'test', 'suite'))
+    children = frozenset(('doc', 'metadata', 'meta', 'status', 'kw', 'thread', 'test', 'suite'))
 
     def start(self, elem, result):
         if hasattr(result, 'suite'):    # root
@@ -177,7 +177,27 @@ class ThreadHandler(ElementHandler):
     children = frozenset(('var', 'value', 'doc', 'status', 'msg', 'kw'))
 
     def start(self, elem, result):
-        return result.body.create_thread(elem.get('name'), elem.get('daemon'))
+        return self._create_thread(elem, result)
+
+    def _create_thread(self, elem, result):
+        try:
+            body = result.body
+        except AttributeError:
+            body = self._get_body_for_suite_level_thread(result)
+        return body.create_thread(name=elem.get('name', ''), daemon=elem.get('daemon'))
+
+    def _get_body_for_suite_level_thread(self, result):
+        # Someone, most likely a listener, has created a `<kw>` element on suite level.
+        # Add the keyword into a suite setup or teardown, depending on have we already
+        # seen tests or not. Create an implicit setup/teardown if needed. Possible real
+        # setup/teardown parsed later will reset the implicit one otherwise, but leaves
+        # the added keyword into its body.
+        kw_type = 'teardown' if result.tests or result.suites else 'setup'
+        keyword = getattr(result, kw_type)
+        if not keyword:
+            keyword.config(kwname=f'Implicit {kw_type}', status=keyword.PASS)
+        return keyword.body
+
 
 
 @ElementHandler.register
