@@ -172,7 +172,18 @@ class VariableScopes:
     def set_global(self, name, value):
         for scope in self._all_scopes:
             name, value = self._set_global_suite_or_test(scope, name, value)
+        self._set_global_thread(name, value)
         self._variables_set.set_global(name, value)
+
+    def _set_global_thread(self, name, value):
+        for thread_name, thread_scope in self._thread_scopes.items():
+            for scope in thread_scope:
+                scope[name] = value
+                # Avoid creating new list/dict objects in different scopes.
+                if name[0] != '$':
+                    name = '$' + name[1:]
+                    value = scope[name]
+                return name, value
 
     def _set_global_suite_or_test(self, scope, name, value):
         scope[name] = value

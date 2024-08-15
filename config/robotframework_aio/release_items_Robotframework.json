@@ -108,24 +108,29 @@ chapter \"Threading\".
 "
                              ],
                    "0.13": [
-"                      
+"
 **Introduction of New Thread Locking Keywords:**
+    
 In this release, we have introduced two powerful new keywords to enhance thread management and synchronization in your test automation: `Thread RLock Acquire` and `Thread RLock Release`. These keywords are essential for managing re-entrant locks (RLocks), providing greater control and safety in multi-threaded environments.
 
 **Thread RLock Acquire:**
+
 The `Thread RLock Acquire` keyword allows a thread to acquire a re-entrant lock (RLock). This is crucial for ensuring that critical sections of your code are executed by only one thread at a time, preventing race conditions and ensuring data consistency.
 
 * *In robot code*:
-   .. code::
 
+   .. code::
+   
       Thread RLock Acquire     rlock_name     blocking=True     timeout=-1
 
 **Thread RLock Release:**
+    
 The `Thread RLock Release` keyword allows a thread to release a previously acquired re-entrant lock (RLock). Properly releasing locks is vital for avoiding deadlocks and ensuring the smooth execution of concurrent operations.
 
 * *In robot code*:
-   .. code::
 
+   .. code::
+   
       Thread RLock Release     rlock_name
 
 More details can be found in `RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_ chapter \"Threading\".
