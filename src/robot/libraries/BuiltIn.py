@@ -17,6 +17,7 @@ import difflib
 import re
 import time
 import threading, queue
+from threading import RLock
 from collections import OrderedDict
 
 from robot.api import logger, SkipExecution
@@ -554,11 +555,18 @@ class _Verify(_BuiltInBase):
         This keyword is useful for communication and synchronization between different threads in a multi-threaded application, allowing for efficient and controlled data exchange.
         """
         if dst_thread is None:
-            for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
-                if threading.current_thread().name != thread_name:
+            # for thread_name, thread_queue in self._context.thread_message_queue_dict.items():
+            for thread in threading.enumerate():
+                if threading.current_thread().name != thread.name:
                     notification = QueuedNotification(name)
                     notification.params = params
-                    thread_queue.put(notification)
+                    if thread.name in self._context.thread_message_queue_dict:
+                        try:
+                            self._context.thread_message_queue_dict[thread.name].put(notification)
+                            # thread_queue.put(notification)
+                            self.log_to_console(f"Put notification {name} id {hex(id(notification))} to {thread.name} which id is {id(self._context.thread_message_queue_dict[thread.name])}")
+                        except:
+                            pass
         elif dst_thread in self._context.thread_message_queue_dict:
             notification = QueuedNotification(name)
             notification.params = params
@@ -597,28 +605,72 @@ class _Verify(_BuiltInBase):
         is_receive = False
         payloads = None
         timeout = float(timeout)
-        max_time = time.time() + timeout
+        # max_time = time.time() + timeout
         tmp_queue = PriorityQueue(queue_type="FIFO")
-        notification_queue = None
-        # self._variables.set_test("${payloads}", None)
-        while time.time() < max_time:
-            try:
-                notification_queue = self._context.thread_message_queue_dict[threading.current_thread().name]
-                # self.log_to_console(f"{threading.current_thread().name} has queue: {str(notification_queue)}")
-                priority, notification = notification_queue.get(False)
-                if notification.name == name:
-                    payloads = notification.params
-                    self._context.variables.set_test("${payloads}", payloads)
-                    if condition is None or self._is_true(condition):
-                        is_receive = True
-                        break
+        condition = threading.Condition()
+        is_add = False
 
-                tmp_queue.put(notification, priority)
-            except queue.Empty:
-                pass
-            except KeyError:
-                pass
+        def monitor_callback(action, _value):
+            nonlocal is_add
+            # BuiltIn().log_to_console(f"Action: {action}, Value: {value.name}")
+            if action == "put":
+                with condition:
+                    is_add = True
+                    condition.notify_all()
 
+        notification_queue = self._context.thread_message_queue_dict.get(threading.current_thread().name)
+        notification_queue.set_callback(monitor_callback)
+        self.log_to_console(f"notification_queue id : {id(notification_queue)}")
+        start_time = time.time()
+        while True:
+            # Check if the timeout has been reached
+            elapsed_time = time.time() - start_time
+            if elapsed_time >= timeout:
+                print("Timeout reached, stopping wait.")
+                break
+
+            with condition:
+                if is_add is False:
+                    condition.wait_for(lambda: not notification_queue.empty(), timeout - elapsed_time)
+                is_add = False
+
+            while not notification_queue.empty():
+                try:
+                    priority, notification = notification_queue.get(False)
+                    if notification.name == name:
+                        # self.log_to_console(f"Found ----> {notification.name}")
+                        payloads = notification.params
+                        self._context.variables.set_test("${payloads}", payloads)
+                        if condition is None or self._is_true(condition):
+                            is_receive = True
+                            break
+
+                    tmp_queue.put(notification, priority)
+                except queue.Empty:
+                    pass
+                except KeyError:
+                    pass
+
+            if is_receive:
+                break
+
+        # while time.time() < max_time:
+        #     try:
+        #         priority, notification = notification_queue.get(False)
+        #         if notification.name == name:
+        #             payloads = notification.params
+        #             self._context.variables.set_test("${payloads}", payloads)
+        #             if condition is None or self._is_true(condition):
+        #                 is_receive = True
+        #                 break
+        #
+        #         tmp_queue.put(notification, priority)
+        #     except queue.Empty:
+        #         pass
+        #     except KeyError:
+        #         pass
+
+        notification_queue.set_callback(None)
         while notification_queue and not tmp_queue.empty():
             try:
                 priority, notification = tmp_queue.get(False)
@@ -3255,6 +3307,8 @@ class _Misc(_BuiltInBase):
                         "Use 'formatter=repr' instead.")
             formatter = prepr if is_truthy(repr) else self._get_formatter(formatter)
         message = formatter(message)
+        # print("---->" + message)
+        # print("+++" + str(logger))
         logger.write(message, level, html)
         if console:
             logger.console(message)
