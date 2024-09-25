@@ -212,7 +212,7 @@ class Thread(BodyItem):
     repr_args = ('name', 'daemon')
     __slots__ = ['name', 'daemon']
 
-    def __init__(self, name='ROBOT_THREAD2', daemon=True, parent=None):
+    def __init__(self, name='ROBOT_THREAD', daemon=True, parent=None):
         self.name = name
         self.daemon = daemon
         self.parent = parent
