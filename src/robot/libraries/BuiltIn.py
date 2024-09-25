@@ -17,7 +17,6 @@ import difflib
 import re
 import time
 import threading, queue
-from threading import RLock
 from collections import OrderedDict
 
 from robot.api import logger, SkipExecution
