@@ -16,7 +16,8 @@
 import difflib
 import re
 import time
-import threading, queue
+import threading
+import queue
 from collections import OrderedDict
 
 from robot.api import logger, SkipExecution
@@ -606,20 +607,20 @@ class _Verify(_BuiltInBase):
         timeout = float(timeout)
         # max_time = time.time() + timeout
         tmp_queue = PriorityQueue(queue_type="FIFO")
-        condition = threading.Condition()
+        thread_condition = threading.Condition()
         is_add = False
 
         def monitor_callback(action, _value):
             nonlocal is_add
             # BuiltIn().log_to_console(f"Action: {action}, Value: {value.name}")
             if action == "put":
-                with condition:
+                with thread_condition:
                     is_add = True
-                    condition.notify_all()
+                    thread_condition.notify_all()
 
         notification_queue = self._context.thread_message_queue_dict.get(threading.current_thread().name)
         notification_queue.set_callback(monitor_callback)
-        self.log_to_console(f"notification_queue id : {id(notification_queue)}")
+        # self.log_to_console(f"notification_queue id : {id(notification_queue)}")
         start_time = time.time()
         while True:
             # Check if the timeout has been reached
@@ -628,9 +629,9 @@ class _Verify(_BuiltInBase):
                 print("Timeout reached, stopping wait.")
                 break
 
-            with condition:
+            with thread_condition:
                 if is_add is False:
-                    condition.wait_for(lambda: not notification_queue.empty(), timeout - elapsed_time)
+                    thread_condition.wait_for(lambda: not notification_queue.empty(), timeout - elapsed_time)
                 is_add = False
 
             while not notification_queue.empty():
