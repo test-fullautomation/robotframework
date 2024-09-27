@@ -564,7 +564,7 @@ class _Verify(_BuiltInBase):
                         try:
                             self._context.thread_message_queue_dict[thread.name].put(notification)
                             # thread_queue.put(notification)
-                            self.log_to_console(f"Put notification {name} id {hex(id(notification))} to {thread.name} which id is {id(self._context.thread_message_queue_dict[thread.name])}")
+                            # self.log_to_console(f"Put notification {name} id {hex(id(notification))} to {thread.name} which id is {id(self._context.thread_message_queue_dict[thread.name])}")
                         except:
                             pass
         elif dst_thread in self._context.thread_message_queue_dict:
