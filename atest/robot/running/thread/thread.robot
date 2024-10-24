@@ -26,6 +26,74 @@ threading_base.thread3
     Sleep    1
     Set Test Variable    ${var_thrd_3}    ${31}
 
+#
+#    Threading sync using RLock keywords
+#
+################################################################################
+threading_rlock_base.thread1
+    Log    Thread 1 is acquiring lock    console=True
+    Thread RLock Acquire    test_lock
+    Append To List    ${var_thrd}    11
+    Sleep    2
+    Log    Thread 1 is releasing lock    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread1_finished
+
+threading_rlock_base.thread2
+    Log    Thread 2 is acquiring lock    console=True
+    Thread RLock Acquire    test_lock
+    Append To List    ${var_thrd}    21
+    Sleep    2
+    Log    Thread 2 is releasing lock    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread2_finished
+
+
+threading_rlock_base.thread2_with_time_out
+    Log    Thread 2 is acquiring lock    console=True
+    ${is_lock_acquired}=  Thread RLock Acquire    test_lock    timeout=1
+    Run Keyword If    '${is_lock_acquired}'=='False'
+    ...    Fail
+    Append To List    ${var_thrd}    21
+    Sleep    2
+    Log    Thread 2 is releasing lock    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread2_finished
+
+threading_rlock_base.thread2_non_block
+    Log    Thread 2 is acquiring lock    console=True
+    ${is_lock_acquired}=  Thread RLock Acquire    test_lock    blocking=${False}
+    Run Keyword If    '${is_lock_acquired}'=='False'
+    ...    Fail
+    Append To List    ${var_thrd}    21
+    Sleep    2
+    Log    Thread 2 is releasing lock    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread2_finished
+
+threading_rlock_base.thread1_reacquire
+    Log    Thread 1 is acquiring lock for first append    console=True
+    Thread RLock Acquire    test_lock
+    Append To List    ${var_thrd}    Thread_1_First
+    Log    Thread 1 is releasing lock after first append    console=True
+    Thread RLock Release    test_lock
+    Sleep    1  # Simulate waiting to acquire lock again
+    
+    Log    Thread 1 is acquiring lock for second append    console=True
+    Thread RLock Acquire    test_lock
+    Append To List    ${var_thrd}    Thread_1_Second
+    Log    Thread 1 is releasing lock after second append    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread1_finished
+
+threading_rlock_base.thread2_reacquire
+    Log    Thread 2 is acquiring lock    console=True
+    Thread RLock Acquire    test_lock
+    Append To List    ${var_thrd}    Thread_2_First
+    Log    Thread 2 is releasing lock    console=True
+    Thread RLock Release    test_lock
+    Send Thread Notification    threading_rlock_base.thread2_finished
+
 
 #
 #    Threading sync base keywords
@@ -284,12 +352,12 @@ Threading Payload Two Notifications
     END
 
     ${payload1}=    Evaluate    {}
-    ${payload1}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload1_finished    10
+    ${payload1}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload1_finished    timeout=10
     Log    wait thread successfully passed    console=True
     Log    payload1 is: '${payload1}''    console=True
 
     ${payload2}=    Evaluate    {}
-    ${payload2}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload2_finished    10
+    ${payload2}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload2_finished    timeout=10
     Log    wait thread successfully passed    console=True
     Log    payload2 is: '${payload2}''    console=True
 
@@ -310,9 +378,9 @@ Threading Wait Thread Notification Base
     Send Thread Notification    threading_wait_thread_notification_base    ${payload2}    MainThread
     Send Thread Notification    threading_wait_thread_notification_base    ${payload1}    MainThread
 
-    ${payload1_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    10
+    ${payload1_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    timeout=10
     Log    payload1 is: '${payload1_recv}''    console=True
-    ${payload2_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    10
+    ${payload2_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    timeout=10
     Log    payload2 is: '${payload2_recv}''    console=True
 
     #it's enough to test two values
@@ -364,3 +432,92 @@ Threading Keyword Multiple Time Called
     List Should Contain Value    ${var_thrd}    "thrd2"
     List Should Contain Value    ${var_thrd}    "thrd3"
     List Should Contain Value    ${var_thrd}    "thrd4"    
+
+Threading RLock Basic
+    # Testing acquiring and releasing lock in two threads
+    @{var_thrd}=    Create List
+    Set Test Variable    @{var_thrd}
+
+    THREAD    TEST_THREAD1    False
+        threading_rlock_base.thread1
+    END
+
+    THREAD    TEST_THREAD2    False
+        threading_rlock_base.thread2
+    END
+
+    Wait Thread Notification    threading_rlock_base.thread2_finished    timeout=10
+
+    FOR    ${element}    IN    @{var_thrd}
+        Log    ${element}    console=True
+    END
+
+    @{ref}=    Create List    11    21
+    Lists Should Be Equal    ${var_thrd}    ${ref}
+
+Threading RLock Exceeded timeout 
+    # Testing acquiring and releasing lock in two threads
+    @{var_thrd}=    Create List
+    Set Test Variable    @{var_thrd}
+
+    THREAD    TEST_THREAD1    False
+        threading_rlock_base.thread1
+    END
+
+    THREAD    TEST_THREAD2    False
+        threading_rlock_base.thread2_with_time_out
+    END
+
+    Run Keyword And Expect Error   *    Wait Thread Notification    threading_rlock_base.thread2_finished    timeout=10
+
+    FOR    ${element}    IN    @{var_thrd}
+        Log    ${element}    console=True
+    END
+
+    @{ref}=    Create List    11
+    Lists Should Be Equal    ${var_thrd}    ${ref}
+
+Threading RLock Non blocking 
+    # Testing acquiring and releasing lock in two threads
+    @{var_thrd}=    Create List
+    Set Test Variable    @{var_thrd}
+
+    THREAD    TEST_THREAD1    False
+        threading_rlock_base.thread1
+    END
+
+    THREAD    TEST_THREAD2    False
+        threading_rlock_base.thread2_non_block
+    END
+
+    Run Keyword And Expect Error   *    Wait Thread Notification    threading_rlock_base.thread2_finished    timeout=10
+
+    FOR    ${element}    IN    @{var_thrd}
+        Log    ${element}    console=True
+    END
+
+    @{ref}=    Create List    11
+    Lists Should Be Equal    ${var_thrd}    ${ref}
+
+Threading RLock Reacquire Append
+    # Testing threads alternating appending with lock reacquisition
+    @{var_thrd}=    Create List
+    Set Test Variable    @{var_thrd}
+
+    THREAD    TEST_THREAD1    False
+        threading_rlock_base.thread1_reacquire
+    END
+
+    THREAD    TEST_THREAD2    False
+        threading_rlock_base.thread2_reacquire
+    END
+
+    Wait Thread Notification    threading_rlock_base.thread1_finished    timeout=10
+    Wait Thread Notification    threading_rlock_base.thread2_finished    timeout=10
+
+    FOR    ${element}    IN    @{var_thrd}
+        Log    ${element}    console=True
+    END
+
+    @{ref}=    Create List    Thread_1_First    Thread_2_First    Thread_1_Second
+    Lists Should Be Equal    ${var_thrd}    ${ref}
