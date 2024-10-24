@@ -39,14 +39,14 @@ threading_sync_base.thread1
 
 threading_sync_base.thread2
     Log    entering thrd2    console=True
-    Wait Thread Notification    threading_sync_base.thread1_finished    5000
+    Wait Thread Notification    threading_sync_base.thread1_finished    timeout=5000
     Sleep    2
     Append To List    ${var_thrd}    21
     Send Thread Notification    threading_sync_base.thread2_finished    0
 
 threading_sync_base.thread3
     Log    entering thrd3    console=True
-    Wait Thread Notification    threading_sync_base.thread2_finished    5000
+    Wait Thread Notification    threading_sync_base.thread2_finished    timeout=5000
     Sleep    1
     Append To List    ${var_thrd}    31
     Send Thread Notification    threading_sync_base.thread3_finished    0
@@ -64,14 +64,14 @@ threading_sync_named_base.thread1
 
 threading_sync_named_base.thread2
     Log    entering thrd2    console=True
-    Wait Thread Notification    threading_sync_named_base.thread1_finished    5000
+    Wait Thread Notification    threading_sync_named_base.thread1_finished    timeout=5000
     Sleep    2
     Append To List    ${var_thrd}    21
     Send Thread Notification    threading_sync_named_base.thread2_finished    0    TEST_THREAD3
 
 threading_sync_named_base.thread3
     Log    entering thrd3    console=True
-    Wait Thread Notification    threading_sync_named_base.thread2_finished    5000
+    Wait Thread Notification    threading_sync_named_base.thread2_finished    timeout=5000
     Sleep    1
     Append To List    ${var_thrd}    31
     Send Thread Notification    threading_sync_named_base.thread3_finished    0    MainThread
@@ -216,7 +216,7 @@ Threading Sync Base
         threading_sync_base.thread3
     END
 
-    Wait Thread Notification    threading_sync_base.thread3_finished    10
+    Wait Thread Notification    threading_sync_base.thread3_finished    timeout=10
 
     FOR    ${element}    IN    @{var_thrd}
         Log    ${element}    console=True 
@@ -245,7 +245,7 @@ Threading Sync Named Base
         threading_sync_named_base.thread3
     END
 
-    Wait Thread Notification    threading_sync_named_base.thread3_finished    100
+    Wait Thread Notification    threading_sync_named_base.thread3_finished    timeout=100
 
     FOR    ${element}    IN    @{var_thrd}
         Log    ${element}    console=True 
@@ -263,7 +263,7 @@ Threading Payload Base
     END
 
     ${payload}=    Evaluate    {}
-    ${payload}=    Wait Thread Notification    threading_payload_base.thread1_finished    10
+    ${payload}=    Wait Thread Notification    threading_payload_base.thread1_finished    timeout=10
     Log    wait thread successfully passed    console=True
     Log    payload is: '${payload}''    console=True
 
@@ -280,12 +280,12 @@ Threading Payload Two Notifications
     END
 
     ${payload1}=    Evaluate    {}
-    ${payload1}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload1_finished    10
+    ${payload1}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload1_finished    timeout=10
     Log    wait thread successfully passed    console=True
     Log    payload1 is: '${payload1}''    console=True
 
     ${payload2}=    Evaluate    {}
-    ${payload2}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload2_finished    10
+    ${payload2}=    Wait Thread Notification    threading_payload_two_notifications.thread1_payload2_finished    timeout=10
     Log    wait thread successfully passed    console=True
     Log    payload2 is: '${payload2}''    console=True
 
@@ -306,9 +306,9 @@ Threading Wait Thread Notification Base
     Send Thread Notification    threading_wait_thread_notification_base    ${payload2}    MainThread
     Send Thread Notification    threading_wait_thread_notification_base    ${payload1}    MainThread
 
-    ${payload1_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    10
+    ${payload1_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    timeout=10
     Log    payload1 is: '${payload1_recv}''    console=True
-    ${payload2_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    10
+    ${payload2_recv}=    Wait Thread Notification    threading_wait_thread_notification_base    timeout=10
     Log    payload2 is: '${payload2_recv}''    console=True
 
     #it's enough to test two values
