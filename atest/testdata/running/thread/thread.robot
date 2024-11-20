@@ -133,10 +133,10 @@ Thread executed
 
 
 Thread change variable
-    ${var}=   set variable       ${1}
+    set test variable    ${var}    ${1}
     THREAD    TEST_THREAD    False
         SLEEP  1
-        ${var}=   set variable       ${2}
+        set test variable   ${var}    ${2}
     END
     log    Variable before: ${var}
     Should be equal     ${var}    ${1}
@@ -163,9 +163,9 @@ Thread wait for thread notification timeout
         SLEEP  5
         send thread notification        thread notify      Thread Done
     END
-    ${err_msg}=    Run Keyword And Expect Error    *    wait_thread_notification    thread notify    2    
+    ${err_msg}=    Run Keyword And Expect Error    *    wait_thread_notification    thread notify    timeout=2    
     LOG TO CONSOLE      ${err_msg}
-    Should Contain    ${err_msg}    'thread notify' in '2' seconds.
+    Should Contain    ${err_msg}    'thread notify' within '2' seconds.
 
 
 
