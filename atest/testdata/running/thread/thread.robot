@@ -165,7 +165,7 @@ Thread wait for thread notification timeout
     END
     ${err_msg}=    Run Keyword And Expect Error    *    wait_thread_notification    thread notify    timeout=2    
     LOG TO CONSOLE      ${err_msg}
-    Should Contain    ${err_msg}    'thread notify' within '2' seconds.
+    Should Contain    ${err_msg}    'thread notify' within '2.0' seconds.
 
 
 
