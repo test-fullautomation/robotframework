@@ -249,7 +249,7 @@ class IfHandler(ElementHandler):
 class BranchHandler(ElementHandler):
     tag = 'branch'
     children = frozenset(('status', 'kw', 'if', 'for', 'try', 'while', 'msg', 'doc',
-                          'return', 'pattern', 'break', 'continue', 'error'))
+                          'return', 'pattern', 'break', 'continue', 'error', 'thread'))
 
     def start(self, elem, result):
         return result.body.create_branch(**elem.attrib)
