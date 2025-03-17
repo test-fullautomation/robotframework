@@ -191,7 +191,8 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutError)
-        unknown = isinstance(error, UnknownAssertionError) or type(error) == Exception
+        unknown = isinstance(error, UnknownAssertionError) or type(error) == Exception \
+                                                           or isinstance(error, AttributeError)
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = isinstance(error, DataError) and error.syntax
