@@ -24,6 +24,8 @@ from .model import Keyword
 from .outputcapture import OutputCapturer
 from .signalhandler import STOP_SIGNAL_MONITOR
 from .statusreporter import StatusReporter
+import threading
+import sys
 
 
 class LibraryKeywordRunner:
@@ -86,7 +88,7 @@ class LibraryKeywordRunner:
 
     def _runner_for(self, context, handler, positional, named):
         timeout = self._get_timeout(context)
-        if timeout and timeout.active:
+        if not ('linux' in sys.platform and threading.current_thread().name != "MainThread") and timeout and timeout.active:
             def runner():
                 with LOGGER.delayed_logging:
                     context.output.debug(timeout.get_message)
