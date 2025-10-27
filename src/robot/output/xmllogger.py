@@ -190,21 +190,22 @@ class XmlLogger(ResultVisitor):
             self._writer.end('for')
 
     def start_thread(self, thread_):
-        main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
-        main_thread_writer.start('thread', {'name': thread_.name,
-                                      'daemon': str(thread_.daemon)})
-        # self._writer.element('name', thread_.name)
-        # self._writer.element('daemon', thread_.daemon)
-        thread_.result.status = thread_.PASS
-        # self._get_thread_writer(thread_.name)
-        attrs = {'status': thread_.PASS, 'starttime': thread_.starttime or 'N/A',
-                 'endtime': thread_.endtime or 'N/A'}
-        if not (thread_.starttime and thread_.endtime):
-            attrs['elapsedtime'] = str(thread_.elapsedtime)
-        main_thread_writer.element('status', thread_.message, attrs)
-        # self._write_status(thread_)
-        main_thread_writer.element('doc', thread_.doc)
-        main_thread_writer.end('thread')
+        if threading.current_thread().name == 'MainThread' and self._writer:
+            main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
+            main_thread_writer.start('thread', {'name': thread_.name,
+                                                'daemon': str(thread_.daemon)})
+            # self._writer.element('name', thread_.name)
+            # self._writer.element('daemon', thread_.daemon)
+            thread_.result.status = thread_.PASS
+            # self._get_thread_writer(thread_.name)
+            attrs = {'status': thread_.PASS, 'starttime': thread_.starttime or 'N/A',
+                     'endtime': get_timestamp()}
+            if not (thread_.starttime and thread_.endtime):
+                attrs['elapsedtime'] = str(thread_.elapsedtime)
+            main_thread_writer.element('status', thread_.message, attrs)
+            # self._write_status(thread_)
+            main_thread_writer.element('doc', thread_.doc)
+            main_thread_writer.end('thread')
 
     def end_thread(self, thread_):
         self._write_status(thread_)
