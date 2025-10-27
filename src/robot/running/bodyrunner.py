@@ -526,11 +526,14 @@ class ThreadRunner(object):
         self._templated = templated
 
     def run(self, data):
-        thread_worker = threading.Thread(target=self.run_worker, args=(data,))
-        thread_worker.name = data.name
-        thread_worker.setDaemon(data.daemon)
-        logger.add_thread_logging(thread_worker.name)
-        thread_worker.start()
+        thread_result = ThreadResult(data.name, data.daemon)
+        with StatusReporter(data, thread_result, self._context, self._run):
+            thread_worker = threading.Thread(target=self.run_worker, args=(data,))
+            thread_worker.name = data.name
+            thread_worker.daemon = data.daemon
+            logger.add_thread_logging(thread_worker.name)
+            thread_worker.start()
+
 
     def run_worker(self, data):
         self._context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type='FIFO')
