@@ -208,7 +208,7 @@ class XmlLogger(ResultVisitor):
             main_thread_writer.end('thread')
 
     def end_thread(self, thread_):
-        if threading.current_thread().name != 'MainThread':
+        if threading.current_thread() != threading.main_thread():
             self._write_status(thread_)
             self._writer.end('thread')
             thread_name = threading.current_thread().name
