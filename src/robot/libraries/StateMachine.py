@@ -12,12 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import hashlib
 import json
 import os
 import time
 
 from robot.api import logger
+from robot.errors import TimeoutError as RobotTimeoutError
 from robot.libraries.BuiltIn import BuiltIn
+from robot.running.timeouts import KeywordTimeout
 from robot.utils import timestr_to_secs, secs_to_timestr
 from robot.version import get_version
 
@@ -95,9 +98,13 @@ class StateMachine:
       exceeded, the machine goes to the state's `on_error` target, or fails
       if there is none.
 
-    Both checks run between keyword calls (cooperative, not preemptive). For
-    preemptive interruption of a stuck keyword use Robot Framework's own
-    keyword/test timeouts, or run a supervisor in a ``THREAD`` block.
+    State ``timeout`` is enforced preemptively: enter/during/exit keywords
+    run under a Robot Framework keyword timeout limited to the remaining
+    visit budget, so also a stuck keyword is interrupted (RF timeouts cannot
+    interrupt code blocking inside C, but RF's own keywords like ``Sleep``
+    are interruptible). ``max_duration`` is checked between keyword calls;
+    for hard supervision of the whole run combine with a ``Watchdog`` in a
+    ``THREAD`` block.
     """
     ROBOT_LIBRARY_SCOPE = 'TEST'
     ROBOT_LIBRARY_VERSION = get_version()
@@ -153,11 +160,26 @@ class StateMachine:
 
         Registered variables are stored in the checkpoint file after every
         transition and restored as test variables when the run is resumed.
-        Values must be JSON serializable.
+        Values must be JSON serializable; if the variable already has a
+        value, that is validated immediately so mistakes fail fast instead
+        of crashing the engine at the first transition.
         """
         name = str(name)
+        value = BuiltIn().get_variable_value(name)
+        if value is not None and not self._is_serializable(value):
+            raise RuntimeError(
+                f"Value of checkpoint variable '{name}' is not JSON "
+                f"serializable: {type(value).__name__}.")
         if name not in self._checkpoint_variables:
             self._checkpoint_variables.append(name)
+
+    @staticmethod
+    def _is_serializable(value):
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            return False
+        return True
 
     def reset_state_machine(self):
         """Removes all states, transitions and registered variables."""
@@ -222,7 +244,8 @@ class StateMachine:
         visit_started = time.time()
         logger.info(f"STATE {name} (visit #{self._visits[name]})",
                     also_console=True)
-        error = self._run_state_keyword(builtin, state['enter'])
+        error = self._run_state_keyword(builtin, state['enter'],
+                                        self._remaining(state, visit_started))
         if error:
             return self._handle_error(state, error, checkpoint, started)
         if state['final']:
@@ -241,11 +264,13 @@ class StateMachine:
                 return self._handle_error(
                     state, f"State '{name}' timeout {timeout} exceeded.",
                     checkpoint, started)
-            error = self._run_state_keyword(builtin, state['during'])
+            error = self._run_state_keyword(builtin, state['during'],
+                                            self._remaining(state, visit_started))
             if error:
                 return self._handle_error(state, error, checkpoint, started)
             time.sleep(poll)
-        error = self._run_state_keyword(builtin, state['exit'])
+        error = self._run_state_keyword(builtin, state['exit'],
+                                        self._remaining(state, visit_started))
         if error:
             return self._handle_error(state, error, checkpoint, started)
         logger.info(f'TRANSITION {name} -> {target}')
@@ -263,12 +288,38 @@ class StateMachine:
                 return tr['target']
         return None
 
-    def _run_state_keyword(self, builtin, keyword):
-        """Runs a state keyword, returns an error message or None."""
+    def _run_state_keyword(self, builtin, keyword, timeout=None):
+        """Runs a state keyword, returns an error message or None.
+
+        With ``timeout`` (seconds, the remaining visit budget) the keyword is
+        interrupted preemptively using Robot Framework's keyword timeout
+        machinery. Like all RF timeouts this cannot interrupt keywords that
+        block inside C code; RF's own keywords (e.g. ``Sleep``) are
+        interruptible.
+        """
         if not keyword:
             return None
-        status, message = builtin.run_keyword_and_ignore_error(keyword)
+        try:
+            if timeout is not None:
+                if timeout <= 0:
+                    return 'State timeout exceeded.'
+                kw_timeout = KeywordTimeout()
+                kw_timeout.string = secs_to_timestr(timeout)
+                kw_timeout.secs = timeout
+                kw_timeout.start()
+                status, message = kw_timeout.run(
+                    builtin.run_keyword_and_ignore_error, args=(keyword,))
+            else:
+                status, message = builtin.run_keyword_and_ignore_error(keyword)
+        except RobotTimeoutError as err:
+            return str(err)
         return None if status == 'PASS' else message
+
+    def _remaining(self, state, visit_started):
+        """Remaining visit time budget in seconds, or None if unlimited."""
+        if state['timeout'] is None:
+            return None
+        return state['timeout'] - (time.time() - visit_started)
 
     def _handle_error(self, state, error, checkpoint, started):
         if state['on_error'] and state['on_error'] != state['name']:
@@ -315,20 +366,37 @@ class StateMachine:
     def _save(self, checkpoint, started):
         if not checkpoint:
             return
-        builtin = BuiltIn()
-        variables = {}
-        for name in self._checkpoint_variables:
-            variables[name] = builtin.get_variable_value(name)
-        data = {'state': self._current,
-                'visits': self._visits,
-                'elapsed': time.time() - started,
-                'variables': variables,
-                'saved': time.strftime('%Y-%m-%d %H:%M:%S')}
-        tmp = checkpoint + '.tmp'
-        with open(tmp, 'w', encoding='UTF-8') as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp, checkpoint)   # atomic also on Windows
-        logger.debug(f"Checkpoint saved to '{checkpoint}'.")
+        try:
+            builtin = BuiltIn()
+            variables = {}
+            for name in self._checkpoint_variables:
+                value = builtin.get_variable_value(name)
+                if not self._is_serializable(value):
+                    logger.warn(f"Checkpoint variable '{name}' value is not "
+                                f"JSON serializable and was not saved.")
+                    continue
+                variables[name] = value
+            data = {'state': self._current,
+                    'visits': self._visits,
+                    'elapsed': time.time() - started,
+                    'variables': variables,
+                    'machine': self._machine_fingerprint(),
+                    'saved': time.strftime('%Y-%m-%d %H:%M:%S')}
+            tmp = checkpoint + '.tmp'
+            with open(tmp, 'w', encoding='UTF-8') as f:
+                json.dump(data, f, indent=2)
+            os.replace(tmp, checkpoint)   # atomic also on Windows
+            logger.debug(f"Checkpoint saved to '{checkpoint}'.")
+        except Exception as err:
+            # A failing checkpoint must never kill a running machine; it
+            # only degrades resumability.
+            logger.warn(f"Saving checkpoint to '{checkpoint}' failed: {err}")
+
+    def _machine_fingerprint(self):
+        """Stable hash of the machine definition for resume validation."""
+        data = {'states': self._states, 'transitions': self._transitions}
+        text = json.dumps(data, sort_keys=True, default=str)
+        return hashlib.sha1(text.encode('UTF-8')).hexdigest()
 
     def _restore(self, initial, checkpoint, resume, builtin):
         resume = str(resume).upper()
@@ -346,6 +414,12 @@ class StateMachine:
         if state not in self._states:
             raise RuntimeError(f"Checkpointed state '{state}' is not defined "
                                f"in the current machine.")
+        fingerprint = data.get('machine')
+        if fingerprint and fingerprint != self._machine_fingerprint():
+            logger.warn(f"Checkpoint '{checkpoint}' was created with a "
+                        f"different state machine definition. Resuming "
+                        f"anyway, but visit counters and saved variables "
+                        f"may not match the current machine.")
         self._visits = data.get('visits', {})
         self._elapsed_offset = data.get('elapsed', 0)
         for name, value in data.get('variables', {}).items():

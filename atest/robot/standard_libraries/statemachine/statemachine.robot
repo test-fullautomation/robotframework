@@ -1,0 +1,135 @@
+*** Settings ***
+Documentation     Acceptance tests for the StateMachine standard library.
+Library           StateMachine
+Library           OperatingSystem
+Test Teardown     Reset State Machine
+
+*** Variables ***
+${CHECKPOINT}     ${OUTPUT DIR}${/}statemachine_checkpoint.json
+
+*** Test Cases ***
+Machine Runs To Final State
+    Set Test Variable    ${CYCLES}    ${0}
+    Define State    INIT    enter=Prepare
+    Define State    WORK    during=Increment Cycles
+    Define State    DONE    final=True
+    Define Transition    INIT    WORK
+    Define Transition    WORK    DONE    condition=$CYCLES >= 3
+    Run State Machine    initial=INIT    poll_interval=0.05 s
+    Should Be Equal    ${CYCLES}    ${3}
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    DONE
+
+Transitions Are Evaluated In Definition Order
+    Set Test Variable    ${N}    ${10}
+    Define State    A
+    Define State    FIRST    final=True
+    Define State    SECOND    final=True
+    Define Transition    A    FIRST     condition=$N > 5
+    Define Transition    A    SECOND    condition=$N > 1
+    Run State Machine    initial=A    poll_interval=0.05 s
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    FIRST
+
+Failure Routes To On Error State
+    Define State    INIT    enter=Break Something    on_error=FAULT
+    Define State    FAULT    enter=Collect Diagnostics    final=True
+    Define State    DONE    final=True
+    Define Transition    INIT    DONE
+    Run State Machine    initial=INIT
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    FAULT
+
+Failure Without On Error Fails The Test
+    Define State    INIT    enter=Break Something
+    Define State    DONE    final=True
+    Define Transition    INIT    DONE
+    Run Keyword And Expect Error    State 'INIT' failed: Simulated hardware fault
+    ...    Run State Machine    initial=INIT
+
+Invalid Machine Is Rejected Before Running
+    Define State    LONELY    # not final, no outgoing transitions
+    Run Keyword And Expect Error    *no outgoing transitions*
+    ...    Run State Machine    initial=LONELY
+
+Stuck Keyword Is Interrupted By State Timeout
+    [Documentation]    The enter keyword would sleep 60 s; the state timeout
+    ...                interrupts it preemptively and routes to FAULT.
+    Define State    SLOW    enter=Sleep A Long Time    timeout=0.3 s
+    ...    on_error=FAULT
+    Define State    FAULT    final=True
+    Define State    DONE    final=True
+    Define Transition    SLOW    DONE
+    ${start}=    Get Time    epoch
+    Run State Machine    initial=SLOW    poll_interval=0.05 s
+    ${end}=    Get Time    epoch
+    Should Be True    ${end} - ${start} < 30    Timeout did not interrupt
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    FAULT
+
+Interrupted Run Resumes From Checkpoint
+    Remove File    ${CHECKPOINT}
+    Set Test Variable    ${N}    ${0}
+    Define State    INIT    enter=Prepare
+    Define State    WORK    during=Increment N
+    Define State    DONE    final=True
+    Define Transition    INIT    WORK
+    Define Transition    WORK    DONE    condition=$N >= 5
+    Checkpoint Variable    \${N}
+    Run Keyword And Expect Error    *max_duration*exceeded*
+    ...    Run State Machine    initial=INIT    max_duration=0.4 s
+    ...    checkpoint=${CHECKPOINT}    poll_interval=0.1 s
+    File Should Exist    ${CHECKPOINT}
+    ${before}=    Set Variable    ${N}
+    Should Be True    ${before} > 0
+    Run State Machine    initial=INIT    max_duration=1 min
+    ...    checkpoint=${CHECKPOINT}    poll_interval=0.1 s
+    Should Be Equal    ${N}    ${5}
+    File Should Not Exist    ${CHECKPOINT}
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    DONE
+
+Unserializable Checkpoint Variable Fails Fast
+    ${obj}=    Evaluate    object()
+    Set Test Variable    ${OBJ}    ${obj}
+    Run Keyword And Expect Error    *not JSON serializable*
+    ...    Checkpoint Variable    \${OBJ}
+
+Graceful Stop From A Keyword
+    Set Test Variable    ${N}    ${0}
+    Define State    INIT    enter=Prepare
+    Define State    WORK    during=Increment N And Stop At 3
+    Define State    DONE    final=True
+    Define Transition    INIT    WORK
+    Define Transition    WORK    DONE    condition=$N >= 999999
+    Run State Machine    initial=INIT    poll_interval=0.05 s
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    WORK
+    Should Be Equal    ${N}    ${3}
+
+*** Keywords ***
+Prepare
+    Log    Preparing the device under test
+
+Increment Cycles
+    ${c}=    Evaluate    $CYCLES + 1
+    Set Test Variable    ${CYCLES}    ${c}
+
+Increment N
+    ${n}=    Evaluate    $N + 1
+    Set Test Variable    ${N}    ${n}
+
+Increment N And Stop At 3
+    Increment N
+    IF    $N >= 3
+        Stop State Machine
+    END
+
+Break Something
+    Fail    Simulated hardware fault
+
+Collect Diagnostics
+    Log    Collecting diagnostics after fault
+
+Sleep A Long Time
+    Sleep    60 s
