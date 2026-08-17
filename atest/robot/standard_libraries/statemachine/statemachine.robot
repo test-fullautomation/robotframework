@@ -95,6 +95,46 @@ Unserializable Checkpoint Variable Fails Fast
     Run Keyword And Expect Error    *not JSON serializable*
     ...    Checkpoint Variable    \${OBJ}
 
+State Keywords Accept Arguments
+    Set Test Variable    ${TOTAL}    ${0}
+    ${enter}=    Create List    Add To Total    ${5}
+    ${during}=    Create List    Add To Total    ${2}
+    Define State    INIT    enter=${enter}
+    Define State    WORK    during=${during}
+    Define State    DONE    final=True
+    Define Transition    INIT    WORK
+    Define Transition    WORK    DONE    condition=$TOTAL >= 9
+    Run State Machine    initial=INIT    poll_interval=0.05 s
+    Should Be Equal    ${TOTAL}    ${9}
+
+Machine Loaded From JSON File
+    Set Test Variable    ${N}    ${0}
+    ${machine}=    Catenate    SEPARATOR=\n
+    ...    {"states": {
+    ...      "INIT": {"enter": "Prepare"},
+    ...      "WORK": {"during": ["Add N", "3"]},
+    ...      "DONE": {"final": true}},
+    ...    "transitions": [
+    ...      "INIT -> WORK",
+    ...      {"source": "WORK", "target": "DONE", "condition": "$N >= 6"}],
+    ...    "checkpoint_variables": ["\${N}"]}
+    Create File    ${OUTPUT DIR}${/}machine.json    ${machine}
+    Load State Machine    ${OUTPUT DIR}${/}machine.json
+    Run State Machine    initial=INIT    poll_interval=0.05 s
+    Should Be Equal    ${N}    ${6}
+    ${state}=    Get Current State
+    Should Be Equal    ${state}    DONE
+    [Teardown]    Run Keywords    Reset State Machine
+    ...    AND    Remove File    ${OUTPUT DIR}${/}machine.json
+
+Invalid Machine File Is Rejected
+    Create File    ${OUTPUT DIR}${/}bad.json
+    ...    {"states": {"A": {"final": true, "colour": "red"}}}
+    Run Keyword And Expect Error    *unknown option*colour*
+    ...    Load State Machine    ${OUTPUT DIR}${/}bad.json
+    [Teardown]    Run Keywords    Reset State Machine
+    ...    AND    Remove File    ${OUTPUT DIR}${/}bad.json
+
 Graceful Stop From A Keyword
     Set Test Variable    ${N}    ${0}
     Define State    INIT    enter=Prepare
@@ -124,6 +164,16 @@ Increment N And Stop At 3
     IF    $N >= 3
         Stop State Machine
     END
+
+Add To Total
+    [Arguments]    ${amount}
+    ${t}=    Evaluate    $TOTAL + $amount
+    Set Test Variable    ${TOTAL}    ${t}
+
+Add N
+    [Arguments]    ${amount}
+    ${n}=    Evaluate    $N + int($amount)
+    Set Test Variable    ${N}    ${n}
 
 Break Something
     Fail    Simulated hardware fault

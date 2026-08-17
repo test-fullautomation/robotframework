@@ -17,11 +17,13 @@ import json
 import os
 import time
 
+import re
+
 from robot.api import logger
 from robot.errors import TimeoutError as RobotTimeoutError
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.timeouts import KeywordTimeout
-from robot.utils import timestr_to_secs, secs_to_timestr
+from robot.utils import is_list_like, timestr_to_secs, secs_to_timestr
 from robot.version import get_version
 
 
@@ -66,9 +68,38 @@ class StateMachine:
     - `during` is run on every polling round while waiting for a transition.
     - `exit` is run once when leaving the state.
 
-    All of them are names of (user) keywords without arguments; wrap more
-    complex actions in a user keyword. They appear in log.html as normal
-    keywords nested inside `Run State Machine`, one block per state visit.
+    Each accepts either a keyword name, or a list whose first item is the
+    keyword name and the rest are arguments:
+
+    | ${enter}=       | Create List | Start Charging | fast | ${AMPS} |
+    | `Define State`  | CHARGING    | enter=${enter} |      |         |
+
+    They appear in log.html as normal keywords nested inside
+    `Run State Machine`, one block per state visit.
+
+    == Defining a machine in a file ==
+
+    `Load State Machine` reads the whole machine from a YAML or JSON file
+    (YAML requires the ``pyyaml`` module; JSON works out of the box):
+
+    | `Load State Machine` | ${CURDIR}${/}machine.yaml |
+    | `Run State Machine`  | initial=INIT | max_duration=48h |
+
+    machine.yaml:
+    | states:
+    |   INIT:     {enter: Setup DUT, timeout: 10 min}
+    |   CHARGING: {enter: [Start Charging, fast], on_error: FAULT}
+    |   FAULT:    {enter: Collect Diagnostics, final: true}
+    |   DONE:     {final: true}
+    | transitions:
+    |   - INIT -> CHARGING when $DUT_READY
+    |   - {source: CHARGING, target: DONE, condition: $CYCLES >= 500}
+    | checkpoint_variables: ['${CYCLES}']
+
+    Transitions support the compact ``SOURCE -> TARGET when CONDITION``
+    string form (``when ...`` optional) and the explicit mapping form; they
+    are evaluated in file order. File definitions and `Define State` /
+    `Define Transition` keywords can be freely combined.
 
     == Error handling ==
 
@@ -126,7 +157,8 @@ class StateMachine:
                      timeout=None, on_error=None, final=False):
         """Defines a state.
 
-        - ``enter``/``during``/``exit``: keyword names (see library docs).
+        - ``enter``/``during``/``exit``: a keyword name, or a list of
+          keyword name followed by its arguments (see library docs).
         - ``timeout``: max duration of one visit, e.g. ``10 min`` or ``30s``.
         - ``on_error``: state to go to if a keyword fails or ``timeout`` is
           exceeded.
@@ -135,12 +167,27 @@ class StateMachine:
         if name in self._states:
             raise RuntimeError(f"State '{name}' is already defined.")
         self._states[name] = {
-            'name': name, 'enter': enter, 'during': during, 'exit': exit,
+            'name': name,
+            'enter': self._normalize_keyword(name, 'enter', enter),
+            'during': self._normalize_keyword(name, 'during', during),
+            'exit': self._normalize_keyword(name, 'exit', exit),
             'timeout': timestr_to_secs(timeout) if timeout else None,
             'on_error': on_error,
             'final': self._is_truthy(final),
         }
         logger.info(f"Defined state '{name}' (final={final}).")
+
+    @staticmethod
+    def _normalize_keyword(state, what, value):
+        """Normalizes a state keyword to ``(name, args)`` or None."""
+        if value is None or value == '':
+            return None
+        if is_list_like(value):
+            items = list(value)
+            if not items:
+                return None
+            return (str(items[0]), tuple(items[1:]))
+        return (str(value), ())
 
     def define_transition(self, source, target, condition=None):
         """Defines a transition from ``source`` to ``target``.
@@ -180,6 +227,77 @@ class StateMachine:
         except (TypeError, ValueError):
             return False
         return True
+
+    def load_state_machine(self, path):
+        """Loads states, transitions and checkpoint variables from a file.
+
+        The file format is selected by extension: ``.json`` is parsed with
+        the standard library, everything else as YAML (requires the
+        ``pyyaml`` module). See the library documentation for the file
+        structure. Definitions from the file go through the same validation
+        as `Define State` / `Define Transition` and can be combined with
+        them; transitions keep their file order.
+        """
+        data = self._read_machine_file(path)
+        if not isinstance(data, dict):
+            raise RuntimeError(f"Machine file '{path}' must contain a "
+                               f"mapping, got {type(data).__name__}.")
+        known = {'enter', 'during', 'exit', 'timeout', 'on_error', 'final'}
+        for name, options in (data.get('states') or {}).items():
+            options = options or {}
+            if not isinstance(options, dict):
+                raise RuntimeError(f"State '{name}': options must be a "
+                                   f"mapping, got {type(options).__name__}.")
+            unknown = set(options) - known
+            if unknown:
+                raise RuntimeError(f"State '{name}' has unknown option(s) "
+                                   f"{', '.join(sorted(unknown))}.")
+            self.define_state(str(name), **options)
+        for item in (data.get('transitions') or []):
+            source, target, condition = self._parse_transition(item)
+            self.define_transition(source, target, condition)
+        for name in (data.get('checkpoint_variables') or []):
+            self.checkpoint_variable(name)
+        logger.info(f"Loaded state machine from '{path}': "
+                    f"{len(self._states)} state(s), "
+                    f"{len(self._transitions)} transition(s).")
+
+    def _read_machine_file(self, path):
+        if not os.path.isfile(path):
+            raise RuntimeError(f"Machine file '{path}' does not exist.")
+        with open(path, encoding='UTF-8') as f:
+            text = f.read()
+        if str(path).lower().endswith('.json'):
+            return json.loads(text)
+        try:
+            import yaml
+        except ImportError:
+            raise RuntimeError(
+                f"Using YAML machine file '{path}' requires the 'pyyaml' "
+                f"module to be installed (pip install pyyaml). JSON files "
+                f"work without extra dependencies.")
+        return yaml.safe_load(text)
+
+    _TRANSITION_RE = re.compile(r'^\s*(\S+)\s*->\s*(\S+?)\s*'
+                                r'(?:\s+when\s+(.+?))?\s*$')
+
+    def _parse_transition(self, item):
+        if isinstance(item, dict):
+            unknown = set(item) - {'source', 'target', 'condition'}
+            if unknown:
+                raise RuntimeError(f"Transition has unknown key(s) "
+                                   f"{', '.join(sorted(unknown))}.")
+            try:
+                return (str(item['source']), str(item['target']),
+                        item.get('condition'))
+            except KeyError as err:
+                raise RuntimeError(f"Transition is missing key {err}.")
+        match = self._TRANSITION_RE.match(str(item))
+        if not match:
+            raise RuntimeError(
+                f"Invalid transition {item!r}. Expected 'SOURCE -> TARGET' "
+                f"or 'SOURCE -> TARGET when CONDITION'.")
+        return match.group(1), match.group(2), match.group(3)
 
     def reset_state_machine(self):
         """Removes all states, transitions and registered variables."""
@@ -289,7 +407,7 @@ class StateMachine:
         return None
 
     def _run_state_keyword(self, builtin, keyword, timeout=None):
-        """Runs a state keyword, returns an error message or None.
+        """Runs a state keyword ``(name, args)``, returns an error or None.
 
         With ``timeout`` (seconds, the remaining visit budget) the keyword is
         interrupted preemptively using Robot Framework's keyword timeout
@@ -299,6 +417,7 @@ class StateMachine:
         """
         if not keyword:
             return None
+        name, args = keyword
         try:
             if timeout is not None:
                 if timeout <= 0:
@@ -308,9 +427,9 @@ class StateMachine:
                 kw_timeout.secs = timeout
                 kw_timeout.start()
                 status, message = kw_timeout.run(
-                    builtin.run_keyword_and_ignore_error, args=(keyword,))
+                    builtin.run_keyword_and_ignore_error, args=(name,) + tuple(args))
             else:
-                status, message = builtin.run_keyword_and_ignore_error(keyword)
+                status, message = builtin.run_keyword_and_ignore_error(name, *args)
         except RobotTimeoutError as err:
             return str(err)
         return None if status == 'PASS' else message

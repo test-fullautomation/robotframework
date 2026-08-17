@@ -25,9 +25,9 @@ class FakeBuiltIn:
         ns = {name.strip('${}'): value for name, value in self.variables.items()}
         return eval(re.sub(r'\$(\w+)', r'\1', expression), {}, ns)
 
-    def run_keyword_and_ignore_error(self, name):
+    def run_keyword_and_ignore_error(self, name, *args):
         try:
-            self.keywords[name]()
+            self.keywords[name](*args)
         except RobotTimeoutError:
             # Like the real BuiltIn keyword: timeouts are never ignored.
             # Swallowing the asynchronously raised timeout would leave the
@@ -269,6 +269,142 @@ class TestCheckpoint(StateMachineTestCase):
         self.assertEqual(self.sm.get_current_state(), 'DONE')
         self.assertTrue(any('not JSON serializable' in w
                             for w in self.logger.warnings))
+
+
+class TestKeywordArguments(StateMachineTestCase):
+
+    def test_state_keyword_with_arguments(self):
+        calls = []
+
+        def record(*args):
+            calls.append(args)
+
+        FakeBuiltIn.keywords['Record'] = record
+        self.sm.define_state('A', enter=['Record', 'x', 'y'], final=True)
+        self.sm.run_state_machine('A')
+        self.assertEqual(calls, [('x', 'y')])
+
+    def test_plain_string_keyword_has_no_arguments(self):
+        calls = []
+        FakeBuiltIn.keywords['Record'] = lambda *args: calls.append(args)
+        self.sm.define_state('A', enter='Record', final=True)
+        self.sm.run_state_machine('A')
+        self.assertEqual(calls, [()])
+
+    def test_empty_keyword_values_mean_no_keyword(self):
+        self.sm.define_state('A', enter='', during=None, exit=[], final=True)
+        self.sm.run_state_machine('A')    # nothing to run, must not crash
+
+
+class TestLoadStateMachine(StateMachineTestCase):
+
+    MACHINE = {
+        'states': {
+            'INIT': {'enter': 'Prepare'},
+            'WORK': {'during': ['Add', '2'], 'on_error': 'FAULT'},
+            'FAULT': {'final': True},
+            'DONE': {'final': True},
+        },
+        'transitions': [
+            'INIT -> WORK',
+            {'source': 'WORK', 'target': 'DONE', 'condition': '$N >= 4'},
+        ],
+        'checkpoint_variables': ['${N}'],
+    }
+
+    def setUp(self):
+        super().setUp()
+        FakeBuiltIn.variables['${N}'] = 0
+        FakeBuiltIn.keywords['Prepare'] = lambda: None
+
+        def add(amount):
+            FakeBuiltIn.variables['${N}'] += int(amount)
+
+        FakeBuiltIn.keywords['Add'] = add
+        fd, self.path = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+
+    def tearDown(self):
+        os.remove(self.path)
+        super().tearDown()
+
+    def write(self, data):
+        with open(self.path, 'w', encoding='UTF-8') as f:
+            json.dump(data, f)
+
+    def test_load_json_machine_and_run(self):
+        self.write(self.MACHINE)
+        self.sm.load_state_machine(self.path)
+        self.assertEqual(sorted(self.sm._states), ['DONE', 'FAULT', 'INIT', 'WORK'])
+        self.assertIn('${N}', self.sm._checkpoint_variables)
+        self.sm.run_state_machine('INIT', poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(), 'DONE')
+        self.assertEqual(FakeBuiltIn.variables['${N}'], 4)
+
+    def test_compact_transition_without_condition(self):
+        source, target, condition = self.sm._parse_transition('A -> B')
+        self.assertEqual((source, target, condition), ('A', 'B', None))
+
+    def test_compact_transition_with_condition(self):
+        source, target, condition = self.sm._parse_transition(
+            'A -> B when $N >= 5')
+        self.assertEqual((source, target, condition), ('A', 'B', '$N >= 5'))
+
+    def test_invalid_transition_string(self):
+        self.write({'states': {'A': {'final': True}},
+                    'transitions': ['A B C']})
+        with self.assertRaisesRegex(RuntimeError, 'Invalid transition'):
+            self.sm.load_state_machine(self.path)
+
+    def test_unknown_state_option(self):
+        self.write({'states': {'A': {'final': True, 'colour': 'red'}}})
+        with self.assertRaisesRegex(RuntimeError, "unknown option.*colour"):
+            self.sm.load_state_machine(self.path)
+
+    def test_unknown_transition_key(self):
+        self.write({'states': {'A': {'final': True}},
+                    'transitions': [{'source': 'A', 'target': 'A',
+                                     'via': 'B'}]})
+        with self.assertRaisesRegex(RuntimeError, "unknown key.*via"):
+            self.sm.load_state_machine(self.path)
+
+    def test_missing_file(self):
+        with self.assertRaisesRegex(RuntimeError, 'does not exist'):
+            self.sm.load_state_machine(self.path + '.nope')
+
+    def test_yaml_machine(self):
+        try:
+            import yaml    # noqa: F401
+        except ImportError:
+            self.skipTest('pyyaml not installed')
+        path = self.path + '.yaml'
+        with open(path, 'w', encoding='UTF-8') as f:
+            f.write('states:\n'
+                    '  A: {enter: Prepare}\n'
+                    '  B: {final: true}\n'
+                    'transitions:\n'
+                    '  - A -> B\n')
+        try:
+            self.sm.load_state_machine(path)
+            self.sm.run_state_machine('A', poll_interval='0.01 s')
+            self.assertEqual(self.sm.get_current_state(), 'B')
+        finally:
+            os.remove(path)
+
+    def test_yaml_without_pyyaml_gives_clear_error(self):
+        try:
+            import yaml    # noqa: F401
+            self.skipTest('pyyaml is installed')
+        except ImportError:
+            pass
+        path = self.path + '.yaml'
+        with open(path, 'w', encoding='UTF-8') as f:
+            f.write('states: {}\n')
+        try:
+            with self.assertRaisesRegex(RuntimeError, 'pyyaml'):
+                self.sm.load_state_machine(path)
+        finally:
+            os.remove(path)
 
 
 if __name__ == '__main__':
