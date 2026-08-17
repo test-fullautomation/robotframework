@@ -1,0 +1,365 @@
+#  cuongnht add state machine
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+import json
+import os
+import time
+
+from robot.api import logger
+from robot.libraries.BuiltIn import BuiltIn
+from robot.utils import timestr_to_secs, secs_to_timestr
+from robot.version import get_version
+
+
+class StateMachine:
+    """Library for running long tests as a persistent state machine.
+
+    Designed for very long running tests (hours to days). The test is modeled
+    as states with enter/during/exit keywords and guarded transitions. The
+    engine loop evaluates guards, runs the keywords and - crucially for long
+    runs - checkpoints its progress to disk after every transition so that an
+    interrupted run (crash, power loss, reboot) can be *resumed* from the last
+    state instead of restarting from zero.
+
+    == Defining a machine ==
+
+    | `Define State`      | INIT        | enter=Setup DUT        | timeout=10 min  |
+    | `Define State`      | CHARGING    | enter=Start Charging   | on_error=FAULT  |
+    | `Define State`      | DISCHARGING | enter=Start Discharging | on_error=FAULT |
+    | `Define State`      | FAULT       | enter=Collect Diagnostics | final=True   |
+    | `Define State`      | DONE        | final=True             |                 |
+    | `Define Transition` | INIT        | CHARGING    | condition=$DUT_READY      |
+    | `Define Transition` | CHARGING    | DISCHARGING | condition=$SOC >= 80      |
+    | `Define Transition` | DISCHARGING | CHARGING    | condition=$SOC <= 20      |
+    | `Define Transition` | DISCHARGING | DONE        | condition=$CYCLES >= 500  |
+    | `Checkpoint Variable` | ${/}CYCLES |            |                           |
+    | `Run State Machine` | initial=INIT | max_duration=48h | checkpoint=${OUTPUTDIR}${/}sm.json |
+
+    == Conditions ==
+
+    Conditions are Python expressions evaluated with BuiltIn `Evaluate`
+    semantics every polling round. Use the special `$name` variable syntax
+    (*not* `${name}`) so that the *current* value of the variable is used on
+    every evaluation instead of the value at definition time. A transition
+    without a condition is always taken; define it last as a default branch.
+
+    Transitions are evaluated in definition order; the first matching one is
+    taken.
+
+    == Keywords attached to states ==
+
+    - `enter` is run once when the state is entered.
+    - `during` is run on every polling round while waiting for a transition.
+    - `exit` is run once when leaving the state.
+
+    All of them are names of (user) keywords without arguments; wrap more
+    complex actions in a user keyword. They appear in log.html as normal
+    keywords nested inside `Run State Machine`, one block per state visit.
+
+    == Error handling ==
+
+    If a state keyword fails and the state defines `on_error`, the machine
+    transitions to that state (typically a diagnostics/FAULT state) instead
+    of failing the test. Without `on_error` the failure is propagated and the
+    machine stops (checkpoint is saved first, so the run can be resumed).
+
+    == Checkpoint and resume ==
+
+    With `checkpoint=<file>` the engine atomically writes a JSON file after
+    every transition containing the current state, visit counters, elapsed
+    time and the values of variables registered with `Checkpoint Variable`.
+    On the next run with `resume=AUTO` (default) the machine continues from
+    the checkpointed state: registered variables are restored and the state's
+    `enter` keyword is executed again - design enter keywords to be
+    *idempotent*. Use `resume=False` to ignore an existing checkpoint or
+    `resume=True` to require one. The checkpoint file is removed when the
+    machine finishes successfully.
+
+    == Timeouts and the watchdog ==
+
+    - `max_duration` given to `Run State Machine` bounds the whole run. When
+      exceeded, the checkpoint is saved and the test fails with a message
+      telling that the run can be resumed.
+    - `timeout` given to `Define State` bounds one visit to that state. When
+      exceeded, the machine goes to the state's `on_error` target, or fails
+      if there is none.
+
+    Both checks run between keyword calls (cooperative, not preemptive). For
+    preemptive interruption of a stuck keyword use Robot Framework's own
+    keyword/test timeouts, or run a supervisor in a ``THREAD`` block.
+    """
+    ROBOT_LIBRARY_SCOPE = 'TEST'
+    ROBOT_LIBRARY_VERSION = get_version()
+
+    def __init__(self):
+        self._states = {}
+        self._transitions = []       # evaluated in definition order
+        self._checkpoint_variables = []
+        self._current = None
+        self._visits = {}
+        self._stop_requested = False
+        self._elapsed_offset = 0     # elapsed seconds restored from checkpoint
+
+    # ------------------------------------------------------------------
+    # Definition keywords
+    # ------------------------------------------------------------------
+
+    def define_state(self, name, enter=None, during=None, exit=None,
+                     timeout=None, on_error=None, final=False):
+        """Defines a state.
+
+        - ``enter``/``during``/``exit``: keyword names (see library docs).
+        - ``timeout``: max duration of one visit, e.g. ``10 min`` or ``30s``.
+        - ``on_error``: state to go to if a keyword fails or ``timeout`` is
+          exceeded.
+        - ``final``: entering this state completes the machine.
+        """
+        if name in self._states:
+            raise RuntimeError(f"State '{name}' is already defined.")
+        self._states[name] = {
+            'name': name, 'enter': enter, 'during': during, 'exit': exit,
+            'timeout': timestr_to_secs(timeout) if timeout else None,
+            'on_error': on_error,
+            'final': self._is_truthy(final),
+        }
+        logger.info(f"Defined state '{name}' (final={final}).")
+
+    def define_transition(self, source, target, condition=None):
+        """Defines a transition from ``source`` to ``target``.
+
+        ``condition`` is a Python expression evaluated with `Evaluate`
+        semantics; use ``$name`` syntax to access variables at run time.
+        Omitting the condition makes the transition unconditional (default
+        branch); define it after the guarded ones.
+        """
+        self._transitions.append({'source': source, 'target': target,
+                                  'condition': condition})
+        cond = condition or '<always>'
+        logger.info(f"Defined transition {source} -> {target} when {cond}.")
+
+    def checkpoint_variable(self, name):
+        """Registers a variable (e.g. ``\\${CYCLES}``) to be persisted.
+
+        Registered variables are stored in the checkpoint file after every
+        transition and restored as test variables when the run is resumed.
+        Values must be JSON serializable.
+        """
+        name = str(name)
+        if name not in self._checkpoint_variables:
+            self._checkpoint_variables.append(name)
+
+    def reset_state_machine(self):
+        """Removes all states, transitions and registered variables."""
+        self.__init__()
+
+    # ------------------------------------------------------------------
+    # Runtime keywords
+    # ------------------------------------------------------------------
+
+    def get_current_state(self):
+        """Returns the name of the state the machine is currently in."""
+        return self._current
+
+    def stop_state_machine(self):
+        """Requests a graceful stop.
+
+        Can be called from a state keyword (or from a ``THREAD`` supervisor).
+        The machine finishes the current polling round, saves the checkpoint
+        and returns from `Run State Machine` successfully.
+        """
+        self._stop_requested = True
+        logger.info('State machine stop requested.')
+
+    def run_state_machine(self, initial, max_duration=None, checkpoint=None,
+                          resume='AUTO', poll_interval='1 s'):
+        """Runs the machine until a final state, stop request, or failure.
+
+        - ``initial``: name of the start state.
+        - ``max_duration``: overall limit, e.g. ``48h`` (see library docs).
+        - ``checkpoint``: path of the persistent checkpoint file.
+        - ``resume``: ``AUTO`` (default) resumes when a checkpoint exists,
+          ``True`` requires one, ``False`` starts from scratch.
+        - ``poll_interval``: delay between guard evaluation rounds.
+        """
+        self._validate_machine(initial)
+        builtin = BuiltIn()
+        max_duration = timestr_to_secs(max_duration) if max_duration else None
+        poll = timestr_to_secs(poll_interval)
+        state = self._restore(initial, checkpoint, resume, builtin)
+        started = time.time() - self._elapsed_offset
+        self._stop_requested = False
+        while True:
+            state = self._visit(state, builtin, started, max_duration,
+                                checkpoint, poll)
+            if state is None:
+                break
+        if checkpoint and os.path.isfile(checkpoint):
+            os.remove(checkpoint)
+        elapsed = secs_to_timestr(time.time() - started)
+        logger.info(f'State machine finished in {elapsed} after '
+                    f'{sum(self._visits.values())} state visit(s).')
+
+    # ------------------------------------------------------------------
+    # Engine
+    # ------------------------------------------------------------------
+
+    def _visit(self, name, builtin, started, max_duration, checkpoint, poll):
+        """Runs one visit of state ``name``, returns the next state or None."""
+        state = self._states[name]
+        self._current = name
+        self._visits[name] = self._visits.get(name, 0) + 1
+        visit_started = time.time()
+        logger.info(f"STATE {name} (visit #{self._visits[name]})",
+                    also_console=True)
+        error = self._run_state_keyword(builtin, state['enter'])
+        if error:
+            return self._handle_error(state, error, checkpoint, started)
+        if state['final']:
+            self._save(checkpoint, started)
+            return None
+        while True:
+            self._check_max_duration(started, max_duration, checkpoint)
+            if self._stop_requested:
+                self._save(checkpoint, started)
+                return None
+            target = self._find_transition(name, builtin)
+            if target:
+                break
+            if state['timeout'] and time.time() - visit_started > state['timeout']:
+                timeout = secs_to_timestr(state['timeout'])
+                return self._handle_error(
+                    state, f"State '{name}' timeout {timeout} exceeded.",
+                    checkpoint, started)
+            error = self._run_state_keyword(builtin, state['during'])
+            if error:
+                return self._handle_error(state, error, checkpoint, started)
+            time.sleep(poll)
+        error = self._run_state_keyword(builtin, state['exit'])
+        if error:
+            return self._handle_error(state, error, checkpoint, started)
+        logger.info(f'TRANSITION {name} -> {target}')
+        self._current = target
+        self._save(checkpoint, started)
+        return target
+
+    def _find_transition(self, source, builtin):
+        for tr in self._transitions:
+            if tr['source'] != source:
+                continue
+            if tr['condition'] is None:
+                return tr['target']
+            if self._is_truthy(builtin.evaluate(tr['condition'])):
+                return tr['target']
+        return None
+
+    def _run_state_keyword(self, builtin, keyword):
+        """Runs a state keyword, returns an error message or None."""
+        if not keyword:
+            return None
+        status, message = builtin.run_keyword_and_ignore_error(keyword)
+        return None if status == 'PASS' else message
+
+    def _handle_error(self, state, error, checkpoint, started):
+        if state['on_error'] and state['on_error'] != state['name']:
+            logger.warn(f"State '{state['name']}' failed: {error} "
+                        f"Continuing in state '{state['on_error']}'.")
+            self._current = state['on_error']
+            self._save(checkpoint, started)
+            return state['on_error']
+        self._save(checkpoint, started)
+        raise AssertionError(f"State '{state['name']}' failed: {error}")
+
+    def _check_max_duration(self, started, max_duration, checkpoint):
+        if max_duration and time.time() - started > max_duration:
+            self._save(checkpoint, started)
+            limit = secs_to_timestr(max_duration)
+            raise AssertionError(
+                f'State machine max_duration {limit} exceeded in state '
+                f"'{self._current}'. The run can be resumed from the "
+                f'checkpoint file.')
+
+    def _validate_machine(self, initial):
+        if initial not in self._states:
+            raise RuntimeError(f"Initial state '{initial}' is not defined.")
+        for tr in self._transitions:
+            for end in (tr['source'], tr['target']):
+                if end not in self._states:
+                    raise RuntimeError(f"Transition {tr['source']} -> "
+                                       f"{tr['target']} uses undefined "
+                                       f"state '{end}'.")
+        for state in self._states.values():
+            if state['on_error'] and state['on_error'] not in self._states:
+                raise RuntimeError(f"State '{state['name']}' has undefined "
+                                   f"on_error state '{state['on_error']}'.")
+            has_out = any(tr['source'] == state['name']
+                          for tr in self._transitions)
+            if not state['final'] and not has_out:
+                raise RuntimeError(f"Non-final state '{state['name']}' has "
+                                   f"no outgoing transitions.")
+
+    # ------------------------------------------------------------------
+    # Checkpointing
+    # ------------------------------------------------------------------
+
+    def _save(self, checkpoint, started):
+        if not checkpoint:
+            return
+        builtin = BuiltIn()
+        variables = {}
+        for name in self._checkpoint_variables:
+            variables[name] = builtin.get_variable_value(name)
+        data = {'state': self._current,
+                'visits': self._visits,
+                'elapsed': time.time() - started,
+                'variables': variables,
+                'saved': time.strftime('%Y-%m-%d %H:%M:%S')}
+        tmp = checkpoint + '.tmp'
+        with open(tmp, 'w', encoding='UTF-8') as f:
+            json.dump(data, f, indent=2)
+        os.replace(tmp, checkpoint)   # atomic also on Windows
+        logger.debug(f"Checkpoint saved to '{checkpoint}'.")
+
+    def _restore(self, initial, checkpoint, resume, builtin):
+        resume = str(resume).upper()
+        exists = checkpoint and os.path.isfile(checkpoint)
+        if resume == 'TRUE' and not exists:
+            raise RuntimeError(f"resume=True but checkpoint file "
+                               f"'{checkpoint}' does not exist.")
+        if resume == 'FALSE' or not exists:
+            self._visits = {}
+            self._elapsed_offset = 0
+            return initial
+        with open(checkpoint, encoding='UTF-8') as f:
+            data = json.load(f)
+        state = data['state']
+        if state not in self._states:
+            raise RuntimeError(f"Checkpointed state '{state}' is not defined "
+                               f"in the current machine.")
+        self._visits = data.get('visits', {})
+        self._elapsed_offset = data.get('elapsed', 0)
+        for name, value in data.get('variables', {}).items():
+            builtin.set_test_variable(name, value)
+        elapsed = secs_to_timestr(self._elapsed_offset)
+        logger.info(f"Resuming state machine from checkpoint "
+                    f"'{checkpoint}': state '{state}', {elapsed} elapsed, "
+                    f"saved {data.get('saved', 'N/A')}.", also_console=True)
+        return state
+
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_truthy(value):
+        if isinstance(value, str):
+            return value.upper() not in ('FALSE', 'NO', '0', 'NONE', '')
+        return bool(value)
