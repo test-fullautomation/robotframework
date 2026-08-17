@@ -95,6 +95,36 @@ Unserializable Checkpoint Variable Fails Fast
     Run Keyword And Expect Error    *not JSON serializable*
     ...    Checkpoint Variable    \${OBJ}
 
+Max Visits Guard Stops Transition Ping Pong
+    Define State    A
+    Define State    B
+    Define Transition    A    B
+    Define Transition    B    A
+    Run Keyword And Expect Error    *max_visits 6 reached*
+    ...    Run State Machine    initial=A    max_visits=6    poll_interval=0.02 s
+
+On Error Routing Cycle Is Detected
+    Define State    A    enter=Break Something    on_error=B
+    Define State    B    enter=Break Something    on_error=A
+    Define State    C    final=True
+    Define Transition    A    C
+    Define Transition    B    C
+    Run Keyword And Expect Error    *cycle detected*
+    ...    Run State Machine    initial=A
+
+State Statistics Are Available
+    Set Test Variable    ${CYCLES}    ${0}
+    Define State    INIT    enter=Prepare
+    Define State    WORK    during=Increment Cycles
+    Define State    DONE    final=True
+    Define Transition    INIT    WORK
+    Define Transition    WORK    DONE    condition=$CYCLES >= 2
+    Run State Machine    initial=INIT    poll_interval=0.05 s
+    ${stats}=    Get State Statistics
+    Should Be Equal    ${stats['WORK']['visits']}    ${1}
+    Should Be True    ${stats['WORK']['elapsed']} >= 0
+    Should Be True    ${stats['INIT']['visits']} == 1
+
 State Keywords Accept Arguments
     Set Test Variable    ${TOTAL}    ${0}
     ${enter}=    Create List    Add To Total    ${5}

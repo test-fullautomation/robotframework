@@ -107,6 +107,11 @@ class StateMachine:
     transitions to that state (typically a diagnostics/FAULT state) instead
     of failing the test. Without `on_error` the failure is propagated and the
     machine stops (checkpoint is saved first, so the run can be resumed).
+    The failing state's `exit` keyword is *not* run when routing to
+    `on_error` - the state did not complete. If `on_error` routing itself
+    forms a cycle (e.g. FAULT and RECOVER failing into each other) without
+    any successful transition in between, the machine fails instead of
+    looping; a normal guarded transition resets the cycle tracking.
 
     == Checkpoint and resume ==
 
@@ -146,6 +151,9 @@ class StateMachine:
         self._checkpoint_variables = []
         self._current = None
         self._visits = {}
+        self._visit_times = {}       # state -> accumulated seconds in state
+        self._current_visit = None   # (state name, start time) while visiting
+        self._error_chain = []       # states reached via on_error routing
         self._stop_requested = False
         self._elapsed_offset = 0     # elapsed seconds restored from checkpoint
 
@@ -322,7 +330,7 @@ class StateMachine:
         logger.info('State machine stop requested.')
 
     def run_state_machine(self, initial, max_duration=None, checkpoint=None,
-                          resume='AUTO', poll_interval='1 s'):
+                          resume='AUTO', poll_interval='1 s', max_visits=None):
         """Runs the machine until a final state, stop request, or failure.
 
         - ``initial``: name of the start state.
@@ -331,24 +339,63 @@ class StateMachine:
         - ``resume``: ``AUTO`` (default) resumes when a checkpoint exists,
           ``True`` requires one, ``False`` starts from scratch.
         - ``poll_interval``: delay between guard evaluation rounds.
+        - ``max_visits``: fail when the total number of state visits reaches
+          this limit — a guard against transition ping-pong caused by wrong
+          conditions. The counter includes visits restored from a checkpoint.
+
+        A per-state statistics summary (visits, time in state) is logged when
+        the machine ends, also on failure; see `Get State Statistics`.
         """
         self._validate_machine(initial)
         builtin = BuiltIn()
         max_duration = timestr_to_secs(max_duration) if max_duration else None
+        max_visits = int(max_visits) if max_visits else None
         poll = timestr_to_secs(poll_interval)
         state = self._restore(initial, checkpoint, resume, builtin)
         started = time.time() - self._elapsed_offset
         self._stop_requested = False
-        while True:
-            state = self._visit(state, builtin, started, max_duration,
-                                checkpoint, poll)
-            if state is None:
-                break
+        self._error_chain = []
+        try:
+            while True:
+                if max_visits and sum(self._visits.values()) >= max_visits:
+                    self._save(checkpoint, started)
+                    raise AssertionError(
+                        f'State machine max_visits {max_visits} reached in '
+                        f"state '{self._current}'. Check the transition "
+                        f'conditions for ping-pong loops. The run can be '
+                        f'resumed from the checkpoint file.')
+                state = self._visit(state, builtin, started, max_duration,
+                                    checkpoint, poll)
+                if state is None:
+                    break
+        finally:
+            self._log_statistics()
         if checkpoint and os.path.isfile(checkpoint):
             os.remove(checkpoint)
         elapsed = secs_to_timestr(time.time() - started)
         logger.info(f'State machine finished in {elapsed} after '
                     f'{sum(self._visits.values())} state visit(s).')
+
+    def get_state_statistics(self):
+        """Returns ``{state: {'visits': int, 'elapsed': seconds}}``.
+
+        Covers all states visited so far, including visits and times restored
+        from a checkpoint when the run was resumed.
+        """
+        return {name: {'visits': count,
+                       'elapsed': self._visit_times.get(name, 0)}
+                for name, count in self._visits.items()}
+
+    def _log_statistics(self):
+        if not self._visits:
+            return
+        width = max(len(name) for name in self._visits)
+        lines = [f'{name.ljust(width)}  {count:>6}  '
+                 f'{secs_to_timestr(self._visit_times.get(name, 0))}'
+                 for name, count in self._visits.items()]
+        header = f"{'STATE'.ljust(width)}  VISITS  TIME IN STATE"
+        logger.info('State machine statistics:\n' + header + '\n'
+                    + '\n'.join(lines))
 
     # ------------------------------------------------------------------
     # Engine
@@ -356,10 +403,22 @@ class StateMachine:
 
     def _visit(self, name, builtin, started, max_duration, checkpoint, poll):
         """Runs one visit of state ``name``, returns the next state or None."""
+        visit_started = time.time()
+        self._current_visit = (name, visit_started)
+        try:
+            return self._do_visit(name, builtin, started, max_duration,
+                                  checkpoint, poll, visit_started)
+        finally:
+            # Accumulate time-in-state on every outcome, also failures.
+            self._current_visit = None
+            self._visit_times[name] = (self._visit_times.get(name, 0)
+                                       + time.time() - visit_started)
+
+    def _do_visit(self, name, builtin, started, max_duration, checkpoint,
+                  poll, visit_started):
         state = self._states[name]
         self._current = name
         self._visits[name] = self._visits.get(name, 0) + 1
-        visit_started = time.time()
         logger.info(f"STATE {name} (visit #{self._visits[name]})",
                     also_console=True)
         error = self._run_state_keyword(builtin, state['enter'],
@@ -367,6 +426,7 @@ class StateMachine:
         if error:
             return self._handle_error(state, error, checkpoint, started)
         if state['final']:
+            self._error_chain = []
             self._save(checkpoint, started)
             return None
         while True:
@@ -392,6 +452,8 @@ class StateMachine:
         if error:
             return self._handle_error(state, error, checkpoint, started)
         logger.info(f'TRANSITION {name} -> {target}')
+        # A normal guarded transition ends a possible on_error incident.
+        self._error_chain = []
         self._current = target
         self._save(checkpoint, started)
         return target
@@ -441,12 +503,22 @@ class StateMachine:
         return state['timeout'] - (time.time() - visit_started)
 
     def _handle_error(self, state, error, checkpoint, started):
-        if state['on_error'] and state['on_error'] != state['name']:
+        target = state['on_error']
+        if target and target != state['name']:
+            if target in self._error_chain:
+                chain = ' -> '.join([state['name']]
+                                    + self._error_chain[self._error_chain.index(target):]
+                                    + [target])
+                self._save(checkpoint, started)
+                raise AssertionError(
+                    f"on_error routing cycle detected ({chain}) after "
+                    f"state '{state['name']}' failed: {error}")
+            self._error_chain.append(target)
             logger.warn(f"State '{state['name']}' failed: {error} "
-                        f"Continuing in state '{state['on_error']}'.")
-            self._current = state['on_error']
+                        f"Continuing in state '{target}'.")
+            self._current = target
             self._save(checkpoint, started)
-            return state['on_error']
+            return target
         self._save(checkpoint, started)
         raise AssertionError(f"State '{state['name']}' failed: {error}")
 
@@ -495,8 +567,17 @@ class StateMachine:
                                 f"JSON serializable and was not saved.")
                     continue
                 variables[name] = value
+            # Include the in-flight time of a visit that is still running:
+            # mid-visit checkpoints (max_duration, error routing, stop) are
+            # written before the visit's own accounting runs.
+            visit_times = dict(self._visit_times)
+            if self._current_visit is not None:
+                name, visit_started = self._current_visit
+                visit_times[name] = (visit_times.get(name, 0)
+                                     + time.time() - visit_started)
             data = {'state': self._current,
                     'visits': self._visits,
+                    'visit_times': visit_times,
                     'elapsed': time.time() - started,
                     'variables': variables,
                     'machine': self._machine_fingerprint(),
@@ -525,6 +606,7 @@ class StateMachine:
                                f"'{checkpoint}' does not exist.")
         if resume == 'FALSE' or not exists:
             self._visits = {}
+            self._visit_times = {}
             self._elapsed_offset = 0
             return initial
         with open(checkpoint, encoding='UTF-8') as f:
@@ -540,6 +622,7 @@ class StateMachine:
                         f"anyway, but visit counters and saved variables "
                         f"may not match the current machine.")
         self._visits = data.get('visits', {})
+        self._visit_times = data.get('visit_times', {})
         self._elapsed_offset = data.get('elapsed', 0)
         for name, value in data.get('variables', {}).items():
             builtin.set_test_variable(name, value)

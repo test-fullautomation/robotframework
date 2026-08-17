@@ -180,6 +180,71 @@ class TestEngine(StateMachineTestCase):
         self.assertTrue(any('timeout' in w.lower() for w in self.logger.warnings))
 
 
+class TestGuardsAndStatistics(StateMachineTestCase):
+
+    def test_max_visits_guard(self):
+        self.sm.define_state('A')
+        self.sm.define_state('B')
+        self.sm.define_transition('A', 'B')
+        self.sm.define_transition('B', 'A')
+        with self.assertRaisesRegex(AssertionError, 'max_visits 5 reached'):
+            self.sm.run_state_machine('A', max_visits=5,
+                                      poll_interval='0.01 s')
+        self.assertEqual(sum(self.sm._visits.values()), 5)
+
+    def test_on_error_cycle_detected(self):
+        def boom():
+            raise AssertionError('simulated fault')
+
+        FakeBuiltIn.keywords['Boom'] = boom
+        self.sm.define_state('A', enter='Boom', on_error='B')
+        self.sm.define_state('B', enter='Boom', on_error='A')
+        self.sm.define_state('C', final=True)
+        self.sm.define_transition('A', 'C')
+        self.sm.define_transition('B', 'C')
+        with self.assertRaisesRegex(AssertionError, 'cycle detected'):
+            self.sm.run_state_machine('A', poll_interval='0.01 s')
+
+    def test_error_chain_reset_by_successful_transition(self):
+        # FLAKY fails twice; each failure routes to RECOVER which
+        # transitions back. Re-routing to RECOVER after a successful
+        # transition must NOT count as a cycle.
+        attempts = {'n': 0}
+
+        def flaky():
+            attempts['n'] += 1
+            if attempts['n'] <= 2:
+                raise AssertionError('attempt fails')
+
+        FakeBuiltIn.keywords['Flaky'] = flaky
+        self.sm.define_state('FLAKY', enter='Flaky', on_error='RECOVER')
+        self.sm.define_state('RECOVER')
+        self.sm.define_state('DONE', final=True)
+        self.sm.define_transition('FLAKY', 'DONE')
+        self.sm.define_transition('RECOVER', 'FLAKY')
+        self.sm.run_state_machine('FLAKY', poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(), 'DONE')
+        self.assertEqual(attempts['n'], 3)
+
+    def test_state_statistics(self):
+        self.define_simple_machine()
+        self.sm.run_state_machine('INIT', poll_interval='0.01 s')
+        stats = self.sm.get_state_statistics()
+        self.assertEqual(stats['WORK']['visits'], 1)
+        self.assertGreaterEqual(stats['WORK']['elapsed'], 0)
+        self.assertEqual(sorted(stats), ['DONE', 'INIT', 'WORK'])
+        self.assertTrue(any('State machine statistics' in m
+                            for m in self.logger.infos))
+
+    def test_statistics_logged_also_on_failure(self):
+        self.define_simple_machine(condition='$N >= 999999')
+        with self.assertRaises(AssertionError):
+            self.sm.run_state_machine('INIT', max_duration='0.05 s',
+                                      poll_interval='0.02 s')
+        self.assertTrue(any('State machine statistics' in m
+                            for m in self.logger.infos))
+
+
 class TestCheckpoint(StateMachineTestCase):
 
     def setUp(self):
@@ -212,6 +277,8 @@ class TestCheckpoint(StateMachineTestCase):
             data = json.load(f)
         self.assertEqual(data['state'], 'WORK')
         self.assertIn('machine', data)
+        self.assertIn('visit_times', data)
+        self.assertIn('WORK', data['visit_times'])
         progress = data['variables']['${N}']
         self.assertGreater(progress, 0)
         # New engine instance resumes and completes with a reachable guard.
