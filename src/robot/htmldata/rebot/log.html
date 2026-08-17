@@ -52,13 +52,25 @@ $(document).ready(function() {
     addErrors();
     addExecutionLog(topsuite);
     addLogLevelSelector(window.settings['minLevel'], window.settings['defaultLevel']);
-    if (window.location.hash) {
-        makeElementVisible(window.location.hash.substring(1));
+    if (hashTargetId()) {
+        makeElementVisible(hashTargetId());
     } else {
         expandSuite(topsuite);
     }
+    // cuongnht: navigate also when the hash changes while the page is already
+    // open, e.g. when clicking bars in timeline.html reusing the same tab.
+    window.addEventListener('hashchange', function () {
+        if (hashTargetId())
+            makeElementVisible(hashTargetId());
+    });
     setTimeout(function () { loadAndExpandElementIds(window.output['expand_keywords']); }, 100);
 });
+
+function hashTargetId() {
+    // cuongnht: strip an optional '~<n>' suffix that external tools (e.g.
+    // timeline.html) append to force re-navigation to the same element.
+    return window.location.hash.substring(1).split('~')[0];
+}
 
 function addLogLevelSelector(minLevel, defaultLevel) {
     var controller = LogLevelController(minLevel, defaultLevel);
@@ -93,20 +105,33 @@ function drawErrorsRecursively(errors, target) {
 }
 
 function highlightLinkTarget() {
-    if (window.location.hash) {
-        var target = $(window.location.hash);
-        highlight(target);
+    // cuongnht: resolve via hashTargetId() so a possible '~<n>' suffix does
+    // not end up in a jQuery selector.
+    var id = hashTargetId();
+    if (id) {
+        highlight($(document.getElementById(id)));
     }
 }
 
-function highlight(element, color) {
-    if (color === undefined)
-        color = 242;
-    if (color < 255) {
-        element.css({'background-color': 'rgb('+color+','+color+','+color+')'});
-        setTimeout(function () { highlight(element, color+1); }, 300);
+function highlight(element, count) {
+    // cuongnht: replaced the barely visible gray fade with a short yellow
+    // flash (3 pulses, ~1.5s) so the link target is easy to spot.
+    if (count === undefined) {
+        if (element.data('rf-flashing'))
+            return;    // Already flashing; don't stack overlapping timers.
+        element.data('rf-flashing', true);
+        count = 3;
+    }
+    if (count > 0) {
+        element.css({'background-color': '#ffe567',
+                     'transition': 'background-color 0.15s'});
+        setTimeout(function () {
+            element.css({'background-color': ''});
+            setTimeout(function () { highlight(element, count - 1); }, 180);
+        }, 320);
     } else {
-        element.css({'background-color': ''});
+        element.css({'transition': ''});
+        element.removeData('rf-flashing');
     }
 }
 

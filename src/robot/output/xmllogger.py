@@ -19,22 +19,104 @@ from robot.result.visitor import ResultVisitor
 
 from .loggerhelper import IsLogged
 import threading
+import time
 import os
 
 LOG_LEVEL_XML_FILE = "INFO" # output caused by code in this file, depends on this trace level
 
+
+class _SegmentingWriter:
+    """XmlWriter proxy that tracks open elements and supports rotation.
+
+    cuongnht add segmented output: used for the main output.xml writer so
+    that during very long runs the file can periodically be sealed into a
+    well-formed segment (``<base>_part_NNN.xml``) and writing continues in a
+    fresh file with the same open element structure. Replayed elements are
+    marked with ``continued="true"`` so that the segment merger knows to
+    join them with their counterparts in the previous segment.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self._writer = XmlWriter(path, write_empty=False, usage='output')
+        self._stack = []    # [(tag, attrs dict), ...], root first
+        self.segment_paths = []
+        self.last_rotation = time.monotonic()
+
+    def start(self, name, attrs=None, newline=True):
+        self._stack.append((name, dict(attrs or {})))
+        self._writer.start(name, attrs, newline)
+
+    def end(self, name, newline=True):
+        if self._stack and self._stack[-1][0] == name:
+            self._stack.pop()
+        self._writer.end(name, newline)
+
+    def element(self, name, content=None, attrs=None, escape=True, newline=True):
+        self._writer.element(name, content, attrs, escape, newline)
+
+    def content(self, content=None, escape=True, newline=False):
+        self._writer.content(content, escape, newline)
+
+    def close(self):
+        self._writer.close()
+
+    def rotate(self, sealed_path):
+        """Seals the current file into ``sealed_path`` and starts a new one."""
+        for name, _ in reversed(self._stack):
+            self._writer.end(name)
+        self._writer.close()
+        os.replace(self.path, sealed_path)
+        self._writer = XmlWriter(self.path, write_empty=False, usage='output')
+        for index, (name, attrs) in enumerate(self._stack):
+            attrs = dict(attrs)
+            if index > 0:    # roots of segments correspond by position
+                attrs['continued'] = 'true'
+            self._writer.start(name, attrs)
+
+    def maybe_rotate(self, interval):
+        """Rotates when ``interval`` seconds have passed since the last one.
+
+        Must only be called by the thread that owns this writer.
+        """
+        if time.monotonic() - self.last_rotation < interval:
+            return
+        base, ext = os.path.splitext(self.path)
+        sealed = f'{base}_part_{len(self.segment_paths) + 1:03d}{ext}'
+        self.rotate(sealed)
+        self.segment_paths.append(sealed)
+        self.last_rotation = time.monotonic()
+
+    def finalize(self):
+        """Closes all still open elements and the file itself."""
+        while self._stack:
+            self.end(self._stack[-1][0])
+        self.close()
+
+
 class XmlLogger(ResultVisitor):
 
-    thread_writer_dict = ThreadSafeDict() 
+    thread_writer_dict = ThreadSafeDict()
+    # cuongnht add thread: thread name -> path of its partial output file.
+    # Used by threadmerger to graft thread outputs into the main output.xml.
+    thread_output_files = ThreadSafeDict()
 
-    def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot'):
+    def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot',
+                 segment_interval=None):
         self._log_message_is_logged = IsLogged(log_level)
         self._error_message_is_logged = IsLogged('WARN')
-        self._get_writer(path, rpa, generator)
+        writer = self._get_writer(path, rpa, generator)
+        # cuongnht add thread: register here as well so that subclasses that
+        # override _get_writer (e.g. OutputWriter test doubles) get their own
+        # writer from the _writer property instead of a stale earlier one.
+        if path and writer is not None:
+            XmlLogger.thread_writer_dict['MainThread'] = writer
         self._errors = []
         self.path = path
         self.rpa = rpa
         self.generator = generator
+        # cuongnht add segmented output
+        self._segment_interval = segment_interval
 
     def get_level_from_kw_args(self, args=None):
         # args expected to be a 'kw.args' tuple
@@ -56,7 +138,11 @@ class XmlLogger(ResultVisitor):
         thread_name = threading.current_thread().name
         if thread_name not in XmlLogger.thread_writer_dict:
             filename, file_extension = os.path.splitext(self.path)
-            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + file_extension, write_empty=False, usage='output')
+            thread_path = filename + '_' + thread_name + file_extension
+            XmlLogger.thread_output_files[thread_name] = thread_path
+            # cuongnht add segmented output: thread writers also support
+            # rotation so long living threads get segmented too.
+            XmlLogger.thread_writer_dict[thread_name] = _SegmentingWriter(thread_path)
             XmlLogger.thread_writer_dict[thread_name].start('thread', {'name': thread_name,
                                                                        'generator': get_full_version(self.generator),
                                                                        'generated': get_timestamp(),
@@ -67,7 +153,13 @@ class XmlLogger(ResultVisitor):
     def _get_writer(self, path, rpa, generator):
         if not path:
             return NullMarkupWriter()
-        writer = XmlWriter(path, write_empty=False, usage='output')
+        # cuongnht add thread: drop stale state from a possible earlier run in
+        # the same process so thread files of this run are tracked from scratch.
+        XmlLogger.thread_writer_dict.clear()
+        XmlLogger.thread_output_files.clear()
+        # cuongnht add segmented output: the main writer tracks open elements
+        # so that the output can be rotated into segments during long runs.
+        writer = _SegmentingWriter(path)
         writer.start('robot', {'generator': get_full_version(generator),
                                'generated': get_timestamp(),
                                'rpa': 'true' if rpa else 'false',
@@ -82,6 +174,29 @@ class XmlLogger(ResultVisitor):
         self.end_errors()
         self._writer.end('robot')
         self._writer.close()
+        self._close_leftover_thread_writers()
+
+    def _close_leftover_thread_writers(self):
+        # cuongnht add thread: threads (typically daemons) that are still
+        # running when execution ends leave their writers open. Finalize the
+        # files here so they are well-formed XML and can be merged/parsed.
+        for name in list(XmlLogger.thread_writer_dict):
+            if name == 'MainThread':
+                continue
+            writer = XmlLogger.thread_writer_dict.pop(name, None)
+            if writer is None:
+                continue
+            try:
+                if isinstance(writer, _SegmentingWriter):
+                    # Closes the whole open element stack, not only the root,
+                    # so also files of threads stuck deep inside keywords
+                    # remain well-formed.
+                    writer.finalize()
+                else:
+                    writer.end('thread')
+                    writer.close()
+            except Exception:
+                pass
 
     def set_log_level(self, level):
         return self._log_message_is_logged.set_level(level)
@@ -91,8 +206,29 @@ class XmlLogger(ResultVisitor):
             self._errors.append(msg)
 
     def log_message(self, msg):
+        self._maybe_rotate()  # cuongnht add segmented output
         if self._log_message_is_logged(msg.level):
             self._write_message(msg)
+
+    @property
+    def segment_paths(self):
+        # cuongnht add segmented output: sealed segments of the main writer.
+        writer = XmlLogger.thread_writer_dict.get('MainThread')
+        if isinstance(writer, _SegmentingWriter):
+            return writer.segment_paths
+        return []
+
+    def _maybe_rotate(self):
+        # cuongnht add segmented output: periodically seal the current
+        # thread's output file into a well-formed segment so that a crash
+        # during a very long run loses at most one segment interval of log
+        # data. Each thread rotates its own writer (the main writer seals
+        # output_part_NNN.xml, thread writers output_<name>_part_NNN.xml).
+        if not self._segment_interval or not self.path:
+            return
+        writer = self._writer
+        if isinstance(writer, _SegmentingWriter):
+            writer.maybe_rotate(self._segment_interval)
 
     def _write_message(self, msg):
         attrs = {'timestamp': msg.timestamp or 'N/A', 'level': msg.level}
@@ -101,6 +237,7 @@ class XmlLogger(ResultVisitor):
         self._writer.element('msg', msg.message, attrs)
 
     def start_keyword(self, kw):
+        self._maybe_rotate()  # cuongnht add segmented output
 
         # inits
         log_kw_start = True
@@ -130,6 +267,7 @@ class XmlLogger(ResultVisitor):
             self._writer.element('doc', kw.doc)
 
     def end_keyword(self, kw):
+        self._maybe_rotate()  # cuongnht add segmented output
 
         # inits
         log_kw_end = True
@@ -191,7 +329,9 @@ class XmlLogger(ResultVisitor):
 
     def start_thread(self, thread_):
         if threading.current_thread().name == 'MainThread' and self._writer:
-            main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
+            # The _writer property resolves to the main writer on the main
+            # thread and to a NullMarkupWriter when output.xml is disabled.
+            main_thread_writer = self._writer
             main_thread_writer.start('thread', {'name': thread_.name,
                                                 'daemon': str(thread_.daemon)})
             # self._writer.element('name', thread_.name)
@@ -213,7 +353,8 @@ class XmlLogger(ResultVisitor):
             self._writer.end('thread')
             thread_name = threading.current_thread().name
             if thread_name in XmlLogger.thread_writer_dict:
-                XmlLogger.thread_writer_dict.pop(thread_name)
+                # Close so the file is flushed to disk for the merger.
+                XmlLogger.thread_writer_dict.pop(thread_name).close()
 
     def start_for_iteration(self, iteration):
         if self._log_message_is_logged(LOG_LEVEL_XML_FILE):

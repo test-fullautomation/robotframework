@@ -128,6 +128,7 @@ class StubSettings:
     report_config = None
     output = None
     xunit = None
+    timeline = None  # cuongnht add thread
     status_rc = True
     suite_config = {}
     statistics_config = {}

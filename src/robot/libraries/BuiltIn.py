@@ -3215,6 +3215,50 @@ class _Misc(_BuiltInBase):
                 break
             time.sleep(min(remaining, 0.01))
 
+    # cuongnht thread scope ------------------------------------------------
+
+    def wait_for_thread(self, name, timeout=None):
+        """Waits until the ``THREAD`` block named ``name`` has finished.
+
+        Fails if the thread is still running after ``timeout`` (a time string
+        like ``10 s``; waits forever by default). Passing an unknown or
+        already finished thread name succeeds immediately.
+        """
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        secs = timestr_to_secs(timeout) if timeout else None
+        entry['worker'].join(secs)
+        if entry['worker'].is_alive():
+            raise AssertionError(f"Thread '{name}' did not finish in "
+                                 f"{secs_to_timestr(secs)}.")
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' finished.")
+
+    def stop_thread(self, name, timeout='10 s'):
+        """Requests the ``THREAD`` named ``name`` to stop and waits for it.
+
+        The stop is cooperative: the thread finishes its current keyword and
+        stops at the next keyword boundary. Fails if the thread is still
+        running after ``timeout``. Passing an unknown or already finished
+        thread name succeeds immediately.
+        """
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        entry['stop_event'].set()
+        secs = timestr_to_secs(timeout)
+        entry['worker'].join(secs)
+        if entry['worker'].is_alive():
+            raise AssertionError(f"Thread '{name}' did not stop in "
+                                 f"{secs_to_timestr(secs)}.")
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' stopped.")
+
+    # ----------------------------------------------------------------------
+
     def catenate(self, *items):
         """Catenates the given items together and returns the resulted string.
 

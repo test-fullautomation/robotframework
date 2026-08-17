@@ -179,8 +179,24 @@ Options
  -l --log file            HTML log file. Can be disabled by giving a special
                           value `NONE`. Default: log.html
                           Examples: `--log mylog.html`, `-l NONE`
+    --segmentoutput time  Seal output files periodically into well-formed
+                          segment files so that a crash during a very long
+                          run loses at most the given interval of log data.
+                          The main output.xml is sealed as
+                          `output_part_NNN.xml` and outputs of long living
+                          THREAD blocks as `output_<thread>_part_NNN.xml`.
+                          Segments are merged back automatically at the end
+                          of the run. After a crash merge them manually with
+                          `python -m robot.output.segmentmerger output.xml`
+                          followed by
+                          `python -m robot.output.threadmerger output.xml`.
+                          Examples: --segmentoutput 4h --segmentoutput 30min
  -r --report file         HTML report file. Can be disabled with `NONE`
                           similarly as --log. Default: report.html
+    --timeline file       HTML timeline file showing per-thread execution as
+                          parallel lanes on a common time axis. Bars link to
+                          the corresponding elements in the log file. Not
+                          created unless this option is specified.
  -x --xunit file          xUnit compatible result file. Not created unless this
                           option is specified.
  -b --debugfile file      Debug file written during execution. Not created
@@ -461,8 +477,9 @@ class RobotFramework(Application):
                 text.MAX_ASSIGN_LENGTH = old_max_assign_length
             LOGGER.info("Tests execution ended. Statistics:\n%s"
                         % result.suite.stat_message)
-            if settings.log or settings.report or settings.xunit:
-                writer = ResultWriter(settings.output if settings.log
+            if settings.log or settings.report or settings.xunit or settings.timeline:
+                writer = ResultWriter(settings.output
+                                      if settings.log or settings.timeline
                                       else result)
                 writer.write_results(settings.get_rebot_settings())
         return result.return_code

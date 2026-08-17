@@ -135,6 +135,11 @@ Options
                           Examples: `--log mylog.html`, `-l none`
  -r --report file         HTML report file. Can be disabled with `NONE`
                           similarly as --log. Default: report.html
+    --timeline file       HTML timeline file showing per-thread execution as
+                          parallel lanes on a common time axis. Bars link to
+                          the corresponding elements in the log file. Requires
+                          exactly one input XML. Not created unless this
+                          option is specified.
  -x --xunit file          xUnit compatible result file. Not created unless this
                           option is specified.
  -T --timestampoutputs    When this option is used, timestamp in a format

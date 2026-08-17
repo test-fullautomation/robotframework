@@ -174,7 +174,9 @@ class KeywordHandler(ElementHandler):
 @ElementHandler.register
 class ThreadHandler(ElementHandler):
     tag = 'thread'
-    children = frozenset(('var', 'value', 'doc', 'status', 'msg', 'kw'))
+    children = frozenset(('var', 'value', 'doc', 'status', 'msg', 'kw', 'if', 'for',
+                          'try', 'while', 'return', 'break', 'continue', 'error',
+                          'thread'))
 
     def start(self, elem, result):
         return self._create_thread(elem, result)

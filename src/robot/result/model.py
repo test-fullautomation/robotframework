@@ -358,7 +358,12 @@ class ThreadBranch(model.IfBranch, StatusMixin, DeprecatedAttributesMixin):
 class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
     branch_class = ThreadBranch
     branches_class = Branches[branch_class]
-    __slots__ = ['status', 'starttime', 'endtime', 'doc']
+    # Result-level body so that children grafted from per-thread output files
+    # get status, timestamps etc. when parsed back with ExecutionResult.
+    body_class = Body
+    # 'message' is writable so that a status message (e.g. the UNKNOWN reason
+    # of an abandoned thread) survives an ExecutionResult round-trip.
+    __slots__ = ['status', 'starttime', 'endtime', 'doc', 'message']
 
     def __init__(self, name='ROBOT_THREAD1',  daemon=True, status='PASS',
                  starttime=None, endtime=None, doc='', parent=None):
@@ -367,6 +372,7 @@ class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
         self.starttime = starttime
         self.endtime = endtime
         self.doc = doc
+        self.message = ''
 
     # @property
     # @deprecated

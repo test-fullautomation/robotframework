@@ -26,7 +26,8 @@ class Output(AbstractLogger):
     def __init__(self, settings):
         AbstractLogger.__init__(self)
         self._xmllogger = XmlLogger(settings.output, settings.log_level,
-                                    settings.rpa)
+                                    settings.rpa,
+                                    segment_interval=settings.segment_output)
         self._flat_xml_logger = None
         self.listeners = Listeners(settings.listeners, settings.log_level)
         self.library_listeners = LibraryListeners(settings.log_level)
@@ -53,7 +54,37 @@ class Output(AbstractLogger):
         self._xmllogger.visit_statistics(result.statistics)
         self._xmllogger.close()
         LOGGER.unregister_xml_logger()
+        self._merge_output_segments()  # cuongnht add segmented output
+        self._merge_thread_outputs()   # cuongnht add thread
         LOGGER.output_file('Output', self._settings['Output'])
+
+    def _merge_output_segments(self):
+        # cuongnht add segmented output: join sealed segments and the final
+        # live file back into one complete output.xml. Runs before the
+        # thread merge so that thread placeholders are grafted into the
+        # full document.
+        path = self._settings.output
+        if not path or not self._xmllogger.segment_paths:
+            return
+        try:
+            from .segmentmerger import merge_segments
+            merge_segments(path, self._xmllogger.segment_paths)
+        except Exception as err:
+            LOGGER.error(f'Merging output segments failed: {err}')
+
+    def _merge_thread_outputs(self):
+        # cuongnht add thread: graft per-thread output files into the main
+        # output.xml so that log/report generation sees one complete file.
+        path = self._settings.output
+        if not path or not XmlLogger.thread_output_files:
+            return
+        try:
+            from .threadmerger import merge_thread_outputs
+            merge_thread_outputs(path, dict(XmlLogger.thread_output_files))
+        except Exception as err:
+            LOGGER.error(f'Merging thread output files failed: {err}')
+        finally:
+            XmlLogger.thread_output_files.clear()
 
     def start_suite(self, suite):
         LOGGER.start_suite(suite)
