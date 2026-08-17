@@ -141,11 +141,156 @@ class StateMachine:
     are interruptible). ``max_duration`` is checked between keyword calls;
     for hard supervision of the whole run combine with a ``Watchdog`` in a
     ``THREAD`` block.
+
+    == Multiple machines ==
+
+    All keywords accept ``machine=<name>`` (default ``DEFAULT``), so several
+    fully isolated machines - own states, transitions, checkpoint variables,
+    statistics - can live in one test. They can run sequentially, or
+    concurrently by giving each machine its own ``THREAD`` block:
+
+    | `Define State`      | ...  | machine=CHARGER |
+    | THREAD | CHARGER_SM | True |
+    |        | `Run State Machine` | initial=INIT | machine=CHARGER |
+    | END    |
+    | `Run State Machine` | initial=INIT | machine=MAIN |
+    | Wait For Thread     | CHARGER_SM |
+
+    Give concurrently running machines separate checkpoint files. Log
+    messages of non-default machines are prefixed with ``[<name>]``.
+
+    *Variable scoping caveat:* transition guards of a machine running inside
+    a ``THREAD`` block do not see variables set by keywords in that same
+    thread (thread variable scoping); machines running in the main flow do
+    see variables fed by worker threads. Control a worker-hosted machine
+    with `Stop State Machine` from the main flow, or base its guards on
+    variables set before the thread starts.
     """
     ROBOT_LIBRARY_SCOPE = 'TEST'
     ROBOT_LIBRARY_VERSION = get_version()
 
     def __init__(self):
+        self._machines = {}
+
+    def _machine(self, machine):
+        name = str(machine)
+        if name not in self._machines:
+            self._machines[name] = _Engine(name)
+        return self._machines[name]
+
+    def define_state(self, name, enter=None, during=None, exit=None,
+                     timeout=None, on_error=None, final=False,
+                     machine='DEFAULT'):
+        """Defines a state.
+
+        - ``enter``/``during``/``exit``: a keyword name, or a list of
+          keyword name followed by its arguments (see library docs).
+        - ``timeout``: max duration of one visit, e.g. ``10 min`` or ``30s``.
+        - ``on_error``: state to go to if a keyword fails or ``timeout`` is
+          exceeded.
+        - ``final``: entering this state completes the machine.
+        - ``machine``: the machine this state belongs to.
+        """
+        self._machine(machine).define_state(name, enter, during, exit,
+                                            timeout, on_error, final)
+
+    def define_transition(self, source, target, condition=None,
+                          machine='DEFAULT'):
+        """Defines a transition from ``source`` to ``target``.
+
+        ``condition`` is a Python expression evaluated with `Evaluate`
+        semantics; use ``$name`` syntax to access variables at run time.
+        Omitting the condition makes the transition unconditional (default
+        branch); define it after the guarded ones.
+        """
+        self._machine(machine).define_transition(source, target, condition)
+
+    def checkpoint_variable(self, name, machine='DEFAULT'):
+        """Registers a variable (e.g. ``\\${CYCLES}``) to be persisted.
+
+        Registered variables are stored in the machine's checkpoint file
+        after every transition and restored as test variables when the run
+        is resumed. Values must be JSON serializable; an existing value is
+        validated immediately so mistakes fail fast.
+        """
+        self._machine(machine).checkpoint_variable(name)
+
+    def load_state_machine(self, path, machine='DEFAULT'):
+        """Loads states, transitions and checkpoint variables from a file.
+
+        The file format is selected by extension: ``.json`` is parsed with
+        the standard library, everything else as YAML (requires the
+        ``pyyaml`` module). See the library documentation for the file
+        structure. Definitions from the file go through the same validation
+        as `Define State` / `Define Transition` and can be combined with
+        them; transitions keep their file order.
+        """
+        self._machine(machine).load_state_machine(path)
+
+    def run_state_machine(self, initial, max_duration=None, checkpoint=None,
+                          resume='AUTO', poll_interval='1 s', max_visits=None,
+                          machine='DEFAULT'):
+        """Runs the machine until a final state, stop request, or failure.
+
+        - ``initial``: name of the start state.
+        - ``max_duration``: overall limit, e.g. ``48h`` (see library docs).
+        - ``checkpoint``: path of the persistent checkpoint file.
+        - ``resume``: ``AUTO`` (default) resumes when a checkpoint exists,
+          ``True`` requires one, ``False`` starts from scratch.
+        - ``poll_interval``: delay between guard evaluation rounds.
+        - ``max_visits``: fail when the total number of state visits reaches
+          this limit - a guard against transition ping-pong caused by wrong
+          conditions. The counter includes visits restored from a checkpoint.
+        - ``machine``: the machine to run.
+
+        A per-state statistics summary (visits, time in state) is logged when
+        the machine ends, also on failure; see `Get State Statistics`.
+        """
+        self._machine(machine).run_state_machine(initial, max_duration,
+                                                 checkpoint, resume,
+                                                 poll_interval, max_visits)
+
+    def get_current_state(self, machine='DEFAULT'):
+        """Returns the name of the state the machine is currently in."""
+        return self._machine(machine).get_current_state()
+
+    def get_state_statistics(self, machine='DEFAULT'):
+        """Returns ``{state: {'visits': int, 'elapsed': seconds}}``.
+
+        Covers all states visited so far, including visits and times restored
+        from a checkpoint when the run was resumed.
+        """
+        return self._machine(machine).get_state_statistics()
+
+    def stop_state_machine(self, machine='DEFAULT'):
+        """Requests a graceful stop of the machine.
+
+        Can be called from a state keyword (or from a ``THREAD`` supervisor).
+        The machine finishes the current polling round, saves the checkpoint
+        and returns from `Run State Machine` successfully.
+        """
+        self._machine(machine).stop_state_machine()
+
+    def reset_state_machine(self, machine=None):
+        """Removes machine definitions.
+
+        With ``machine`` only that machine is removed; without an argument
+        ALL machines are removed. Still running machines are asked to stop
+        gracefully first.
+        """
+        names = [str(machine)] if machine is not None else list(self._machines)
+        for name in names:
+            engine = self._machines.pop(name, None)
+            if engine is not None:
+                engine._stop_requested = True
+
+
+class _Engine:
+    """One state machine: definitions, engine loop, checkpointing."""
+
+    def __init__(self, name='DEFAULT'):
+        self.name = name
+        self._label = '' if name == 'DEFAULT' else f'[{name}] '
         self._states = {}
         self._transitions = []       # evaluated in definition order
         self._checkpoint_variables = []
@@ -158,20 +303,11 @@ class StateMachine:
         self._elapsed_offset = 0     # elapsed seconds restored from checkpoint
 
     # ------------------------------------------------------------------
-    # Definition keywords
+    # Definitions
     # ------------------------------------------------------------------
 
     def define_state(self, name, enter=None, during=None, exit=None,
                      timeout=None, on_error=None, final=False):
-        """Defines a state.
-
-        - ``enter``/``during``/``exit``: a keyword name, or a list of
-          keyword name followed by its arguments (see library docs).
-        - ``timeout``: max duration of one visit, e.g. ``10 min`` or ``30s``.
-        - ``on_error``: state to go to if a keyword fails or ``timeout`` is
-          exceeded.
-        - ``final``: entering this state completes the machine.
-        """
         if name in self._states:
             raise RuntimeError(f"State '{name}' is already defined.")
         self._states[name] = {
@@ -183,7 +319,7 @@ class StateMachine:
             'on_error': on_error,
             'final': self._is_truthy(final),
         }
-        logger.info(f"Defined state '{name}' (final={final}).")
+        logger.info(f"{self._label}Defined state '{name}' (final={final}).")
 
     @staticmethod
     def _normalize_keyword(state, what, value):
@@ -208,7 +344,8 @@ class StateMachine:
         self._transitions.append({'source': source, 'target': target,
                                   'condition': condition})
         cond = condition or '<always>'
-        logger.info(f"Defined transition {source} -> {target} when {cond}.")
+        logger.info(f"{self._label}Defined transition {source} -> {target} "
+                    f"when {cond}.")
 
     def checkpoint_variable(self, name):
         """Registers a variable (e.g. ``\\${CYCLES}``) to be persisted.
@@ -266,7 +403,7 @@ class StateMachine:
             self.define_transition(source, target, condition)
         for name in (data.get('checkpoint_variables') or []):
             self.checkpoint_variable(name)
-        logger.info(f"Loaded state machine from '{path}': "
+        logger.info(f"{self._label}Loaded state machine from '{path}': "
                     f"{len(self._states)} state(s), "
                     f"{len(self._transitions)} transition(s).")
 
@@ -307,27 +444,16 @@ class StateMachine:
                 f"or 'SOURCE -> TARGET when CONDITION'.")
         return match.group(1), match.group(2), match.group(3)
 
-    def reset_state_machine(self):
-        """Removes all states, transitions and registered variables."""
-        self.__init__()
-
     # ------------------------------------------------------------------
-    # Runtime keywords
+    # Runtime
     # ------------------------------------------------------------------
 
     def get_current_state(self):
-        """Returns the name of the state the machine is currently in."""
         return self._current
 
     def stop_state_machine(self):
-        """Requests a graceful stop.
-
-        Can be called from a state keyword (or from a ``THREAD`` supervisor).
-        The machine finishes the current polling round, saves the checkpoint
-        and returns from `Run State Machine` successfully.
-        """
         self._stop_requested = True
-        logger.info('State machine stop requested.')
+        logger.info(f'{self._label}State machine stop requested.')
 
     def run_state_machine(self, initial, max_duration=None, checkpoint=None,
                           resume='AUTO', poll_interval='1 s', max_visits=None):
@@ -360,10 +486,10 @@ class StateMachine:
                 if max_visits and sum(self._visits.values()) >= max_visits:
                     self._save(checkpoint, started)
                     raise AssertionError(
-                        f'State machine max_visits {max_visits} reached in '
-                        f"state '{self._current}'. Check the transition "
-                        f'conditions for ping-pong loops. The run can be '
-                        f'resumed from the checkpoint file.')
+                        f'{self._label}State machine max_visits {max_visits} '
+                        f"reached in state '{self._current}'. Check the "
+                        f'transition conditions for ping-pong loops. The run '
+                        f'can be resumed from the checkpoint file.')
                 state = self._visit(state, builtin, started, max_duration,
                                     checkpoint, poll)
                 if state is None:
@@ -373,7 +499,7 @@ class StateMachine:
         if checkpoint and os.path.isfile(checkpoint):
             os.remove(checkpoint)
         elapsed = secs_to_timestr(time.time() - started)
-        logger.info(f'State machine finished in {elapsed} after '
+        logger.info(f'{self._label}State machine finished in {elapsed} after '
                     f'{sum(self._visits.values())} state visit(s).')
 
     def get_state_statistics(self):
@@ -394,8 +520,8 @@ class StateMachine:
                  f'{secs_to_timestr(self._visit_times.get(name, 0))}'
                  for name, count in self._visits.items()]
         header = f"{'STATE'.ljust(width)}  VISITS  TIME IN STATE"
-        logger.info('State machine statistics:\n' + header + '\n'
-                    + '\n'.join(lines))
+        logger.info(f'{self._label}State machine statistics:\n' + header
+                    + '\n' + '\n'.join(lines))
 
     # ------------------------------------------------------------------
     # Engine
@@ -419,7 +545,7 @@ class StateMachine:
         state = self._states[name]
         self._current = name
         self._visits[name] = self._visits.get(name, 0) + 1
-        logger.info(f"STATE {name} (visit #{self._visits[name]})",
+        logger.info(f"{self._label}STATE {name} (visit #{self._visits[name]})",
                     also_console=True)
         error = self._run_state_keyword(builtin, state['enter'],
                                         self._remaining(state, visit_started))
@@ -451,7 +577,7 @@ class StateMachine:
                                         self._remaining(state, visit_started))
         if error:
             return self._handle_error(state, error, checkpoint, started)
-        logger.info(f'TRANSITION {name} -> {target}')
+        logger.info(f'{self._label}TRANSITION {name} -> {target}')
         # A normal guarded transition ends a possible on_error incident.
         self._error_chain = []
         self._current = target
@@ -514,8 +640,8 @@ class StateMachine:
                     f"on_error routing cycle detected ({chain}) after "
                     f"state '{state['name']}' failed: {error}")
             self._error_chain.append(target)
-            logger.warn(f"State '{state['name']}' failed: {error} "
-                        f"Continuing in state '{target}'.")
+            logger.warn(f"{self._label}State '{state['name']}' failed: "
+                        f"{error} Continuing in state '{target}'.")
             self._current = target
             self._save(checkpoint, started)
             return target
@@ -527,9 +653,9 @@ class StateMachine:
             self._save(checkpoint, started)
             limit = secs_to_timestr(max_duration)
             raise AssertionError(
-                f'State machine max_duration {limit} exceeded in state '
-                f"'{self._current}'. The run can be resumed from the "
-                f'checkpoint file.')
+                f'{self._label}State machine max_duration {limit} exceeded '
+                f"in state '{self._current}'. The run can be resumed from "
+                f'the checkpoint file.')
 
     def _validate_machine(self, initial):
         if initial not in self._states:
@@ -627,7 +753,7 @@ class StateMachine:
         for name, value in data.get('variables', {}).items():
             builtin.set_test_variable(name, value)
         elapsed = secs_to_timestr(self._elapsed_offset)
-        logger.info(f"Resuming state machine from checkpoint "
+        logger.info(f"{self._label}Resuming state machine from checkpoint "
                     f"'{checkpoint}': state '{state}', {elapsed} elapsed, "
                     f"saved {data.get('saved', 'N/A')}.", also_console=True)
         return state

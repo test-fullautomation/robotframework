@@ -68,6 +68,10 @@ class StateMachineTestCase(unittest.TestCase):
         sm_module.BuiltIn = self._real_builtin
         sm_module.logger = self._real_logger
 
+    @property
+    def engine(self):
+        return self.sm._machine('DEFAULT')
+
     def define_simple_machine(self, condition='$N >= 3'):
         FakeBuiltIn.variables['${N}'] = 0
 
@@ -190,7 +194,7 @@ class TestGuardsAndStatistics(StateMachineTestCase):
         with self.assertRaisesRegex(AssertionError, 'max_visits 5 reached'):
             self.sm.run_state_machine('A', max_visits=5,
                                       poll_interval='0.01 s')
-        self.assertEqual(sum(self.sm._visits.values()), 5)
+        self.assertEqual(sum(self.engine._visits.values()), 5)
 
     def test_on_error_cycle_detected(self):
         def boom():
@@ -329,7 +333,7 @@ class TestCheckpoint(StateMachineTestCase):
     def test_unserializable_value_at_save_time_warns_not_crashes(self):
         self.define_simple_machine()
         self.sm.checkpoint_variable('${N}')
-        self.sm._checkpoint_variables.append('${LATE}')
+        self.engine._checkpoint_variables.append('${LATE}')
         FakeBuiltIn.variables['${LATE}'] = object()
         self.sm.run_state_machine('INIT', checkpoint=self.checkpoint,
                                   poll_interval='0.01 s')
@@ -402,18 +406,18 @@ class TestLoadStateMachine(StateMachineTestCase):
     def test_load_json_machine_and_run(self):
         self.write(self.MACHINE)
         self.sm.load_state_machine(self.path)
-        self.assertEqual(sorted(self.sm._states), ['DONE', 'FAULT', 'INIT', 'WORK'])
-        self.assertIn('${N}', self.sm._checkpoint_variables)
+        self.assertEqual(sorted(self.engine._states), ['DONE', 'FAULT', 'INIT', 'WORK'])
+        self.assertIn('${N}', self.engine._checkpoint_variables)
         self.sm.run_state_machine('INIT', poll_interval='0.01 s')
         self.assertEqual(self.sm.get_current_state(), 'DONE')
         self.assertEqual(FakeBuiltIn.variables['${N}'], 4)
 
     def test_compact_transition_without_condition(self):
-        source, target, condition = self.sm._parse_transition('A -> B')
+        source, target, condition = self.engine._parse_transition('A -> B')
         self.assertEqual((source, target, condition), ('A', 'B', None))
 
     def test_compact_transition_with_condition(self):
-        source, target, condition = self.sm._parse_transition(
+        source, target, condition = self.engine._parse_transition(
             'A -> B when $N >= 5')
         self.assertEqual((source, target, condition), ('A', 'B', '$N >= 5'))
 
@@ -472,6 +476,83 @@ class TestLoadStateMachine(StateMachineTestCase):
                 self.sm.load_state_machine(path)
         finally:
             os.remove(path)
+
+
+class TestNamedMachines(StateMachineTestCase):
+
+    def define_counter_machine(self, machine, variable, limit):
+        FakeBuiltIn.variables.setdefault(variable, 0)
+
+        def work():
+            FakeBuiltIn.variables[variable] = \
+                FakeBuiltIn.variables.get(variable, 0) + 1
+
+        FakeBuiltIn.keywords[f'Work{machine}'] = work
+        self.sm.define_state('INIT', machine=machine)
+        self.sm.define_state('WORK', during=f'Work{machine}', machine=machine)
+        self.sm.define_state('DONE', final=True, machine=machine)
+        self.sm.define_transition('INIT', 'WORK', machine=machine)
+        self.sm.define_transition(
+            'WORK', 'DONE',
+            condition=f'${variable.strip("${}")} >= {limit}', machine=machine)
+
+    def test_machines_are_isolated(self):
+        # Same state names in two machines: no clash, separate statistics.
+        self.define_counter_machine('A', '${NA}', 2)
+        self.define_counter_machine('B', '${NB}', 3)
+        self.sm.run_state_machine('INIT', machine='A',
+                                  poll_interval='0.01 s')
+        self.sm.run_state_machine('INIT', machine='B',
+                                  poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(machine='A'), 'DONE')
+        self.assertEqual(self.sm.get_current_state(machine='B'), 'DONE')
+        self.assertEqual(FakeBuiltIn.variables['${NA}'], 2)
+        self.assertEqual(FakeBuiltIn.variables['${NB}'], 3)
+        stats_a = self.sm.get_state_statistics(machine='A')
+        stats_b = self.sm.get_state_statistics(machine='B')
+        self.assertEqual(stats_a['WORK']['visits'], 1)
+        self.assertEqual(stats_b['WORK']['visits'], 1)
+
+    def test_concurrent_machines(self):
+        import threading
+        # BG increments ${N}; FG waits until BG made enough progress.
+        self.define_counter_machine('BG', '${N}', 3)
+        self.sm.define_state('WAIT', machine='FG')
+        self.sm.define_state('DONE', final=True, machine='FG')
+        self.sm.define_transition('WAIT', 'DONE', condition='$N >= 3',
+                                  machine='FG')
+        bg = threading.Thread(target=self.sm.run_state_machine,
+                              args=('INIT',),
+                              kwargs={'machine': 'BG',
+                                      'poll_interval': '0.01 s'})
+        bg.start()
+        try:
+            self.sm.run_state_machine('WAIT', machine='FG',
+                                      poll_interval='0.01 s')
+        finally:
+            bg.join(timeout=10)
+        self.assertFalse(bg.is_alive())
+        self.assertEqual(self.sm.get_current_state(machine='BG'), 'DONE')
+        self.assertEqual(self.sm.get_current_state(machine='FG'), 'DONE')
+
+    def test_reset_single_machine(self):
+        self.define_counter_machine('A', '${NA}', 2)
+        self.define_counter_machine('B', '${NB}', 2)
+        self.sm.reset_state_machine(machine='A')
+        self.assertEqual(self.sm._machine('A')._states, {})
+        self.assertIn('WORK', self.sm._machine('B')._states)
+
+    def test_reset_all_machines(self):
+        self.define_counter_machine('A', '${NA}', 2)
+        self.define_counter_machine('B', '${NB}', 2)
+        self.sm.reset_state_machine()
+        self.assertEqual(self.sm._machines, {})
+
+    def test_default_machine_unchanged_by_named_ones(self):
+        self.define_simple_machine()
+        self.define_counter_machine('X', '${NX}', 1)
+        self.sm.run_state_machine('INIT', poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(), 'DONE')
 
 
 if __name__ == '__main__':

@@ -165,6 +165,56 @@ Invalid Machine File Is Rejected
     [Teardown]    Run Keywords    Reset State Machine
     ...    AND    Remove File    ${OUTPUT DIR}${/}bad.json
 
+Independent Named Machines
+    [Documentation]    Two machines share state names without clashing.
+    Set Test Variable    ${NA}    ${0}
+    Set Test Variable    ${NB}    ${0}
+    Define State    INIT    machine=A
+    Define State    WORK    during=Increment NA    machine=A
+    Define State    DONE    final=True    machine=A
+    Define Transition    INIT    WORK    machine=A
+    Define Transition    WORK    DONE    condition=$NA >= 2    machine=A
+    Define State    INIT    machine=B
+    Define State    WORK    during=Increment NB    machine=B
+    Define State    DONE    final=True    machine=B
+    Define Transition    INIT    WORK    machine=B
+    Define Transition    WORK    DONE    condition=$NB >= 3    machine=B
+    Run State Machine    initial=INIT    machine=A    poll_interval=0.05 s
+    Run State Machine    initial=INIT    machine=B    poll_interval=0.05 s
+    Should Be Equal    ${NA}    ${2}
+    Should Be Equal    ${NB}    ${3}
+    ${state a}=    Get Current State    machine=A
+    ${state b}=    Get Current State    machine=B
+    Should Be Equal    ${state a}    DONE
+    Should Be Equal    ${state b}    DONE
+
+Concurrent Machines In Threads
+    [Documentation]    BG machine runs in a THREAD and feeds ${N}; the FG
+    ...                machine in the main flow waits for that progress and
+    ...                then stops the BG machine via the shared library
+    ...                instance (guards of a machine running inside a THREAD
+    ...                do not see variables set in that same thread - see
+    ...                library docs; control such machines with
+    ...                Stop State Machine instead).
+    Set Test Variable    ${N}    ${0}
+    Define State    WORK    during=Increment N    machine=BG
+    Define State    DONE    final=True    machine=BG
+    Define Transition    WORK    DONE    condition=$N >= 999999    machine=BG
+    Define State    WAIT    machine=FG
+    Define State    DONE    final=True    machine=FG
+    Define Transition    WAIT    DONE    condition=$N >= 3    machine=FG
+    THREAD    BG_SM    True
+        Run State Machine    initial=WORK    machine=BG    poll_interval=0.1 s
+    END
+    Run State Machine    initial=WAIT    machine=FG    poll_interval=0.1 s
+    Stop State Machine    machine=BG
+    Wait For Thread    BG_SM    timeout=10 s
+    ${state bg}=    Get Current State    machine=BG
+    ${state fg}=    Get Current State    machine=FG
+    Should Be Equal    ${state bg}    WORK    # stopped gracefully mid-state
+    Should Be Equal    ${state fg}    DONE
+    Should Be True    ${N} >= 3
+
 Graceful Stop From A Keyword
     Set Test Variable    ${N}    ${0}
     Define State    INIT    enter=Prepare
@@ -204,6 +254,14 @@ Add N
     [Arguments]    ${amount}
     ${n}=    Evaluate    $N + int($amount)
     Set Test Variable    ${N}    ${n}
+
+Increment NA
+    ${n}=    Evaluate    $NA + 1
+    Set Test Variable    ${NA}    ${n}
+
+Increment NB
+    ${n}=    Evaluate    $NB + 1
+    Set Test Variable    ${NB}    ${n}
 
 Break Something
     Fail    Simulated hardware fault
