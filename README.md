@@ -66,10 +66,34 @@ Parallel Measurement
 - **Bounded memory** — the framework's internal message collections are capped or spilled to
   disk, so execution memory stays flat over days-long runs.
 
+### The UNKNOWN test status
+
+Standard Robot Framework knows only PASS, FAIL and SKIP — which forces two very different
+situations into the same FAIL bucket. This fork separates them: **FAIL means a check ran and
+the result contradicted the expectation** (a real verdict about the product), **UNKNOWN means
+no verdict could be produced at all**.
+
+Testing a calculator app with `3 + 2`:
+
+| Observed behaviour | Status | Meaning |
+|---|---|---|
+| Result shown: `5` | **PASS** | product works |
+| Result shown: `4` | **FAIL** | product defect — file a bug |
+| No result — app crashed, exception in the test, keyword not found, bad arguments | **UNKNOWN** | no statement about the product possible; fix the test, environment or rerun |
+
+This split pays off in triage and reporting: FAILs go to developers as defect candidates,
+UNKNOWNs go to the test team — and neither pollutes the other's statistics (all outputs,
+logs, reports and counters show `passed / failed / unknown` separately). It matters even more
+in long runs, where an abandoned worker thread or an environment hiccup should not masquerade
+as a product failure.
+
+UNKNOWN is assigned automatically for broken test data (missing keywords, invalid arguments,
+syntax problems) and for unexpected generic exceptions escaping from libraries; ordinary
+assertion failures (`Should Be Equal` etc.) remain FAIL. Test libraries can also raise
+`robot.errors.UnknownAssertionError` deliberately to state "no verdict".
+
 ### Further extensions
 
-- **UNKNOWN test status** in addition to PASS/FAIL/SKIP, fully supported in outputs, logs,
-  reports and statistics.
 - Additional log level `USER` for end-user oriented messages.
 
 ## Example
