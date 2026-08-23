@@ -18,6 +18,7 @@ from robot.version import get_full_version
 from robot.result.visitor import ResultVisitor
 
 from .loggerhelper import IsLogged, Message
+import json
 import threading
 import time
 import os
@@ -100,9 +101,11 @@ class XmlLogger(ResultVisitor):
     # cuongnht add thread: thread name -> path of its partial output file.
     # Used by threadmerger to graft thread outputs into the main output.xml.
     thread_output_files = ThreadSafeDict()
-    # cuongnht memory cap: WARN/ERROR messages are collected in memory for
-    # the <errors> section until the run ends; without a limit a days-long
-    # run that warns periodically grows without bound.
+    # cuongnht memory cap: WARN/ERROR messages are collected for the <errors>
+    # section until the run ends. Only the first max_errors stay in memory;
+    # further ones are spilled to a sidecar file next to output.xml and read
+    # back when the section is written, so the section stays complete with
+    # bounded memory. Without an output file the overflow is only counted.
     max_errors = 10000
 
     def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot',
@@ -117,6 +120,9 @@ class XmlLogger(ResultVisitor):
             XmlLogger.thread_writer_dict['MainThread'] = writer
         self._errors = []
         self._errors_dropped = 0
+        self._errors_spill_path = None
+        self._errors_spill_file = None
+        self._errors_spill_lock = threading.Lock()
         self.path = path
         self.rpa = rpa
         self.generator = generator
@@ -176,11 +182,13 @@ class XmlLogger(ResultVisitor):
         self.start_errors()
         for msg in self._errors:
             self._write_message(msg)
+        self._write_spilled_errors()
         if self._errors_dropped:
+            # Only possible without an output file (nowhere to spill to).
             self._write_message(Message(
                 f'{self._errors_dropped} further warning/error messages were '
-                f'suppressed in this listing (limit {self.max_errors}); the '
-                f'full log contains all of them.', 'WARN'))
+                f'not collected (in-memory limit {self.max_errors}, no '
+                f'output file to spill to).', 'WARN'))
         self.end_errors()
         self._writer.end('robot')
         self._writer.close()
@@ -215,8 +223,47 @@ class XmlLogger(ResultVisitor):
         if self._error_message_is_logged(msg.level):
             if len(self._errors) < self.max_errors:
                 self._errors.append(msg)
+            elif self.path:
+                self._spill_error(msg)
             else:
                 self._errors_dropped += 1
+
+    def _spill_error(self, msg):
+        """Writes an overflowing errors-section message to the sidecar file."""
+        with self._errors_spill_lock:
+            if self._errors_spill_file is None:
+                base, _ = os.path.splitext(self.path)
+                self._errors_spill_path = base + '_errors_spill.jsonl'
+                self._errors_spill_file = open(self._errors_spill_path, 'w',
+                                               encoding='UTF-8')
+            json.dump({'timestamp': msg.timestamp, 'level': msg.level,
+                       'message': msg.message, 'html': msg.html},
+                      self._errors_spill_file)
+            self._errors_spill_file.write('\n')
+
+    def _write_spilled_errors(self):
+        with self._errors_spill_lock:
+            spill_file = self._errors_spill_file
+            self._errors_spill_file = None
+        if spill_file is None:
+            return
+        spill_file.close()
+        try:
+            with open(self._errors_spill_path, encoding='UTF-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    self._write_message(Message(data['message'],
+                                                data.get('level', 'WARN'),
+                                                data.get('html', False),
+                                                data.get('timestamp')))
+            os.remove(self._errors_spill_path)
+        except Exception as err:
+            self._write_message(Message(
+                f"Reading spilled error messages from "
+                f"'{self._errors_spill_path}' failed: {err}", 'WARN'))
 
     def log_message(self, msg):
         self._maybe_rotate()  # cuongnht add segmented output

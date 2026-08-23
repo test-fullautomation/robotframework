@@ -60,34 +60,53 @@ class TestXmlLoggerErrorsCap(unittest.TestCase):
         os.close(fd)
         self.xml_logger = XmlLogger(self.path)
         self.xml_logger.max_errors = 40
+        base, _ = os.path.splitext(self.path)
+        self.spill_path = base + '_errors_spill.jsonl'
 
     def tearDown(self):
-        for path in (self.path,):
+        for path in (self.path, self.spill_path):
             if os.path.exists(path):
                 os.remove(path)
 
-    def test_errors_are_capped_and_suppression_reported(self):
+    def test_overflow_spills_to_disk_and_errors_section_is_complete(self):
         for i in range(100):
             self.xml_logger.message(Message(f'warn {i}', 'WARN'))
         self.assertEqual(len(self.xml_logger._errors), 40)
-        self.assertEqual(self.xml_logger._errors_dropped, 60)
+        self.assertEqual(self.xml_logger._errors_dropped, 0)
+        self.assertTrue(os.path.exists(self.spill_path))
         self.xml_logger.close()
         with open(self.path, encoding='UTF-8') as f:
             content = f.read()
-        self.assertIn('60 further warning/error messages were suppressed',
-                      content)
+        # No message is lost: memory batch AND spilled overflow are written.
+        for i in (0, 39, 40, 99):
+            self.assertIn(f'warn {i}', content)
+        self.assertNotIn('further warning/error messages', content)
+        self.assertFalse(os.path.exists(self.spill_path),
+                         'spill file must be removed after close')
 
-    def test_no_suppression_message_below_cap(self):
+    def test_no_spill_below_cap(self):
         self.xml_logger.message(Message('only one', 'WARN'))
+        self.assertFalse(os.path.exists(self.spill_path))
         self.xml_logger.close()
         with open(self.path, encoding='UTF-8') as f:
             content = f.read()
-        self.assertNotIn('suppressed', content)
+        self.assertIn('only one', content)
+
+    def test_without_output_file_overflow_is_counted(self):
+        self.xml_logger.close()    # release the setUp file handle (Windows)
+        logger = XmlLogger(None)
+        logger.max_errors = 40
+        for i in range(100):
+            logger.message(Message(f'warn {i}', 'WARN'))
+        self.assertEqual(len(logger._errors), 40)
+        self.assertEqual(logger._errors_dropped, 60)
+        logger.close()    # NullMarkupWriter: must not raise
 
     def test_info_messages_not_collected(self):
         for i in range(100):
             self.xml_logger.message(Message(f'info {i}', 'INFO'))
         self.assertEqual(len(self.xml_logger._errors), 0)
+        self.assertFalse(os.path.exists(self.spill_path))
         self.xml_logger.close()
 
 
