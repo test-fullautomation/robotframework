@@ -4,6 +4,11 @@
 docutils >= 0.10
 pygments
 
+# Used by TestCheckerLibrary to validate output.xml against the schema.
+# Without it the shared 'Process Output' keyword is unavailable and nearly
+# every acceptance test fails in its parent suite setup.
+xmlschema
+
 pyyaml
 
 # On Linux installing lxml with pip may require compilation and development
