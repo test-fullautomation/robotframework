@@ -127,8 +127,13 @@ class StateMachine:
     the checkpointed state: registered variables are restored and the state's
     `enter` keyword is executed again - design enter keywords to be
     *idempotent*. Use `resume=False` to ignore an existing checkpoint or
-    `resume=True` to require one. The checkpoint file is removed when the
-    machine finishes successfully.
+    `resume=True` to require one. The checkpoint file is removed only when
+    the machine reaches a final state; a stopped machine keeps it.
+
+    Restored variables are set as *test* variables. Keywords that update
+    checkpointed variables should therefore use `Set Test Variable` -
+    updating a *suite* variable of the same name would be shadowed by the
+    restored test-scope value after a resume.
 
     == Timeouts and the watchdog ==
 
