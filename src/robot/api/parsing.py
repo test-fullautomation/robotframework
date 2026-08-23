@@ -196,6 +196,7 @@ Blocks:
 - :class:`~robot.parsing.model.blocks.Try`
 - :class:`~robot.parsing.model.blocks.For`
 - :class:`~robot.parsing.model.blocks.While`
+- :class:`~robot.parsing.model.blocks.Thread`
 
 Statements:
 
@@ -236,6 +237,7 @@ Statements:
 - :class:`~robot.parsing.model.statements.FinallyHeader`
 - :class:`~robot.parsing.model.statements.ForHeader`
 - :class:`~robot.parsing.model.statements.WhileHeader`
+- :class:`~robot.parsing.model.statements.ThreadHeader`
 - :class:`~robot.parsing.model.statements.End`
 - :class:`~robot.parsing.model.statements.ReturnStatement`
 - :class:`~robot.parsing.model.statements.Break`
@@ -503,7 +505,8 @@ from robot.parsing.model.blocks import (
     If,
     Try,
     For,
-    While
+    While,
+    Thread    # cuongnht add thread
 )
 from robot.parsing.model.statements import (
     SectionHeader,
@@ -544,6 +547,7 @@ from robot.parsing.model.statements import (
     FinallyHeader,
     ForHeader,
     WhileHeader,
+    ThreadHeader,    # cuongnht add thread
     End,
     ReturnStatement,
     Continue,
