@@ -16,5 +16,5 @@ Use with incorrect arguments
     Eq    too    many    args
 
 Built-ins not set to attributes are not exposes
-    [Documentation]    FAIL    No keyword with name 'Sum' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Sum' found.
     Sum

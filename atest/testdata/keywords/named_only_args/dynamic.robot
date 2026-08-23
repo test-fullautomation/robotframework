@@ -28,23 +28,23 @@ Last given value has precedence
     Args Should Have Been    kwo=used
 
 Missing value
-    [Documentation]    FAIL Keyword 'DynamicKwOnlyArgs.Kw Only Arg' missing named-only argument 'kwo'.
+    [Documentation]    UNKNOWN Keyword 'DynamicKwOnlyArgs.Kw Only Arg' missing named-only argument 'kwo'.
     Kw Only Arg
 
 Missing multiple values
-    [Documentation]    FAIL Keyword 'DynamicKwOnlyArgs.Many Kw Only Args' missing named-only arguments 'first' and 'third'.
+    [Documentation]    UNKNOWN Keyword 'DynamicKwOnlyArgs.Many Kw Only Args' missing named-only arguments 'first' and 'third'.
     Many Kw Only Args    second=xxx
 
 Unexpected keyword argumemt
-    [Documentation]    FAIL Keyword 'DynamicKwOnlyArgs.Kw Only Arg' got unexpected named argument 'invalid'.
+    [Documentation]    UNKNOWN Keyword 'DynamicKwOnlyArgs.Kw Only Arg' got unexpected named argument 'invalid'.
     Kw Only Arg    kwo=value    invalid=ooops
 
 Multiple unexpected keyword argumemt
-    [Documentation]    FAIL Keyword 'DynamicKwOnlyArgs.Kw Only Arg' got unexpected named arguments 'invalid' and 'ooops'.
+    [Documentation]    UNKNOWN Keyword 'DynamicKwOnlyArgs.Kw Only Arg' got unexpected named arguments 'invalid' and 'ooops'.
     Kw Only Arg    kwo=value    invalid=ooops    ooops=invalid
 
 Unexpected positional argument 1
-    [Documentation]    FAIL Keyword 'DynamicKwOnlyArgs.Kw Only Arg' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'DynamicKwOnlyArgs.Kw Only Arg' expected 0 non-named arguments, got 1.
     Kw Only Arg    ooops
 
 Unexpected positional argument 2
@@ -68,5 +68,5 @@ With other arguments
     Args Should Have Been    k4=!!!    kwo_def=k2     k3=!          pos_req=p1    pos_def=p2    kwo_req=k1
 
 Using kw-only arguments is not possible if 'run_keyword' accepts no kwargs
-    [Documentation]    FAIL No keyword with name 'No kwargs' found.
+    [Documentation]    UNKNOWN No keyword with name 'No kwargs' found.
     No kwargs    kwo=value

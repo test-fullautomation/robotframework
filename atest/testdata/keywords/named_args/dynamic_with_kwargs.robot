@@ -148,7 +148,7 @@ Naming without varargs works
     Should be equal    ${ret}    a:A, b:B, x:1, y:2
 
 Positional after named 1
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Varargs' got positional argument after named arguments.
     Args & Varargs    foo    b=bar    dar
 
 Positional after named 2
@@ -164,7 +164,7 @@ Positional after named 4
     Args & Kwargs    kw=value    ooops
 
 Missing argument 1
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Varargs' missing value for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Varargs' missing value for argument 'a'.
     Args & Varargs    b=value
 
 Missing argument 2
@@ -172,7 +172,7 @@ Missing argument 2
     Args & Kwargs    b=value    kw=value    c=value
 
 Multiple values for argument 1
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Two Args' got multiple values for argument 'first'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Two Args' got multiple values for argument 'first'.
     Two Args    1    first=oops
 
 Multiple values for argument 2

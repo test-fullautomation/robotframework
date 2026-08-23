@@ -34,11 +34,11 @@ Separate keys and values with equals in variable value
     Verify Dictionary    ${d}    {'foo=bar': 'foo=bar'}
 
 Separate keys and values with non-existing variables
-    [Documentation]    FAIL Variable '\${NONEX VALUE}' not found.
+    [Documentation]    UNKNOWN Variable '\${NONEX VALUE}' not found.
     Create Dictionary    key    ${NONEX VALUE}
 
 Wrong number of separate keys and values 1
-    [Documentation]    FAIL Expected even number of keys and values, got 3.
+    [Documentation]    UNKNOWN Expected even number of keys and values, got 3.
     Create Dictionary    1    2    3
 
 Wrong number of separate keys and values 2
@@ -66,7 +66,7 @@ Separate keys and values with invalid key
     Verify Dictionary    ${d}    {'foo=bar': 'foo=bar'}
 
 `key=value` syntax with non-existing variables 1
-    [Documentation]    FAIL Variable '\${NONEX VALUE}' not found.
+    [Documentation]    UNKNOWN Variable '\${NONEX VALUE}' not found.
     Create Dictionary    key=${NONEX VALUE}
 
 `key=value` syntax with non-existing variables 2
@@ -74,11 +74,11 @@ Separate keys and values with invalid key
     Create Dictionary    ${NONEX KEY}=${NONEX VALUE}
 
 `key=value` syntax with invalid key
-    [Documentation]    FAIL STARTS: Creating dictionary failed:
+    [Documentation]    UNKNOWN STARTS: Creating dictionary failed:
     Create Dictionary    ${DICT}=non-hashable
 
 `key=value` syntax without equals
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid dictionary variable item 'no'. \
     ...    Items must use 'name=value' syntax or be dictionary variables themselves.
     Create Dictionary    a=1   no   equals

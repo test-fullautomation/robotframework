@@ -8,7 +8,7 @@ Passing, Logging And Returning
     Should Be Equal    ${ret}    Hello, world
 
 Failing
-    [Documentation]    FAIL    Failure: Hi tellus
+    [Documentation]    UNKNOWN    Failure: Hi tellus
     Get Keyword That Fails    Hi tellus
 
 Keyword Implemented In Library Class Itself
@@ -16,22 +16,22 @@ Keyword Implemented In Library Class Itself
     Should Be Equal    ${ret}    No need for __getattr__ here!!
 
 Non Existing Attribute
-    [Documentation]    FAIL    No keyword with name 'Non-existing attribute' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Non-existing attribute' found.
     Non-existing attribute
 
 Named Keyword Is Not Method
-    [Documentation]    FAIL    No keyword with name 'not_method_or_function' found.
+    [Documentation]    UNKNOWN    No keyword with name 'not_method_or_function' found.
     not_method_or_function
 
 Unexpected error getting attribute
-    [Documentation]    FAIL    No keyword with name 'Unexpected error getting attribute' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Unexpected error getting attribute' found.
     Unexpected error getting attribute
 
 Name Set Using 'robot_name' Attribute
     Name Set Using 'robot_name' Attribute
 
 Old Name Doesn't Work If Name Set Using 'robot_name'
-    [Documentation]    FAIL    No keyword with name 'Name Set In Method Signature' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Name Set In Method Signature' found.
     Name Set In Method Signature
 
 'robot_name' Attribute Set To None

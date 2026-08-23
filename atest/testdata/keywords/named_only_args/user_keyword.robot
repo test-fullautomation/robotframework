@@ -37,7 +37,7 @@ Last given value has precedence
     Should Be Equal    ${result}    used
 
 Missing value 1
-    [Documentation]    FAIL Keyword 'Kw Only Arg' missing named-only argument 'kwo'.
+    [Documentation]    UNKNOWN Keyword 'Kw Only Arg' missing named-only argument 'kwo'.
     Kw Only Arg
 
 Missing value 2
@@ -45,19 +45,19 @@ Missing value 2
     Mandatory After Defaults    default2=this is not enough
 
 Missing multiple values
-    [Documentation]    FAIL Keyword 'Many Kw Only Args' missing named-only arguments 'first' and 'third'.
+    [Documentation]    UNKNOWN Keyword 'Many Kw Only Args' missing named-only arguments 'first' and 'third'.
     Many Kw Only Args    second=xxx
 
 Unexpected keyword argument
-    [Documentation]    FAIL Keyword 'Kw Only Arg' got unexpected named argument 'invalid'.
+    [Documentation]    UNKNOWN Keyword 'Kw Only Arg' got unexpected named argument 'invalid'.
     Kw Only Arg    kwo=value    invalid=ooops
 
 Multiple unexpected keyword argument
-    [Documentation]    FAIL Keyword 'Kw Only Arg' got unexpected named arguments 'invalid' and 'ooops'.
+    [Documentation]    UNKNOWN Keyword 'Kw Only Arg' got unexpected named arguments 'invalid' and 'ooops'.
     Kw Only Arg    kwo=value    invalid=ooops    ooops=invalid
 
 Unexpected positional argument 1
-    [Documentation]    FAIL Keyword 'Kw Only Arg' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'Kw Only Arg' expected 0 non-named arguments, got 1.
     Kw Only Arg    ooops
 
 Unexpected positional argument 2
@@ -90,7 +90,7 @@ Argument name as variable
     Should Be Equal    ${result}    -kwo
 
 Argument name as non-existing variable
-    [Documentation]    FAIL Variable '${i do not exist}' not found.
+    [Documentation]    UNKNOWN Variable '${i do not exist}' not found.
     Kw Only Arg    ${i do not exist}=value
 
 With positional argument containing equal sign

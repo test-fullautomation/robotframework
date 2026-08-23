@@ -29,7 +29,7 @@ Environment Variable With Internal Variables
     Should Be Equal  %{%{yet_another_env_var}_${normal_var}}  Env var value
 
 Non-Existing Environment Variable
-    [Documentation]  FAIL Environment variable '%{NON_EXISTING}' not found.
+    [Documentation]  UNKNOWN Environment variable '%{NON_EXISTING}' not found.
     Log  %{NON_EXISTING}
 
 Environment Variables Are Case Sensitive
@@ -42,7 +42,7 @@ Environment Variables Are Not Case Sensitive On Windows
     Log  %{this_env_var_is_set}
 
 Environment Variables Are Space Sensitive 1
-    [Documentation]  FAIL Environment variable '%{THIS ENV VAR IS SET}' not found. Did you mean:
+    [Documentation]  UNKNOWN Environment variable '%{THIS ENV VAR IS SET}' not found. Did you mean:
     ...    ${SPACE * 4}\%{THIS_ENV_VAR_IS_SET}
     Log  %{THIS ENV VAR IS SET}
 
@@ -52,7 +52,7 @@ Environment Variables Are Space Sensitive 2
     Log  %{ THIS_ENV_VAR_IS_SET }
 
 Environment Variables Are Underscore Sensitive
-    [Documentation]  FAIL Environment variable '%{TH_IS_ENVVAR_IS_SET}' not found. Did you mean:
+    [Documentation]  UNKNOWN Environment variable '%{TH_IS_ENVVAR_IS_SET}' not found. Did you mean:
     ...    ${SPACE * 4}\%{THIS_ENV_VAR_IS_SET}
     Log  %{TH_IS_ENVVAR_IS_SET}
 
@@ -79,7 +79,7 @@ Escaping Environment Variables
     Should Be Equal  \%{THIS_IS_NOT_ENV_VAR}  %\{THIS_IS_NOT_ENV_VAR}
 
 Empty Environment Variable
-    [Documentation]    FAIL    STARTS: Environment variable '\%{}' not found.
+    [Documentation]    UNKNOWN    STARTS: Environment variable '\%{}' not found.
     Log  %{}
 
 Environment Variable with Default Value

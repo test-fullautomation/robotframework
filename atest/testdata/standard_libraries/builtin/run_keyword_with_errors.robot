@@ -52,14 +52,14 @@ Ignore Error When Timeout Occurs In UK
     Run Keyword And Ignore Error    Timeouting UK
 
 Ignore Error Cannot Catch Syntax Errors
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     Run Keyword And Ignore Error    Broken User Keyword
 
 Ignore Error Can Catch Non-Syntax Errors
     Run Keyword And Ignore Error    No Operation    wrong    number    of    arguments
 
 Ignore Error When Syntax Error In Setting Variables
-    [Documentation]    FAIL Assignment can contain only one list variable.
+    [Documentation]    UNKNOWN Assignment can contain only one list variable.
     Run Keyword And Ignore Error    Invalid Syntax When Setting Variable
 
 Ignore Error When Invalid Return Values When Setting Variables
@@ -67,7 +67,7 @@ Ignore Error When Invalid Return Values When Setting Variables
     Should Be Equal    ${status}: ${error}    FAIL: Cannot set variables: Expected 2 return values, got 3.
 
 Ignore Error When Syntax Error In For Loop
-    [Documentation]    FAIL FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN FOR loop has no 'IN' or other valid separator.
     Run Keyword And Ignore Error    For Loop With Syntax Error
 
 Ignore Error When Non Existing Variable In For Loop
@@ -155,7 +155,7 @@ Expect Error When Timeout Occurs In UK
     Run Keyword And Expect Error    *    Timeouting UK
 
 Expect Error Cannot Catch Syntax Errors
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     Run Keyword And Expect Error    *    Broken User Keyword
 
 Expect Error Can Catch Non-Syntax Errors
@@ -164,7 +164,7 @@ Expect Error Can Catch Non-Syntax Errors
     ...    Non existing keyword
 
 Expect Error When Syntax Error In Setting Variables
-    [Documentation]    FAIL Assignment can contain only one list variable.
+    [Documentation]    UNKNOWN Assignment can contain only one list variable.
     Run Keyword And Expect Error    *    Invalid Syntax When Setting Variable
 
 Expect Error When Invalid Return Values When Setting Variables
@@ -173,7 +173,7 @@ Expect Error When Invalid Return Values When Setting Variables
     ...    Invalid Return Values When Setting Variables
 
 Expect Error When Syntax Error In For Loop
-    [Documentation]    FAIL FOR loop has no 'IN' or other valid separator.
+    [Documentation]    UNKNOWN FOR loop has no 'IN' or other valid separator.
     Run Keyword And Expect Error    *    For Loop With Syntax Error
 
 Expect Error When Non Existing Variable In For Loop

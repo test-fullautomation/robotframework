@@ -80,9 +80,9 @@ Failing dict
     Log Many   &{FAILING DICT}
 
 Open files are not lists
-    [Documentation]    FAIL Value of variable '\@{OPEN FILE}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{OPEN FILE}' is not list or list-like.
     Log Many    @{OPEN FILE}
 
 Closed files are not lists
-    [Documentation]    FAIL Value of variable '\@{CLOSED FILE}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{CLOSED FILE}' is not list or list-like.
     Log Many    @{CLOSED FILE}

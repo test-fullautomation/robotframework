@@ -28,7 +28,7 @@ Less types than arguments is ok
     Less types than arguments is ok    1    2    3
 
 More types than arguments causes error
-    [Documentation]    FAIL No keyword with name 'Too many types' found.
+    [Documentation]    UNKNOWN No keyword with name 'Too many types' found.
     Too many types
 
 Varargs and kwargs

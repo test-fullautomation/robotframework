@@ -92,12 +92,12 @@ Using with named
     Keyword    &{EMPTY}    &{args}    &{EMPTY}
 
 Using with non-existing keys
-    [Documentation]    FAIL Keyword 'Keyword' got unexpected named argument 'nonex'.
+    [Documentation]    UNKNOWN Keyword 'Keyword' got unexpected named argument 'nonex'.
     ${args} =    Create Dictionary    arg1=Urho    nonex=Not accepted
     Keyword    &{args}
 
 Using when no named or kwargs accepted 1
-    [Documentation]    FAIL Keyword 'No args' got unexpected named argument 'not_accepted'.
+    [Documentation]    UNKNOWN Keyword 'No args' got unexpected named argument 'not_accepted'.
     No args    &{EMPTY}
     ${args} =    Create Dictionary    not_accepted=
     No args    &{args}
@@ -109,19 +109,19 @@ Using when no named or kwargs accepted 2
     Varargs    &{args}
 
 Positional after
-    [Documentation]    FAIL Keyword 'Kwargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Kwargs' got positional argument after named arguments.
     Kwargs    &{EMPTY}    positional     values
 
 Non-existing
-    [Documentation]    FAIL Variable '&{non existing}' not found.
+    [Documentation]    UNKNOWN Variable '&{non existing}' not found.
     Create Dictionary    &{non existing}
 
 Non-dictionary
-    [Documentation]    FAIL Value of variable '\&{LIST}' is not dictionary or dictionary-like.
+    [Documentation]    UNKNOWN Value of variable '\&{LIST}' is not dictionary or dictionary-like.
     Create Dictionary    &{LIST}
 
 Non-string keys
-    [Documentation]    FAIL Argument names must be strings.
+    [Documentation]    UNKNOWN Argument names must be strings.
     ${ints} =    Evaluate    {1: 2, 3: 4}
     Kwargs    &{ints}
 

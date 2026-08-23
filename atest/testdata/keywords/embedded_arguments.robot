@@ -48,27 +48,27 @@ Embedded Arguments as List And Dict Variables
     Should Be Equal    ${o2}    ${i2}
 
 Non-Existing Variable in Embedded Arguments
-    [Documentation]    FAIL Variable '${non existing}' not found.
+    [Documentation]    UNKNOWN Variable '${non existing}' not found.
     User ${non existing} Selects ${variables} From Webshop
 
 Invalid List Variable as Embedded Argument
-    [Documentation]    FAIL Value of variable '\@{TEST NAME}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{TEST NAME}' is not list or list-like.
     User @{TEST NAME} Selects ${whatever} From Webshop
 
 Invalid Dict Variable as Embedded Argument
-    [Documentation]    FAIL Value of variable '\&{TEST NAME}' is not dictionary or dictionary-like.
+    [Documentation]    UNKNOWN Value of variable '\&{TEST NAME}' is not dictionary or dictionary-like.
     User &{TEST NAME} Selects ${whatever} From Webshop
 
 Non-Existing Variable in Embedded Arguments and Positional Arguments
-    [Documentation]    FAIL Keyword 'User \${user} Selects \${item} From Webshop' expected 0 arguments, got 2.
+    [Documentation]    UNKNOWN Keyword 'User \${user} Selects \${item} From Webshop' expected 0 arguments, got 2.
     User ${non existing} Selects ${variables} From Webshop    invalid    args
 
 Non-Existing Variable in Embedded Arguments and in Positional Arguments
-    [Documentation]    FAIL Variable '\${nonex pos}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonex pos}' not found.
     User ${nonex emb} Selects ${variables} From Webshop    ${nonex pos}
 
 Custom Embedded Argument Regexp
-    [Documentation]    FAIL No keyword with name 'Result of a + b is fail' found.
+    [Documentation]    UNKNOWN No keyword with name 'Result of a + b is fail' found.
     I execute "foo"
     I execute "bar" with "zap"
     Result of 1 + 1 is 2
@@ -115,11 +115,11 @@ Non String Variable Is Accepted With Custom Regexp
     I execute "${42}"
 
 Regexp Extensions Are Not Supported
-    [Documentation]    FAIL Regexp extensions are not allowed in embedded arguments.
+    [Documentation]    UNKNOWN Regexp extensions are not allowed in embedded arguments.
     Regexp extensions like ${x:(?x)re} are not supported
 
 Invalid Custom Regexp
-    [Documentation]    FAIL STARTS: Compiling embedded arguments regexp failed:
+    [Documentation]    UNKNOWN STARTS: Compiling embedded arguments regexp failed:
     Invalid ${x:(} Regexp
 
 Escaping Values Given As Embedded Arguments
@@ -135,12 +135,12 @@ Embedded Arguments Syntax Is Case Insensitive
     x gets y FROM THE z
 
 Embedded Arguments Syntax is Space Sensitive
-    [Documentation]    FAIL No keyword with name 'User Janne Selects x fromwebshop' found.
+    [Documentation]    UNKNOWN No keyword with name 'User Janne Selects x fromwebshop' found.
     User Janne Selects x from webshop
     User Janne Selects x fromwebshop
 
 Embedded Arguments Syntax is Underscore Sensitive
-    [Documentation]    FAIL No keyword with name 'User Janne Selects x from_webshop' found.
+    [Documentation]    UNKNOWN No keyword with name 'User Janne Selects x from_webshop' found.
     User Janne Selects x from webshop
     User Janne Selects x from_webshop
 
@@ -154,12 +154,12 @@ Embedded Arguments In Resource File Used Explicitly
     embedded_args_in_uk_2.-r1-r2-+r1+
 
 Embedded And Positional Arguments Do Not Work Together
-    [Documentation]    FAIL Keyword 'User \${user} Selects \${item} From Webshop' expected 0 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'User \${user} Selects \${item} From Webshop' expected 0 arguments, got 1.
     Given this "usage" with @{EMPTY} works    @{EMPTY}
     Then User Invalid Selects Invalid From Webshop    invalid
 
 Keyword with embedded args cannot be used as "normal" keyword
-    [Documentation]    FAIL Variable '${user}' not found.
+    [Documentation]    UNKNOWN Variable '${user}' not found.
     User ${user} Selects ${item} From Webshop
 
 Keyword with both normal and embedded arguments
@@ -170,11 +170,11 @@ Keyword with both normal, positional and embedded arguments
     Number of horses should be    2    swimming
 
 Keyword with both normal and embedded arguments with too few arguments
-    [Documentation]    FAIL Keyword 'Number of ${animals} should be' expected 1 to 2 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'Number of ${animals} should be' expected 1 to 2 arguments, got 0.
     Number of horses should be
 
 Keyword Matching Multiple Keywords In Test Case File
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'foo+tc+bar-tc-zap' found:
     ...    ${INDENT}\${a}+tc+\${b}
     ...    ${INDENT}\${a}-tc-\${b}
@@ -184,7 +184,7 @@ Keyword Matching Multiple Keywords In Test Case File
     foo+tc+bar-tc-zap
 
 Keyword Matching Multiple Keywords In One Resource File
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'foo+r1+bar-r1-zap' found:
     ...    ${INDENT}embedded_args_in_uk_1.\${a}+r1+\${b}
     ...    ${INDENT}embedded_args_in_uk_1.\${a}-r1-\${b}
@@ -193,7 +193,7 @@ Keyword Matching Multiple Keywords In One Resource File
     foo+r1+bar-r1-zap
 
 Keyword Matching Multiple Keywords In Different Resource Files
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'foo-r1-bar-r2-zap' found:
     ...    ${INDENT}embedded_args_in_uk_1.\${a}-r1-\${b}
     ...    ${INDENT}embedded_args_in_uk_2.\${arg1}-r2-\${arg2}
@@ -202,7 +202,7 @@ Keyword Matching Multiple Keywords In Different Resource Files
     foo-r1-bar-r2-zap
 
 Keyword Matching Multiple Keywords In One And Different Resource Files
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name '-r1-r2-+r1+' found:
     ...    ${INDENT}embedded_args_in_uk_1.\${a}+r1+\${b}
     ...    ${INDENT}embedded_args_in_uk_1.\${a}-r1-\${b}
@@ -215,14 +215,14 @@ Same name with different regexp works
     It is a cow
 
 Same name with different regexp matching multiple fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'It is a cat' found:
     ...    ${INDENT}It is \${animal:a (cat|cow)}
     ...    ${INDENT}It is \${animal:a (dog|cat)}
     It is a cat
 
 Same name with same regexp fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'It is totally same' found:
     ...    ${INDENT}It is totally \${same}
     ...    ${INDENT}It is totally \${same}

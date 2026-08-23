@@ -1,16 +1,16 @@
 *** Test cases ***
 CONTINUE in test case
-    [Documentation]    FAIL CONTINUE is not allowed in this context.
+    [Documentation]    UNKNOWN CONTINUE is not allowed in this context.
     Log    all good
     CONTINUE
     Fail    Should not be executed
 
 CONTINUE in keyword
-    [Documentation]    FAIL CONTINUE is not allowed in this context.
+    [Documentation]    UNKNOWN CONTINUE is not allowed in this context.
     Continue in keyword
 
 CONTINUE in IF
-    [Documentation]    FAIL CONTINUE can only be used inside a loop.
+    [Documentation]    UNKNOWN CONTINUE can only be used inside a loop.
     IF    True
         Log    nice!
         CONTINUE
@@ -18,7 +18,7 @@ CONTINUE in IF
     Fail    Should not be executed
 
 CONTINUE in ELSE
-    [Documentation]    FAIL CONTINUE can only be used inside a loop.
+    [Documentation]    UNKNOWN CONTINUE can only be used inside a loop.
     IF    False
         Fail
     ELSE
@@ -28,7 +28,7 @@ CONTINUE in ELSE
     Fail    Should not be executed
 
 CONTINUE in TRY
-    [Documentation]    FAIL CONTINUE can only be used inside a loop.
+    [Documentation]    UNKNOWN CONTINUE can only be used inside a loop.
     TRY
         CONTINUE
     EXCEPT
@@ -37,7 +37,7 @@ CONTINUE in TRY
     Fail    Should not be executed
 
 CONTINUE in EXCEPT
-    [Documentation]    FAIL CONTINUE can only be used inside a loop.
+    [Documentation]    UNKNOWN CONTINUE can only be used inside a loop.
     TRY
         Fail
     EXCEPT
@@ -46,7 +46,7 @@ CONTINUE in EXCEPT
     Fail    Should not be executed
 
 CONTINUE in TRY-ELSE
-    [Documentation]    FAIL CONTINUE can only be used inside a loop.
+    [Documentation]    UNKNOWN CONTINUE can only be used inside a loop.
     TRY
         No operation
     EXCEPT
@@ -57,7 +57,7 @@ CONTINUE in TRY-ELSE
     Fail    Should not be executed
 
 CONTINUE with argument in FOR
-    [Documentation]    FAIL CONTINUE does not accept arguments, got 'should not work'.
+    [Documentation]    UNKNOWN CONTINUE does not accept arguments, got 'should not work'.
     FOR    ${i}    IN     1    2
         Log    ${i}
         CONTINUE    should not work
@@ -65,7 +65,7 @@ CONTINUE with argument in FOR
     Fail    Should not be executed
 
 CONTINUE with argument in WHILE
-    [Documentation]    FAIL CONTINUE does not accept arguments, got 'should', 'not' and 'work'.
+    [Documentation]    UNKNOWN CONTINUE does not accept arguments, got 'should', 'not' and 'work'.
     WHILE    True
         No operation
         CONTINUE    should    not    work
@@ -73,17 +73,17 @@ CONTINUE with argument in WHILE
     Fail    Should not be executed
 
 BREAK in test case
-    [Documentation]    FAIL BREAK is not allowed in this context.
+    [Documentation]    UNKNOWN BREAK is not allowed in this context.
     Log    all good
     BREAK
     Fail    Should not be executed
 
 BREAK in keyword
-    [Documentation]    FAIL BREAK is not allowed in this context.
+    [Documentation]    UNKNOWN BREAK is not allowed in this context.
     Break in keyword
 
 BREAK in IF
-    [Documentation]    FAIL BREAK can only be used inside a loop.
+    [Documentation]    UNKNOWN BREAK can only be used inside a loop.
     IF    True
         Log    nice!
         BREAK
@@ -91,7 +91,7 @@ BREAK in IF
     Fail    Should not be executed
 
 BREAK in ELSE
-    [Documentation]    FAIL BREAK can only be used inside a loop.
+    [Documentation]    UNKNOWN BREAK can only be used inside a loop.
     IF    False
         Fail
     ELSE
@@ -101,7 +101,7 @@ BREAK in ELSE
     Fail    Should not be executed
 
 BREAK in TRY
-    [Documentation]    FAIL BREAK can only be used inside a loop.
+    [Documentation]    UNKNOWN BREAK can only be used inside a loop.
     TRY
         BREAK
     EXCEPT
@@ -110,7 +110,7 @@ BREAK in TRY
     Fail    Should not be executed
 
 BREAK in EXCEPT
-    [Documentation]    FAIL BREAK can only be used inside a loop.
+    [Documentation]    UNKNOWN BREAK can only be used inside a loop.
     TRY
         Fail
     EXCEPT
@@ -119,7 +119,7 @@ BREAK in EXCEPT
     Fail    Should not be executed
 
 BREAK in TRY-ELSE
-    [Documentation]    FAIL BREAK can only be used inside a loop.
+    [Documentation]    UNKNOWN BREAK can only be used inside a loop.
     TRY
         No operation
     EXCEPT
@@ -130,7 +130,7 @@ BREAK in TRY-ELSE
     Fail    Should not be executed
 
 BREAK with argument in FOR
-    [Documentation]    FAIL BREAK does not accept arguments, got 'should not work'.
+    [Documentation]    UNKNOWN BREAK does not accept arguments, got 'should not work'.
     FOR    ${i}    IN     1    2
         Log    ${i}
         BREAK    should not work
@@ -138,7 +138,7 @@ BREAK with argument in FOR
     Fail    Should not be executed
 
 BREAK with argument in WHILE
-    [Documentation]    FAIL BREAK does not accept arguments, got 'should', 'not' and 'work'.
+    [Documentation]    UNKNOWN BREAK does not accept arguments, got 'should', 'not' and 'work'.
     WHILE    True
         No operation
         BREAK    should    not    work

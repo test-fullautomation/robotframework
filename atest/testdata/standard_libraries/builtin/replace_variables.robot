@@ -16,7 +16,7 @@ Replace Variables Using Extended Variable Syntax
     Should Be Equal    ${replaced}    I like PYTHON! Me 2!!
 
 Replace Variables Fails When Variable Does Not Exist
-    [Documentation]    FAIL Variable '\${non existing variables}' not found.
+    [Documentation]    UNKNOWN Variable '\${non existing variables}' not found.
     Replace Variables    Using \${non existing variables} is an error
 
 Replace Variables With Escaped Variables

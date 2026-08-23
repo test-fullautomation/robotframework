@@ -6,11 +6,11 @@ ${INDENT}         ${SPACE * 4}
 
 *** Test Cases ***
 Using keyword defined multiple times fails
-    [Documentation]    FAIL Keyword with same name defined multiple times.
+    [Documentation]    UNKNOWN Keyword with same name defined multiple times.
     Defined TWICE
 
 Keyword with embedded arguments defined multiple times fails at run-time
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Embedded twice' found:
     ...    ${INDENT}DupeHybridKeywords.EMBEDDED \${ARG}
     ...    ${INDENT}DupeHybridKeywords.Embedded \${twice}

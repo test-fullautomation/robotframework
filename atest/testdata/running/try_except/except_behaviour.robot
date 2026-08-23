@@ -66,7 +66,7 @@ Variable in pattern
     END
 
 Invalid variable in pattern
-    [Documentation]    FAIL    Variable '${does not exist}' not found.
+    [Documentation]    UNKNOWN    Variable '${does not exist}' not found.
     TRY
         Fail   Oh no!
     EXCEPT    ${does not exist}
@@ -97,7 +97,7 @@ Variable in pattern type
     END
 
 Invalid variable in pattern type
-    [Documentation]    FAIL    Variable '${does not exist}' not found.
+    [Documentation]    UNKNOWN    Variable '${does not exist}' not found.
     TRY
         Fail   Oh no!
     EXCEPT    foo    type=${does not exist}
@@ -107,7 +107,7 @@ Invalid variable in pattern type
     END
 
 Invalid pattern type
-    [Documentation]    FAIL    Invalid EXCEPT pattern type 'invalid', expected 'GLOB', 'LITERAL', 'REGEXP' or 'START'.
+    [Documentation]    UNKNOWN    Invalid EXCEPT pattern type 'invalid', expected 'GLOB', 'LITERAL', 'REGEXP' or 'START'.
     TRY
         Fail   Should not be executed
     EXCEPT    x    type=invalid
@@ -115,7 +115,7 @@ Invalid pattern type
     END
 
 Non-string pattern type
-    [Documentation]    FAIL    Invalid EXCEPT pattern type '42', expected 'GLOB', 'LITERAL', 'REGEXP' or 'START'.
+    [Documentation]    UNKNOWN    Invalid EXCEPT pattern type '42', expected 'GLOB', 'LITERAL', 'REGEXP' or 'START'.
     TRY
         Fail    failure
     EXCEPT    x    type=${42}

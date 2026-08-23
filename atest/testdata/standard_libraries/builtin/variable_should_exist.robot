@@ -53,7 +53,7 @@ Variable Should Exist With Extended Variable Syntax And Missing Object
     Variable Should Exist    \${missing.missing}
 
 Variable Should Exist With Invalid name 1
-    [Documentation]    FAIL Invalid variable name 'invalid'.
+    [Documentation]    UNKNOWN Invalid variable name 'invalid'.
     Variable Should Exist    invalid
 
 Variable Should Exist With Invalid name 2
@@ -102,7 +102,7 @@ Variable Should Not Exist With Variables
     Variable Should Not Exist    $${name}${name}${42}
 
 Variable Should Not Exist With Invalid name 1
-    [Documentation]    FAIL Invalid variable name 'invalid'.
+    [Documentation]    UNKNOWN Invalid variable name 'invalid'.
     Variable Should Not Exist    invalid
 
 Variable Should Not Exist With Invalid name 2

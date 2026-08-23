@@ -9,7 +9,7 @@ Wrapped functions
     Wrapped function with arguments    arg1    arg2
 
 Wrapped function with wrong number of arguments
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword 'WrappedFunctions.Wrapped Function With Arguments' expected 1 to 2 arguments, got 0.
     Wrapped function with arguments
 
@@ -19,6 +19,6 @@ Wrapped methods
     Wrapped method with arguments    arg1    arg2
 
 Wrapped method with wrong number of arguments
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword 'WrappedMethods.Wrapped Method With Arguments' expected 1 to 2 arguments, got 0.
     Wrapped method with arguments

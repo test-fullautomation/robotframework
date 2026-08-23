@@ -63,13 +63,13 @@ Timeout Expires
     Sleep    1
 
 Non existing Keyword
-    [Documentation]    FAIL No keyword with name 'Non Existing Keyword' found.
+    [Documentation]    UNKNOWN No keyword with name 'Non Existing Keyword' found.
     Non Existing Keyword
 
 Non Existing Scalar Variable
-    [Documentation]    FAIL Variable '\${non existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non existing}' not found.
     Log    ${non existing}
 
 Non Existing List Variable
-    [Documentation]    FAIL Variable '\@{non existing}' not found.
+    [Documentation]    UNKNOWN Variable '\@{non existing}' not found.
     Log Many    @{non existing}.

@@ -76,7 +76,7 @@ Timeout with variables
     Timeout with variables
 
 Invalid timeout
-    [Documentation]    FAIL Setting keyword timeout failed: Invalid time string 'invalid'.
+    [Documentation]    UNKNOWN Setting keyword timeout failed: Invalid time string 'invalid'.
     Invalid timeout
 
 Multiple settings
@@ -84,16 +84,16 @@ Multiple settings
     Should Be Equal    ${ret}    Hello World!!
 
 Invalid setting
-    [Documentation]    FAIL Non-existing setting 'Invalid Setting'.
+    [Documentation]    UNKNOWN Non-existing setting 'Invalid Setting'.
     Invalid
     Invalid
 
 Setting not valid with user keywords
-    [Documentation]    FAIL Setting 'Metadata' is not allowed with user keywords.
+    [Documentation]    UNKNOWN Setting 'Metadata' is not allowed with user keywords.
     Setting not valid with user keywords
 
 Small typo should provide recommendation
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Non-existing setting 'Doc Umentation'. Did you mean:
     ...    ${SPACE*4}Documentation
     Small typo should provide recommendation

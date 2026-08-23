@@ -33,11 +33,11 @@ False Condition
     Should Be Equal  ${var}  ${None}
 
 Invalid Expression
-    [Documentation]  FAIL STARTS: Evaluating expression 'invalid expr' failed: SyntaxError:
+    [Documentation]  UNKNOWN STARTS: Evaluating expression 'invalid expr' failed: SyntaxError:
     Set Variable If  invalid expr  whatever  values
 
 Fails Without Values 1
-    [Documentation]  FAIL At least one value is required
+    [Documentation]  UNKNOWN At least one value is required
     Set Variable If  True
 
 Fails Without Values 2
@@ -45,7 +45,7 @@ Fails Without Values 2
     Set Variable If  False
 
 Non-Existing Variables In Values 1
-    [Documentation]  FAIL Variable '\${now this breaks}' not found.
+    [Documentation]  UNKNOWN Variable '\${now this breaks}' not found.
     ${existing} =  Set Variable  ${42}
     ${var} =  Set Variable If  True  ${existing}*2 = ${existing*2}  ${nonex}
     Should Be Equal  ${var}  42*2 = 84
@@ -95,7 +95,7 @@ If / Else If / Else
     Should Be Equal  ${var}  ${None}
 
 With Empty List Variables 1
-    [Documentation]  FAIL At least one value is required
+    [Documentation]  UNKNOWN At least one value is required
     Set Variable If  True  @{EMPTY LIST}
 
 With Empty List Variables 2

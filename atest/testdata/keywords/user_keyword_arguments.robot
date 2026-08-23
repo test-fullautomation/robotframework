@@ -18,7 +18,7 @@ Correct Number Of Arguments When No Defaults Or Varargs
     Should Be Equal    ${ret}    a_3: a1 a2 a3
 
 Too Few Arguments When No Defaults Or Varargs 1
-    [Documentation]    FAIL Keyword 'A 1' expected 1 argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'A 1' expected 1 argument, got 0.
     A 1
 
 Too Few Arguments When No Defaults Or Varargs 2
@@ -26,7 +26,7 @@ Too Few Arguments When No Defaults Or Varargs 2
     A 3    a1    a2
 
 Too Many Arguments When No Defaults Or Varargs 1
-    [Documentation]    FAIL Keyword 'A 0' expected 0 arguments, got 10.
+    [Documentation]    UNKNOWN Keyword 'A 0' expected 0 arguments, got 10.
     A 0    This    is    too    much    !    Really
     ...    way    too    much    !!!!!
 
@@ -51,11 +51,11 @@ Correct Number Of Arguments With Defaults
     Should Be Equal    ${ret}    a_1_3: My argument My argument 2 My argument 3
 
 Too Few Arguments With Defaults
-    [Documentation]    FAIL Keyword 'A 1 3' expected 1 to 3 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'A 1 3' expected 1 to 3 arguments, got 0.
     A 1 3
 
 Too Many Arguments With Defaults 1
-    [Documentation]    FAIL Keyword 'A 0 1' expected 0 to 1 arguments, got 2.
+    [Documentation]    UNKNOWN Keyword 'A 0 1' expected 0 to 1 arguments, got 2.
     A 0 1    Too    much
 
 Too Many Arguments With Defaults 2
@@ -76,7 +76,7 @@ Correct Number Of Arguments With Varargs
     Should Be Equal    ${ret}    a_1_n: 1 (req) 2 3 4 5 6 7 8 9
 
 Too Few Arguments With Varargs
-    [Documentation]    FAIL Keyword 'A 1 N' expected at least 1 argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'A 1 N' expected at least 1 argument, got 0.
     A 1 N
 
 Correct Number Of Arguments With Defaults And Varargs
@@ -86,7 +86,7 @@ Correct Number Of Arguments With Defaults And Varargs
     Should Be Equal    ${ret}    a_1_2_n: one (req) two three four
 
 Too Few Arguments With Defaults And Varargs
-    [Documentation]    FAIL Keyword 'A 1 2 N' expected at least 1 argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'A 1 2 N' expected at least 1 argument, got 0.
     A 1 2 N
 
 Default With Variable
@@ -96,7 +96,7 @@ Default With Variable
     Should Be Equal    ${ret}    Variable value
 
 Default With Non-Existing Variable
-    [Documentation]    FAIL Resolving argument default values failed: Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Resolving argument default values failed: Variable '\${NON EXISTING}' not found.
     Default With Non-Existing Variable
 
 Local Variable Does Not Affect Variable In Default Value
@@ -139,7 +139,7 @@ Default With List Variable
     Should Be True    $result is $arg
 
 Default With Invalid List Variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Resolving argument default values failed: \
     ...    Value of variable '\@{VAR}' is not list or list-like.
     Default With Invalid List Variable
@@ -154,7 +154,7 @@ Default With Dict Variable
     Should Be True    $result is $arg
 
 Default With Invalid Dict Variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Resolving argument default values failed: \
     ...    Value of variable '\&{VAR}' is not dictionary or dictionary-like.
     Default With Invalid Dict Variable
@@ -168,7 +168,7 @@ Argument With `=` In Name
     Should Be Equal    ${result}    x-y-z
 
 Calling Using List Variables
-    [Documentation]    FAIL Keyword 'A 0 1' expected 0 to 1 arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'A 0 1' expected 0 to 1 arguments, got 3.
     A 0      @{EMPTY}
     A 1      @{EMPTY}    arg
     A 3      @{LIST}
@@ -195,17 +195,17 @@ Caller does not see modifications to varargs
     Should Be True    @{v2} == ['list2']
 
 Invalid Arguments Spec - Invalid argument syntax
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Invalid argument syntax 'no deco'.
     Invalid argument syntax
 
 Invalid Arguments Spec - Non-default after defaults
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Non-default argument after default arguments.
     Non-default after defaults
 
 Invalid Arguments Spec - Default with varargs
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Only normal arguments accept default values, list arguments like '\@{varargs}' do not.
     Default with varargs
 
@@ -215,12 +215,12 @@ Invalid Arguments Spec - Default with kwargs
     Default with kwargs
 
 Invalid Arguments Spec - Kwargs not last
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Only last argument can be kwargs.
     Kwargs not last
 
 Invalid Arguments Spec - Multiple errors
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Multiple errors:
     ...    - Invalid argument syntax 'invalid'.
     ...    - Non-default argument after default arguments.

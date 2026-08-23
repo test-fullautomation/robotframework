@@ -11,7 +11,7 @@ Reload and add keyword
     Keyword should exist    Added later
 
 Reloading changes args
-    [Documentation]    FAIL Keyword 'Reloadable.Original 1' expected 2 arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'Reloadable.Original 1' expected 2 arguments, got 3.
     Original 1    takes one argument
     Add keyword    Original 1    arg1    arg2
     Reload library    Reloadable
@@ -19,7 +19,7 @@ Reloading changes args
     Original 1    now    this    fails
 
 Reloading can remove a keyword
-    [Documentation]    FAIL STARTS:No keyword with name 'Original 2' found.
+    [Documentation]    UNKNOWN STARTS:No keyword with name 'Original 2' found.
     Original 2    takes one argument
     Remove keyword    Original 2
     Reload library    Reloadable
@@ -38,15 +38,15 @@ Changes are reflected in next instance
     Original 3    arg1   arg2
 
 Reloading non-existing
-    [Documentation]   FAIL No library 'NotThere' found.
+    [Documentation]   UNKNOWN No library 'NotThere' found.
     Reload library    NotThere
 
 Reloading non-existing instance
-    [Documentation]   FAIL No library '1' found.
+    [Documentation]   UNKNOWN No library '1' found.
     Reload library    ${1}
 
 Reloading None fails
-    [Documentation]   FAIL Library can not be None.
+    [Documentation]   UNKNOWN Library can not be None.
     Reload library    ${None}
 
 Static library

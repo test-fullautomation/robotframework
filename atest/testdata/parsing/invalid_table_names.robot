@@ -11,7 +11,7 @@ https://github.com/robotframework/robotframework/issues/793
 
 *** Test Cases ***
 Test in valid table
-    [Documentation]   FAIL No keyword with name 'Kw in valid table in resource' found.
+    [Documentation]   UNKNOWN No keyword with name 'Kw in valid table in resource' found.
     Keyword in valid table
     Kw in valid table in resource
 

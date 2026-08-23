@@ -86,7 +86,7 @@ List and dict variable items
     Should Be Equal    ${x}    default
 
 Invalid variable syntax 1
-    [Documentation]    FAIL Invalid variable name 'notvar'.
+    [Documentation]    UNKNOWN Invalid variable name 'notvar'.
     Get Variable Value    notvar
 
 Invalid variable syntax 2

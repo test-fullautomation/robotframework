@@ -11,7 +11,7 @@ Test Fails
     Fail    failure
 
 Non-Existing Keyword Error
-    [Documentation]    FAIL No keyword with name 'Non Existing KW' found.
+    [Documentation]    UNKNOWN No keyword with name 'Non Existing KW' found.
     Non Existing KW
 
 Test Setup Passes
@@ -26,7 +26,7 @@ Test Setup Fails
     Fail    This should not be executed
 
 Test Setup Error
-    [Documentation]    FAIL Setup failed:
+    [Documentation]    UNKNOWN Setup failed:
     ...    No keyword with name 'Non Existing KW' found.
     [Setup]    Non Existing KW
     No Operation
@@ -43,7 +43,7 @@ Test Teardown Fails
     [Teardown]    Fail    failure
 
 Test Teardown Error
-    [Documentation]    FAIL Teardown failed:
+    [Documentation]    UNKNOWN Teardown failed:
     ...    No keyword with name 'Non Existing KW' found.
     No Operation
     [Teardown]    Non Existing KW
@@ -63,7 +63,7 @@ Test Setup And Teardown Pass
     [Teardown]    Do Nothing
 
 Test Teardown is Run When Setup Fails
-    [Documentation]    FAIL Setup failed:
+    [Documentation]    UNKNOWN Setup failed:
     ...    No keyword with name 'Non Existing Keyword' found.
     [Setup]    Non Existing Keyword    whatever
     Fail    This should not be run

@@ -201,7 +201,7 @@ Override timeout using NONE
     No Operation
 
 Invalid timeout
-    [Documentation]    FAIL Setup failed:
+    [Documentation]    UNKNOWN Setup failed:
     ...    Setting test timeout failed: Invalid time string 'invalid'.
     [Timeout]    invalid
     Fail    Should not be run
@@ -215,18 +215,18 @@ Multiple settings
     [Teardown]    Log    Test case teardown
 
 Invalid setting
-    [Documentation]    FAIL Non-existing setting 'Invalid'.
+    [Documentation]    UNKNOWN Non-existing setting 'Invalid'.
     [Invalid]    This is invalid
     Fail    Should not be run
 
 Setting not valid with tests
-    [Documentation]    FAIL Setting 'Metadata' is not allowed with tests or tasks.
+    [Documentation]    UNKNOWN Setting 'Metadata' is not allowed with tests or tasks.
     [Metadata]    Not valid.
     [Arguments]    Not valid.
     Fail    Should not be run
 
 Small typo should provide recommendation
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Non-existing setting 'Doc U ment a tion'. Did you mean:
     ...    ${SPACE*4}Documentation
     [Doc U ment a tion]    This actually worked before RF 3.2.

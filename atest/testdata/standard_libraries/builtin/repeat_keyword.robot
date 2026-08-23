@@ -48,11 +48,11 @@ Repeat Keyword Arguments As Variables
     Repeat Keyword    1x    @{items}
 
 Repeated Keyword As Non-existing Variable
-    [Documentation]    FAIL Variable '\${non existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non existing}' not found.
     Repeat Keyword    1 x    ${non existing}
 
 Argument To Repeated Keyword As Non-existing Variable
-    [Documentation]    FAIL Variable '\${nonexisting}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonexisting}' not found.
     Repeat Keyword    1 x    Log    ${nonexisting}
 
 Repeated Keyword Failing Immediately

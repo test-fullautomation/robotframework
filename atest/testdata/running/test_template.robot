@@ -156,7 +156,7 @@ Nested FOR
     END
 
 Invalid FOR
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple errors:
     ...    - FOR loop has no loop values.
     ...    - FOR loop must have closing END.
@@ -191,7 +191,7 @@ Template With IF Failing
     END
 
 Invalid IF
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple errors:
     ...    - IF must have a condition.
     ...    - IF must have closing END.
@@ -238,7 +238,7 @@ Commented Rows With Test Template
     # And one final comment here
 
 Templates with Run Keyword
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) First failure
@@ -327,13 +327,13 @@ Templated test with for loop continues after keyword timeout
     END
 
 Templated test ends after syntax errors
-    [Documentation]    FAIL   IF must have closing END.
+    [Documentation]    UNKNOWN   IF must have closing END.
     [Template]    Syntax Error
     fails here
     not run
 
 Templated test continues after non-syntax errors
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) Variable '\${this does not exist}' not found.
@@ -359,7 +359,7 @@ Templates and fatal errors 1
     Fail    This should not be executed
 
 Templates and fatal errors 2
-    [Documentation]    FAIL    Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN    Test execution stopped due to a fatal error.
     Fail    This should not be executed
 
 *** Keywords ***

@@ -16,15 +16,15 @@ In Return Value
     Should Be Equal    ${retval}    ${exp_return_value}
 
 In Exception
-    [Documentation]    FAIL ${exp_error_msg}
+    [Documentation]    UNKNOWN ${exp_error_msg}
     In Exception
 
 In Exception In Setup
-    [Documentation]    FAIL Setup failed:\n${exp_error_msg}
+    [Documentation]    UNKNOWN Setup failed:\n${exp_error_msg}
     [Setup]    In Exception
     No Operation
 
 In Exception In Teardown
-    [Documentation]    FAIL Teardown failed:\n${exp_error_msg}
+    [Documentation]    UNKNOWN Teardown failed:\n${exp_error_msg}
     No Operation
     [Teardown]    In Exception

@@ -43,33 +43,33 @@ In nested FOR/IF structure
     Should be equal    ${x}    ${6}
 
 In test
-    [Documentation]    FAIL RETURN is not allowed in this context.
+    [Documentation]    UNKNOWN RETURN is not allowed in this context.
     RETURN
 
 In test with values
-    [Documentation]    FAIL RETURN is not allowed in this context.
+    [Documentation]    UNKNOWN RETURN is not allowed in this context.
     RETURN    v1    v2
 
 In test inside IF
-    [Documentation]    FAIL RETURN can only be used inside a user keyword.
+    [Documentation]    UNKNOWN RETURN can only be used inside a user keyword.
     IF    True
         RETURN
     END
 
 In test inside FOR
-    [Documentation]    FAIL RETURN can only be used inside a user keyword.
+    [Documentation]    UNKNOWN RETURN can only be used inside a user keyword.
     FOR    ${x}    IN    whatever
         RETURN
     END
 
 In test inside WHILE
-    [Documentation]    FAIL RETURN can only be used inside a user keyword.
+    [Documentation]    UNKNOWN RETURN can only be used inside a user keyword.
     WHILE    True
         RETURN
     END
 
 In test inside TRY
-    [Documentation]    FAIL RETURN can only be used inside a user keyword.
+    [Documentation]    UNKNOWN RETURN can only be used inside a user keyword.
     TRY
         RETURN
     EXCEPT

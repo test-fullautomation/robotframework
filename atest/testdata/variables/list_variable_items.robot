@@ -45,7 +45,7 @@ Slicing with variable
     Slicing with variable    ${BYTEARRAY}
 
 Invalid index list
-    [Documentation]    FAIL List '\${LIST}' has no item in index 12.
+    [Documentation]    UNKNOWN List '\${LIST}' has no item in index 12.
     Log    ${LIST}[12]
 
 Invalid index string
@@ -57,11 +57,11 @@ Invalid index bytes
     Log    ${BYTES}[12]
 
 Invalid index using variable
-    [Documentation]    FAIL List '\${LIST}' has no item in index 13.
+    [Documentation]    UNKNOWN List '\${LIST}' has no item in index 13.
     Log    ${LIST}[${ONE}${3}]
 
 Non-int index list
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index 'invalid'. \
     ...    To use '[invalid]' as a literal value, it needs to be escaped like '\\[invalid]'.
     Log    ${LIST}[invalid]
@@ -79,7 +79,7 @@ Non-int index bytes
     Log    ${BYTES}[invalid]
 
 Non-int index using variable 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index 'xxx'. \
     ...    To use '[xxx]' as a literal value, it needs to be escaped like '\\[xxx]'.
     Log    ${LIST}[${INVALID}]
@@ -91,7 +91,7 @@ Non-int index using variable 2
     Log    ${LIST}[${1.1}]
 
 Empty index list
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index ''. \
     ...    To use '[]' as a literal value, it needs to be escaped like '\\[]'.
     Log    ${LIST}[]
@@ -109,7 +109,7 @@ Empty index bytes
     Log    ${BYTES}[]
 
 Invalid slice list
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index '1:2:3:4'. \
     ...    To use '[1:2:3:4]' as a literal value, it needs to be escaped like '\\[1:2:3:4]'.
     Log    ${LIST}[1:2:3:4]
@@ -127,7 +127,7 @@ Invalid slice bytes
     Log    ${BYTES}[1:2:3:4]
 
 Non-int slice index 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index 'ooops:'. \
     ...    To use '[ooops:]' as a literal value, it needs to be escaped like '\\[ooops:]'.
     Log    ${LIST}[ooops:]
@@ -145,28 +145,28 @@ Non-int slice index 3
     Log    ${LIST}[1:2:ooops]
 
 Non-existing variable
-    [Documentation]    FAIL Variable '\${nonex list}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonex list}' not found.
     Log    ${nonex list}[0]
 
 Non-existing index variable
-    [Documentation]    FAIL Variable '\${nonex index}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonex index}' not found.
     Log    ${LIST}[${nonex index}]
 
 Non-subscriptable variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Variable '\${INT}' is integer, which is not subscriptable, and thus \
     ...    accessing item '0' from it is not possible. To use '[0]' as a \
     ...    literal value, it needs to be escaped like '\\[0]'.
     Log    ${INT}[0]
 
 List expansion using `@` syntax
-    [Documentation]    FAIL List '\@{NESTED}' has no item in index 99.
+    [Documentation]    UNKNOWN List '\@{NESTED}' has no item in index 99.
     ${result} =    Catenate    @{NESTED}[0]    -    @{NESTED}[${-1}]
     Should Be Equal    ${result}    a b c - 1 2 3
     Log Many    @{NESTED}[99]
 
 List expansion fails if value is not list-like 1
-    [Documentation]    FAIL Value of variable '\@{LIST}[0]' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{LIST}[0]' is not list or list-like.
     Log Many    @{LIST}[0]
 
 List expansion fails if value is not list-like 2
@@ -180,7 +180,7 @@ List expansion with slice
     Should Be Equal    ${result}    b c - 3 1
 
 List expansion with slice fails if value is not list-like
-    [Documentation]    FAIL Value of variable '\@{STRING}[1:]' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{STRING}[1:]' is not list or list-like.
     Log Many    @{STRING}[1:]
 
 Object supporting both index and key access

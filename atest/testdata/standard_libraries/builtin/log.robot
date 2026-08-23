@@ -152,15 +152,15 @@ Log Many with positional, named and dict arguments
     Log Many    @{LIST}    &{DICT}    @{LIST}    &{DICT}
 
 Log Many with non-existing variable
-    [Documentation]    FAIL Variable '${no such variable}' not found.
+    [Documentation]    UNKNOWN Variable '${no such variable}' not found.
     Log Many    ${no such variable}
 
 Log Many with list variable containing non-list
-    [Documentation]    FAIL Value of variable '@{HTML}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '@{HTML}' is not list or list-like.
     Log Many    @{HTML}
 
 Log Many with dict variable containing non-dict
-    [Documentation]    FAIL Value of variable '&{LIST}' is not dictionary or dictionary-like.
+    [Documentation]    UNKNOWN Value of variable '&{LIST}' is not dictionary or dictionary-like.
     Log Many    &{LIST}
 
 Log To Console

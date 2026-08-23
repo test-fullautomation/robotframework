@@ -17,7 +17,7 @@ Best match wins in suite file
     Execute "x" on device "y"
 
 Conflict in suite file 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Execute "ls"' found:
     ...    ${INDENT}Execute "\${command:(ls|grep)}"
     ...    ${INDENT}Execute "\${command}"
@@ -38,7 +38,7 @@ Best match wins in resource
     x and y in resource
 
 Conflict in resource
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'y in resource' found:
     ...    ${INDENT}resource.\${x} in resource
     ...    ${INDENT}resource.\${y:y} in resource
@@ -52,7 +52,7 @@ Best match wins in resource with explicit usage
     resource.x and y in resource
 
 Conflict in resource with explicit usage
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'resource.y in resource' found:
     ...    ${INDENT}resource.\${x} in resource
     ...    ${INDENT}resource.\${y:y} in resource
@@ -66,7 +66,7 @@ Best match wins in library
     x and y in library
 
 Conflict in library
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'y in library' found:
     ...    ${INDENT}library.\${x} in library
     ...    ${INDENT}library.\${y:y} in library
@@ -80,7 +80,7 @@ Best match wins in library with explicit usage
     library.x and y in library
 
 Conflict in library with explicit usage
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'library.y in library' found:
     ...    ${INDENT}library.\${x} in library
     ...    ${INDENT}library.\${y:y} in library
@@ -107,7 +107,7 @@ Search order wins over best match in libraries
     [Teardown]    Disable search order
 
 Search order cannot resolve conflict within resource
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Unresolvable conflict in resource' found:
     ...    ${INDENT}resource2.\${possible} conflict in resource
     ...    ${INDENT}resource2.Unresolvable \${conflict} in resource
@@ -116,7 +116,7 @@ Search order cannot resolve conflict within resource
     [Teardown]    Disable search order
 
 Search order causes conflict within resource
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Unresolvable conflict in resource' found:
     ...    ${INDENT}resource2.\${possible} conflict in resource
     ...    ${INDENT}resource2.Unresolvable \${conflict} in resource
@@ -125,7 +125,7 @@ Search order causes conflict within resource
     [Teardown]    Disable search order
 
 Search order cannot resolve conflict within library
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Unresolvable conflict in library' found:
     ...    ${INDENT}library2.\${possible} conflict in library
     ...    ${INDENT}library2.Unresolvable \${conflict} in library
@@ -134,7 +134,7 @@ Search order cannot resolve conflict within library
     [Teardown]    Disable search order
 
 Search order causes conflict within library
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Unresolvable conflict in library' found:
     ...    ${INDENT}library2.\${possible} conflict in library
     ...    ${INDENT}library2.Unresolvable \${conflict} in library
