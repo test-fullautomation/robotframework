@@ -51,6 +51,11 @@ class StateMachine:
     | `Checkpoint Variable` | ${/}CYCLES |            |                           |
     | `Run State Machine` | initial=INIT | max_duration=48h | checkpoint=${OUTPUTDIR}${/}sm.json |
 
+    The example models a battery endurance test: ``$DUT_READY`` signals that
+    the device under test (DUT) is initialized, ``$SOC`` is the battery's
+    state of charge in percent and ``$CYCLES`` counts the completed
+    charge/discharge cycles.
+
     == Conditions ==
 
     Conditions are Python expressions evaluated with BuiltIn `Evaluate`
