@@ -165,8 +165,29 @@ class StateMachine:
     see variables fed by worker threads. Control a worker-hosted machine
     with `Stop State Machine` from the main flow, or base its guards on
     variables set before the thread starts.
+
+    == Library scope ==
+
+    The library has ``SUITE`` scope: machine definitions live for the whole
+    suite and are shared by all its tests (nested suites get own instances).
+    This enables two patterns:
+
+    - Define the machine once in the *suite setup* (e.g. with
+      `Load State Machine`) and run it from any test.
+    - A machine running in a SUITE-scoped ``THREAD`` (``daemon=False``)
+      stays reachable in later tests: `Stop State Machine`,
+      `Get Current State` and `Get State Statistics` address the same
+      machine that the worker thread is running.
+
+    Consequence: tests that define the *same* machine again must clean up
+    with ``Test Teardown    Reset State Machine`` (or use unique machine
+    names) - defining an already existing state fails.
+
+    A machine whose hosting ``THREAD`` is stopped at its scope end (test or
+    suite boundary) stops *gracefully*: it saves its checkpoint and returns
+    from `Run State Machine` instead of routing into ``on_error``.
     """
-    ROBOT_LIBRARY_SCOPE = 'TEST'
+    ROBOT_LIBRARY_SCOPE = 'SUITE'
     ROBOT_LIBRARY_VERSION = get_version()
 
     def __init__(self):
@@ -285,6 +306,19 @@ class StateMachine:
                 engine._stop_requested = True
 
 
+def _thread_scope_stop_requested():
+    """True if the current worker THREAD was asked to stop (scope ended)."""
+    from robot.running.context import EXECUTION_CONTEXTS
+    ctx = EXECUTION_CONTEXTS.current
+    checker = getattr(ctx, 'thread_stop_requested', None) if ctx else None
+    return bool(checker and checker())
+
+
+# Checkpoint files of currently running machines: abspath -> machine name.
+# Guards against two concurrently running machines sharing one file.
+_active_checkpoints = {}
+
+
 class _Engine:
     """One state machine: definitions, engine loop, checkpointing."""
 
@@ -300,6 +334,7 @@ class _Engine:
         self._current_visit = None   # (state name, start time) while visiting
         self._error_chain = []       # states reached via on_error routing
         self._stop_requested = False
+        self._reached_final = False
         self._elapsed_offset = 0     # elapsed seconds restored from checkpoint
 
     # ------------------------------------------------------------------
@@ -481,22 +516,38 @@ class _Engine:
         started = time.time() - self._elapsed_offset
         self._stop_requested = False
         self._error_chain = []
+        self._reached_final = False
+        cp_key = os.path.abspath(checkpoint) if checkpoint else None
+        if cp_key is not None:
+            holder = _active_checkpoints.get(cp_key)
+            if holder is not None:
+                raise RuntimeError(
+                    f"Checkpoint file '{checkpoint}' is already used by the "
+                    f"running state machine '{holder}'. Give concurrently "
+                    f"running machines separate checkpoint files.")
+            _active_checkpoints[cp_key] = self.name
         try:
-            while True:
-                if max_visits and sum(self._visits.values()) >= max_visits:
-                    self._save(checkpoint, started)
-                    raise AssertionError(
-                        f'{self._label}State machine max_visits {max_visits} '
-                        f"reached in state '{self._current}'. Check the "
-                        f'transition conditions for ping-pong loops. The run '
-                        f'can be resumed from the checkpoint file.')
-                state = self._visit(state, builtin, started, max_duration,
-                                    checkpoint, poll)
-                if state is None:
-                    break
+            try:
+                while True:
+                    if max_visits and sum(self._visits.values()) >= max_visits:
+                        self._save(checkpoint, started)
+                        raise AssertionError(
+                            f'{self._label}State machine max_visits {max_visits} '
+                            f"reached in state '{self._current}'. Check the "
+                            f'transition conditions for ping-pong loops. The run '
+                            f'can be resumed from the checkpoint file.')
+                    state = self._visit(state, builtin, started, max_duration,
+                                        checkpoint, poll)
+                    if state is None:
+                        break
+            finally:
+                self._log_statistics()
         finally:
-            self._log_statistics()
-        if checkpoint and os.path.isfile(checkpoint):
+            if cp_key is not None:
+                _active_checkpoints.pop(cp_key, None)
+        if self._reached_final and checkpoint and os.path.isfile(checkpoint):
+            # Only a completed machine removes its checkpoint; a stopped one
+            # keeps it so the run stays resumable.
             os.remove(checkpoint)
         elapsed = secs_to_timestr(time.time() - started)
         logger.info(f'{self._label}State machine finished in {elapsed} after '
@@ -553,13 +604,17 @@ class _Engine:
             return self._handle_error(state, error, checkpoint, started)
         if state['final']:
             self._error_chain = []
+            self._reached_final = True
             self._save(checkpoint, started)
             return None
         while True:
-            self._check_max_duration(started, max_duration, checkpoint)
-            if self._stop_requested:
+            if self._stop_requested or _thread_scope_stop_requested():
+                if not self._stop_requested:
+                    logger.info(f"{self._label}State machine stopped because "
+                                f"its thread's scope ended.")
                 self._save(checkpoint, started)
                 return None
+            self._check_max_duration(started, max_duration, checkpoint)
             target = self._find_transition(name, builtin)
             if target:
                 break
@@ -572,7 +627,7 @@ class _Engine:
                                             self._remaining(state, visit_started))
             if error:
                 return self._handle_error(state, error, checkpoint, started)
-            time.sleep(poll)
+            self._sleep(poll)
         error = self._run_state_keyword(builtin, state['exit'],
                                         self._remaining(state, visit_started))
         if error:
@@ -628,7 +683,24 @@ class _Engine:
             return None
         return state['timeout'] - (time.time() - visit_started)
 
+    def _sleep(self, seconds):
+        """Polling sleep that stays responsive to stop requests."""
+        end = time.time() + seconds
+        while not (self._stop_requested or _thread_scope_stop_requested()):
+            remaining = end - time.time()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.2, remaining))
+
     def _handle_error(self, state, error, checkpoint, started):
+        if _thread_scope_stop_requested():
+            # The hosting THREAD's scope ended: the cooperative thread stop
+            # surfaces as a keyword failure inside the state keyword. Treat
+            # it as a graceful stop, not as a state error.
+            logger.info(f"{self._label}State machine stopped because its "
+                        f"thread's scope ended.")
+            self._save(checkpoint, started)
+            return None
         target = state['on_error']
         if target and target != state['name']:
             if target in self._error_chain:

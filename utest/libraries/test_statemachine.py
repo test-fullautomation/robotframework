@@ -60,13 +60,18 @@ class StateMachineTestCase(unittest.TestCase):
         FakeBuiltIn.keywords = {}
         self._real_builtin = sm_module.BuiltIn
         self._real_logger = sm_module.logger
+        self._real_thread_stop = sm_module._thread_scope_stop_requested
         sm_module.BuiltIn = FakeBuiltIn
         sm_module.logger = self.logger = FakeLogger()
+        sm_module._thread_scope_stop_requested = lambda: False
+        sm_module._active_checkpoints.clear()
         self.sm = StateMachine()
 
     def tearDown(self):
         sm_module.BuiltIn = self._real_builtin
         sm_module.logger = self._real_logger
+        sm_module._thread_scope_stop_requested = self._real_thread_stop
+        sm_module._active_checkpoints.clear()
 
     @property
     def engine(self):
@@ -476,6 +481,106 @@ class TestLoadStateMachine(StateMachineTestCase):
                 self.sm.load_state_machine(path)
         finally:
             os.remove(path)
+
+
+class TestThreadScopeStop(StateMachineTestCase):
+
+    def setUp(self):
+        super().setUp()
+        fd, self.checkpoint = tempfile.mkstemp(suffix='.json')
+        os.close(fd)
+        os.remove(self.checkpoint)
+
+    def tearDown(self):
+        if os.path.exists(self.checkpoint):
+            os.remove(self.checkpoint)
+        super().tearDown()
+
+    def arm_thread_stop_after(self, calls):
+        counter = {'n': 0}
+
+        def stop_requested():
+            counter['n'] += 1
+            return counter['n'] > calls
+
+        sm_module._thread_scope_stop_requested = stop_requested
+
+    def test_poll_loop_stops_gracefully_on_thread_scope_end(self):
+        FakeBuiltIn.variables['${N}'] = 0
+        self.sm.define_state('WORK')
+        self.sm.define_state('DONE', final=True)
+        self.sm.define_transition('WORK', 'DONE', condition='$N >= 999999')
+        self.arm_thread_stop_after(5)
+        self.sm.run_state_machine('WORK', checkpoint=self.checkpoint,
+                                  poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(), 'WORK')
+        self.assertTrue(os.path.exists(self.checkpoint))
+        self.assertTrue(any("thread's scope ended" in m
+                            for m in self.logger.infos))
+
+    def test_keyword_failure_during_thread_scope_end_is_graceful(self):
+        # The cooperative thread stop surfaces as a keyword failure; it must
+        # NOT be routed to on_error or fail the machine.
+        def boom():
+            raise AssertionError('Thread stop requested.')
+
+        FakeBuiltIn.variables['${N}'] = 0
+        FakeBuiltIn.keywords['Boom'] = boom
+        self.sm.define_state('WORK', during='Boom', on_error='FAULT')
+        self.sm.define_state('FAULT', final=True)
+        self.sm.define_state('DONE', final=True)
+        self.sm.define_transition('WORK', 'DONE', condition='$N >= 999999')
+        # flag turns True after the poll-loop check, so the stop surfaces
+        # first as the failing keyword handled by _handle_error
+        self.arm_thread_stop_after(1)
+        self.sm.run_state_machine('WORK', poll_interval='0.01 s')
+        self.assertEqual(self.sm.get_current_state(), 'WORK')
+        self.assertFalse(any('Continuing in state' in w
+                             for w in self.logger.warnings))
+
+    def test_stopped_machine_keeps_checkpoint(self):
+        FakeBuiltIn.variables['${N}'] = 0
+
+        def stop_it():
+            self.sm.stop_state_machine()
+
+        FakeBuiltIn.keywords['StopIt'] = stop_it
+        self.sm.define_state('WORK', during='StopIt')
+        self.sm.define_state('DONE', final=True)
+        self.sm.define_transition('WORK', 'DONE', condition='$N >= 999999')
+        self.sm.run_state_machine('WORK', checkpoint=self.checkpoint,
+                                  poll_interval='0.01 s')
+        self.assertTrue(os.path.exists(self.checkpoint),
+                        'stopped machine must keep its checkpoint')
+
+    def test_checkpoint_file_collision_rejected(self):
+        import threading
+        FakeBuiltIn.variables['${N}'] = 0
+        for machine in ('A', 'B'):
+            self.sm.define_state('WORK', machine=machine)
+            self.sm.define_state('DONE', final=True, machine=machine)
+            self.sm.define_transition('WORK', 'DONE',
+                                      condition='$N >= 999999',
+                                      machine=machine)
+        runner = threading.Thread(
+            target=self.sm.run_state_machine, args=('WORK',),
+            kwargs={'machine': 'A', 'checkpoint': self.checkpoint,
+                    'poll_interval': '0.01 s'})
+        runner.start()
+        try:
+            deadline = time.time() + 5
+            while (not sm_module._active_checkpoints
+                   and time.time() < deadline):
+                time.sleep(0.01)
+            self.assertTrue(sm_module._active_checkpoints)
+            with self.assertRaisesRegex(RuntimeError, 'already used'):
+                self.sm.run_state_machine('WORK', machine='B',
+                                          checkpoint=self.checkpoint)
+        finally:
+            self.sm.stop_state_machine(machine='A')
+            runner.join(timeout=10)
+        self.assertFalse(runner.is_alive())
+        self.assertEqual(sm_module._active_checkpoints, {})
 
 
 class TestNamedMachines(StateMachineTestCase):
