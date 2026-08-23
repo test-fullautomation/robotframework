@@ -1,5 +1,7 @@
+import gc
 import os
 import tempfile
+import tracemalloc
 import unittest
 
 from robot.output.logger import Logger
@@ -132,6 +134,95 @@ class TestNotificationQueueCap(unittest.TestCase):
         self.assertEqual(q.dropped, 0)
         _, item = q.get(block=False)
         self.assertEqual(item.name, 'n0')
+
+
+def steady_state_growth(action, iterations=5000):
+    """Bytes of Python memory retained between two equal workload phases.
+
+    The caller must have pushed the exercised accumulator past its cap
+    BEFORE calling, so both measurements happen in the steady (capped)
+    state: entries allocated in phase 1 are replaced by entries from
+    phase 2, and the delta only shows genuine unbounded growth.
+    """
+    gc.collect()
+    tracemalloc.start()
+    try:
+        for i in range(iterations):
+            action(i)
+        gc.collect()
+        first = tracemalloc.get_traced_memory()[0]
+        for i in range(iterations):
+            action(iterations + i)
+        gc.collect()
+        second = tracemalloc.get_traced_memory()[0]
+    finally:
+        tracemalloc.stop()
+    return second - first
+
+
+class NullSink:
+    """Registered logger that consumes without storing (like console)."""
+
+    def message(self, msg):
+        pass
+
+
+class TestMemorySoak(unittest.TestCase):
+    """Push real workloads through the pipelines and assert flat memory.
+
+    Unlike the cap tests above (which assert bounded container sizes),
+    these measure actual retained Python memory with tracemalloc, so an
+    unknown accumulator sitting on the same code path would also fail them.
+    """
+
+    THRESHOLD = 256 * 1024    # generous noise allowance for 5000 iterations
+
+    def test_logger_message_pipeline_is_flat(self):
+        logger = Logger(register_console_logger=False)
+        logger.message_cache_limit = 100
+        logger.register_logger(NullSink())
+        for i in range(150):    # past the cap -> steady state
+            logger.message(Message(f'fill {i}', 'INFO'))
+
+        growth = steady_state_growth(
+            lambda i: logger.message(Message(f'msg {i} with some payload',
+                                             'WARN')))
+        self.assertLess(growth, self.THRESHOLD,
+                        f'LOGGER.message grew by {growth} bytes in steady state')
+
+    def test_xml_logger_errors_pipeline_is_flat(self):
+        fd, path = tempfile.mkstemp(suffix='.xml')
+        os.close(fd)
+        xml_logger = XmlLogger(path)
+        xml_logger.max_errors = 100
+        try:
+            for i in range(150):    # past the cap -> spill active
+                xml_logger.message(Message(f'fill {i}', 'WARN'))
+
+            growth = steady_state_growth(
+                lambda i: xml_logger.message(Message(f'warn {i} with payload',
+                                                     'WARN')))
+            self.assertLess(growth, self.THRESHOLD,
+                            f'XmlLogger.message grew by {growth} bytes in '
+                            f'steady state')
+        finally:
+            xml_logger.close()
+            base, _ = os.path.splitext(path)
+            for leftover in (path, base + '_errors_spill.jsonl'):
+                if os.path.exists(leftover):
+                    os.remove(leftover)
+
+    def test_notification_queue_is_flat(self):
+        q = PriorityQueue(queue_type='FIFO')
+        q.max_items = 100
+        for i in range(150):    # past the cap -> drop-oldest active
+            q.put(QueuedNotification(f'fill {i}'))
+
+        growth = steady_state_growth(
+            lambda i: q.put(QueuedNotification(f'notification {i}')))
+        self.assertLess(growth, self.THRESHOLD,
+                        f'notification queue grew by {growth} bytes in '
+                        f'steady state')
 
 
 class TestDebugFileThreadInfoCleanup(unittest.TestCase):
