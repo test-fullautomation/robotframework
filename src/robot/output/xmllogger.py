@@ -17,7 +17,7 @@ from robot.utils import get_timestamp, NullMarkupWriter, safe_str, XmlWriter, Th
 from robot.version import get_full_version
 from robot.result.visitor import ResultVisitor
 
-from .loggerhelper import IsLogged
+from .loggerhelper import IsLogged, Message
 import threading
 import time
 import os
@@ -100,6 +100,10 @@ class XmlLogger(ResultVisitor):
     # cuongnht add thread: thread name -> path of its partial output file.
     # Used by threadmerger to graft thread outputs into the main output.xml.
     thread_output_files = ThreadSafeDict()
+    # cuongnht memory cap: WARN/ERROR messages are collected in memory for
+    # the <errors> section until the run ends; without a limit a days-long
+    # run that warns periodically grows without bound.
+    max_errors = 10000
 
     def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot',
                  segment_interval=None):
@@ -112,6 +116,7 @@ class XmlLogger(ResultVisitor):
         if path and writer is not None:
             XmlLogger.thread_writer_dict['MainThread'] = writer
         self._errors = []
+        self._errors_dropped = 0
         self.path = path
         self.rpa = rpa
         self.generator = generator
@@ -171,6 +176,11 @@ class XmlLogger(ResultVisitor):
         self.start_errors()
         for msg in self._errors:
             self._write_message(msg)
+        if self._errors_dropped:
+            self._write_message(Message(
+                f'{self._errors_dropped} further warning/error messages were '
+                f'suppressed in this listing (limit {self.max_errors}); the '
+                f'full log contains all of them.', 'WARN'))
         self.end_errors()
         self._writer.end('robot')
         self._writer.close()
@@ -203,7 +213,10 @@ class XmlLogger(ResultVisitor):
 
     def message(self, msg):
         if self._error_message_is_logged(msg.level):
-            self._errors.append(msg)
+            if len(self._errors) < self.max_errors:
+                self._errors.append(msg)
+            else:
+                self._errors_dropped += 1
 
     def log_message(self, msg):
         self._maybe_rotate()  # cuongnht add segmented output

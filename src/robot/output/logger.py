@@ -20,7 +20,7 @@ from robot.errors import DataError
 
 from .console import ConsoleOutput
 from .filelogger import FileLogger
-from .loggerhelper import AbstractLogger, AbstractLoggerProxy
+from .loggerhelper import AbstractLogger, AbstractLoggerProxy, Message
 from .stdoutlogsplitter import StdoutLogSplitter
 
 
@@ -34,6 +34,12 @@ class Logger(AbstractLogger):
     NOTE: This API is likely to change in future versions.
     """
 
+    # cuongnht memory cap: the message cache exists so that loggers
+    # registering mid-run get earlier messages relayed. Without a limit it
+    # grows for the whole run (days-long runs leak memory); only the first
+    # `message_cache_limit` messages are kept, the rest are counted.
+    message_cache_limit = 10000
+
     def __init__(self, register_console_logger=True):
         self._console_logger = None
         self._syslog = None
@@ -42,6 +48,7 @@ class Logger(AbstractLogger):
         self._library_listeners = None
         self._other_loggers = []
         self._message_cache = []
+        self._message_cache_dropped = 0
         self._log_message_cache = None
         self._started_keywords = 0
         self._error_occurred = False
@@ -91,6 +98,11 @@ class Logger(AbstractLogger):
         if self._message_cache:
             for msg in self._message_cache[:]:
                 logger.message(msg)
+            if self._message_cache_dropped:
+                logger.message(Message(
+                    f'{self._message_cache_dropped} further messages were '
+                    f'not cached (cache limit {self.message_cache_limit}).',
+                    'INFO'))
 
     def unregister_console_logger(self):
         self._console_logger = None
@@ -144,7 +156,10 @@ class Logger(AbstractLogger):
             for logger in self:
                 logger.message(msg)
         if self._message_cache is not None:
-            self._message_cache.append(msg)
+            if len(self._message_cache) < self.message_cache_limit:
+                self._message_cache.append(msg)
+            else:
+                self._message_cache_dropped += 1
         if msg.level == 'ERROR':
             self._error_occurred = True
             if self._error_listener:

@@ -106,8 +106,9 @@ class _DebugFileWriter:
             self._separator('THREAD')
             self._end('THREAD', thread.data.name, thread.elapsedtime)
             self._separator('THREAD')
-            if thread.data.name in _DebugFileWriter.thread_level_dict:
-                _DebugFileWriter.thread_log_info.pop(thread.data.name)
+            # cuongnht memory cap: the guard used to check the (never
+            # populated) thread_level_dict, so entries were never removed.
+            _DebugFileWriter.thread_log_info.pop(thread.data.name, None)
 
     def start_keyword(self, kw):
 

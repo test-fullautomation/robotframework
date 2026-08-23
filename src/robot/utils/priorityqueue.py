@@ -11,9 +11,16 @@ class QueuedNotification:
 
 
 class PriorityQueue(queue.PriorityQueue, object):
+   # cuongnht memory cap: notifications put into a queue that nobody ever
+   # consumes (e.g. broadcasts into MainThread's queue) would otherwise grow
+   # without bound during days-long runs. When the cap is reached the oldest
+   # entry is dropped and counted in `dropped`.
+   max_items = 10000
+
    def __init__(self, queue_type="FIFO", callback=None):
       super(PriorityQueue, self).__init__()
       self.counter = 0
+      self.dropped = 0
       self._callback = callback
       self.factor = -1
       if queue_type == "LIFO":
@@ -40,6 +47,12 @@ class PriorityQueue(queue.PriorityQueue, object):
          self.counter += 1
          priority = self.counter
 
+      while self.max_items and self.qsize() >= self.max_items:
+         try:
+            super(PriorityQueue, self).get(block=False)
+            self.dropped += 1
+         except queue.Empty:
+            break
       super(PriorityQueue, self).put((self.factor * priority, item), block=True)
       if not skip_callback:
          # BuiltIn().log_to_console(f"put item {item.name} into {id(self)}")
