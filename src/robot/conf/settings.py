@@ -285,7 +285,7 @@ class _BaseSettings:
         return self._split_from_colon(value)
 
     def _process_report_background(self, colors):
-        if colors.count(':') not in [1, 3]:
+        if colors.count(':') not in [1, 2, 3]:
             self._raise_invalid('ReportBackground', f"Expected format 'pass:fail:unknown:skip' "
 				               									f"or 'pass:fail:unknown' "
                                                     f"or 'pass:fail', got '{colors}'.")

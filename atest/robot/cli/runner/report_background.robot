@@ -20,7 +20,9 @@ Invalid Colors
 
 *** Keywords ***
 Report should have correct background
-    [Arguments]  ${opt}  ${pass}=#9e9  ${fail}=#f66  ${skip}=#fed84f  ${unknown}=#66c7ff
+    # Argument order matches the 'pass:fail:unknown:skip' option format.
+    [Arguments]  ${opt}  ${pass}=#9e9  ${fail}=#f66  ${unknown}=#66c7ff  ${skip}=#fed84f
     Run Tests  ${opt} --report rep.html  misc/pass_and_fail.robot
     ${report} =  Get File  ${OUTDIR}/rep.html
-    Should Contain  ${report}  "background":{"fail":"${fail}","pass":"${pass}","unknown":"${unknown}","skip":"${skip}"},
+    # Keys are written in alphabetical order by the JSON writer.
+    Should Contain  ${report}  "background":{"fail":"${fail}","pass":"${pass}","skip":"${skip}","unknown":"${unknown}"},
