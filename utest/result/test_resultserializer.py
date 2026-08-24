@@ -1,3 +1,4 @@
+import os.path
 import unittest
 from io import BytesIO, StringIO
 
@@ -7,6 +8,13 @@ from robot.utils import ET, ETSource, XmlWriter
 from robot.utils.asserts import assert_equal
 
 from test_resultbuilder import GOLDEN_XML, GOLDEN_XML_TWICE
+
+# Expected serialization results with the fork's write-time behaviour:
+# BuiltIn.Log keywords below the XML log level are suppressed and
+# statistics carry the 'unknown' attribute.
+CURDIR = os.path.dirname(os.path.abspath(__file__))
+GOLDEN_SERIALIZED = os.path.join(CURDIR, 'golden_serialized.xml')
+GOLDEN_TWICE_SERIALIZED = os.path.join(CURDIR, 'goldenTwice_serialized.xml')
 
 
 class StreamXmlWriter(XmlWriter):
@@ -36,7 +44,7 @@ class TestResultSerializer(unittest.TestCase):
         writer = TestableOutputWriter(output)
         ExecutionResult(GOLDEN_XML).visit(writer)
         self._assert_xml_content(self._xml_lines(output.getvalue()),
-                                 self._xml_lines(GOLDEN_XML))
+                                 self._xml_lines(GOLDEN_SERIALIZED))
 
     def _xml_lines(self, text):
         with ETSource(text) as source:
@@ -55,7 +63,7 @@ class TestResultSerializer(unittest.TestCase):
         writer = TestableOutputWriter(output)
         ExecutionResult(GOLDEN_XML, GOLDEN_XML).visit(writer)
         self._assert_xml_content(self._xml_lines(output.getvalue()),
-                                 self._xml_lines(GOLDEN_XML_TWICE))
+                                 self._xml_lines(GOLDEN_TWICE_SERIALIZED))
 
 
 if __name__ == '__main__':

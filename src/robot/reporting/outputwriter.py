@@ -18,6 +18,10 @@ from robot.output.xmllogger import XmlLogger
 
 class OutputWriter(XmlLogger):
 
+    # Serialization must preserve existing results: suppressing BuiltIn.Log
+    # keyword elements here would orphan their <msg> children.
+    suppress_log_keywords = False
+
     def __init__(self, output, rpa=False):
         XmlLogger.__init__(self, output, rpa=rpa, generator='Rebot')
 

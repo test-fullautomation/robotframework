@@ -176,10 +176,12 @@ class _DebugFileWriter:
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
             thread_name = threading.current_thread().name
             if thread_name == 'MainThread':
-                thread_id = ''
-                if len(threading.enumerate()) > 1:
-                    thread_id = f"{thread_name}> "
-                self._write('%s+%s START %s: %s%s' % (thread_id, '-'*self._indent, type_, name, args))
+                # Never prefix main-thread lines. The prefix used to depend
+                # on threading.enumerate(), which flips on and off as
+                # unrelated background threads come and go, making the file
+                # content nondeterministic. Worker-thread lines keep their
+                # thread-name prefix, which is enough to tell them apart.
+                self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
                 self._indent += 1
             else:
                 self._write('%s> +%s START %s: %s%s' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, args))
@@ -189,11 +191,8 @@ class _DebugFileWriter:
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
             thread_name = threading.current_thread().name
             if thread_name == 'MainThread':
-                thread_id = ''
-                if len(threading.enumerate()) > 1:
-                    thread_id = f"{thread_name}> "
                 self._indent -= 1
-                self._write('%s+%s END %s: %s (%s)' % (thread_id, '-'*self._indent, type_, name, elapsed))
+                self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
             else:
                 _DebugFileWriter.thread_log_info[thread_name]['indent'] -= 1
                 self._write('%s> +%s END %s: %s (%s)' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, elapsed))
