@@ -28,9 +28,14 @@ ${COMMON DEFAULTS}
 ...               --output ${OUTFILE}
 ...               --report NONE
 ...               --log NONE
+# RUNNER DEFAULTS uses --ImportFailure test to keep the upstream test data
+# usable: many suites mix intentionally broken imports with tests that must
+# still run; the default 'suite' mode would turn all of them UNKNOWN without
+# running their bodies.
 ${RUNNER DEFAULTS}
 ...               ${COMMON DEFAULTS}
 ...               --ConsoleMarkers OFF
+...               --ImportFailure test
 ...               --PYTHONPATH "${CURDIR}${/}..${/}testresources${/}testlibs"
 ...               --PYTHONPATH "${CURDIR}${/}..${/}testresources${/}listeners"
 

@@ -179,6 +179,14 @@ Options
  -l --log file            HTML log file. Can be disabled by giving a special
                           value `NONE`. Default: log.html
                           Examples: `--log mylog.html`, `-l NONE`
+    --importfailure suite|test  How Library/Resource/Variables import errors
+                          affect test statuses.
+                          suite: every test of the suite gets status UNKNOWN
+                          because the suite environment is not as specified.
+                          This is the default.
+                          test:  only tests that actually use keywords or
+                          variables from the failed import get status
+                          UNKNOWN; unaffected tests run normally.
     --segmentoutput time  Seal output files periodically into well-formed
                           segment files so that a crash during a very long
                           run loses at most the given interval of log data.

@@ -144,6 +144,15 @@ class _BaseSettings:
             return tuple('.' + ext.lower().lstrip('.') for ext in value.split(':'))
         if name == 'SegmentOutput':  # cuongnht add segmented output
             return self._process_segment_output(value)
+        if name == 'ImportFailure':  # cuongnht unknown state
+            return self._process_import_failure(value)
+        return value
+
+    def _process_import_failure(self, value):
+        value = str(value).lower()
+        if value not in ('suite', 'test'):
+            self._raise_invalid('ImportFailure',
+                                f"Value must be 'suite' or 'test', got '{value}'.")
         return value
 
     def _process_segment_output(self, value):
@@ -486,6 +495,7 @@ class RobotSettings(_BaseSettings):
     _extra_cli_opts = {'Extension'          : ('extension', ('.robot', '.rbt', '.robot.rst')),
                        'Output'             : ('output', 'output.xml'),
                        'SegmentOutput'      : ('segmentoutput', None),  # cuongnht add segmented output
+                       'ImportFailure'      : ('importfailure', 'suite'),  # cuongnht unknown state
                        'LogLevel'           : ('loglevel', 'INFO'),
                        'MaxErrorLines'      : ('maxerrorlines', 40),
                        'MaxAssignLength'    : ('maxassignlength', 200),
@@ -543,6 +553,11 @@ class RobotSettings(_BaseSettings):
     def segment_output(self):
         # cuongnht add segmented output: interval in seconds or None.
         return self['SegmentOutput']
+
+    @property
+    def import_failure(self):
+        # cuongnht unknown state: 'suite' (default) or 'test'.
+        return self['ImportFailure']
 
     @property
     def languages(self):

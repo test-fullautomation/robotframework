@@ -82,13 +82,19 @@ class SuiteRunner(SuiteVisitor):
                                        self._settings.dry_run)
         self._context.set_suite_variables(result)
         if not self._suite_status.failed:
-            # cuongnht unknown state: import errors are NOT escalated to a
-            # suite-wide UNKNOWN anymore. They are logged (level UNKNOWN) and
-            # every test actually using a keyword from a failed import gets
-            # UNKNOWN individually via keyword resolution; a suite-wide flag
-            # also poisoned tests that never touch the broken import.
-            ns.handle_imports()
+            import_errors = ns.handle_imports()
             ns.variables.resolve_delayed()
+            if import_errors and not self._settings.dry_run \
+                    and self._settings.import_failure == 'suite':
+                # cuongnht unknown state: with --importfailure suite (the
+                # default) any import error makes the whole suite UNKNOWN -
+                # the suite environment is not as specified, so no test in it
+                # gets a verdict. The error text is attached so tests show a
+                # meaningful message. With --importfailure test only tests
+                # actually using keywords or variables from the failed import
+                # become UNKNOWN via normal keyword/variable resolution.
+                self._suite_status.failure.unknown = True
+                self._suite_status.failure.setup = '\n'.join(import_errors)
 
         result.doc = self._resolve_setting(result.doc)
         result.metadata = [(self._resolve_setting(n), self._resolve_setting(v))
