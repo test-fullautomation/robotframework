@@ -103,7 +103,7 @@ Using when no named or kwargs accepted 1
     No args    &{args}
 
 Using when no named or kwargs accepted 2
-    [Documentation]    FAIL Keyword 'Varargs' got unexpected named argument 'not_accepted'.
+    [Documentation]    UNKNOWN Keyword 'Varargs' got unexpected named argument 'not_accepted'.
     Varargs    &{EMPTY}
     ${args} =    Create Dictionary    not_accepted=
     Varargs    &{args}

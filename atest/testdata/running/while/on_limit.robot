@@ -61,7 +61,7 @@ On limit fail with continuable failure
     Fail    One more failure!
 
 Invalid on_limit
-    [Documentation]    FAIL Invalid WHILE loop 'on_limit' value 'inValid': Value must be 'PASS' or 'FAIL'.
+    [Documentation]    UNKNOWN Invalid WHILE loop 'on_limit' value 'inValid': Value must be 'PASS' or 'FAIL'.
     WHILE    True    limit=5    on_limit=inValid
         Fail   Oh no!
     END

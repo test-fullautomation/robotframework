@@ -21,3 +21,4 @@ Instantiating Fails
     ...    Processing variable file '${path}' failed:
     ...    Importing variable file '${path}' failed:
     ...    Variable file 'InvalidClass' expected 4 arguments, got 0.
+    ...    level=UNKNOWN

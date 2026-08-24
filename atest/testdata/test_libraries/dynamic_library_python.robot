@@ -14,11 +14,11 @@ Passing, Logging and Returning
     Should Be Equal  ${ret}  Hi, tellus
 
 Failing
-    [Documentation]  UNKNOWN Failure: Hello world
+    [Documentation]  FAIL Failure: Hello world
     RunKeywordLibrary. Run Keyword That Fails  Hello world
 
 Global Dynamic Library
-    [Documentation]  UNKNOWN Failure
+    [Documentation]  FAIL Failure
     ${ret} =  RunKeywordLibrary. GlobalRunKeywordLibrary. RunKeyword That Passes  Hi  tellus  and  Hello  Mars!
     Should Be Equal  ${ret}  Hi, tellus, and, Hello, Mars!
     RunKeywordLibrary. GlobalRunKeywordLibrary. RunKeyword That Fails

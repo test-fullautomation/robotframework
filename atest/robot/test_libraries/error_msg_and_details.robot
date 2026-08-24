@@ -72,12 +72,12 @@ No Details For Timeouts
 
 No Details For Non Existing Keywords
     [Template]    Verify Test Case, Error In Log And No Details
-    Non existing Keyword    No keyword with name 'Non Existing Keyword' found.
+    Non existing Keyword    No keyword with name 'Non Existing Keyword' found.    level=UNKNOWN
 
 No Details For Non Existing Variables
     [Template]    Verify Test Case, Error In Log And No Details
-    Non Existing Scalar Variable    Variable '\${non existing}' not found.
-    Non Existing List Variable    Variable '\@{non existing}' not found.
+    Non Existing Scalar Variable    Variable '\${non existing}' not found.    level=UNKNOWN
+    Non Existing List Variable    Variable '\@{non existing}' not found.    level=UNKNOWN
 
 Include internal traces when ROBOT_INTERNAL_TRACE is set
     [Template]    NONE
@@ -94,12 +94,12 @@ Include internal traces when ROBOT_INTERNAL_TRACE is set
 
 *** Keyword ***
 Verify Test Case And Error In Log
-    [Arguments]    ${name}    ${error}    ${index}=0    ${msg}=0
+    [Arguments]    ${name}    ${error}    ${index}=0    ${msg}=0    ${level}=FAIL
     ${tc} =    Check Test Case    ${name}
-    Check Log Message    ${tc.kws[${index}].msgs[${msg}]}    ${error}    FAIL
+    Check Log Message    ${tc.kws[${index}].msgs[${msg}]}    ${error}    ${level}
     [Return]    ${tc}
 
 Verify Test Case, Error In Log And No Details
-    [Arguments]    ${name}    ${error}    ${msg_index}=${0}
-    ${tc} =    Verify Test Case And Error In Log    ${name}    ${error}    0    ${msg_index}
+    [Arguments]    ${name}    ${error}    ${msg_index}=${0}    ${level}=FAIL
+    ${tc} =    Verify Test Case And Error In Log    ${name}    ${error}    0    ${msg_index}    ${level}
     Length Should Be    ${tc.kws[0].msgs}    ${msg_index + 1}

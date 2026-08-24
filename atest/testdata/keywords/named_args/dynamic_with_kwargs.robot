@@ -152,15 +152,15 @@ Positional after named 1
     Args & Varargs    foo    b=bar    dar
 
 Positional after named 2
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Varargs' got positional argument after named arguments.
     Args & Varargs    foo    b=bar    @{EMPTY}
 
 Positional after named 3
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Two Args' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Two Args' got positional argument after named arguments.
     Two Args    first=1    oops
 
 Positional after named 4
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Kwargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Kwargs' got positional argument after named arguments.
     Args & Kwargs    kw=value    ooops
 
 Missing argument 1
@@ -168,7 +168,7 @@ Missing argument 1
     Args & Varargs    b=value
 
 Missing argument 2
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Kwargs' missing value for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Kwargs' missing value for argument 'a'.
     Args & Kwargs    b=value    kw=value    c=value
 
 Multiple values for argument 1
@@ -176,9 +176,9 @@ Multiple values for argument 1
     Two Args    1    first=oops
 
 Multiple values for argument 2
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Varargs' got multiple values for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Varargs' got multiple values for argument 'a'.
     Args & Varargs    A    B   a=ooops
 
 Multiple values for argument 3
-    [Documentation]    FAIL Keyword 'DynamicWithKwargs.Args & Kwargs' got multiple values for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithKwargs.Args & Kwargs' got multiple values for argument 'a'.
     Args & Kwargs    A    B   a=ooops

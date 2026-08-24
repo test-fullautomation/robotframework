@@ -49,11 +49,11 @@ Invalid index list
     Log    ${LIST}[12]
 
 Invalid index string
-    [Documentation]    FAIL String '\${STRING}' has no item in index 12.
+    [Documentation]    UNKNOWN String '\${STRING}' has no item in index 12.
     Log    ${STRING}[12]
 
 Invalid index bytes
-    [Documentation]    FAIL ${BYTES NAME} '\${BYTES}' has no item in index 12.
+    [Documentation]    UNKNOWN ${BYTES NAME} '\${BYTES}' has no item in index 12.
     Log    ${BYTES}[12]
 
 Invalid index using variable
@@ -67,13 +67,13 @@ Non-int index list
     Log    ${LIST}[invalid]
 
 Non-int index string
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    String '\${STRING}' used with invalid index 'invalid'. \
     ...    To use '[invalid]' as a literal value, it needs to be escaped like '\\[invalid]'.
     Log    ${STRING}[invalid]
 
 Non-int index bytes
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    ${BYTES NAME} '\${BYTES}' used with invalid index 'invalid'. \
     ...    To use '[invalid]' as a literal value, it needs to be escaped like '\\[invalid]'.
     Log    ${BYTES}[invalid]
@@ -85,7 +85,7 @@ Non-int index using variable 1
     Log    ${LIST}[${INVALID}]
 
 Non-int index using variable 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    List '\${LIST}' used with invalid index '1.1'. \
     ...    To use '[1.1]' as a literal value, it needs to be escaped like '\\[1.1]'.
     Log    ${LIST}[${1.1}]
@@ -97,13 +97,13 @@ Empty index list
     Log    ${LIST}[]
 
 Empty index string
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    String '\${STRING}' used with invalid index ''. \
     ...    To use '[]' as a literal value, it needs to be escaped like '\\[]'.
     Log    ${STRING}[]
 
 Empty index bytes
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    ${BYTES NAME} '\$\{BYTES}' used with invalid index ''. \
     ...    To use '[]' as a literal value, it needs to be escaped like '\\[]'.
     Log    ${BYTES}[]
@@ -115,13 +115,13 @@ Invalid slice list
     Log    ${LIST}[1:2:3:4]
 
 Invalid slice string
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    String '\${STRING}' used with invalid index '1:2:3:4'. \
     ...    To use '[1:2:3:4]' as a literal value, it needs to be escaped like '\\[1:2:3:4]'.
     Log    ${STRING}[1:2:3:4]
 
 Invalid slice bytes
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    ${BYTES NAME} '\${BYTES}' used with invalid index '1:2:3:4'. \
     ...    To use '[1:2:3:4]' as a literal value, it needs to be escaped like '\\[1:2:3:4]'.
     Log    ${BYTES}[1:2:3:4]
@@ -133,13 +133,13 @@ Non-int slice index 1
     Log    ${LIST}[ooops:]
 
 Non-int slice index 2
-    [Documentation]    FAIL \
+    [Documentation]    UNKNOWN \
     ...    List '\${LIST}' used with invalid index '1:ooops'. \
     ...    To use '[1:ooops]' as a literal value, it needs to be escaped like '\\[1:ooops]'.
     Log    ${LIST}[1:ooops]
 
 Non-int slice index 3
-    [Documentation]    FAIL \
+    [Documentation]    UNKNOWN \
     ...    List '\${LIST}' used with invalid index '1:2:ooops'. \
     ...    To use '[1:2:ooops]' as a literal value, it needs to be escaped like '\\[1:2:ooops]'.
     Log    ${LIST}[1:2:ooops]
@@ -170,7 +170,7 @@ List expansion fails if value is not list-like 1
     Log Many    @{LIST}[0]
 
 List expansion fails if value is not list-like 2
-    [Documentation]    FAIL Value of variable '\@{NESTED}[1][0]' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{NESTED}[1][0]' is not list or list-like.
     Log Many    @{NESTED}[1][0]
 
 List expansion with slice

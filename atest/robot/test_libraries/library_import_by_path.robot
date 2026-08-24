@@ -33,28 +33,28 @@ Importing Invalid Python File Fails
     ${path} =    Normalize Path    ${DATADIR}/test_libraries/MyInvalidLibFile.py
     Error in file    1    test_libraries/library_import_by_path.robot    9
     ...    Importing library '${path}' failed: ImportError: I'm not really a library!
-    ...    traceback=*
+    ...    traceback=*    level=UNKNOWN
 
 Importing Dir Library Without Trailing "/" Fails
     Error in file    0    test_libraries/library_import_by_path.robot    3
     ...    Importing library 'MyLibDir' failed: *Error: *
-    ...    traceback=None
+    ...    traceback=None    level=UNKNOWN
 
 Importing Non Python File Fails
     Error in file    2    test_libraries/library_import_by_path.robot    10
     ...    Importing library 'library_import_by_path.robot' failed: *Error: *
-    ...    traceback=None
+    ...    traceback=None    level=UNKNOWN
 
 Importing Non Python Dir Fails
     Error in file    3    test_libraries/library_import_by_path.robot    11
-    ...    Library 'library_scope' does not exist.
+    ...    Library 'library_scope' does not exist.    level=UNKNOWN
 
 Importing Non Existing Py File
     Error in file    4    test_libraries/library_import_by_path.robot    13
-    ...    Library 'this_does_not_exist.py' does not exist.
+    ...    Library 'this_does_not_exist.py' does not exist.    level=UNKNOWN
 
 Import failure when path contains non-ASCII characters is handled correctly
     ${path} =    Normalize path    ${DATADIR}/test_libraries/nön_äscii_dïr/invalid.py
     Error in file    -1    test_libraries/library_import_by_path.robot    15
     ...    Importing library '${path}' failed: Ööööps!
-    ...    traceback=File "${path}", line 1, in <module>\n*raise RuntimeError('Ööööps!')
+    ...    traceback=File "${path}", line 1, in <module>\n*raise RuntimeError('Ööööps!')    level=UNKNOWN

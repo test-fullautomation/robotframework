@@ -171,7 +171,7 @@ Invalid usage in test
     No operation
 
 Invalid usage in user keyword
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     Invalid Usage In UK
 
 Invalid usage in keyword call

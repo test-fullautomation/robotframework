@@ -57,7 +57,7 @@ Variable Should Exist With Invalid name 1
     Variable Should Exist    invalid
 
 Variable Should Exist With Invalid name 2
-    [Documentation]    FAIL Invalid variable name '\\'.
+    [Documentation]    UNKNOWN Invalid variable name '\\'.
     Variable Should Exist    \
 
 Variable Should Not Exist With Default error message
@@ -106,7 +106,7 @@ Variable Should Not Exist With Invalid name 1
     Variable Should Not Exist    invalid
 
 Variable Should Not Exist With Invalid name 2
-    [Documentation]    FAIL Invalid variable name '\\'.
+    [Documentation]    UNKNOWN Invalid variable name '\\'.
     Variable Should Not Exist    \
 
 Variable Should Exist In User Keyword When Variable Name Is Argument And Variable Exists

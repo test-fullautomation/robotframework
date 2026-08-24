@@ -38,7 +38,7 @@ Changing test status in end suite changes console output, but not output.xml
     Stdout Should Contain     SEPARATOR=\n
     ...    5 tests, 5 passed, 0 failed
     ${from output.xml} =    Catenate    SEPARATOR=\n
-    ...    5 tests, 2 passed, 3 failed
+    ...    5 tests, 2 passed, 3 failed, 0 unknown
     Should be equal    ${SUITE.stat_message}     ${from output.xml}
 
 Test tags can be modified

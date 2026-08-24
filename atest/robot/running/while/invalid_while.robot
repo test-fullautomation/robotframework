@@ -42,7 +42,7 @@ Check Invalid WHILE Test Case
     [Arguments]    ${body}=True
     ${tc} =    Check Test Case    ${TESTNAME}
     Should Be Equal    ${tc.body[0].type}              WHILE
-    Should Be Equal    ${tc.body[0].status}            FAIL
+    Should Be Equal    ${tc.body[0].status}            UNKNOWN
     Should Be Equal    ${tc.body[0].body[0].type}      ITERATION
     Should Be Equal    ${tc.body[0].body[0].status}    NOT RUN
     IF    ${body}

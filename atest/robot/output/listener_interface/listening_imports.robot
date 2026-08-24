@@ -93,11 +93,13 @@ Failed Impors Are Listed In Errors
     ${path} =    Normalize Path    ${LISTENER DIR}/imports/imports.robot
     Error in file    0    ${path}    9
     ...    Resource file 'resource that does not exist and fails' does not exist.
+    ...    level=UNKNOWN
     Error in file    1    ${path}    10
     ...    Importing library 'LibraryThatDoesNotExist' failed: *
-    ...    traceback=None
+    ...    traceback=None    level=UNKNOWN
     Error in file    2    ${path}    11
     ...    Variable file 'variables which dont exist.py' does not exist.
+    ...    level=UNKNOWN
 
 *** Keywords ***
 Init expect

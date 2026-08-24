@@ -12,7 +12,7 @@ Resource Order Set In Suite Setup Should Be Available In Test Cases
     Active Resource Should Be    resource1
 
 Empty Resource Order Can Be Set
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords with name 'Get Name' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}resource1.Get Name

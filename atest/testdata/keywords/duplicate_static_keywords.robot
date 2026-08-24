@@ -21,7 +21,7 @@ Keyword with embedded arguments defined twice fails at run-time: Called with emb
     Embedded arguments twice
 
 Keyword with embedded arguments defined twice fails at run-time: Called with exact name
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Embedded \${arguments match} twice' found:
     ...    ${INDENT}DupeKeywords.Embedded \${arguments match} TWICE
     ...    ${INDENT}DupeKeywords.Embedded \${arguments} twice

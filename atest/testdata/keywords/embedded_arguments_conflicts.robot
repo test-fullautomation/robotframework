@@ -24,7 +24,7 @@ Conflict in suite file 1
     Execute "ls"
 
 Conflict in suite file 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'Robot Framework' found:
     ...    ${INDENT}\${x} Framework
     ...    ${INDENT}Robot \${x}

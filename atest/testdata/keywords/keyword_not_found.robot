@@ -4,7 +4,7 @@ Non Existing Implicit Keyword 1
     No Keyword With This Name
 
 Non Existing Implicit Keyword 2
-    [Documentation]    FAIL No keyword with name 'this name is NOT altered' found.
+    [Documentation]    UNKNOWN No keyword with name 'this name is NOT altered' found.
     this name is NOT altered
 
 Non Existing Explicit Keyword 1
@@ -13,7 +13,7 @@ Non Existing Explicit Keyword 1
     BuiltIn.No Keyword With This Name
 
 Non Existing Explicit Keyword 2
-    [Documentation]    FAIL No keyword with name 'built in. ThisName is _not_ altered' found.
+    [Documentation]    UNKNOWN No keyword with name 'built in. ThisName is _not_ altered' found.
     built in . n o o PERA ti on
     built in. ThisName is _not_ altered
 

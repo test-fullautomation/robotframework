@@ -142,8 +142,11 @@ Pass Execution If with multiple variables
     Check Test Tags    ${TESTNAME}    force1    force2    my    tags
 
 Statuses should be correct when running tests
+    # Two tests that used to fail are UNKNOWN in this fork: 'Pass Execution'
+    # without a message and with a non-existing variable are errors, not
+    # assertion failures.
     Stdout Should Contain    SEPARATOR=\n
-    ...    34 tests, 20 passed, 14 failed
+    ...    34 tests, 20 passed, 12 failed, 2 unknown
 
 Passes suite setup and teardown and can modify tags in former
     Run Tests    ${EMPTY}    running/pass_execution_in_suite_setup_and_teardown.robot

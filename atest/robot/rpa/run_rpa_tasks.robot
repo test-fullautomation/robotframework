@@ -117,7 +117,7 @@ Outputs should contain correct mode information
     File should contain regexp     ${OUTDIR}/report.html    window\\.settings = \\{.*"rpa":${rpa},.*\\};
     File should contain regexp     ${OUTDIR}/log.html       window\\.output\\["stats"\\] = \\[\\[\\{.*"label":"All ${title}s",.*\\}\\]\\];
     File should contain regexp     ${OUTDIR}/report.html    window\\.output\\["stats"\\] = \\[\\[\\{.*"label":"All ${title}s",.*\\}\\]\\];
-    Stdout Should Contain Regexp    \\d+ ${lower}s?, \\d+ passed, \\d+ failed\n
+    Stdout Should Contain Regexp    \\d+ ${lower}s?, \\d+ passed, \\d+ failed, \\d+ unknown\n
 
 Initialize tests and tasks data
     Create directory    ${TEMPDIR}/rpa

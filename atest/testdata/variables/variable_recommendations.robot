@@ -43,7 +43,7 @@ All Types Are Recommended With Scalars 1
    Log    ${MIST}
 
 All Types Are Recommended With Scalars 2
-   [Documentation]    FAIL    Variable '${BICTIONARY}' not found. Did you mean:
+   [Documentation]    UNKNOWN    Variable '${BICTIONARY}' not found. Did you mean:
    ...    ${INDENT}\${DICTIONARY}
    ...    ${INDENT}\${S DICTIONARY}
    ...    ${INDENT}\${L DICTIONARY}
@@ -77,23 +77,23 @@ Misspelled Lower Case
     Log    ${sstring}
 
 Misspelled Underscore
-    [Documentation]    FAIL    Variable '${_S_STRI_NG}' not found. Did you mean:
+    [Documentation]    UNKNOWN    Variable '${_S_STRI_NG}' not found. Did you mean:
     ...    ${INDENT}\${STRING}
     Log    ${_S_STRI_NG}
 
 Misspelled Period
-    [Documentation]    FAIL    Resolving variable '${INT.EGER}' failed: Variable '${INT}' not found. Did you mean:
+    [Documentation]    UNKNOWN    Resolving variable '${INT.EGER}' failed: Variable '${INT}' not found. Did you mean:
     ...    ${INDENT}\${INDENT}
     ...    ${INDENT}\${INTEGER}
     Log    ${INT.EGER}
 
 Misspelled Camel Case
-    [Documentation]    FAIL    Variable '@{OneeItem}' not found. Did you mean:
+    [Documentation]    UNKNOWN    Variable '@{OneeItem}' not found. Did you mean:
     ...    ${INDENT}\@{ONE ITEM}
     Log    @{OneeItem}
 
 Misspelled Whitespace
-    [Documentation]    FAIL    Variable '${S STRI NG}' not found. Did you mean:
+    [Documentation]    UNKNOWN    Variable '${S STRI NG}' not found. Did you mean:
     ...    ${INDENT}\${STRING}
     Log    ${S STRI NG}
 

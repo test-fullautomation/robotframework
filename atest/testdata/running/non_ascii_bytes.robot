@@ -20,7 +20,7 @@ In Exception
     In Exception
 
 In Exception In Setup
-    [Documentation]    UNKNOWN Setup failed:\n${exp_error_msg}
+    [Documentation]    UNKNOWN Setup unknown:\n${exp_error_msg}
     [Setup]    In Exception
     No Operation
 

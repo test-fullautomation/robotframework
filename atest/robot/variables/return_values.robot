@@ -181,7 +181,7 @@ Big Items In Dictionary
 
 No Keyword
     ${tc} =    Check Test Case    ${TEST NAME}
-    Check Keyword Data    ${tc.kws[0]}    ${EMPTY}    \${nokeyword}    status=FAIL
+    Check Keyword Data    ${tc.kws[0]}    ${EMPTY}    \${nokeyword}    status=UNKNOWN
 
 Failing Keyword
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -190,8 +190,8 @@ Failing Keyword
 Non-existing keyword
     ${tc1} =    Check Test Case    ${TEST NAME} 1
     ${tc2} =    Check Test Case    ${TEST NAME} 2
-    Check Keyword Data    ${tc1.kws[0]}    I do not exist           \${x}    status=FAIL
-    Check Keyword Data    ${tc2.kws[0]}    I do not exist either    \${x}    status=FAIL
+    Check Keyword Data    ${tc1.kws[0]}    I do not exist           \${x}    status=UNKNOWN
+    Check Keyword Data    ${tc2.kws[0]}    I do not exist either    \${x}    status=UNKNOWN
 
 Failing Keyword And Teardown
     Check Test Case    ${TESTNAME}

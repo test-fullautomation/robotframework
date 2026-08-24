@@ -198,7 +198,7 @@ Wrong Library Name
     NoSuchLib.Nothing
 
 Wrong Library Name 2
-    [Documentation]    FAIL    No keyword with name 'NoSuchLib.Action' found.
+    [Documentation]    UNKNOWN    No keyword with name 'NoSuchLib.Action' found.
     NoSuchLib.Action
 
 BuiltIn Similar To Other BuiltIns

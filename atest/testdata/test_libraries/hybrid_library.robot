@@ -8,7 +8,7 @@ Passing, Logging And Returning
     Should Be Equal    ${ret}    Hello, world
 
 Failing
-    [Documentation]    UNKNOWN    Failure: Hi tellus
+    [Documentation]    FAIL    Failure: Hi tellus
     Get Keyword That Fails    Hi tellus
 
 Keyword Implemented In Library Class Itself

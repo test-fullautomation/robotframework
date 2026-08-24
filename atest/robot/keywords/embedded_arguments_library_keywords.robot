@@ -60,7 +60,7 @@ Embedded Arguments as List And Dict Variables
 
 Non-Existing Variable in Embedded Arguments
     ${tc} =    Check Test Case    ${TEST NAME}
-    Check Keyword Data    ${tc.kws[0]}    embedded_args_in_lk_1.User \${non existing} Selects \${variables} From Webshop    status=FAIL
+    Check Keyword Data    ${tc.kws[0]}    embedded_args_in_lk_1.User \${non existing} Selects \${variables} From Webshop    status=UNKNOWN
 
 Custom Embedded Argument Regexp
     Check Test Case    ${TEST NAME}

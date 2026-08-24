@@ -82,9 +82,9 @@ Template With IF Failing
 
 Invalid IF
     ${tc} =    Check Test Case    ${TESTNAME}
-    Should Be Equal    ${tc.body[0].status}            FAIL
+    Should Be Equal    ${tc.body[0].status}            UNKNOWN
     Should Be Equal    ${tc.body[0].body[0].type}      IF
-    Should Be Equal    ${tc.body[0].body[0].status}    FAIL
+    Should Be Equal    ${tc.body[0].body[0].status}    UNKNOWN
 
 FOR and IF
     Check Test Case    ${TESTNAME}

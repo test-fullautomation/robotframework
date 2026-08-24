@@ -6,7 +6,7 @@ Resource         atest_resource.robot
 Fail Because Timeout exceeded
     ${tc} =    Check Test Case    ${TESTNAME}
     # Cannot test exactly how many times kw is run because it depends on interpreter speed.
-    Check Log Message    ${tc.kws[0].kws[0].msgs[0]}    Still 2 times to fail!    FAIL
+    Check Log Message    ${tc.kws[0].kws[0].msgs[0]}    Still 2 times to fail!    UNKNOWN
     Should Be True    len($tc.kws[0].kws) < 4
 
 Pass with first Try
@@ -16,9 +16,9 @@ Pass with first Try
 
 Pass With Some Medium Try
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].kws[0].msgs[0]}    Still 2 times to fail!    FAIL
-    Check Log Message    ${tc.kws[0].kws[1].msgs[0]}    Still 1 times to fail!    FAIL
-    Check Log Message    ${tc.kws[0].kws[2].msgs[0]}    Still 0 times to fail!    FAIL
+    Check Log Message    ${tc.kws[0].kws[0].msgs[0]}    Still 2 times to fail!    UNKNOWN
+    Check Log Message    ${tc.kws[0].kws[1].msgs[0]}    Still 1 times to fail!    UNKNOWN
+    Check Log Message    ${tc.kws[0].kws[2].msgs[0]}    Still 0 times to fail!    UNKNOWN
     Length Should Be    ${tc.kws[0].kws}    4
 
 Pass With Last Possible Try
@@ -83,14 +83,14 @@ Retry if wrong number of arguments
 
 Retry if variable is not found
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].kws[0].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    FAIL
-    Check Log Message    ${tc.kws[0].kws[1].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    FAIL
-    Check Log Message    ${tc.kws[0].kws[2].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    FAIL
+    Check Log Message    ${tc.kws[0].kws[0].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    UNKNOWN
+    Check Log Message    ${tc.kws[0].kws[1].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    UNKNOWN
+    Check Log Message    ${tc.kws[0].kws[2].kws[0].msgs[0]}    Variable '\${nonexisting}' not found.    UNKNOWN
     Length Should Be    ${tc.kws[0].kws}    3
 
 Pass With Initially Nonexisting Variable Inside Wait Until Keyword Succeeds
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].kws[0].kws[0].msgs[0]}    Variable '\${created after accessing first time}' not found.    FAIL
+    Check Log Message    ${tc.kws[0].kws[0].kws[0].msgs[0]}    Variable '\${created after accessing first time}' not found.    UNKNOWN
     Check Log Message    ${tc.kws[0].kws[1].kws[0].msgs[0]}    created in keyword teardown
     Length Should Be    ${tc.kws[0].kws}    2
 

@@ -47,7 +47,7 @@ Environment Variables Are Space Sensitive 1
     Log  %{THIS ENV VAR IS SET}
 
 Environment Variables Are Space Sensitive 2
-    [Documentation]  FAIL Environment variable '%{ THIS_ENV_VAR_IS_SET }' not found. Did you mean:
+    [Documentation]  UNKNOWN Environment variable '%{ THIS_ENV_VAR_IS_SET }' not found. Did you mean:
     ...    ${SPACE * 4}\%{THIS_ENV_VAR_IS_SET}
     Log  %{ THIS_ENV_VAR_IS_SET }
 

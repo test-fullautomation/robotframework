@@ -2,12 +2,13 @@
 Resource          atest_resource.robot
 
 *** Variables ***
-${1 PASS MSG}     1 test, 1 passed, 0 failed
-${1 FAIL MSG}     1 test, 0 passed, 1 failed
-${2 FAIL MSG}     2 tests, 0 passed, 2 failed
-${4 FAIL MSG}     4 tests, 0 passed, 4 failed
-${5 FAIL MSG}     5 tests, 0 passed, 5 failed
-${12 FAIL MSG}    12 tests, 0 passed, 12 failed
+${1 PASS MSG}     1 test, 1 passed, 0 failed, 0 unknown
+${1 FAIL MSG}     1 test, 0 passed, 1 failed, 0 unknown
+${2 FAIL MSG}     2 tests, 0 passed, 2 failed, 0 unknown
+${4 FAIL MSG}     4 tests, 0 passed, 4 failed, 0 unknown
+${5 FAIL MSG}     5 tests, 0 passed, 5 failed, 0 unknown
+${12 FAIL MSG}    12 tests, 0 passed, 12 failed, 0 unknown
+${2 UNKNOWN MSG}    2 tests, 0 passed, 0 failed, 2 unknown
 ${ALSO}           \n\nAlso teardown of the parent suite failed.
 ${EXECUTED FILE}    %{TEMPDIR}/robot-suite-teardown-executed.txt
 
@@ -46,10 +47,12 @@ Failing Suite Setup
 
 Erroring Suite Setup
     Run Tests    ${EMPTY}    core/erroring_suite_setup.robot
-    Check Suite Status    ${SUITE}    FAIL
-    ...    Suite setup failed:\nNo keyword with name 'Non-Existing Keyword' found.\n\n${2 FAIL MSG}
+    # A non-existing keyword is an error, not an assertion failure, so the
+    # suite and its tests are UNKNOWN in this fork.
+    Check Suite Status    ${SUITE}    UNKNOWN
+    ...    Suite setup unknown:\nNo keyword with name 'Non-Existing Keyword' found.\n\n${2 UNKNOWN MSG}
     ...    Test 1    Test 2
-    Should Be Equal    ${SUITE.setup.status}    FAIL
+    Should Be Equal    ${SUITE.setup.status}    UNKNOWN
     ${td} =    Set Variable    ${SUITE.teardown}
     Should Be Equal    ${td.name}    My TD
     Should Be Equal    ${td.status}    PASS
@@ -80,17 +83,19 @@ Failing Suite Teardown
     ...    1) first
     ...    2) second
     Check Suite Status    ${SUITE}    FAIL
-    ...    Suite teardown failed:\n${error}\n\n3 tests, 0 passed, 2 failed, 1 skipped
+    ...    Suite teardown failed:\n${error}\n\n3 tests, 0 passed, 2 failed, 0 unknown, 1 skipped
     ...    Passing    Failing    Skipping
     Should Be Equal    ${SUITE.teardown.status}    FAIL
     Output should contain teardown error    ${error}
 
 Erroring Suite Teardown
     Run Tests    ${EMPTY}    core/erroring_suite_teardown.robot
-    Check Suite Status    ${SUITE}    FAIL
-    ...    Suite teardown failed:\nNo keyword with name 'Non-Existing Keyword' found.\n\n${2 FAIL MSG}
+    # A non-existing keyword is an error, not an assertion failure, so the
+    # suite and its tests are UNKNOWN in this fork.
+    Check Suite Status    ${SUITE}    UNKNOWN
+    ...    Suite teardown failed:\nNo keyword with name 'Non-Existing Keyword' found.\n\n${2 UNKNOWN MSG}
     ...    Test 1    Test 2
-    Should Be Equal    ${SUITE.teardown.status}    FAIL
+    Should Be Equal    ${SUITE.teardown.status}    UNKNOWN
     Output should contain teardown error    No keyword with name 'Non-Existing Keyword' found.
 
 Failing Suite Setup And Teardown

@@ -32,11 +32,11 @@ Unmatched square brackets 1
     Log    ${SQUARES}[[]
 
 Unmatched square brackets 2
-    [Documentation]    FAIL Variable item '\${SQUARES}[][' was not closed properly.
+    [Documentation]    UNKNOWN Variable item '\${SQUARES}[][' was not closed properly.
     Log    ${SQUARES}[][
 
 Unmatched square brackets 3
-    [Documentation]    FAIL Variable item '\${SQUARES}[[x[y]]' was not closed properly.
+    [Documentation]    UNKNOWN Variable item '\${SQUARES}[[x[y]]' was not closed properly.
     Log    ${SQUARES}[[x[y]]
 
 Index with variable

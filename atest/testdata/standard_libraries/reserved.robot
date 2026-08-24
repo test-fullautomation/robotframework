@@ -6,7 +6,7 @@ Markers should get note about case 1
     EnD
 
 Markers should get note about case 2
-    [Documentation]     FAIL 'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
+    [Documentation]     UNKNOWN 'If' is a reserved keyword. It must be an upper case 'IF' when used as a marker.
     if    Log    ${message}
 
 Others should just be reserved 1
@@ -14,7 +14,7 @@ Others should just be reserved 1
     Continue
 
 Others should just be reserved 2
-    [Documentation]    FAIL 'Return' is a reserved keyword.
+    [Documentation]    UNKNOWN 'Return' is a reserved keyword.
     Return    ${something}
 
 'End' gets extra note

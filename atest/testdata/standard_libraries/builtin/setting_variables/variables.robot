@@ -34,7 +34,7 @@ Set Variable With More Or Less Than One Value
     Should Be Equal    ${emp}    ${EMPTY}
 
 Set Local Variable - Scalars
-    [Documentation]    FAIL Variable '\${non_existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non_existing}' not found.
     Should Be Equal    ${scalar}    Hi tellus
     Set Local Variable    ${scalar}    Hello world
     Should Be Equal    ${scalar}    Hello world
@@ -94,7 +94,7 @@ Setting Local Variable In Test Not Available In Keyword
      Setting Local Variable
 
 Set Test Variable - Scalars
-    [Documentation]    FAIL Variable '\${non_existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non_existing}' not found.
     Should Be Equal    ${scalar}    Hi tellus
     Set Test Variable    $scalar    Hello world
     Should Be Equal    ${scalar}    Hello world
@@ -206,7 +206,7 @@ Set Task Variable as alias for Set Test Variable
     Test Variable Should Be Set To      Set again in test level
 
 Set Suite Variable 1
-    [Documentation]    FAIL Variable '\${non_existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non_existing}' not found.
     Variable Should Not Exist    $parent_suite_setup_suite_var
     Set Suite Variable    $parent_suite_setup_suite_var    Parent should not see this value
     Variable Should Not Exist    $suite_setup_local_var
@@ -228,7 +228,7 @@ Set Suite Variable 1
     Set Suite Variable    \${non_existing}
 
 Set Suite Variable 2
-    [Documentation]    FAIL Invalid variable name 'invalid'.
+    [Documentation]    UNKNOWN Invalid variable name 'invalid'.
     Should Be Equal    ${test_level_suite_var}    Suite var set in test
     Should Be True    ${test_level_suite_var_list} == [ 'Suite var set in', 'test' ]
     Should Be Equal    ${suite_var_needing_escaping}    One backslash \\ and \${notvar}
@@ -248,14 +248,14 @@ Set Child Suite Variable 1
     Set Suite Variable    ${PARENT SUITE SETUP CHILD SUITE VAR 3}    Only seen, and overridden, in this suite    children=${TRUE}
 
 Set Child Suite Variable 2
-    [Documentation]    FAIL Variable '${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '${NON EXISTING}' not found.
     Should Be Equal    ${PARENT SUITE SETUP CHILD SUITE VAR 1}    Set in __init__
     Should Be Equal    ${PARENT SUITE SETUP CHILD SUITE VAR 2}    Overridden by global
     Should Be Equal    ${PARENT SUITE SETUP CHILD SUITE VAR 3}    Only seen, and overridden, in this suite
     Set Suite Variable    ${VAR}    value    children=${NON EXISTING}
 
 Set Global Variable 1
-    [Documentation]    FAIL Variable '\${non_existing}' not found.
+    [Documentation]    UNKNOWN Variable '\${non_existing}' not found.
     Should Be Equal    ${parent_suite_setup_global_var}    Set in __init__
     Should Be Equal    ${suite_setup_global_var}    Global var set in suite setup
     Should Be True    ${suite_setup_global_var_list} == [ 'Global var set in', 'suite setup' ]
@@ -276,7 +276,7 @@ Set Global Variable 1
     Set Global Variable    @non_existing
 
 Set Global Variable 2
-    [Documentation]    FAIL Invalid variable name 'Ö'.
+    [Documentation]    UNKNOWN Invalid variable name 'Ö'.
     Should Be Equal    ${test_level_global_var}    Global var set in test
     Should Be True    ${test_level_global_var_list} == [ 'Global var set in', 'test' ]
     Should Be Equal    ${uk_level_global_var}    Global var set in user keyword
@@ -382,7 +382,7 @@ Setting Test/Suite/Global Variable Which Value Is In Variable Syntax
 Set Test/Suite/Global Variable With Internal Variables In Name
     [Documentation]    This obscure test is here to prevent this bug from reappearing:
     ...                https://github.com/robotframework/robotframework/issues/397
-    ...                FAIL    Variable '\${nonexisting}' not found.
+    ...                UNKNOWN    Variable '\${nonexisting}' not found.
     ${x} =    Set Variable    bar
     Set Test Variable    \${foo ${x}}    value
     Should Be Equal    ${foo bar}    value
@@ -476,7 +476,7 @@ Using \@{EMPTY} with `Set Test/Suite/Global Variable` keywords 2
     Should Be True    ${NEW} == ['global']
 
 If setting test/suite/global variable fails, old value is preserved 1
-    [Documentation]    FAIL Variable '\${SETTING NONEX FAILS}' not found.
+    [Documentation]    UNKNOWN Variable '\${SETTING NONEX FAILS}' not found.
     Set Test Variable    ${VALID TEST}    valid test
     Set Suite Variable    @{VALID SUITE}    valid suite
     Set Global Variable    &{VALID GLOBAL}    valid=global
@@ -484,12 +484,12 @@ If setting test/suite/global variable fails, old value is preserved 1
     [Teardown]    Should Be Equal    ${VALID TEST}    valid test
 
 If setting test/suite/global variable fails, old value is preserved 2
-    [Documentation]    FAIL Variable '\@{SETTING NONEX FAILS}' not found.
+    [Documentation]    UNKNOWN Variable '\@{SETTING NONEX FAILS}' not found.
     Set Suite Variable    @{VALID SUITE}    @{SETTING NONEX FAILS}
     [Teardown]    Should Be Equal    @{VALID SUITE}    valid suite
 
 If setting test/suite/global variable fails, old value is preserved 3
-    [Documentation]    FAIL Variable '\&{SETTING NONEX FAILS}' not found.
+    [Documentation]    UNKNOWN Variable '\&{SETTING NONEX FAILS}' not found.
     Set Global Variable    &{VALID GLOBAL}    &{SETTING NONEX FAILS}
     [Teardown]    Should Be Equal    ${VALID GLOBAL.valid}    global
 
@@ -498,45 +498,45 @@ If setting test/suite/global variable fails, old value is preserved 4
     Should Be Equal    ${VALID GLOBAL}[valid]    global
 
 Setting non-dict value to test/suite/global level dict variable - test
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid dictionary variable item 'invalid'. \
     ...    Items must use 'name=value' syntax or be dictionary variables themselves.
     Set Test Variable    &{DICT}    invalid    values
 
 Setting non-dict value to test/suite/global level dict variable - suite
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid dictionary variable item '\@{bad}'. \
     ...    Items must use 'name=value' syntax or be dictionary variables themselves.
     Set Suite Variable    &{DICT}    this=good    @{bad}
 
 Setting non-dict value to test/suite/global level dict variable - global
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid dictionary variable item 'oops\\=i did it again'. \
     ...    Items must use 'name=value' syntax or be dictionary variables themselves.
     Set Global Variable    &{DICT}    oops\=i did it again
 
 Setting scalar test variable with list value is not possible 1
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Test Variable    ${SCALAR}    This    does    not    work
 
 Setting scalar test variable with list value is not possible 2
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Test Variable    ${SCALAR}    @{EMPTY}
 
 Setting scalar suite variable with list value is not possible 1
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Suite Variable    ${SCALAR}    This    does    not    work
 
 Setting scalar suite variable with list value is not possible 2
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Suite Variable    ${SCALAR}    @{EMPTY}
 
 Setting scalar global variable with list value is not possible 1
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Global Variable    ${SCALAR}    This    does    not    work
 
 Setting scalar global variable with list value is not possible 2
-    [Documentation]    FAIL ${SCALAR LIST ERROR}
+    [Documentation]    UNKNOWN ${SCALAR LIST ERROR}
     Set Global Variable    ${SCALAR}    @{EMPTY}
 
 *** Keyword ***

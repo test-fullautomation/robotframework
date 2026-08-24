@@ -44,7 +44,7 @@ Failing When Base Name Starts With Existing Variable 1
     Log    ${nonexisting}
 
 Failing When Base Name Starts With Existing Variable 2
-    [Documentation]    FAIL STARTS: Variable '\${lista}' not found.
+    [Documentation]    UNKNOWN STARTS: Variable '\${lista}' not found.
     Log    ${list}
     Log    ${lista}
 
@@ -93,7 +93,7 @@ Failing When Attribute Does Not exists 1
     Log    ${OBJ.nonex}
 
 Failing When Attribute Does Not exists 2
-    [Documentation]    FAIL STARTS: Resolving variable '\${OBJ.nonex_method()}' failed: AttributeError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${OBJ.nonex_method()}' failed: AttributeError:
     Log    ${OBJ.nonex_method()}
 
 Failing When Calling Method With Wrong Number Of Arguments
@@ -101,7 +101,7 @@ Failing When Calling Method With Wrong Number Of Arguments
     Log    ${OBJ.greet('too', 'many')}
 
 Failing When Method Raises Exception
-    [Documentation]    FAIL Resolving variable '\${OBJ.greet('FAIL')}' failed: ValueError
+    [Documentation]    UNKNOWN Resolving variable '\${OBJ.greet('FAIL')}' failed: ValueError
     Log    ${OBJ.greet('FAIL')}
 
 Fail When Accessing Item Not In List

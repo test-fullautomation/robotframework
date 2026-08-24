@@ -122,11 +122,11 @@ Positional after named 1
     Args & Varargs    foo    b=bar    dar
 
 Positional after named 2
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
     Args & Varargs    foo    b=bar    @{EMPTY}
 
 Positional after named 3
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Two Args' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Two Args' got positional argument after named arguments.
     Two Args    first=1    oops
 
 Missing argument
@@ -138,5 +138,5 @@ Both positional and named value 1
     Two Args    1    first=oops
 
 Both positional and named value 2
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' got multiple values for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' got multiple values for argument 'a'.
     Args & Varargs    A    B   a=ooops

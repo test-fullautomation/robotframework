@@ -22,12 +22,12 @@ In Return Value
 
 In Exception
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].msgs[0]}    ${exp_error_msg}    FAIL
+    Check Log Message    ${tc.kws[0].msgs[0]}    ${exp_error_msg}    UNKNOWN
 
 In Exception In Setup
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.setup.msgs[0]}    ${exp_error_msg}    FAIL
+    Check Log Message    ${tc.setup.msgs[0]}    ${exp_error_msg}    UNKNOWN
 
 In Exception In Teardown
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.teardown.msgs[0]}    ${exp_error_msg}    FAIL
+    Check Log Message    ${tc.teardown.msgs[0]}    ${exp_error_msg}    UNKNOWN

@@ -20,7 +20,7 @@ Library keyword tags with documentation and attribute
     Library keyword tags with documentation and attribute
 
 Invalid library keyword tags
-    [Documentation]    FAIL No keyword with name 'Invalid library keyword tags' found.
+    [Documentation]    UNKNOWN No keyword with name 'Invalid library keyword tags' found.
     Invalid library keyword tags
 
 User keyword tags with `[Tags]` setting

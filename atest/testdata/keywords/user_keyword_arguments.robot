@@ -22,7 +22,7 @@ Too Few Arguments When No Defaults Or Varargs 1
     A 1
 
 Too Few Arguments When No Defaults Or Varargs 2
-    [Documentation]    FAIL Keyword 'A 3' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN Keyword 'A 3' expected 3 arguments, got 2.
     A 3    a1    a2
 
 Too Many Arguments When No Defaults Or Varargs 1
@@ -31,11 +31,11 @@ Too Many Arguments When No Defaults Or Varargs 1
     ...    way    too    much    !!!!!
 
 Too Many Arguments When No Defaults Or Varargs 2
-    [Documentation]    FAIL Keyword 'A 1' expected 1 argument, got 2.
+    [Documentation]    UNKNOWN Keyword 'A 1' expected 1 argument, got 2.
     A 1    Too    much
 
 Too Many Arguments When No Defaults Or Varargs 3
-    [Documentation]    FAIL Keyword 'A 3' expected 3 arguments, got 4.
+    [Documentation]    UNKNOWN Keyword 'A 3' expected 3 arguments, got 4.
     A 3    a1    a2    a3    a4
 
 Correct Number Of Arguments With Defaults
@@ -59,7 +59,7 @@ Too Many Arguments With Defaults 1
     A 0 1    Too    much
 
 Too Many Arguments With Defaults 2
-    [Documentation]    FAIL Keyword 'A 1 3' expected 1 to 3 arguments, got 4.
+    [Documentation]    UNKNOWN Keyword 'A 1 3' expected 1 to 3 arguments, got 4.
     A 1 3    This    is    too    much
 
 Correct Number Of Arguments With Varargs
@@ -210,7 +210,7 @@ Invalid Arguments Spec - Default with varargs
     Default with varargs
 
 Invalid Arguments Spec - Default with kwargs
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: Only normal arguments accept default values, dictionary arguments like '&{kwargs}' do not.
     Default with kwargs
 

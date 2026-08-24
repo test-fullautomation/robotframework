@@ -57,7 +57,7 @@ Unexpected positional argument 1
     Kw Only Arg    ooops
 
 Unexpected positional argument 2
-    [Documentation]    FAIL Keyword 'KwOnlyArgs.Kw Only Arg' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'KwOnlyArgs.Kw Only Arg' expected 0 non-named arguments, got 1.
     Kw Only Arg    ooops    kwo=value
 
 With varargs

@@ -65,15 +65,15 @@ If __all__ is present, only functions listed there are available 1
     Not in all
 
 If __all__ is present, only functions listed there are available 2
-    [Documentation]  FAIL No keyword with name 'Join' found.
+    [Documentation]  UNKNOWN No keyword with name 'Join' found.
     Join  arg1  arg2
 
 If __all__ is present, only functions listed there are available 3
-    [Documentation]  FAIL No keyword with name 'attr_is_not_kw' found.
+    [Documentation]  UNKNOWN No keyword with name 'attr_is_not_kw' found.
     attr_is_not_kw
 
 If __all__ is present, only functions listed there are available 4
-    [Documentation]  FAIL No keyword with name '_not_kw_even_if_listed_in_all' found.
+    [Documentation]  UNKNOWN No keyword with name '_not_kw_even_if_listed_in_all' found.
     _not_kw_even_if_listed_in_all
 
 Class Method Assigned To Module Variable

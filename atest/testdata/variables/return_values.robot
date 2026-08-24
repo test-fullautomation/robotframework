@@ -64,7 +64,7 @@ Multiple Scalars When No List Returned 1
     ${a}    ${b} =    Set Variable    This is not list
 
 Multiple Scalars When No List Returned 2
-    [Documentation]    FAIL Cannot set variables: Expected list-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variables: Expected list-like value, got integer.
     ${a}    ${b} =    Set Variable    ${42}
 
 List Variable
@@ -112,7 +112,7 @@ List When Non-List Returned 1
     @{list} =    Set Variable    kekkonen
 
 List When Non-List Returned 2
-    [Documentation]    FAIL Cannot set variable '\@{list}': Expected list-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variable '\@{list}': Expected list-like value, got integer.
     @{list} =    Set Variable    ${42}
 
 Only One List Variable Allowed 1
@@ -120,7 +120,7 @@ Only One List Variable Allowed 1
     @{list}    @{list2} =    Fail    Not executed
 
 Only One List Variable Allowed 2
-    [Documentation]    FAIL Assignment can contain only one list variable.
+    [Documentation]    UNKNOWN Assignment can contain only one list variable.
     @{list}    ${scalar}    @{list2} =    Fail    Not executed
 
 List After Scalars
@@ -168,11 +168,11 @@ List and scalars with not enough values 1
     ${first}    ${second}    @{list} =    Create List    1
 
 List and scalars with not enough values 2
-    [Documentation]     FAIL Cannot set variables: Expected 2 or more return values, got 1.
+    [Documentation]     UNKNOWN Cannot set variables: Expected 2 or more return values, got 1.
     ${first}    @{list}    ${last} =    Create List    1
 
 List and scalars with not enough values 3
-    [Documentation]     FAIL Cannot set variables: Expected 1 or more return values, got 0.
+    [Documentation]     UNKNOWN Cannot set variables: Expected 1 or more return values, got 0.
     @{list}    ${last} =    Create List
 
 Dictionary return value
@@ -201,19 +201,19 @@ Dictionary only allowed alone 1
     ${s}    &{d} =    Fail    Not executed
 
 Dictionary only allowed alone 2
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d}    ${s} =    Fail    Not executed
 
 Dictionary only allowed alone 3
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d}    @{l} =    Fail    Not executed
 
 Dictionary only allowed alone 4
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     @{l}    &{d} =    Fail    Not executed
 
 Dictionary only allowed alone 5
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d1}    &{d2} =    Fail    Not executed
 
 Dict when non-dict returned 1
@@ -221,11 +221,11 @@ Dict when non-dict returned 1
     &{ret} =     Create List
 
 Dict when non-dict returned 2
-    [Documentation]    FAIL Cannot set variable '\&{ret}': Expected dictionary-like value, got string.
+    [Documentation]    UNKNOWN Cannot set variable '\&{ret}': Expected dictionary-like value, got string.
     &{ret} =     Set variable   foo
 
 Dict when non-dict returned 3
-    [Documentation]    FAIL Cannot set variable '\&{ret}': Expected dictionary-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variable '\&{ret}': Expected dictionary-like value, got integer.
     &{ret} =     Set variable    ${5}
 
 Long String To Scalar Variable
@@ -266,7 +266,7 @@ Non-existing keyword 1
     ${x} =    I do not exist
 
 Non-existing keyword 2
-    [Documentation]    FAIL No keyword with name 'I do not exist either' found.
+    [Documentation]    UNKNOWN No keyword with name 'I do not exist either' found.
     ${x}      I do not exist either
 
 Assign Mark Without Space

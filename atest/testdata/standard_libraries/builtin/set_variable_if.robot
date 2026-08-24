@@ -33,11 +33,11 @@ False Condition
     Should Be Equal  ${var}  ${None}
 
 Invalid Expression
-    [Documentation]  UNKNOWN STARTS: Evaluating expression 'invalid expr' failed: SyntaxError:
+    [Documentation]  FAIL STARTS: Evaluating expression 'invalid expr' failed: SyntaxError:
     Set Variable If  invalid expr  whatever  values
 
 Fails Without Values 1
-    [Documentation]  UNKNOWN At least one value is required
+    [Documentation]  FAIL At least one value is required
     Set Variable If  True
 
 Fails Without Values 2
@@ -54,19 +54,19 @@ Non-Existing Variables In Values 1
     ${var} =  Set Variable If  ${existing}  ${now this breaks}  Not used
 
 Non-Existing Variables In Values 2
-    [Documentation]  FAIL Resolving variable '${nonexisting.extended}' failed: Variable '${nonexisting}' not found.
+    [Documentation]  UNKNOWN Resolving variable '${nonexisting.extended}' failed: Variable '${nonexisting}' not found.
     ${var} =  Set Variable If  False is True  ${not used}  ${nonexisting.extended}
 
 Non-Existing Variables In Values 3
-    [Documentation]  FAIL Variable '\${ooooops}' not found.
+    [Documentation]  UNKNOWN Variable '\${ooooops}' not found.
     Set Variable If  False  ${not used}  True  ${ooooops}
 
 Non-Existing Variables In Values 4
-    [Documentation]  FAIL STARTS: Resolving variable '\${SPACE.nonex}' failed: AttributeError:
+    [Documentation]  UNKNOWN STARTS: Resolving variable '\${SPACE.nonex}' failed: AttributeError:
     Set Variable If  False  ${not used}  False  ${not used}  ${SPACE.nonex}
 
 Non-Existing Variables In Values 5
-    [Documentation]  FAIL Variable '\${nonexisting}' not found.
+    [Documentation]  UNKNOWN Variable '\${nonexisting}' not found.
     Set Variable If  False  ${not used}  False  ${not used}  True  This is ${nonexisting} is enough
 
 Extra Values Are Ignored If First Expression Is True
@@ -95,7 +95,7 @@ If / Else If / Else
     Should Be Equal  ${var}  ${None}
 
 With Empty List Variables 1
-    [Documentation]  UNKNOWN At least one value is required
+    [Documentation]  FAIL At least one value is required
     Set Variable If  True  @{EMPTY LIST}
 
 With Empty List Variables 2

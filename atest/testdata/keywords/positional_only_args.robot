@@ -38,7 +38,7 @@ Too few arguments 1
     Three arguments    1    2
 
 Too few arguments 2
-    [Documentation]    FAIL Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 0.
     Defaults
 
 Too many arguments 1
@@ -46,7 +46,7 @@ Too many arguments 1
     One argument    too    many    args
 
 Too many arguments 2
-    [Documentation]    FAIL Keyword 'PositionalOnly.With Normal' expected 2 arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.With Normal' expected 2 arguments, got 3.
     With normal    too    many    args
 
 Named argument syntax doesn't work after valid named arguments

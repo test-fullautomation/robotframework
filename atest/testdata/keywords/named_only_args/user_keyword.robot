@@ -41,7 +41,7 @@ Missing value 1
     Kw Only Arg
 
 Missing value 2
-    [Documentation]    FAIL Keyword 'Mandatory After Defaults' missing named-only argument 'mandatory'.
+    [Documentation]    UNKNOWN Keyword 'Mandatory After Defaults' missing named-only argument 'mandatory'.
     Mandatory After Defaults    default2=this is not enough
 
 Missing multiple values
@@ -61,7 +61,7 @@ Unexpected positional argument 1
     Kw Only Arg    ooops
 
 Unexpected positional argument 2
-    [Documentation]    FAIL Keyword 'Kw Only Arg' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'Kw Only Arg' expected 0 non-named arguments, got 1.
     Kw Only Arg    ooops    kwo=value
 
 With varargs

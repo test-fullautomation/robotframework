@@ -201,7 +201,7 @@ Override timeout using NONE
     No Operation
 
 Invalid timeout
-    [Documentation]    UNKNOWN Setup failed:
+    [Documentation]    UNKNOWN Setup unknown:
     ...    Setting test timeout failed: Invalid time string 'invalid'.
     [Timeout]    invalid
     Fail    Should not be run

@@ -115,9 +115,11 @@ With Name When Library Arguments Are Not Strings
     # WITH NAME
     Error In File    -2    test_libraries/with_name_3.robot    5
     ...    Library 'ParameterLibrary' expected 0 to 2 arguments, got 4.
+    ...    level=UNKNOWN
     # AS
     Error In File    -1    test_libraries/with_name_3.robot    6
     ...    Library 'ParameterLibrary' expected 0 to 2 arguments, got 5.
+    ...    level=UNKNOWN
 
 'WITH NAME' cannot come from variable
     Check Test Case    ${TEST NAME}

@@ -26,7 +26,7 @@ Test Setup Fails
     Fail    This should not be executed
 
 Test Setup Error
-    [Documentation]    UNKNOWN Setup failed:
+    [Documentation]    UNKNOWN Setup unknown:
     ...    No keyword with name 'Non Existing KW' found.
     [Setup]    Non Existing KW
     No Operation
@@ -63,7 +63,7 @@ Test Setup And Teardown Pass
     [Teardown]    Do Nothing
 
 Test Teardown is Run When Setup Fails
-    [Documentation]    UNKNOWN Setup failed:
+    [Documentation]    UNKNOWN Setup unknown:
     ...    No keyword with name 'Non Existing Keyword' found.
     [Setup]    Non Existing Keyword    whatever
     Fail    This should not be run

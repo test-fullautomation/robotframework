@@ -36,7 +36,7 @@ Invalid Tables
     Invalid Section Error    0    invalid_table_names.robot        1     *** Error ***
     Invalid Section Error    1    invalid_table_names.robot        8     *** ***
     Invalid Section Error    2    invalid_table_names.robot        18    *one more table cause an error
-    Error In File    3    parsing/invalid_table_names.robot        6     Error in file '${path}' on line 1: Unrecognized section header '*** ***'. Valid sections: 'Settings', 'Variables', 'Keywords' and 'Comments'.
+    Error In File    3    parsing/invalid_table_names.robot        6     Error in file '${path}' on line 1: Unrecognized section header '*** ***'. Valid sections: 'Settings', 'Variables', 'Keywords' and 'Comments'.    level=UNKNOWN
 
 
 *** Keywords ***
