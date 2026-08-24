@@ -55,7 +55,8 @@ def union_with_subscripted_generics_and_str(argument: list[str] | str, expected)
     assert argument == eval(expected), '%r != %s' % (argument, expected)
 
 
-def union_with_typeddict(argument: TypedDict('X', x=int) | None, expected):
+# Keyword-argument syntax for TypedDict was removed in Python 3.13.
+def union_with_typeddict(argument: TypedDict('X', {'x': int}) | None, expected):
     assert argument == eval(expected), '%r != %s' % (argument, expected)
 
 

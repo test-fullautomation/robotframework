@@ -11,6 +11,14 @@ xmlschema
 
 pyyaml
 
+# Python 3.13 removed the telnetlib module (PEP 594) that the standard
+# Telnet library needs. This backport restores it; without it e.g. the
+# whole Libdoc python_library suite fails in its setup because it
+# documents robot.libraries.Telnet. If PyPI is not reachable, copying
+# Lib/telnetlib.py from a Python <= 3.12 installation into site-packages
+# works as well.
+standard-telnetlib; python_version >= '3.13'
+
 # On Linux installing lxml with pip may require compilation and development
 # headers. Alternatively it can be installed using a package manager like
 # `sudo apt-get install python-lxml`.
