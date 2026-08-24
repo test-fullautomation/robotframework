@@ -34,7 +34,9 @@ With --SkipTeardownOnExit
     Executed normally    Pass    Fail    Before Error
     Failed due to error    Runtime Error
     Skipped due to error    After Error   First One    Second One
-    Teardowns not executed    Runtime Error
+    # Runtime Error itself ran and failed due to the error, so its status is
+    # FAIL, unlike the not-run tests that are UNKNOWN.
+    Teardowns not executed    Runtime Error    status=FAIL
 
 *** Keywords ***
 Executed normally
@@ -55,10 +57,10 @@ Skipped due to error
     END
 
 Teardowns not executed
-    [Arguments]    ${name}
+    [Arguments]    ${name}    ${status}=UNKNOWN
     ${suite} =    Get Test Suite    ${name}
     Teardown Should Not Be Defined    ${suite}
-    ${tc} =    Check Test Case    ${name}    UNKNOWN    ${MESSAGE}
+    ${tc} =    Check Test Case    ${name}    ${status}    ${MESSAGE}
     Teardown Should Not Be Defined    ${tc}
 
 Teardowns executed

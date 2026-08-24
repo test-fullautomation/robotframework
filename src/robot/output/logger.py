@@ -160,7 +160,10 @@ class Logger(AbstractLogger):
                 self._message_cache.append(msg)
             else:
                 self._message_cache_dropped += 1
-        if msg.level == 'ERROR':
+        # cuongnht: import and other framework errors are reported at UNKNOWN
+        # level, but they are still errors - without this --exitonerror would
+        # never trigger on them.
+        if msg.level in ('ERROR', 'UNKNOWN'):
             self._error_occurred = True
             if self._error_listener:
                 self._error_listener()
