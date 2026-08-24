@@ -111,7 +111,18 @@ class TestCheckerLibrary:
         if validate is None:
             validate = os.getenv('ATEST_VALIDATE_OUTPUT', False)
         if utils.is_truthy(validate):
-            self._validate_output(path)
+            # Same handle-release pattern as below: re-raise outside the
+            # except block so the original exception does not pin open file
+            # handles via its traceback.
+            error = None
+            try:
+                self._validate_output(path)
+            except Exception:
+                error = utils.get_error_message()
+            if error is not None:
+                set_suite_variable('$SUITE', None)
+                raise RuntimeError('Validating output failed: %s' % error)
+        error = None
         try:
             logger.info("Processing output '%s'." % path)
             result = Result(root_suite=NoSlotsTestSuite())
@@ -120,7 +131,14 @@ class TestCheckerLibrary:
             set_suite_variable('$SUITE', None)
             msg, details = utils.get_error_details()
             logger.info(details)
-            raise RuntimeError('Processing output failed: %s' % msg)
+            error = msg
+        # Raise outside the except block so the original exception (whose
+        # traceback frames keep the abandoned iterparse file handle alive)
+        # is released first. Raising from inside the block chains it into
+        # __context__, and on Windows the still-open output.xml then makes
+        # every subsequent Run Tests fail with WinError 32.
+        if error is not None:
+            raise RuntimeError('Processing output failed: %s' % error)
         result.visit(ProcessResults())
         set_suite_variable('$SUITE', result.suite)
         set_suite_variable('$STATISTICS', result.statistics)
@@ -319,9 +337,10 @@ class TestCheckerLibrary:
     def check_log_message(self, item, expected, level='INFO', html=False, pattern=False, traceback=False):
         message = item.message.rstrip()
         if traceback:
-            # Remove `^^^` lines added by Python 3.11+.
+            # Remove `^^^` lines added by Python 3.11+ and `~~~^^^` lines
+            # used since Python 3.13.
             message = '\n'.join(line for line in message.splitlines()
-                                if '^' not in line or line.strip('^ '))
+                                if '^' not in line or line.strip('~^ '))
         b = BuiltIn()
         matcher = b.should_match if pattern else b.should_be_equal
         matcher(message, expected.rstrip(), 'Wrong log message')
@@ -332,15 +351,27 @@ class TestCheckerLibrary:
 
 class ProcessResults(ResultVisitor):
 
+    STATUSES = ('FAIL', 'SKIP', 'PASS', 'UNKNOWN')
+
     def start_test(self, test):
-        for status in 'FAIL', 'SKIP', 'PASS', 'UNKNOWN':
-            if status in test.doc:
+        # By convention the expected status is the first word of the
+        # documentation. Check that first: scanning the whole doc would let a
+        # status word inside the expected message win instead, which happens
+        # e.g. with UNKNOWN tests whose message quotes a failure.
+        for status in self.STATUSES:
+            if test.doc.startswith(status):
                 test.exp_status = status
-                test.exp_message = test.doc.split(status, 1)[1].lstrip()
+                test.exp_message = test.doc[len(status):].lstrip()
                 break
         else:
-            test.exp_status = 'PASS'
-            test.exp_message = ''
+            for status in self.STATUSES:
+                if status in test.doc:
+                    test.exp_status = status
+                    test.exp_message = test.doc.split(status, 1)[1].lstrip()
+                    break
+            else:
+                test.exp_status = 'PASS'
+                test.exp_message = ''
         test.kws = list(test.body)
         test.keyword_count = test.kw_count = len(test.kws)
 
