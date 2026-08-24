@@ -568,9 +568,11 @@ def run(*tests, **options):
     respectively.
 
     A return code is returned similarly as when running on the command line.
-    Zero means that tests were executed and no test failed, values up to 250
-    denote the number of failed tests, and values between 251-255 are for other
-    statuses documented in the Robot Framework User Guide.
+    Zero means that tests were executed and no test failed or was UNKNOWN.
+    Other values up to 239 encode the failed and UNKNOWN counts and can be
+    extracted with ``failed = rc & 0xF`` (capped at 15) and
+    ``unknown = (rc >> 4) & 0xF`` (capped at 14). Values between 251-255 are
+    for other statuses documented in the Robot Framework User Guide.
 
     Example::
 

@@ -103,13 +103,13 @@ class TestRun(RunningTestCase):
     def test_multi_options_as_single_string(self):
         assert_equal(run_without_outputs(self.data, include='?a??', skip='pass',
                                          skiponfailure='fail'), 0)
-        self._assert_outputs([('2 tests, 0 passed, 0 failed, 2 skipped', 1)])
+        self._assert_outputs([('2 tests, 0 passed, 0 failed, 0 unknown, 2 skipped', 1)])
 
     def test_multi_options_as_tuples(self):
         assert_equal(run_without_outputs(self.data, exclude=('fail',), skip=('pass',),
                                          skiponfailure=('xxx', 'yyy')), 0)
         self._assert_outputs([('FAIL', 0)])
-        self._assert_outputs([('1 test, 0 passed, 0 failed, 1 skipped', 1)])
+        self._assert_outputs([('1 test, 0 passed, 0 failed, 0 unknown, 1 skipped', 1)])
 
     def test_listener_gets_notification_about_log_report_and_output(self):
         listener = join(ROOT, 'utest', 'resources', 'Listener.py')
@@ -280,7 +280,8 @@ class TestStateBetweenTestRuns(RunningTestCase):
     def test_clear_namespace_between_runs(self):
         data = join(ROOT, 'atest', 'testdata', 'variables', 'commandline_variables.robot')
         self._run(data, test=['NormalText'], variable=['NormalText:Hello'], rc=0)
-        self._run(data, test=['NormalText'], rc=1)
+        # Missing variable -> UNKNOWN -> encoded in the high nibble: 1 << 4.
+        self._run(data, test=['NormalText'], rc=16)
 
     def test_reset_logging_conf(self):
         assert_equal(logging.getLogger().handlers, [])
