@@ -11,9 +11,10 @@ xmlschema
 
 pyyaml
 
-# Used by the log_level suites (CComparison) to compare generated output
-# files against the reference files.
-PythonExtensionsCollection
+# Note: the log_level suites (CComparison) use PythonExtensionsCollection to
+# compare generated output against the reference files, but fall back to a
+# bundled minimal implementation (libs/_pec_compat.py) when it is not
+# installed, so it is intentionally not required here.
 
 # Python 3.13 removed the telnetlib module (PEP 594) that the standard
 # Telnet library needs. This backport restores it; without it e.g. the
