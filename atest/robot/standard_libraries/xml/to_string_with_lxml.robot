@@ -21,4 +21,5 @@ Log element
 
 Log child element
     ${tc}=    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.kws[0].msgs[0]}    <täg attr="hyv&#xE4;">sisältö</täg>
+    # lxml < 5 escapes the non-ASCII attribute value, newer lxml does not.
+    Check Log Message    ${tc.kws[0].msgs[0]}    <täg attr="hyv*">sisältö</täg>    pattern=yes
