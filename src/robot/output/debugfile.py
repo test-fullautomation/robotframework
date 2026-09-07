@@ -92,11 +92,23 @@ class _DebugFileWriter:
             self._end('TEST', test.name, test.elapsedtime)
             self._separator('TEST')
 
+    @classmethod
+    def _thread_info(cls, thread_name):
+        # Created lazily: with a log level above INFO start_thread does not
+        # register the thread, but a keyword with a visible own level (e.g.
+        # `Log msg USER` at --loglevel USER) still needs the bookkeeping.
+        # Accessing the dict directly crashed such workers with a KeyError
+        # (issue #109).
+        if thread_name not in cls.thread_log_info:
+            info = ThreadSafeDict()
+            info['level'] = 0
+            info['indent'] = 0
+            cls.thread_log_info[thread_name] = info
+        return cls.thread_log_info[thread_name]
+
     def start_thread(self, thread):
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
-            _DebugFileWriter.thread_log_info[thread.data.name] = ThreadSafeDict()
-            _DebugFileWriter.thread_log_info[thread.data.name]['level'] = 0
-            _DebugFileWriter.thread_log_info[thread.data.name]['indent'] = 0
+            self._thread_info(thread.data.name)
             self._separator('THREAD')
             self._start('THREAD', thread.data.name)
             self._separator('THREAD')
@@ -134,10 +146,10 @@ class _DebugFileWriter:
                 self._start(kw.type, kw.name, kw.args)
                 self._kw_level += 1
             else:
-                if _DebugFileWriter.thread_log_info[thread_name]['level'] == 0:
+                if self._thread_info(thread_name)['level'] == 0:
                     self._separator('KEYWORD')
                 self._start(kw.type, kw.name, kw.args)
-                _DebugFileWriter.thread_log_info[thread_name]['level'] += 1
+                self._thread_info(thread_name)['level'] += 1
 
     def end_keyword(self, kw):
 
@@ -161,7 +173,7 @@ class _DebugFileWriter:
             if thread_name == 'MainThread':
                 self._kw_level -= 1
             else:
-                _DebugFileWriter.thread_log_info[thread_name]['level'] -= 1
+                self._thread_info(thread_name)['level'] -= 1
 
     def log_message(self, msg):
         if self._is_logged(msg.level):
@@ -184,8 +196,8 @@ class _DebugFileWriter:
                 self._write('+%s START %s: %s%s' % ('-'*self._indent, type_, name, args))
                 self._indent += 1
             else:
-                self._write('%s> +%s START %s: %s%s' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, args))
-                _DebugFileWriter.thread_log_info[thread_name]['indent'] += 1
+                self._write('%s> +%s START %s: %s%s' % (thread_name, '-' * self._thread_info(thread_name)['indent'], type_,  name, args))
+                self._thread_info(thread_name)['indent'] += 1
 
     def _end(self, type_, name, elapsed):
         if self._is_logged(LOG_LEVEL_DEBUG_FILE):
@@ -194,8 +206,8 @@ class _DebugFileWriter:
                 self._indent -= 1
                 self._write('+%s END %s: %s (%s)' % ('-'*self._indent, type_, name, elapsed))
             else:
-                _DebugFileWriter.thread_log_info[thread_name]['indent'] -= 1
-                self._write('%s> +%s END %s: %s (%s)' % (thread_name, '-' * _DebugFileWriter.thread_log_info[thread_name]['indent'], type_,  name, elapsed))
+                self._thread_info(thread_name)['indent'] -= 1
+                self._write('%s> +%s END %s: %s (%s)' % (thread_name, '-' * self._thread_info(thread_name)['indent'], type_,  name, elapsed))
 
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)

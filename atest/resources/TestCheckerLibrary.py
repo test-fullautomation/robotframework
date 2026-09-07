@@ -99,7 +99,11 @@ class TestCheckerLibrary:
     ROBOT_LIBRARY_SCOPE = 'GLOBAL'
 
     def __init__(self):
-        self.schema = XMLSchema('doc/schema/robot.xsd')
+        # Resolve relative to this file so the harness does not depend on
+        # being started from the repository root.
+        schema = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              '..', '..', 'doc', 'schema', 'robot.xsd')
+        self.schema = XMLSchema(schema)
 
     def process_output(self, path, validate=None):
         set_suite_variable = BuiltIn().set_suite_variable
