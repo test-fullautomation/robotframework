@@ -130,7 +130,7 @@ Embedded Arguments Timeout From Argument
     Embedded args timeout '0.003' from arguments
 
 Local Variables Are Not Visible In Child Keyword Timeout
-    [Documentation]    FAIL Setting keyword timeout failed: Variable '\${local}' not found.
+    [Documentation]    UNKNOWN Setting keyword timeout failed: Variable '\${local}' not found.
     ${local}=    Set variable    1 day
     Keyword that uses parent local variable for timeout
 
@@ -230,12 +230,12 @@ Keyword Timeout Should Not Be Active For Run Keyword Variants But To Keywords Th
     Run Keyword With Timeout
 
 Timeouted Keyword Called With Wrong Number of Arguments
-    [Documentation]    FAIL Keyword 'Timeouted Keyword Passes' expected 0 to 1 arguments, got 4.
+    [Documentation]    UNKNOWN Keyword 'Timeouted Keyword Passes' expected 0 to 1 arguments, got 4.
     Timeouted Keyword Passes    wrong    number    of    arguments
     [Teardown]    No Operation
 
 Timeouted Keyword Called With Wrong Number of Arguments with Run Keyword
-    [Documentation]    FAIL Keyword 'Timeouted Keyword Passes' expected 0 to 1 arguments, got 4.
+    [Documentation]    UNKNOWN Keyword 'Timeouted Keyword Passes' expected 0 to 1 arguments, got 4.
     Run Keyword    Timeouted Keyword Passes    wrong    number    of    arguments
     [Teardown]    No Operation
 
@@ -248,12 +248,12 @@ Negative timeout is ignored
     Negative timeout is ignored
 
 Invalid test timeout
-    [Documentation]    FAIL Setting test timeout failed: Invalid time string '¡Bäng!'.
+    [Documentation]    UNKNOWN Setting test timeout failed: Invalid time string '¡Bäng!'.
     [Timeout]    ¡Bäng!
     Fail    Should not be executed!
 
 Invalid keyword timeout
-    [Documentation]    FAIL Setting keyword timeout failed: Invalid time string '¡Bäng!'.
+    [Documentation]    UNKNOWN Setting keyword timeout failed: Invalid time string '¡Bäng!'.
     Invalid keyword timeout
 
 *** Keywords ***

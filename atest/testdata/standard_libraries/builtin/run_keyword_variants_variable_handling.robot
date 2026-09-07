@@ -20,12 +20,12 @@ Run Keyword When Keyword and Arguments Are in List Variable
     Run Keyword    @{KEYWORD AND ARG WHICH NEEDS ESCAPING}
 
 Run Keyword With Empty List Variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword name missing: Given arguments ['\@{EMPTY}'] resolved to an empty list.
     Run Keyword    @{EMPTY}
 
 Run Keyword With Multiple Empty List Variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword name missing: Given arguments ['\@{EMPTY}', '\@{{{}}}', '\@{EMPTY}'] resolved to an empty list.
     Run Keyword    @{EMPTY}    @{{{}}}    @{EMPTY}
 
@@ -43,7 +43,7 @@ Run Keyword When Keyword And String Arguments After Empty Lists
     Run Keyword    @{EMPTY}    @{EMPTY}    Fail    Expected Failure
 
 Run Keyword If When Not Enough Arguments
-    [Documentation]    FAIL Keyword 'BuiltIn.Run Keyword If' expected at least 2 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'BuiltIn.Run Keyword If' expected at least 2 arguments, got 1.
     Run Keyword If    @{EMPTY}    @{EMPTY}    @{EMPTY}    @{EXPRESSION}
 
 Run Keyword When Run Keyword Does Not Take Keyword

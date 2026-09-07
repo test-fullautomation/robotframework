@@ -7,6 +7,9 @@ Resource          xml_resource.robot
 ${TÄG}            <täg attr="hyvä">sisältö</täg>
 ${T&#xE4;G}       <täg attr="hyv&#xE4;">sisältö</täg>
 ${XML}            <root>\n\t${TÄG}\n</root>
+# lxml < 5 escapes non-ASCII attribute values when serializing to unicode,
+# newer lxml keeps them as-is. Both forms are valid XML for the same data.
+@{TÄG FORMS}      ${TÄG}    ${T&#xE4;G}
 
 *** Test Cases ***
 Element to string
@@ -22,10 +25,11 @@ Element to string with encoding
 
 Child element to string
     ${string}=    Element To String    ${XML}    xpath=täg
-    Should Be Equal    ${string}    ${T&#xE4;G}
+    Should Contain    ${TÄG FORMS}    ${string}
     ${string}=    Element To String    ${XML}    täg    latin-1
-    ${expected}=    Encode String To Bytes    ${T&#xE4;G}    encoding=latin-1
-    Should Be Equal    ${string}    ${expected}
+    ${expected 1}=    Encode String To Bytes    ${TÄG}    encoding=latin-1
+    ${expected 2}=    Encode String To Bytes    ${T&#xE4;G}    encoding=latin-1
+    Should Be True    $string in ($expected_1, $expected_2)
 
 Log element
     ${string}=    Log Element    ${XML}
@@ -35,4 +39,4 @@ Log element
 
 Log child element
     ${string}=    Log Element    ${XML}    xpath=täg
-    Should Be Equal    ${string}    ${T&#xE4;G}
+    Should Contain    ${TÄG FORMS}    ${string}

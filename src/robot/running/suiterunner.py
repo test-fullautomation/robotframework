@@ -13,8 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import time
+
 from robot.errors import ExecutionFailed, ExecutionStatus, DataError, PassExecution
 from robot.model import SuiteVisitor, TagPatterns
+from robot.output import LOGGER
+from robot.output.loggerhelper import Message
 from robot.result import TestSuite, Result
 from robot.utils import get_timestamp, is_list_like, NormalizedDict, test_or_task
 from robot.variables import VariableScopes
@@ -28,6 +32,10 @@ from .timeouts import TestTimeout
 
 
 class SuiteRunner(SuiteVisitor):
+
+    # cuongnht thread scope: how long to wait for a scoped thread to stop
+    # cooperatively before abandoning it (seconds).
+    thread_stop_grace = 5.0
 
     def __init__(self, output, settings):
         self.result = None
@@ -74,10 +82,19 @@ class SuiteRunner(SuiteVisitor):
                                        self._settings.dry_run)
         self._context.set_suite_variables(result)
         if not self._suite_status.failed:
-            ret_import = ns.handle_imports()
+            import_errors = ns.handle_imports()
             ns.variables.resolve_delayed()
-            if ret_import != 0 and not self._settings.dry_run:
+            if import_errors and not self._settings.dry_run \
+                    and self._settings.import_failure == 'suite':
+                # cuongnht unknown state: with --importfailure suite (the
+                # default) any import error makes the whole suite UNKNOWN -
+                # the suite environment is not as specified, so no test in it
+                # gets a verdict. The error text is attached so tests show a
+                # meaningful message. With --importfailure test only tests
+                # actually using keywords or variables from the failed import
+                # become UNKNOWN via normal keyword/variable resolution.
                 self._suite_status.failure.unknown = True
+                self._suite_status.failure.setup = '\n'.join(import_errors)
 
         result.doc = self._resolve_setting(result.doc)
         result.metadata = [(self._resolve_setting(n), self._resolve_setting(v))
@@ -121,6 +138,10 @@ class SuiteRunner(SuiteVisitor):
                     self._suite.suite_teardown_failed(str(failure))
         self._suite.endtime = get_timestamp()
         self._suite.message = self._suite_status.message
+        # cuongnht thread scope: stop suite-scoped (daemon=False) threads and
+        # any test-scoped leftovers before the suite context goes away.
+        self._stop_scoped_threads(suite_scope_too=True,
+                                  where=f"suite '{self._suite.name}'")
         self._context.end_suite(ModelCombiner(suite, self._suite))
         self._executed.pop()
         self._suite = self._suite.parent
@@ -144,6 +165,7 @@ class SuiteRunner(SuiteVisitor):
                                           starttime=get_timestamp())
         self._context.start_test(result)
         self._output.start_test(ModelCombiner(test, result))
+        self._report_still_running_threads()  # cuongnht thread scope
         status = TestStatus(self._suite_status, result, settings.skip_on_failure,
                             settings.rpa)
         if status.exit:
@@ -200,6 +222,51 @@ class SuiteRunner(SuiteVisitor):
         if (result.failed or result.unknown) and not failed_before_listeners:
             status.failure_occurred()
         self._context.end_test(result)
+        # cuongnht thread scope: stop test-scoped (daemon=True) threads.
+        self._stop_scoped_threads(suite_scope_too=False,
+                                  where=f"test '{result.name}'")
+
+    def _stop_scoped_threads(self, suite_scope_too, where):
+        # cuongnht thread scope: request cooperative stop of scoped THREADs,
+        # wait a grace period, abandon (with a warning) whatever is stuck.
+        # Abandoned workers are Python daemons, so they can never block the
+        # run; their partial output files are finalized by XmlLogger.close()
+        # and reported with UNKNOWN status.
+        context = self._context
+        threads = getattr(context, 'active_threads', None)
+        if not threads:
+            return
+        entries = [(name, entry) for name, entry in dict(threads).items()
+                   if suite_scope_too or entry['daemon']]
+        if not entries:
+            return
+        for name, entry in entries:
+            entry['stop_event'].set()
+        deadline = time.time() + self.thread_stop_grace
+        for name, entry in entries:
+            worker = entry['worker']
+            worker.join(max(0.0, deadline - time.time()))
+            if worker.is_alive():
+                # Route directly to the errors section: LOGGER.log_message
+                # may be in keyword mode (a thread can be inside a keyword)
+                # and would write the message into the suite XML otherwise.
+                LOGGER.message(Message(
+                    f"Thread '{name}' did not stop within "
+                    f"{self.thread_stop_grace} seconds at the end of {where} "
+                    f"and was abandoned.", 'WARN'))
+            threads.pop(name, None)
+
+    def _report_still_running_threads(self):
+        # cuongnht thread scope: make suite-scoped threads from earlier tests
+        # visible in the current test's log.
+        threads = getattr(self._context, 'active_threads', None)
+        if not threads:
+            return
+        for name, entry in dict(threads).items():
+            if entry['worker'].is_alive():
+                owner = entry['owner'] or 'an earlier test'
+                self._output.info(f"Thread '{name}' started in {owner!r} "
+                                  f"is still running.")
 
     def _add_exit_combine(self):
         exit_combine = ('NOT robot:exit', '')

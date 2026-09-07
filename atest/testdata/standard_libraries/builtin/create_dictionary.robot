@@ -34,15 +34,15 @@ Separate keys and values with equals in variable value
     Verify Dictionary    ${d}    {'foo=bar': 'foo=bar'}
 
 Separate keys and values with non-existing variables
-    [Documentation]    FAIL Variable '\${NONEX VALUE}' not found.
+    [Documentation]    UNKNOWN Variable '\${NONEX VALUE}' not found.
     Create Dictionary    key    ${NONEX VALUE}
 
 Wrong number of separate keys and values 1
-    [Documentation]    FAIL Expected even number of keys and values, got 3.
+    [Documentation]    UNKNOWN Expected even number of keys and values, got 3.
     Create Dictionary    1    2    3
 
 Wrong number of separate keys and values 2
-    [Documentation]    FAIL Expected even number of keys and values, got 7.
+    [Documentation]    UNKNOWN Expected even number of keys and values, got 7.
     Create Dictionary    @{LIST}    ooops
 
 Separate keys and values with invalid key
@@ -66,19 +66,19 @@ Separate keys and values with invalid key
     Verify Dictionary    ${d}    {'foo=bar': 'foo=bar'}
 
 `key=value` syntax with non-existing variables 1
-    [Documentation]    FAIL Variable '\${NONEX VALUE}' not found.
+    [Documentation]    UNKNOWN Variable '\${NONEX VALUE}' not found.
     Create Dictionary    key=${NONEX VALUE}
 
 `key=value` syntax with non-existing variables 2
-    [Documentation]    FAIL Variable '\${NONEX KEY}' not found.
+    [Documentation]    UNKNOWN Variable '\${NONEX KEY}' not found.
     Create Dictionary    ${NONEX KEY}=${NONEX VALUE}
 
 `key=value` syntax with invalid key
-    [Documentation]    FAIL STARTS: Creating dictionary failed:
+    [Documentation]    UNKNOWN STARTS: Creating dictionary failed:
     Create Dictionary    ${DICT}=non-hashable
 
 `key=value` syntax without equals
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid dictionary variable item 'no'. \
     ...    Items must use 'name=value' syntax or be dictionary variables themselves.
     Create Dictionary    a=1   no   equals
@@ -108,11 +108,11 @@ Separate keys and values and 'key=value' syntax
     Verify Dictionary    ${d}    {'a': '1', 'b': 2, 3: 'c', 4: '42'}
 
 Non-existing `\&{dict}` variable
-    [Documentation]    FAIL Variable '\&{NONEX}' not found.
+    [Documentation]    UNKNOWN Variable '\&{NONEX}' not found.
     Create Dictionary    &{EMPTY}    &{NONEX}
 
 Non-dictionary `\&{dict}` variable
-    [Documentation]    FAIL Value of variable '&{LIST}' is not dictionary or dictionary-like.
+    [Documentation]    UNKNOWN Value of variable '&{LIST}' is not dictionary or dictionary-like.
     Create Dictionary   &{LIST}    &{NONEX}
 
 *** Keywords ***

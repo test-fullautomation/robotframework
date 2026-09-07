@@ -52,19 +52,19 @@ None To Multiple Scalar Variables
     Should Be Equal    ${y}    ${None}
 
 Multiple Scalars With Too Few Values
-    [Documentation]    FAIL Cannot set variables: Expected 3 return values, got 2.
+    [Documentation]    UNKNOWN Cannot set variables: Expected 3 return values, got 2.
     ${a}    ${b}    ${c} =    Create List    a    b
 
 Multiple Scalars With Too Many Values
-    [Documentation]    FAIL Cannot set variables: Expected 3 return values, got 4.
+    [Documentation]    UNKNOWN Cannot set variables: Expected 3 return values, got 4.
     ${a}    ${b}    ${c} =    Create List    a    b    c    ${4}
 
 Multiple Scalars When No List Returned 1
-    [Documentation]    FAIL Cannot set variables: Expected list-like value, got string.
+    [Documentation]    UNKNOWN Cannot set variables: Expected list-like value, got string.
     ${a}    ${b} =    Set Variable    This is not list
 
 Multiple Scalars When No List Returned 2
-    [Documentation]    FAIL Cannot set variables: Expected list-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variables: Expected list-like value, got integer.
     ${a}    ${b} =    Set Variable    ${42}
 
 List Variable
@@ -108,19 +108,19 @@ None To List Variable
     Should Be True    ${list} == []
 
 List When Non-List Returned 1
-    [Documentation]    FAIL Cannot set variable '\@{list}': Expected list-like value, got string.
+    [Documentation]    UNKNOWN Cannot set variable '\@{list}': Expected list-like value, got string.
     @{list} =    Set Variable    kekkonen
 
 List When Non-List Returned 2
-    [Documentation]    FAIL Cannot set variable '\@{list}': Expected list-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variable '\@{list}': Expected list-like value, got integer.
     @{list} =    Set Variable    ${42}
 
 Only One List Variable Allowed 1
-    [Documentation]    FAIL Assignment can contain only one list variable.
+    [Documentation]    UNKNOWN Assignment can contain only one list variable.
     @{list}    @{list2} =    Fail    Not executed
 
 Only One List Variable Allowed 2
-    [Documentation]    FAIL Assignment can contain only one list variable.
+    [Documentation]    UNKNOWN Assignment can contain only one list variable.
     @{list}    ${scalar}    @{list2} =    Fail    Not executed
 
 List After Scalars
@@ -164,15 +164,15 @@ None To Scalar Variables And List Variable
     Should Be Equal    ${first}-${rest}-${last}    None-[]-None
 
 List and scalars with not enough values 1
-    [Documentation]     FAIL Cannot set variables: Expected 2 or more return values, got 1.
+    [Documentation]     UNKNOWN Cannot set variables: Expected 2 or more return values, got 1.
     ${first}    ${second}    @{list} =    Create List    1
 
 List and scalars with not enough values 2
-    [Documentation]     FAIL Cannot set variables: Expected 2 or more return values, got 1.
+    [Documentation]     UNKNOWN Cannot set variables: Expected 2 or more return values, got 1.
     ${first}    @{list}    ${last} =    Create List    1
 
 List and scalars with not enough values 3
-    [Documentation]     FAIL Cannot set variables: Expected 1 or more return values, got 0.
+    [Documentation]     UNKNOWN Cannot set variables: Expected 1 or more return values, got 0.
     @{list}    ${last} =    Create List
 
 Dictionary return value
@@ -191,41 +191,41 @@ Dictionary is dot-accessible
     Should Be Equal    ${nested.nested.key}    nested value
 
 Scalar dictionary is not dot-accessible
-    [Documentation]     FAIL STARTS: Resolving variable '${normal.key}' failed: AttributeError:
+    [Documentation]     UNKNOWN STARTS: Resolving variable '${normal.key}' failed: AttributeError:
     ${normal} =    Evaluate    {'key': 'value'}
     Should Be Equal    ${normal['key']}    value
     Should Be Equal    ${normal.key}    value
 
 Dictionary only allowed alone 1
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     ${s}    &{d} =    Fail    Not executed
 
 Dictionary only allowed alone 2
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d}    ${s} =    Fail    Not executed
 
 Dictionary only allowed alone 3
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d}    @{l} =    Fail    Not executed
 
 Dictionary only allowed alone 4
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     @{l}    &{d} =    Fail    Not executed
 
 Dictionary only allowed alone 5
-    [Documentation]     FAIL Dictionary variable cannot be assigned with other variables.
+    [Documentation]     UNKNOWN Dictionary variable cannot be assigned with other variables.
     &{d1}    &{d2} =    Fail    Not executed
 
 Dict when non-dict returned 1
-    [Documentation]    FAIL Cannot set variable '\&{ret}': Expected dictionary-like value, got list.
+    [Documentation]    UNKNOWN Cannot set variable '\&{ret}': Expected dictionary-like value, got list.
     &{ret} =     Create List
 
 Dict when non-dict returned 2
-    [Documentation]    FAIL Cannot set variable '\&{ret}': Expected dictionary-like value, got string.
+    [Documentation]    UNKNOWN Cannot set variable '\&{ret}': Expected dictionary-like value, got string.
     &{ret} =     Set variable   foo
 
 Dict when non-dict returned 3
-    [Documentation]    FAIL Cannot set variable '\&{ret}': Expected dictionary-like value, got integer.
+    [Documentation]    UNKNOWN Cannot set variable '\&{ret}': Expected dictionary-like value, got integer.
     &{ret} =     Set variable    ${5}
 
 Long String To Scalar Variable
@@ -246,7 +246,7 @@ Big Items In Dictionary
     Should Be Equal    ${big.second}    ${v100}
 
 No Keyword
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     ${nokeyword}
 
 Failing Keyword
@@ -262,11 +262,11 @@ Failing Keyword And Teardown
     [Teardown]    Fail    Teardown is executed normally. But fails...
 
 Non-existing keyword 1
-    [Documentation]    FAIL No keyword with name 'I do not exist' found.
+    [Documentation]    UNKNOWN No keyword with name 'I do not exist' found.
     ${x} =    I do not exist
 
 Non-existing keyword 2
-    [Documentation]    FAIL No keyword with name 'I do not exist either' found.
+    [Documentation]    UNKNOWN No keyword with name 'I do not exist either' found.
     ${x}      I do not exist either
 
 Assign Mark Without Space
@@ -295,16 +295,16 @@ Optional Assign Mark With Multiple Variables
     Should Be Equal    @{c}    c
 
 Assign Mark Can Be Used Only With The Last Variable
-    [Documentation]    FAIL Assign mark '=' can be used only with the last variable.
+    [Documentation]    UNKNOWN Assign mark '=' can be used only with the last variable.
     ${v1} =    ${v2} =    Set Variable    a    b
 
 Files are not lists
-    [Documentation]    FAIL Cannot set variable '\@{works not}': Expected list-like value, got file.
+    [Documentation]    UNKNOWN Cannot set variable '\@{works not}': Expected list-like value, got file.
     ${works} =    Get open file
     @{works not} =    Get open file
 
 Invalid count error is catchable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Teardown failed:
     ...    Several failures occurred:
     ...
@@ -322,7 +322,7 @@ Invalid count error is catchable
     ...    Fail    Also this is executed!
 
 Invalid type error is catchable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Teardown failed:
     ...    Several failures occurred:
     ...
@@ -343,15 +343,15 @@ Invalid type error is catchable
     ...    Fail    Also this is executed!
 
 Invalid assign
-    [Documentation]    FAIL No keyword with name '\${oops' found.
+    [Documentation]    UNKNOWN No keyword with name '\${oops' found.
     ${oops    Set Variable    whatever
 
 Invalid assign with assign mark
-    [Documentation]    FAIL No keyword with name '\${oops=' found.
+    [Documentation]    UNKNOWN No keyword with name '\${oops=' found.
     ${oops=    Set Variable    whatever
 
 Too many assign marks
-    [Documentation]    FAIL No keyword with name '\${oops}==' found.
+    [Documentation]    UNKNOWN No keyword with name '\${oops}==' found.
     ${oops}==    Set Variable    whatever
 
 Item assign to scalar dictionary
@@ -447,18 +447,18 @@ Item assign to object with setitem capability
     Dictionary Should Contain Item    ${OBJECT_WITH_SETITEM_CAP.container}    1:2        value_slice_as_str
 
 Item assign to object without setitem capability fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...     Variable '\${OBJECT_WITHOUT_SETITEM_CAP}' is ObjectWithoutSetItemCap and does not support item assignment.
     ${OBJECT_WITHOUT_SETITEM_CAP}[newKey]=    Set Variable        newVal
 
 Item assign to immutable object fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...     Variable '${tuple_variable}' is tuple and does not support item assignment.
     ${tuple_variable}=       Evaluate        (1,)
     ${tuple_variable}[0]=    Set Variable    0
 
 Item assign expects iterable fails
-    [Documentation]    FAIL STARTS:
+    [Documentation]    UNKNOWN STARTS:
     ...     Setting value to list variable '${list_variable}' at index [:1] failed: TypeError:
     ${list_variable}=       Create List    1    2    3
     ${list_variable}[:1]=   Evaluate       0
@@ -466,25 +466,25 @@ Item assign expects iterable fails
     Log To Console  ${list_variable}
 
 Index not found error when item assign to list
-    [Documentation]    FAIL STARTS:
+    [Documentation]    UNKNOWN STARTS:
     ...    Setting value to list variable '${list_variable}[0]' at index [2] failed: IndexError:
     ${list_variable}=        Create List    ${{ [1, 2] }}
     ${list_variable}[0][2]=  Set Variable   3
 
 Item assign to undeclared scalar fails
-    [Documentation]    FAIL    Variable '${undeclared_scalar}' not found.
+    [Documentation]    UNKNOWN    Variable '${undeclared_scalar}' not found.
     ${undeclared_scalar}[0]=  Set Variable   0
 
 Item assign to undeclared dict fails
-    [Documentation]    FAIL    Variable '${undeclared_dict}' not found.
+    [Documentation]    UNKNOWN    Variable '${undeclared_dict}' not found.
     &{undeclared_dict}[0]=  Set Variable   0
 
 Item assign to undeclared list fails
-    [Documentation]    FAIL    Variable '${undeclared_list}' not found.
+    [Documentation]    UNKNOWN    Variable '${undeclared_list}' not found.
     @{undeclared_list}[0]=  Set Variable   0
 
 Empty item assign to list fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting value to list variable '${list_variable}' at index [] failed: \
     ...    TypeError: list indices must be integers or slices, not str
     ${list_variable}=       Create List    ${{ [1, 2] }}
@@ -551,14 +551,14 @@ Single item assign to dict
     Should Not Be Empty   ${inner_dict}
 
 Single item assign to list should fail if value is not list
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting value to list variable '@{list_variable}' at index [1] failed: \
     ...    Expected list-like value, got string.
     @{list_variable}=          Create List     x  y  z
     @{list_variable}[1]=       Set Variable    abc
 
 Single item assign to dict should fail if value is not dict
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting value to DotDict variable '&{dict_variable}' at index [1] failed: \
     ...    Expected dictionary-like value, got string.
     &{dict_variable}=          Create Dictionary    x=y   a=b

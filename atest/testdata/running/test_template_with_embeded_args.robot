@@ -26,7 +26,7 @@ Some arguments can be hard-coded
     1 + 3
 
 Can have different arguments than definition
-    [Documentation]    FAIL No keyword with name 'The non-existing of 666 should be 42' found.
+    [Documentation]    UNKNOWN No keyword with name 'The non-existing of 666 should be 42' found.
     [Template]    The ${meaning} of ${life} should be 42
     result    38 + 3 + 1
     non-existing    666
@@ -36,13 +36,13 @@ Can use variables
     ${1} + ${2}    ${3}
 
 Cannot have more arguments than variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword 'The result of \${calculation} should be \${expected}' expected 0 arguments, got 2.
     [Template]    The result of ${calc} should be 3
     1 + 2    extra
 
 Cannot have less arguments than variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) Keyword 'The result of \${calculation} should be \${expected}' expected 0 arguments, got 1.

@@ -1,5 +1,5 @@
-Robot Framework
-===============
+Robot Framework (RobotFramework AIO fork)
+=========================================
 
 .. contents::
    :local:
@@ -7,144 +7,211 @@ Robot Framework
 Introduction
 ------------
 
-`Robot Framework <http://robotframework.org>`_ |r| is a generic open source
-automation framework for acceptance testing, acceptance test driven
-development (ATDD), and robotic process automation (RPA). It has simple plain
-text syntax and it can be extended easily with generic and custom libraries.
+This repository is an **extended fork of** `Robot Framework
+<http://robotframework.org>`_ **6.1**, the generic open source automation
+framework for acceptance testing, ATDD and RPA. It forms the core of
+*RobotFramework AIO* and extends the upstream framework where large,
+long-running test systems need more than the standard feature set:
 
-Robot Framework is operating system and application independent. It is
-implemented using `Python <http://python.org>`_ which is also the primary
-language to extend it. The framework has a rich ecosystem around it consisting
-of various generic libraries and tools that are developed as separate projects.
-For more information about Robot Framework and the ecosystem, see
-http://robotframework.org.
+- **native parallel execution** inside test cases (the ``THREAD`` keyword
+  with complete result reporting), and
+- **very long, condition-driven test runs** (hours to days) that survive
+  crashes, bound their memory and stay debuggable.
 
-Robot Framework project is hosted on GitHub_ where you can find source code,
-an issue tracker, and some further documentation. Downloads are hosted on PyPI_.
+Everything from standard Robot Framework 6.1 -- syntax, standard libraries,
+listener and library APIs, output formats -- is preserved; existing test
+suites run unchanged. See `Compatibility`_ below and the upstream project at
+http://robotframework.org for the base framework.
 
-Robot Framework development is sponsored by non-profit `Robot Framework Foundation
-<http://robotframework.org/foundation>`_. If you are using the framework
-and benefiting from it, consider joining the foundation to help maintaining
-the framework and developing it further.
+What this fork adds
+-------------------
 
-.. _GitHub: https://github.com/robotframework/robotframework
-.. _PyPI: https://pypi.python.org/pypi/robotframework
+Parallel execution: the THREAD keyword
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. image:: https://img.shields.io/pypi/v/robotframework.svg?label=version
-   :target: https://pypi.python.org/pypi/robotframework
-   :alt: Latest version
+``THREAD`` is a native block keyword (like ``FOR`` or ``IF``) that runs its
+body on a worker thread, in parallel with the main test flow:
 
-.. image:: https://img.shields.io/pypi/l/robotframework.svg
-   :target: http://www.apache.org/licenses/LICENSE-2.0.html
-   :alt: License
+.. code:: robotframework
 
-Installation
-------------
+    *** Test Cases ***
+    Parallel Measurement
+        THREAD    MONITOR    False
+            FOR    ${i}    IN RANGE    1000
+                Read Sensors
+            END
+        END
+        Flash The Device      # runs while MONITOR measures
+        Stop Thread           MONITOR
 
-If you already have Python_ with `pip <https://pip.pypa.io>`_ installed,
-you can simply run::
+- **Lifecycle scopes**: ``daemon=True`` threads are stopped automatically
+  when their test ends, ``daemon=False`` threads continue over the following
+  tests until the suite ends. Stopping is cooperative with a grace period;
+  threads that cannot stop are abandoned safely and reported as ``UNKNOWN``.
+- **Deterministic control**: ``Stop Thread`` and ``Wait For Thread`` BuiltIn
+  keywords.
+- **Inter-thread communication**: ``Send Thread Notification`` /
+  ``Wait Thread Notification`` and re-entrant locks
+  (``Thread RLock Acquire`` / ``Release``).
+- **Complete reporting**: every thread streams into its own output file;
+  at the end of the run the results are merged automatically into one
+  ``output.xml``, so ``log.html`` shows each thread as a collapsible block
+  with real timestamps and statuses.
+- **Execution timeline**: ``--timeline timeline.html`` generates an
+  additional HTML view with one lane per thread on a common time axis --
+  the true parallel interleaving -- where every bar deep-links into
+  ``log.html`` (expand, scroll, flash highlight).
 
-    pip install robotframework
+Very long test runs
+~~~~~~~~~~~~~~~~~~~
 
-For more detailed installation instructions, including installing Python, see
-`<INSTALL.rst>`__.
+- **StateMachine standard library**: model a multi-day test (e.g. battery
+  endurance cycling) as states with attached keywords and guarded
+  transitions -- defined with keywords or loaded from YAML/JSON files.
+  The engine checkpoints its progress atomically after *every* transition:
+  a crash at hour 40 becomes a **resume**, not a rerun. Includes preemptive
+  state timeouts, error routing to diagnostics states with cycle detection,
+  per-state statistics, and multiple named machines running concurrently.
+- **Watchdog standard library**: a supervisor running in a ``THREAD`` block
+  with heartbeat logging, stall detection (``Feed Watchdog``) and an
+  overall deadline; on firing it runs a configurable reaction keyword.
+- **Segmented output**: ``--segmentoutput 1h`` periodically seals the
+  streamed output (main and per-thread) into well-formed segment files, so
+  a crash loses at most the given interval of log data. Segments are merged
+  back automatically at run end; after a crash the
+  ``robot.output.segmentmerger`` and ``robot.output.threadmerger`` command
+  line tools recover everything written so far.
+- **Bounded memory**: the framework's internal message collections are
+  capped or spilled to disk, so execution memory stays flat over days-long
+  runs.
 
-Robot Framework requires Python 3.6 or newer and runs also on `PyPy <http://pypy.org>`_.
-If you need to use Python 2, `Jython <http://jython.org>`_ or
-`IronPython <http://ironpython.net>`_, you can use `Robot Framework 4.1.3`__.
+The UNKNOWN test status
+~~~~~~~~~~~~~~~~~~~~~~~
 
-__ https://github.com/robotframework/robotframework/tree/v4.1.3#readme
+Standard Robot Framework knows only PASS, FAIL and SKIP -- which forces two
+very different situations into the same FAIL bucket. This fork separates
+them: **FAIL means a check ran and the result contradicted the
+expectation** (a real verdict about the product), **UNKNOWN means no
+verdict could be produced at all**.
+
+Testing a calculator app with ``3 + 2``:
+
+=======================  =========  ====================================================
+Observed behaviour       Status     Meaning
+=======================  =========  ====================================================
+Result shown: ``5``      PASS       product works
+Result shown: ``4``      FAIL       product defect -- file a bug
+No result shown at all   UNKNOWN    the app crashed, the test raised an unexpected
+                                    exception, a keyword was not found -- no statement
+                                    about the product is possible; fix the test or the
+                                    environment and rerun
+=======================  =========  ====================================================
+
+This split pays off in triage and reporting: FAILs go to developers as
+defect candidates, UNKNOWNs go to the test team -- and neither pollutes the
+other's statistics (all outputs, logs, reports and counters show
+``passed / failed / unknown`` separately). It matters even more in long
+runs, where an abandoned worker thread or an environment hiccup should not
+masquerade as a product failure.
+
+UNKNOWN is assigned automatically for broken test data (missing keywords,
+invalid arguments, syntax problems) and for unexpected generic exceptions
+escaping from libraries; ordinary assertion failures (``Should Be Equal``
+etc.) remain FAIL. Test libraries can also raise
+``robot.errors.UnknownAssertionError`` deliberately to state "no verdict".
+
+Further extensions
+~~~~~~~~~~~~~~~~~~
+
+- Additional log level ``USER`` for end-user oriented messages.
 
 Example
 -------
 
-Below is a simple example test case for testing login to some system.
-You can find more examples with links to related demo projects from
-http://robotframework.org.
+A resumable endurance test with the StateMachine library:
 
 .. code:: robotframework
 
     *** Settings ***
-    Documentation     A test suite with a single test for valid login.
-    ...
-    ...               This test has a workflow that is created using keywords in
-    ...               the imported resource file.
-    Resource          login.resource
+    Library           StateMachine
 
     *** Test Cases ***
-    Valid Login
-        Open Browser To Login Page
-        Input Username    demo
-        Input Password    mode
-        Submit Credentials
-        Welcome Page Should Be Open
-        [Teardown]    Close Browser
+    Battery Endurance
+        Define State    INIT         enter=Setup DUT           timeout=10 min
+        Define State    CHARGING     during=Charge Step        on_error=FAULT
+        Define State    DISCHARGING  during=Discharge Step     on_error=FAULT
+        Define State    FAULT        enter=Collect Diagnostics    final=True
+        Define State    DONE         final=True
+        Define Transition    INIT         CHARGING       condition=$DUT_READY
+        Define Transition    CHARGING     DONE           condition=$CYCLES >= 500
+        Define Transition    CHARGING     DISCHARGING    condition=$SOC >= 80
+        Define Transition    DISCHARGING  CHARGING       condition=$SOC <= 20
+        Checkpoint Variable  \${CYCLES}
+        Run State Machine    initial=INIT    max_duration=48h
+        ...                  checkpoint=${OUTPUT DIR}${/}sm.json
 
-Usage
------
+Interrupted at any point, the next execution resumes from the last completed
+transition with all registered variables restored.
 
-Tests (or tasks) are executed from the command line using the ``robot``
-command or by executing the ``robot`` module directly like ``python -m robot`` .
+Compatibility
+-------------
 
-The basic usage is giving a path to a test (or task) file or directory as an
-argument with possible command line options before the path::
+This fork is based on Robot Framework **6.1** and is a superset of it:
 
-    robot tests.robot
-    robot --variable BROWSER:Firefox --outputdir results path/to/tests/
+- standard test data syntax, standard libraries and public APIs are
+  unchanged;
+- generated outputs remain compatible with ``rebot`` and the existing
+  reporting toolchain;
+- suites written for upstream Robot Framework 6.1 run unchanged.
 
-Additionally, there is the ``rebot`` tool for combining results and otherwise
-post-processing outputs::
+The extensions are additive (new keywords, new command line options, new
+standard libraries); test data using them is not portable back to upstream
+Robot Framework.
 
-    rebot --name Example output1.xml output2.xml
+Installation
+------------
 
-Run ``robot --help`` and ``rebot --help`` for more information about the command
-line usage. For a complete reference manual see `Robot Framework User Guide`_.
+Install this fork from the repository source with `pip <https://pip.pypa.io>`_::
+
+    pip install .
+
+For more detailed installation instructions, including installing Python, see
+`<INSTALL.rst>`__. Python 3.6 or newer is required.
+
+Note: installing the upstream ``robotframework`` package from PyPI gives you
+the standard framework *without* the extensions described above.
 
 Documentation
 -------------
 
-- `Robot Framework User Guide
-  <http://robotframework.org/robotframework/#user-guide>`_
-- `Standard libraries
-  <http://robotframework.org/robotframework/#standard-libraries>`_
-- `API documentation <http://robot-framework.readthedocs.org>`_
-- `General documentation <http://robotframework.org/>`_
+- Library documentation for the new standard libraries::
 
-Support and Contact
--------------------
+      python -m robot.libdoc StateMachine StateMachine.html
+      python -m robot.libdoc Watchdog Watchdog.html
 
-- `Slack <http://slack.robotframework.org/>`_
-- `Forum <https://forum.robotframework.org/>`_
-- `robotframework-users
-  <https://groups.google.com/group/robotframework-users/>`_ mailing list
-- `@robotframework <https://twitter.com/robotframework>`_ on Twitter
+- Command line help for the new options (``--timeline``,
+  ``--segmentoutput``, ...)::
 
-Contributing
-------------
+      python -m robot --help
 
-Interested to contribute to Robot Framework? Great! In that case it is a good
-start by looking at the `<CONTRIBUTING.rst>`__. If you
-do not already have an issue you would like to work on, you can check
-issues with `good new issue`__ and `help wanted`__ labels.
+- The *RobotFramework AIO Reference* (built from the separate
+  ``robotframework-documentation`` project) contains dedicated chapters on
+  threading and state machines.
+- Acceptance tests under ``atest/robot/`` double as executable examples,
+  e.g. ``atest/robot/standard_libraries/statemachine/``.
 
-Remember also that there are many other tools and libraries in the wider
-`Robot Framework ecosystem <http://robotframework.org>`_ that you can
-contribute to!
+Upstream project and license
+----------------------------
 
-__ https://github.com/robotframework/robotframework/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22
-__ https://github.com/robotframework/robotframework/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22
+Robot Framework is developed by the `Robot Framework Foundation
+<http://robotframework.org/foundation>`_; the upstream sources, issue
+tracker and downloads are hosted on `GitHub
+<https://github.com/robotframework/robotframework>`_ and `PyPI
+<https://pypi.python.org/pypi/robotframework>`_. This fork gratefully
+builds on that work.
 
-License and Trademark
----------------------
+Both the upstream framework and the extensions in this repository are
+licensed under the `Apache License 2.0
+<http://www.apache.org/licenses/LICENSE-2.0.html>`_.
 
-Robot Framework is open source software provided under the `Apache License 2.0`__.
-Robot Framework documentation and other similar content use the
-`Creative Commons Attribution 3.0 Unported`__ license. Most libraries and tools
-in the ecosystem are also open source, but they may use different licenses.
-
-Robot Framework trademark is owned by `Robot Framework Foundation`_.
-
-__ http://apache.org/licenses/LICENSE-2.0
-__ http://creativecommons.org/licenses/by/3.0
-
-.. |r| unicode:: U+00AE
+For guidelines about contributing to this fork see `<CONTRIBUTING.rst>`__.

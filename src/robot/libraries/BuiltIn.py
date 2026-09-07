@@ -562,8 +562,7 @@ class _Verify(_BuiltInBase):
                     notification.params = params
                     if thread.name in self._context.thread_message_queue_dict:
                         try:
-                            self._context.thread_message_queue_dict[thread.name].put(notification)
-                            # thread_queue.put(notification)
+                            self._put_notification(thread.name, notification)
                             # self.log_to_console(f"Put notification {name} id {hex(id(notification))} to {thread.name} which id is {id(self._context.thread_message_queue_dict[thread.name])}")
                         except:
                             pass
@@ -572,13 +571,27 @@ class _Verify(_BuiltInBase):
             notification.params = params
             # for debug
             # self.log_to_console(f"{threading.current_thread().name} put  {name} to {dst_thread}")
-            self._context.thread_message_queue_dict[dst_thread].put(notification)
+            self._put_notification(dst_thread, notification)
             # self.log_to_console(f"DONE")
         else:
             current_threads = threading.enumerate()
             log_message = f"Unable to send notification. Thread '{dst_thread}' does not exist. "
             log_message += "Existing threads: " + ", ".join(thread.name for thread in current_threads)
             AssertionError(log_message)
+
+    def _put_notification(self, thread_name, notification):
+        # cuongnht memory cap: queues drop their oldest entries when full
+        # (see robot.utils.PriorityQueue.max_items); warn once per queue so
+        # a never-consuming destination becomes visible in the log.
+        thread_queue = self._context.thread_message_queue_dict[thread_name]
+        thread_queue.put(notification)
+        if thread_queue.dropped and not getattr(thread_queue, '_drop_warned', False):
+            thread_queue._drop_warned = True
+            self.log(f"Notification queue of thread '{thread_name}' reached "
+                     f"its limit ({thread_queue.max_items}); oldest "
+                     f"notifications are being dropped. Is any thread "
+                     f"consuming them with 'Wait Thread Notification'?",
+                     'WARN')
 
     def wait_thread_notification(self, name, condition=None, timeout=5):
         """Waits for a notification from another thread.
@@ -3214,6 +3227,50 @@ class _Misc(_BuiltInBase):
             if remaining <= 0:
                 break
             time.sleep(min(remaining, 0.01))
+
+    # cuongnht thread scope ------------------------------------------------
+
+    def wait_for_thread(self, name, timeout=None):
+        """Waits until the ``THREAD`` block named ``name`` has finished.
+
+        Fails if the thread is still running after ``timeout`` (a time string
+        like ``10 s``; waits forever by default). Passing an unknown or
+        already finished thread name succeeds immediately.
+        """
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        secs = timestr_to_secs(timeout) if timeout else None
+        entry['worker'].join(secs)
+        if entry['worker'].is_alive():
+            raise AssertionError(f"Thread '{name}' did not finish in "
+                                 f"{secs_to_timestr(secs)}.")
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' finished.")
+
+    def stop_thread(self, name, timeout='10 s'):
+        """Requests the ``THREAD`` named ``name`` to stop and waits for it.
+
+        The stop is cooperative: the thread finishes its current keyword and
+        stops at the next keyword boundary. Fails if the thread is still
+        running after ``timeout``. Passing an unknown or already finished
+        thread name succeeds immediately.
+        """
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        entry['stop_event'].set()
+        secs = timestr_to_secs(timeout)
+        entry['worker'].join(secs)
+        if entry['worker'].is_alive():
+            raise AssertionError(f"Thread '{name}' did not stop in "
+                                 f"{secs_to_timestr(secs)}.")
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' stopped.")
+
+    # ----------------------------------------------------------------------
 
     def catenate(self, *items):
         """Catenates the given items together and returns the resulted string.

@@ -21,6 +21,7 @@ from pathlib import Path
 
 from .charwidth import get_char_width
 from .misc import seq2str2
+from .platform import WINDOWS
 from .robottypes import is_string
 from .unic import safe_str
 
@@ -132,7 +133,7 @@ def split_args_from_name_or_path(name):
     The separator can be either colon ``:`` or semicolon ``;``. If both are used,
     the first one is considered to be the separator.
     """
-    if os.path.exists(name):
+    if os.path.exists(name) and not _looks_like_ntfs_stream(name):
         return os.path.abspath(name), []
     if isinstance(name, Path):
         name = str(name)
@@ -144,6 +145,16 @@ def split_args_from_name_or_path(name):
     if os.path.exists(name):
         name = os.path.abspath(name)
     return name, args
+
+
+def _looks_like_ntfs_stream(name):
+    # On Windows a colon after the drive letter cannot be part of a real
+    # file or directory name. `os.path.exists('file.py:arg')` can still
+    # return True when 'arg' resolves as an NTFS alternate data stream of
+    # 'file.py', which made `path:arg` style arguments unsplittable and
+    # broke e.g. `--variablefile file.py:arg`. Such names must be treated
+    # as argument-separated instead of as existing paths.
+    return WINDOWS and str(name).find(':', 2) != -1
 
 
 def _get_arg_separator_index_from_name_or_path(name):

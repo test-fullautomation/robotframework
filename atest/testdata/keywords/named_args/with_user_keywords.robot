@@ -61,11 +61,11 @@ Naming without the varargs works
     Should be equal    ${ret}[1]    bar
 
 Varargs with naming does not work
-    [Documentation]    FAIL Keyword 'Named arguments with varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Named arguments with varargs' got positional argument after named arguments.
     Named arguments with varargs    foo    b=bar    dar
 
 Varargs with naming does not work with empty lists either
-    [Documentation]    FAIL Keyword 'Named arguments with varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Named arguments with varargs' got positional argument after named arguments.
     Named arguments with varargs    foo    b=bar    @{EMPTY}
 
 Named combinations with varargs

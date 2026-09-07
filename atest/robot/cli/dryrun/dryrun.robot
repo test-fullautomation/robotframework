@@ -121,11 +121,11 @@ Avoid keyword in dry-run
 
 Invalid imports
     Error in file    1    cli/dryrun/dryrun.robot    7
-    ...    Importing library 'DoesNotExist' failed: *Error: *
+    ...    Importing library 'DoesNotExist' failed: *Error: *    level=UNKNOWN
     Error in file    2    cli/dryrun/dryrun.robot    8
-    ...    Variable file 'wrong_path.py' does not exist.
+    ...    Variable file 'wrong_path.py' does not exist.    level=UNKNOWN
     Error in file    3    cli/dryrun/dryrun.robot    9
-    ...    Resource file 'NonExisting.robot' does not exist.
+    ...    Resource file 'NonExisting.robot' does not exist.    level=UNKNOWN
     [Teardown]    NONE
 
 Test from other suite

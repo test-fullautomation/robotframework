@@ -26,11 +26,11 @@ CONTINUE in TRY-ELSE
 
 CONTINUE with argument in FOR
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   CONTINUE does not accept arguments, got 'should not work'.    FAIL
+    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   CONTINUE does not accept arguments, got 'should not work'.    UNKNOWN
 
 CONTINUE with argument in WHILE
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   CONTINUE does not accept arguments, got 'should', 'not' and 'work'.    FAIL
+    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   CONTINUE does not accept arguments, got 'should', 'not' and 'work'.    UNKNOWN
 
 BREAK in test case
     Check Test Case    ${TESTNAME}
@@ -55,8 +55,8 @@ BREAK in TRY-ELSE
 
 BREAK with argument in FOR
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   BREAK does not accept arguments, got 'should not work'.    FAIL
+    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   BREAK does not accept arguments, got 'should not work'.    UNKNOWN
 
 BREAK with argument in WHILE
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   BREAK does not accept arguments, got 'should', 'not' and 'work'.    FAIL
+    Check Log Message    ${tc.body[0].body[0].body[1].body[0]}   BREAK does not accept arguments, got 'should', 'not' and 'work'.    UNKNOWN

@@ -167,15 +167,15 @@ Multiline in for loop body
 
 Invalid usage in test
     ...
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     No operation
 
 Invalid usage in user keyword
-    [Documentation]    FAIL Keyword name cannot be empty.
+    [Documentation]    UNKNOWN Keyword name cannot be empty.
     Invalid Usage In UK
 
 Invalid usage in keyword call
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...   No keyword with name '\\' found. If it is used inside a for loop, remove escaping backslashes and end the loop with 'END'.
     Log Many   1
     ...   2

@@ -17,7 +17,7 @@ ${VARIABLE}          variable value
 ${EXP_SUITE_NAME}    Automatic Variables.Auto1
 ${EXP_SUITE_DOC}     This is suite documentation. With ${VARIABLE}.
 ${EXP_SUITE_META}    {'MeTa1': 'Value', 'meta2': '${VARIABLE}'}
-${EXP_SUITE_STATS}   17 tests, 15 passed, 2 failed
+${EXP_SUITE_STATS}   17 tests, 15 passed, 2 failed, 0 unknown
 @{LAST_TEST}         \&{OPTIONS}    PASS
 
 *** Test Case ***

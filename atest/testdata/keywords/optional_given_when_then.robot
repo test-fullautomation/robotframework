@@ -36,7 +36,7 @@ In user keyword in resource file
     but another resource file  keyword
 
 Correct Name Shown In Keyword Not Found Error
-    [Documentation]  FAIL No keyword with name 'Given this keyword does not exist' found.
+    [Documentation]  UNKNOWN No keyword with name 'Given this keyword does not exist' found.
     Given this keyword does not exist
 
 Keyword can be used with and without prefix
@@ -66,7 +66,7 @@ Prefix consisting of multiple words
     Fie ca multipart prefixes didn't work with RF 6.0
 
 Prefix must be followed by space
-    [Documentation]  FAIL
+    [Documentation]  UNKNOWN
     ...    No keyword with name 'Givenwe don't drink too many beers' found. Did you mean:
     ...    ${SPACE*4}We Don't Drink Too Many Beers
     Givenwe don't drink too many beers

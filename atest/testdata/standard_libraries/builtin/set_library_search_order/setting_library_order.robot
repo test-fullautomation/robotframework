@@ -12,7 +12,7 @@ Library Order Set In Suite Setup Should Be Available In Test Cases
     Active Library Should Be    Library1
 
 Empty Library Order Can Be Set
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords with name 'Get Name' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}Library With Space.Get Name

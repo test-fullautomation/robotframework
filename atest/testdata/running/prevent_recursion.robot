@@ -3,27 +3,27 @@ Suite Teardown       Recursion With Run Keyword
 
 *** Variables ***
 ${LIMIT EXCEEDED}    Maximum limit of started keywords and control structures exceeded.
-${PSTD FAILED}       \n\nAlso parent suite teardown failed:\n${LIMIT EXCEEDED}
+${PSTD FAILED}       \n\nAlso parent suite teardown unknown:\n${LIMIT EXCEEDED}
 
 *** Test Cases ***
 Infinite recursion
-    [Documentation]    FAIL ${LIMIT EXCEEDED}${PSTD FAILED}
+    [Documentation]    UNKNOWN ${LIMIT EXCEEDED}${PSTD FAILED}
     Recursion
 
 Infinite cyclic recursion
-    [Documentation]    FAIL ${LIMIT EXCEEDED}${PSTD FAILED}
+    [Documentation]    UNKNOWN ${LIMIT EXCEEDED}${PSTD FAILED}
     Cyclic recursion
 
 Infinite recursion with Run Keyword
-    [Documentation]    FAIL ${LIMIT EXCEEDED}${PSTD FAILED}
+    [Documentation]    UNKNOWN ${LIMIT EXCEEDED}${PSTD FAILED}
     Recursion with Run Keyword
 
 Infinitely recursive for loop
-    [Documentation]    FAIL ${LIMIT EXCEEDED}${PSTD FAILED}
+    [Documentation]    UNKNOWN ${LIMIT EXCEEDED}${PSTD FAILED}
     Infinitely recursive for loop
 
 Recursion below the recursion limit is ok
-    [Documentation]    FAIL Still below recursion limit!${PSTD FAILED}
+    [Documentation]    UNKNOWN Still below recursion limit!${PSTD FAILED}
     Limited recursion
     Recursive for loop    10
     Failing limited recursion

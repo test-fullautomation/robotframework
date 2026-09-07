@@ -44,7 +44,7 @@ Return List Variable Containing Multiple Items
     Should Be Equal  ${ret2}  ${42}
 
 Return Non-Existing Variable
-    [Documentation]  FAIL  Replacing variables from keyword return value failed: Variable '\${nonexisting}' not found.
+    [Documentation]  UNKNOWN  Replacing variables from keyword return value failed: Variable '\${nonexisting}' not found.
     Return Non-Existing Variable
 
 Error About Non-Existing Variable In Return Value Can Be Caught

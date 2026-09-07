@@ -39,7 +39,7 @@ Invalid List Variable
     ${path} =    Normalize Path    ${RESDIR}/invalid_list_variable.py
     Error in file    14    ${DATAFILE}    43
     ...    Processing variable file '${path}' failed:
-    ...    Invalid variable '\@{invalid_list}': Expected list-like value, got string.
+    ...    Invalid variable '\@{invalid_list}': Expected list-like value, got string.    level=UNKNOWN
 
 Dynamic Variable File
     Check Test Case    ${TEST NAME} With No Args
@@ -53,20 +53,20 @@ Invalid return value from dynamic variable file
     Error in file    4    ${DATAFILE}    10
     ...    Processing variable file '${path}' with arguments [ Two args | returns invalid ] failed:
     ...    Expected 'get_variables' to return dict-like value, got None.
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Dynamic variable file raises exception
     ${path} =    Normalize Path    ${RESDIR}/dynamic_variables.py
     Error in file    5    ${DATAFILE}    12
     ...    Processing variable file '${path}' with arguments [ More | args | raises | exception ] failed:
     ...    Invalid arguments for get_variables
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Non-Existing Variable In Arguments To Dynamic Variable File
     ${path} =    Normalize Path    ${RESDIR}/dynamicVariables.py
     Error in file    13    ${DATAFILE}    42
     ...    Replacing variables from setting 'Variables' failed:
-    ...    Variable '\${non_existing_var_as_arg}' not found.
+    ...    Variable '\${non_existing_var_as_arg}' not found.    level=UNKNOWN
 
 Resource Importing Resources
     Check Test Case    ${TEST NAME}
@@ -92,11 +92,11 @@ Re-Import Variable File
 
 Non-Existing Resource File
     Error in file    6    ${DATAFILE}    34
-    ...    Resource file 'non_existing.robot' does not exist.
+    ...    Resource file 'non_existing.robot' does not exist.    level=UNKNOWN
 
 Non-Existing Variable File
     Error in file    7    ${DATAFILE}    35
-    ...    Variable file 'non_existing.py' does not exist.
+    ...    Variable file 'non_existing.py' does not exist.    level=UNKNOWN
 
 Empty Resource File
     ${path} =  Normalize Path  ${RESDIR}/empty_resource.robot
@@ -110,10 +110,10 @@ Invalid Resource Import Parameters
 Initialization file cannot be used as a resource file
     ${path} =  Normalize Path  ${DATADIR}/core/test_suite_dir_with_init_file/__init__.robot
     Error in file    9    ${DATAFILE}    38
-    ...    Initialization file '${path}' cannot be imported as a resource file.
+    ...    Initialization file '${path}' cannot be imported as a resource file.    level=UNKNOWN
     ${path} =  Normalize Path  ${DATADIR}/core/test_suite_dir_with_init_file/sub_suite_with_init_file/__INIT__.robot
     Error in file    10    ${DATAFILE}    39
-    ...    Initialization file '${path}' cannot be imported as a resource file.
+    ...    Initialization file '${path}' cannot be imported as a resource file.    level=UNKNOWN
 
 Invalid Setting In Resource File
     Error in file    1    ${RESDIR}/resources.robot    8
@@ -125,7 +125,7 @@ Resource cannot contain tests
     ${path} =    Normalize Path    ${RESDIR}/resource_with_testcase_table.robot
     Error in file    3    ${RESDIR}/resources.robot    6
     ...    Error in file '${path}' on line 4:
-    ...    Resource file with 'Test Cases' section is invalid.
+    ...    Resource file with 'Test Cases' section is invalid.    level=UNKNOWN
 
 Invalid Variable File
     ${path} =    Normalize Path    ${RESDIR}/invalid_variable_file.py
@@ -133,15 +133,15 @@ Invalid Variable File
     ...    Processing variable file '${path}' failed:
     ...    Importing variable file '${path}' failed:
     ...    This is an invalid variable file
-    ...    traceback=*
+    ...    traceback=*    level=UNKNOWN
 
 Resource Import Without Path
     Error in file    11    ${DATAFILE}    40
-    ...    Resource setting requires value.
+    ...    Resource setting requires value.    level=UNKNOWN
 
 Variable Import Without Path
     Error in file    15    ${DATAFILE}    44
-    ...    Variables setting requires value.
+    ...    Variables setting requires value.    level=UNKNOWN
 
 Resource File In PYTHONPATH
     Check Test Case    ${TEST NAME}

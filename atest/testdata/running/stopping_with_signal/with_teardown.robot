@@ -12,7 +12,7 @@ Test
     [Teardown]    Log    Logging Test Case Teardown
 
 Test 2
-    [Documentation]    FAIL Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN Test execution stopped due to a fatal error.
     Fail    Should not be executed
 
 *** Keywords ***

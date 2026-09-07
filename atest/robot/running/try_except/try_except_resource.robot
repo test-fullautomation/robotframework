@@ -15,7 +15,9 @@ Check Test Status
     ${tc} =    Check Test Case    ${TESTNAME}
     IF    $tc_status
         Should Be Equal    ${tc.status}    ${tc_status}
-    ELSE IF    'FAIL' in $statuses[1:] or ($statuses[0] == 'FAIL' and 'PASS' not in $statuses[1:])
+    ELSE IF    set($statuses[1:]) & {'FAIL', 'UNKNOWN'} or ($statuses[0] in ('FAIL', 'UNKNOWN') and 'PASS' not in $statuses[1:])
+        # A block reported UNKNOWN because of a syntax error still fails its
+        # test. Cases where the test itself is UNKNOWN pass tc_status.
         Should Be Equal    ${tc.status}    FAIL
     ELSE
         Should Be Equal    ${tc.status}    PASS

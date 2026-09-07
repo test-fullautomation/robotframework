@@ -37,11 +37,11 @@ Set item to dict attribute
     Dictionaries Should Be Equal     ${body.data}          ${EXPECTED_DICT}
 
 Trying to set un-settable attribute
-    [Documentation]    FAIL STARTS: Setting attribute 'not_settable' to variable '\${VAR}' failed: AttributeError:
+    [Documentation]    UNKNOWN STARTS: Setting attribute 'not_settable' to variable '\${VAR}' failed: AttributeError:
     ${VAR.not_settable} =    Set Variable    whatever
 
 Un-settable attribute error is catchable
-    [Documentation]    FAIL GLOB:
+    [Documentation]    UNKNOWN GLOB:
     ...    Teardown failed:
     ...    Several failures occurred:
     ...

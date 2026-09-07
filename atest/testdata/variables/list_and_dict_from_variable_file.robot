@@ -66,23 +66,23 @@ Scalar dicts are not converted to DotDicts
     Variable Should Not Exist    ${SCALAR DICT.a}
 
 Failing list
-    [Documentation]    FAIL STARTS: Resolving variable '\@{FAILING GENERATOR()}' failed: ZeroDivisionError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\@{FAILING GENERATOR()}' failed: ZeroDivisionError:
     Log Many   @{FAILING GENERATOR()}
 
 Failing list in for loop
-    [Documentation]    FAIL STARTS: Resolving variable '\@{FAILING GENERATOR()}' failed: ZeroDivisionError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\@{FAILING GENERATOR()}' failed: ZeroDivisionError:
     FOR    ${i}    IN    @{FAILING GENERATOR()}
         Fail    Not executed
     END
 
 Failing dict
-    [Documentation]    FAIL Resolving variable '\&{FAILING DICT}' failed: Bang
+    [Documentation]    UNKNOWN Resolving variable '\&{FAILING DICT}' failed: Bang
     Log Many   &{FAILING DICT}
 
 Open files are not lists
-    [Documentation]    FAIL Value of variable '\@{OPEN FILE}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{OPEN FILE}' is not list or list-like.
     Log Many    @{OPEN FILE}
 
 Closed files are not lists
-    [Documentation]    FAIL Value of variable '\@{CLOSED FILE}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{CLOSED FILE}' is not list or list-like.
     Log Many    @{CLOSED FILE}

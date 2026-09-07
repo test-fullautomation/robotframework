@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os.path
+
 from robot.conf import RebotSettings
 from robot.errors import DataError
 from robot.model import ModelModifier
@@ -65,6 +67,8 @@ class ResultWriter:
             results.js_result.remove_data_not_needed_in_report()
             self._write_report(results.js_result, settings.report,
                                settings.report_config)
+        if settings.timeline:  # cuongnht add thread
+            self._write_timeline(settings.timeline, settings.log)
         return results.return_code
 
     def _write_output(self, result, path):
@@ -78,6 +82,20 @@ class ResultWriter:
 
     def _write_report(self, js_result, path, config):
         self._write('Report', ReportWriter(js_result).write, path, config)
+
+    def _write_timeline(self, path, log_path):
+        # cuongnht add thread: the timeline is generated from the output.xml
+        # file directly so it needs a single XML source. Element ids in it
+        # must match the log generated from the same data.
+        sources = [str(s) for s in self._sources if not isinstance(s, Result)]
+        if len(sources) != 1:
+            LOGGER.error('Timeline file cannot be created: it requires exactly '
+                         'one output.xml source.')
+            return
+        link = os.path.relpath(log_path, os.path.dirname(path)) if log_path else ''
+        from robot.timeline import generate_timeline
+        self._write('Timeline', lambda p: generate_timeline(sources[0], p, link),
+                    path)
 
     def _write(self, name, writer, path, *args):
         try:

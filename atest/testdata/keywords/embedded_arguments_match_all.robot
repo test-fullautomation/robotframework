@@ -1,6 +1,6 @@
 *** Test Cases ***
 Match all allowed
-    [Documentation]    FAIL Keyword '\${catch all}' expected 0 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword '\${catch all}' expected 0 arguments, got 1.
     Exact match    hello kitty
     Matches catch all
     Matches catch all    Illegal with argument

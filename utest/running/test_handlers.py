@@ -361,7 +361,13 @@ class TestSourceAndLineno(unittest.TestCase):
             "Calling dynamic method 'get_keyword_source' failed: "
             "Return value must be a string, got integer."
         )
-        assert_equal(logger.messages, [(error, 'ERROR')])
+        details = (
+            "Details:\n"
+            "Calling dynamic method 'get_keyword_source' failed: "
+            "Return value must be a string, got integer."
+        )
+        # The fork logs the error details additionally on INFO level.
+        assert_equal(logger.messages, [(error, 'ERROR'), (details, 'INFO')])
 
     def _verify(self, kw, source, lineno=-1):
         if source:

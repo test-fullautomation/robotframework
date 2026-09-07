@@ -35,7 +35,7 @@ Non-ASCII keyword name works when UTF-8 bytes
     Should Be Equal    ${name}    UTF-8 nön-äscïï
 
 Non-ASCII keyword name fails when other bytes
-    [Documentation]  FAIL No keyword with name 'Latin1 nön-äscïï' found.
+    [Documentation]  UNKNOWN No keyword with name 'Latin1 nön-äscïï' found.
     Latin1 nön-äscïï
 
 Run Keyword in Static Library
@@ -48,7 +48,7 @@ Run Keyword in Static Library
     Should Be Equal  ${ret}  this is returned
 
 Not Found Keyword
-    [Documentation]  FAIL No keyword with name 'Get Keyword That Does Not Exist' found.
+    [Documentation]  UNKNOWN No keyword with name 'Get Keyword That Does Not Exist' found.
     Get Keyword That Does Not Exist
 
 Dynamic libraries should work without argument specification

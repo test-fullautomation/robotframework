@@ -96,34 +96,42 @@ class VariableScopes:
         self._variables_set.start_keyword()
         self._variables_set.update(new_scope)
 
-        current_thread_scope = self._current_thread_scope()
-        if current_thread_scope is not None:
-            # If in a thread, add the new scope to the thread's scope stack
-            thread_name = threading.current_thread().name
-            self._thread_scopes[thread_name].append(new_scope)
-        else:
-            # If not in a thread, add the new scope to the general scope stack
+        if threading.current_thread() is threading.main_thread():
             self._scopes.append(new_scope)
+        else:
+            # Worker threads must never touch the main scope stack: pushing
+            # to it from another thread corrupts the main thread's scoping.
+            # A worker without a registered scope (e.g. a keyword still
+            # unwinding after its thread scope was reaped) gets its own
+            # stack created on the fly.
+            thread_name = threading.current_thread().name
+            self._thread_scopes.setdefault(thread_name, []).append(new_scope)
 
     def end_keyword(self):
-        thread_name = threading.current_thread().name
-        if thread_name in self._thread_scopes and self._thread_scopes[thread_name]:
-            # If in a thread, pop from the thread's scope stack
-            self._thread_scopes[thread_name].pop()
-        else:
-            # If not in a thread, pop from the general scope stack
+        if threading.current_thread() is threading.main_thread():
             self._scopes.pop()
-        self._variables_set.end_keyword()
+            self._variables_set.end_keyword()
+        else:
+            # Pop only the worker's own stack. Popping the main stack here
+            # used to drain it one entry per unwinding keyword whenever a
+            # thread failed after its scope was torn down, failing every
+            # later test and finally crashing with an IndexError.
+            stack = self._thread_scopes.get(threading.current_thread().name)
+            if stack:
+                stack.pop()
+                self._variables_set.end_keyword()
 
-    def start_thread(self):
+    def start_thread(self, scope=None):
         """
         Start a new thread scope.
-        The new scope includes the current scope but is isolated from other threads.
+        The new scope includes the current scope but is isolated from other
+        threads. ``scope`` should be a snapshot taken in the spawning thread:
+        copying `current` from the worker races with the main thread pushing
+        and popping its own stack and can miss recently set variables.
         """
-        current_scope = self.current.copy()
+        current_scope = scope if scope is not None else self.current.copy()
         thread_name = threading.current_thread().name
         self._thread_scopes[thread_name] = [current_scope]
-        # self._scopes.append(current_scope)
 
     def end_thread(self):
         """

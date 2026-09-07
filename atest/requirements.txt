@@ -4,7 +4,25 @@
 docutils >= 0.10
 pygments
 
+# Used by TestCheckerLibrary to validate output.xml against the schema.
+# Without it the shared 'Process Output' keyword is unavailable and nearly
+# every acceptance test fails in its parent suite setup.
+xmlschema
+
 pyyaml
+
+# Note: the log_level suites (CComparison) use PythonExtensionsCollection to
+# compare generated output against the reference files, but fall back to a
+# bundled minimal implementation (libs/_pec_compat.py) when it is not
+# installed, so it is intentionally not required here.
+
+# Python 3.13 removed the telnetlib module (PEP 594) that the standard
+# Telnet library needs. This backport restores it; without it e.g. the
+# whole Libdoc python_library suite fails in its setup because it
+# documents robot.libraries.Telnet. If PyPI is not reachable, copying
+# Lib/telnetlib.py from a Python <= 3.12 installation into site-packages
+# works as well.
+standard-telnetlib; python_version >= '3.13'
 
 # On Linux installing lxml with pip may require compilation and development
 # headers. Alternatively it can be installed using a package manager like

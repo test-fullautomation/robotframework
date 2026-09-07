@@ -28,9 +28,11 @@ Named Keyword Is Not Method
 
 Unexpected error getting attribute
     Check Test Case    ${TESTNAME}
+    # In this fork DataError messages include their details section.
     Adding keyword failed    2    Unexpected error getting attribute
     ...    Getting handler method failed:
-    ...    TypeError: Oooops!
+    ...    TypeError: Oooops!\nDetails: Traceback*
+    ...    pattern=True
 
 Name Set Using 'robot_name' Attribute
     Check Test Case    ${TESTNAME}
@@ -50,10 +52,14 @@ Name starting with an underscore is OK
     Check log message    ${tc.kws[0].msgs[0]}    This is explicitly returned from 'get_keyword_names' anyway.
 
 Invalid get_keyword_names
+    # In this fork DataError messages include their details, and import
+    # errors are logged at UNKNOWN level.
     Error in file    3    test_libraries/hybrid_library.robot    3
     ...    Getting keyword names from library 'InvalidKeywordNames' failed:
     ...    Calling dynamic method 'get_keyword_names' failed:
     ...    Return value must be a list of strings.
+    ...    stacktrace=Details: Calling dynamic method 'get_keyword_names' failed: Return value must be a list of strings.
+    ...    level=UNKNOWN
 
 __init__ exposed as keyword
     ${tc} =    Check Test Case    ${TESTNAME}

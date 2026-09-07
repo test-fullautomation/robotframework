@@ -88,31 +88,31 @@ Continue after limit in teardown
     [Teardown]    Continue after limit
 
 Invalid limit invalid suffix
-    [Documentation]     FAIL Invalid WHILE loop limit: Invalid time string '1 times'.
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Invalid time string '1 times'.
     WHILE    $variable < 2    limit=1 times
         Log     ${variable}
     END
 
 Invalid limit invalid value
-    [Documentation]     FAIL Invalid WHILE loop limit: Iteration count must be a positive integer, got '-100'.
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Iteration count must be a positive integer, got '-100'.
     WHILE    $variable < 2    limit=-100
         Log     ${variable}
     END
 
 Invalid limit mistyped prefix
-    [Documentation]     FAIL WHILE loop cannot have more than one condition, got '$variable < 2' and 'limitation=2'.
+    [Documentation]     UNKNOWN WHILE loop cannot have more than one condition, got '$variable < 2' and 'limitation=2'.
     WHILE    $variable < 2    limitation=2
         Log     ${variable}
     END
 
 Limit used multiple times
-    [Documentation]     FAIL Option 'limit' allowed only once, got values '1' and '2'.
+    [Documentation]     UNKNOWN Option 'limit' allowed only once, got values '1' and '2'.
     WHILE    True    limit=1    limit=2
         Log     ${variable}
     END
 
 Invalid values after limit
-    [Documentation]     FAIL WHILE loop cannot have more than one condition, got '$variable < 2', 'limit=2' and 'invalid'.
+    [Documentation]     UNKNOWN WHILE loop cannot have more than one condition, got '$variable < 2', 'limit=2' and 'invalid'.
     WHILE    $variable < 2    limit=2    invalid
         Log     ${variable}
     END

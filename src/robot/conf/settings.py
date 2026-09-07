@@ -27,6 +27,7 @@ from robot.output import LOGGER, loggerhelper
 from robot.result.keywordremover import KeywordRemover
 from robot.result.flattenkeywordmatcher import validate_flatten_keyword
 from robot.utils import (abspath, create_destination_directory, escape, format_time,
+                         timestr_to_secs,  # cuongnht add segmented output
                          get_link_path, html_escape, is_list_like, plural_or_not as s,
                          seq2str, split_args_from_name_or_path)
 
@@ -49,6 +50,7 @@ class _BaseSettings:
                  'OutputDir'        : ('outputdir', abspath('.')),
                  'Log'              : ('log', 'log.html'),
                  'Report'           : ('report', 'report.html'),
+                 'Timeline'         : ('timeline', None),  # cuongnht add thread
                  'XUnit'            : ('xunit', None),
                  'SplitLog'         : ('splitlog', False),
                  'TimestampOutputs' : ('timestampoutputs', False),
@@ -71,7 +73,7 @@ class _BaseSettings:
                  'PythonPath'       : ('pythonpath', []),
                  'StdOut'           : ('stdout', None),
                  'StdErr'           : ('stderr', None)}
-    _output_opts = ['Output', 'Log', 'Report', 'XUnit', 'DebugFile']
+    _output_opts = ['Output', 'Log', 'Report', 'XUnit', 'DebugFile', 'Timeline']
 
     def __init__(self, options=None, **extra_options):
         self.start_timestamp = format_time(time.time(), '', '-', '')
@@ -140,7 +142,30 @@ class _BaseSettings:
             self._validate_expandkeywords(value)
         if name == 'Extension':
             return tuple('.' + ext.lower().lstrip('.') for ext in value.split(':'))
+        if name == 'SegmentOutput':  # cuongnht add segmented output
+            return self._process_segment_output(value)
+        if name == 'ImportFailure':  # cuongnht unknown state
+            return self._process_import_failure(value)
         return value
+
+    def _process_import_failure(self, value):
+        value = str(value).lower()
+        if value not in ('suite', 'test'):
+            self._raise_invalid('ImportFailure',
+                                f"Value must be 'suite' or 'test', got '{value}'.")
+        return value
+
+    def _process_segment_output(self, value):
+        if not value or str(value).upper() == 'NONE':
+            return None
+        try:
+            secs = timestr_to_secs(value)
+        except ValueError as err:
+            self._raise_invalid('SegmentOutput', str(err))
+        if secs <= 0:
+            self._raise_invalid('SegmentOutput',
+                                f'Interval must be positive, got {value!r}.')
+        return secs
 
     def _process_doc(self, value):
         if isinstance(value, Path) or (os.path.isfile(value) and value.strip() == value):
@@ -219,9 +244,10 @@ class _BaseSettings:
         name = self._opts[option]
         if not name:
             return None
-        if option == 'Log' and self._output_disabled():
-            self['Log'] = None
-            LOGGER.error('Log file cannot be created if output.xml is disabled.')
+        if option in ('Log', 'Timeline') and self._output_disabled():
+            self[option] = None
+            LOGGER.error(f'{option} file cannot be created if output.xml '
+                         f'is disabled.')
             return None
         name = self._process_output_name(option, name)
         path = abspath(os.path.join(self['OutputDir'], name))
@@ -240,7 +266,7 @@ class _BaseSettings:
             return extension
         if file_type in ['Output', 'XUnit']:
             return '.xml'
-        if file_type in ['Log', 'Report']:
+        if file_type in ['Log', 'Report', 'Timeline']:
             return '.html'
         if file_type == 'DebugFile':
             return '.txt'
@@ -259,7 +285,7 @@ class _BaseSettings:
         return self._split_from_colon(value)
 
     def _process_report_background(self, colors):
-        if colors.count(':') not in [1, 3]:
+        if colors.count(':') not in [1, 2, 3]:
             self._raise_invalid('ReportBackground', f"Expected format 'pass:fail:unknown:skip' "
 				               									f"or 'pass:fail:unknown' "
                                                     f"or 'pass:fail', got '{colors}'.")
@@ -382,6 +408,11 @@ class _BaseSettings:
         return self['Report']
 
     @property
+    def timeline(self):
+        # cuongnht add thread
+        return self['Timeline']
+
+    @property
     def xunit(self):
         return self['XUnit']
 
@@ -463,6 +494,8 @@ class _BaseSettings:
 class RobotSettings(_BaseSettings):
     _extra_cli_opts = {'Extension'          : ('extension', ('.robot', '.rbt', '.robot.rst')),
                        'Output'             : ('output', 'output.xml'),
+                       'SegmentOutput'      : ('segmentoutput', None),  # cuongnht add segmented output
+                       'ImportFailure'      : ('importfailure', 'suite'),  # cuongnht unknown state
                        'LogLevel'           : ('loglevel', 'INFO'),
                        'MaxErrorLines'      : ('maxerrorlines', 40),
                        'MaxAssignLength'    : ('maxassignlength', 200),
@@ -515,6 +548,16 @@ class RobotSettings(_BaseSettings):
     @property
     def debug_file(self):
         return self['DebugFile']
+
+    @property
+    def segment_output(self):
+        # cuongnht add segmented output: interval in seconds or None.
+        return self['SegmentOutput']
+
+    @property
+    def import_failure(self):
+        # cuongnht unknown state: 'suite' (default) or 'test'.
+        return self['ImportFailure']
 
     @property
     def languages(self):

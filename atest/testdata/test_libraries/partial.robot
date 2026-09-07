@@ -13,7 +13,7 @@ Partial function with argument conversion
     Partial function    VALUE    lower=yes
 
 Partial function with invalid argument count
-    [Documentation]    FAIL    Keyword 'PartialFunction.Partial Function' expected 1 non-named argument, got 3.
+    [Documentation]    UNKNOWN    Keyword 'PartialFunction.Partial Function' expected 1 non-named argument, got 3.
     Partial function    too    many    args
 
 Partial method
@@ -26,5 +26,5 @@ Partial method with argument conversion
     Partial method    VALUE    lower=yes
 
 Partial method with invalid argument count
-    [Documentation]    FAIL    Keyword 'PartialMethod.Partial Method' expected 1 non-named argument, got 0.
+    [Documentation]    UNKNOWN    Keyword 'PartialMethod.Partial Method' expected 1 non-named argument, got 0.
     Partial method

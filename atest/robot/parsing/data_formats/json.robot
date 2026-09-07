@@ -15,7 +15,7 @@ Invalid JSON Resource
     ${inva} =    Normalize Path    ${JSON DIR}/_invalid.json
     Check Log Message    ${ERRORS}[0]
     ...    Error in file '${path}' on line 12: Parsing JSON resource file '${inva}' failed: Loading JSON data failed: Invalid JSON data: *
-    ...    level=ERROR    pattern=True
+    ...    level=UNKNOWN    pattern=True
 
 Invalid JSON Suite
     ${result} =    Run Tests    ${EMPTY}    ${JSON DIR}/_invalid.json    output=None

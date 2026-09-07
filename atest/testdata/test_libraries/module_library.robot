@@ -45,19 +45,19 @@ Variable Arguments
     Should Be Equal  ${sum}  ${55}
 
 Only Methods And Functions Are Keywords
-    [Documentation]  FAIL No keyword with name 'Attribute' found.
+    [Documentation]  UNKNOWN No keyword with name 'Attribute' found.
     Attribute
 
 Class Methods In Module Library Are Not Keywords
-    [Documentation]  FAIL STARTS: No keyword with name 'Not Keyword' found. Did you mean:
+    [Documentation]  UNKNOWN STARTS: No keyword with name 'Not Keyword' found. Did you mean:
     Not Keyword
 
 Functions starting with underscore are not keywords
-    [Documentation]  FAIL STARTS: No keyword with name '_not_keyword' found. Did you mean:
+    [Documentation]  UNKNOWN STARTS: No keyword with name '_not_keyword' found. Did you mean:
     _not_keyword
 
 If __all__ is present, only functions listed there are available 1
-    [Documentation]  FAIL No keyword with name 'Not in all' found.
+    [Documentation]  UNKNOWN No keyword with name 'Not in all' found.
     ${path} =  Join with execdir  xxx
     Should Be Equal  ${path}  ${EXECDIR}${/}xxx
     ${path} =  Abspath  .
@@ -65,15 +65,15 @@ If __all__ is present, only functions listed there are available 1
     Not in all
 
 If __all__ is present, only functions listed there are available 2
-    [Documentation]  FAIL No keyword with name 'Join' found.
+    [Documentation]  UNKNOWN No keyword with name 'Join' found.
     Join  arg1  arg2
 
 If __all__ is present, only functions listed there are available 3
-    [Documentation]  FAIL No keyword with name 'attr_is_not_kw' found.
+    [Documentation]  UNKNOWN No keyword with name 'attr_is_not_kw' found.
     attr_is_not_kw
 
 If __all__ is present, only functions listed there are available 4
-    [Documentation]  FAIL No keyword with name '_not_kw_even_if_listed_in_all' found.
+    [Documentation]  UNKNOWN No keyword with name '_not_kw_even_if_listed_in_all' found.
     _not_kw_even_if_listed_in_all
 
 Class Method Assigned To Module Variable
@@ -82,7 +82,7 @@ Class Method Assigned To Module Variable
     Two Arguments From Class  Hi  Hi
 
 Lambda Keyword
-    [Documentation]  FAIL Keyword 'module_library.Lambda Keyword' expected 1 argument, got 2.
+    [Documentation]  UNKNOWN Keyword 'module_library.Lambda Keyword' expected 1 argument, got 2.
     ${ret} =  Lambda Keyword  2
     Should Be Equal  ${ret}  ${3}
     Lambda Keyword  2  3

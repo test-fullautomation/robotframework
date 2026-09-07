@@ -16,6 +16,7 @@
 import sys
 import inspect
 import asyncio
+import threading
 from contextlib import contextmanager
 
 from robot.errors import DataError
@@ -108,9 +109,13 @@ class _ExecutionContext:
         self.steps = []
         self.user_keywords = []
         self.asynchronous = asynchronous
-        self.thread_message_queue_dict = ThreadSafeDict() 
+        self.thread_message_queue_dict = ThreadSafeDict()
         self.thread_message_queue_dict['MainThread'] = PriorityQueue(queue_type='FIFO')
         self.thread_rlock_dict = ThreadSafeDict()
+        # cuongnht thread scope: registry of THREADs started in this context.
+        # name -> {'worker': Thread, 'stop_event': Event, 'daemon': bool,
+        #          'owner': name of the test that started it}
+        self.active_threads = ThreadSafeDict()
 
     @contextmanager
     def suite_teardown(self):
@@ -255,6 +260,23 @@ class _ExecutionContext:
 
     def get_runner(self, name):
         return self.namespace.get_runner(name)
+
+    # cuongnht thread scope -------------------------------------------------
+
+    def register_thread(self, name, worker, stop_event, daemon):
+        self.active_threads[name] = {
+            'worker': worker, 'stop_event': stop_event, 'daemon': daemon,
+            'owner': self.test.name if self.test is not None else None}
+
+    def unregister_thread(self, name):
+        self.active_threads.pop(name, None)
+
+    def thread_stop_requested(self):
+        """True if the current worker thread has been asked to stop."""
+        entry = self.active_threads.get(threading.current_thread().name)
+        return bool(entry and entry['stop_event'].is_set())
+
+    # -----------------------------------------------------------------------
 
     def trace(self, message):
         self.output.trace(message)

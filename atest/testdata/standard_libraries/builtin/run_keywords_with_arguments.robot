@@ -29,39 +29,39 @@ Should support keywords and arguments from variables
     ...    @{EMPTY}    Should Be Equal As Integers    ${1}    @{EMPTY}    1
 
 AND must be upper case
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    Log Many    this    and    that    AND    no kw
 
 AND must be whitespace sensitive
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    Log Many    this    A ND    that    AND    no kw
 
 Escaped AND
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    Log Many    this    \AND    that    AND    no kw
 
 AND from Variable
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    Log Many    this    ${AND VARIABLE}    that    AND    no kw
 
 AND in List Variable
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    @{LIST VARIABLE}    AND    no kw
 
 Escapes in List Variable should be handled correctly
-    [Documentation]    FAIL  No keyword with name 'no kw' found.
+    [Documentation]    UNKNOWN  No keyword with name 'no kw' found.
     Run Keywords    Log Many    @{ESCAPED}    AND    no kw
 
 AND as last argument should raise an error
-    [Documentation]    FAIL  AND must have keyword before and after.
+    [Documentation]    UNKNOWN  AND must have keyword before and after.
     Run Keywords    Log Many    1    2    AND    No Operation    AND
 
 Consecutive AND's
-    [Documentation]    FAIL  AND must have keyword before and after.
+    [Documentation]    UNKNOWN  AND must have keyword before and after.
     Run Keywords    Log Many    1    2    AND    AND    No Operation
 
 AND as first argument should raise an error
-    [Documentation]    FAIL  AND must have keyword before and after.
+    [Documentation]    UNKNOWN  AND must have keyword before and after.
     Run Keywords    AND    Log Many    1    2
 
 Keywords names needing escaping
@@ -73,7 +73,7 @@ Keywords names needing escaping as variable
 
 In test teardown with non-existing variable in keyword name
     [Documentation]
-    ...    FAIL Teardown failed:
+    ...    UNKNOWN Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) No keyword with name '\${bad}' found.

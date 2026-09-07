@@ -17,36 +17,141 @@ from robot.utils import get_timestamp, NullMarkupWriter, safe_str, XmlWriter, Th
 from robot.version import get_full_version
 from robot.result.visitor import ResultVisitor
 
-from .loggerhelper import IsLogged
+from .loggerhelper import IsLogged, Message
+import json
 import threading
+import time
 import os
 
 LOG_LEVEL_XML_FILE = "INFO" # output caused by code in this file, depends on this trace level
 
+
+class _SegmentingWriter:
+    """XmlWriter proxy that tracks open elements and supports rotation.
+
+    cuongnht add segmented output: used for the main output.xml writer so
+    that during very long runs the file can periodically be sealed into a
+    well-formed segment (``<base>_part_NNN.xml``) and writing continues in a
+    fresh file with the same open element structure. Replayed elements are
+    marked with ``continued="true"`` so that the segment merger knows to
+    join them with their counterparts in the previous segment.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self._writer = XmlWriter(path, write_empty=False, usage='output')
+        self._stack = []    # [(tag, attrs dict), ...], root first
+        self.segment_paths = []
+        self.last_rotation = time.monotonic()
+
+    def start(self, name, attrs=None, newline=True):
+        self._stack.append((name, dict(attrs or {})))
+        self._writer.start(name, attrs, newline)
+
+    def end(self, name, newline=True):
+        if self._stack and self._stack[-1][0] == name:
+            self._stack.pop()
+        self._writer.end(name, newline)
+
+    def element(self, name, content=None, attrs=None, escape=True, newline=True):
+        self._writer.element(name, content, attrs, escape, newline)
+
+    def content(self, content=None, escape=True, newline=False):
+        self._writer.content(content, escape, newline)
+
+    def close(self):
+        self._writer.close()
+
+    def rotate(self, sealed_path):
+        """Seals the current file into ``sealed_path`` and starts a new one."""
+        for name, _ in reversed(self._stack):
+            self._writer.end(name)
+        self._writer.close()
+        os.replace(self.path, sealed_path)
+        self._writer = XmlWriter(self.path, write_empty=False, usage='output')
+        for index, (name, attrs) in enumerate(self._stack):
+            attrs = dict(attrs)
+            if index > 0:    # roots of segments correspond by position
+                attrs['continued'] = 'true'
+            self._writer.start(name, attrs)
+
+    def maybe_rotate(self, interval):
+        """Rotates when ``interval`` seconds have passed since the last one.
+
+        Must only be called by the thread that owns this writer.
+        """
+        if time.monotonic() - self.last_rotation < interval:
+            return
+        base, ext = os.path.splitext(self.path)
+        sealed = f'{base}_part_{len(self.segment_paths) + 1:03d}{ext}'
+        self.rotate(sealed)
+        self.segment_paths.append(sealed)
+        self.last_rotation = time.monotonic()
+
+    def finalize(self):
+        """Closes all still open elements and the file itself."""
+        while self._stack:
+            self.end(self._stack[-1][0])
+        self.close()
+
+
 class XmlLogger(ResultVisitor):
 
-    thread_writer_dict = ThreadSafeDict() 
+    thread_writer_dict = ThreadSafeDict()
+    # cuongnht add thread: thread name -> path of its partial output file.
+    # Used by threadmerger to graft thread outputs into the main output.xml.
+    thread_output_files = ThreadSafeDict()
+    # cuongnht memory cap: WARN/ERROR messages are collected for the <errors>
+    # section until the run ends. Only the first max_errors stay in memory;
+    # further ones are spilled to a sidecar file next to output.xml and read
+    # back when the section is written, so the section stays complete with
+    # bounded memory. Without an output file the overflow is only counted.
+    max_errors = 10000
+    # Suppress BuiltIn.Log keyword elements whose explicit literal level
+    # argument is below the XML log level. The element is only held back,
+    # not dropped outright: if anything visible is logged inside it (e.g.
+    # the FAIL message when the keyword fails), the element is written
+    # after all so the output stays balanced and failures stay visible.
+    # Applies only while EXECUTING tests; re-serializing existing results
+    # (OutputWriter/rebot) must preserve the data.
+    suppress_log_keywords = True
 
-    def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot'):
+    def __init__(self, path, log_level=LOG_LEVEL_XML_FILE, rpa=False, generator='Robot',
+                 segment_interval=None):
         self._log_message_is_logged = IsLogged(log_level)
         self._error_message_is_logged = IsLogged('WARN')
-        self._get_writer(path, rpa, generator)
+        writer = self._get_writer(path, rpa, generator)
+        # cuongnht add thread: register here as well so that subclasses that
+        # override _get_writer (e.g. OutputWriter test doubles) get their own
+        # writer from the _writer property instead of a stale earlier one.
+        if path and writer is not None:
+            XmlLogger.thread_writer_dict['MainThread'] = writer
         self._errors = []
+        self._errors_dropped = 0
+        self._errors_spill_path = None
+        self._errors_spill_file = None
+        self._errors_spill_lock = threading.Lock()
         self.path = path
         self.rpa = rpa
         self.generator = generator
+        # cuongnht add segmented output
+        self._segment_interval = segment_interval
+        # BuiltIn.Log keywords whose start element is held back until
+        # something visible is logged inside them. Keyed by thread name
+        # because each thread streams to its own writer.
+        self._pending_log_kws = {}
 
     def get_level_from_kw_args(self, args=None):
-        # args expected to be a 'kw.args' tuple
+        # args expected to be a 'kw.args' tuple; returns the explicit literal
+        # level argument, or None when the level is absent or non-literal
+        # (e.g. a ${variable} that cannot be resolved at write time).
         supported_levels = ('ERROR', 'WARN', 'USER', 'INFO', 'DEBUG', 'TRACE') # not using LEVELS from loggerhelper.py here, because of more states inside there. A more strict separation is desired here.
-        identified_level = LOG_LEVEL_XML_FILE
         if args is None:
-            return identified_level
+            return None
         for arg in args:
             if arg in supported_levels:
-                identified_level = arg
-                break
-        return identified_level
+                return arg
+        return None
 
 
     @property
@@ -56,7 +161,11 @@ class XmlLogger(ResultVisitor):
         thread_name = threading.current_thread().name
         if thread_name not in XmlLogger.thread_writer_dict:
             filename, file_extension = os.path.splitext(self.path)
-            XmlLogger.thread_writer_dict[thread_name] = XmlWriter(filename + '_' + thread_name + file_extension, write_empty=False, usage='output')
+            thread_path = filename + '_' + thread_name + file_extension
+            XmlLogger.thread_output_files[thread_name] = thread_path
+            # cuongnht add segmented output: thread writers also support
+            # rotation so long living threads get segmented too.
+            XmlLogger.thread_writer_dict[thread_name] = _SegmentingWriter(thread_path)
             XmlLogger.thread_writer_dict[thread_name].start('thread', {'name': thread_name,
                                                                        'generator': get_full_version(self.generator),
                                                                        'generated': get_timestamp(),
@@ -67,7 +176,13 @@ class XmlLogger(ResultVisitor):
     def _get_writer(self, path, rpa, generator):
         if not path:
             return NullMarkupWriter()
-        writer = XmlWriter(path, write_empty=False, usage='output')
+        # cuongnht add thread: drop stale state from a possible earlier run in
+        # the same process so thread files of this run are tracked from scratch.
+        XmlLogger.thread_writer_dict.clear()
+        XmlLogger.thread_output_files.clear()
+        # cuongnht add segmented output: the main writer tracks open elements
+        # so that the output can be rotated into segments during long runs.
+        writer = _SegmentingWriter(path)
         writer.start('robot', {'generator': get_full_version(generator),
                                'generated': get_timestamp(),
                                'rpa': 'true' if rpa else 'false',
@@ -79,20 +194,116 @@ class XmlLogger(ResultVisitor):
         self.start_errors()
         for msg in self._errors:
             self._write_message(msg)
+        self._write_spilled_errors()
+        if self._errors_dropped:
+            # Only possible without an output file (nowhere to spill to).
+            self._write_message(Message(
+                f'{self._errors_dropped} further warning/error messages were '
+                f'not collected (in-memory limit {self.max_errors}, no '
+                f'output file to spill to).', 'WARN'))
         self.end_errors()
         self._writer.end('robot')
         self._writer.close()
+        self._close_leftover_thread_writers()
+
+    def _close_leftover_thread_writers(self):
+        # cuongnht add thread: threads (typically daemons) that are still
+        # running when execution ends leave their writers open. Finalize the
+        # files here so they are well-formed XML and can be merged/parsed.
+        for name in list(XmlLogger.thread_writer_dict):
+            if name == 'MainThread':
+                continue
+            writer = XmlLogger.thread_writer_dict.pop(name, None)
+            if writer is None:
+                continue
+            try:
+                if isinstance(writer, _SegmentingWriter):
+                    # Closes the whole open element stack, not only the root,
+                    # so also files of threads stuck deep inside keywords
+                    # remain well-formed.
+                    writer.finalize()
+                else:
+                    writer.end('thread')
+                    writer.close()
+            except Exception:
+                pass
 
     def set_log_level(self, level):
         return self._log_message_is_logged.set_level(level)
 
     def message(self, msg):
         if self._error_message_is_logged(msg.level):
-            self._errors.append(msg)
+            if len(self._errors) < self.max_errors:
+                self._errors.append(msg)
+            elif self.path:
+                self._spill_error(msg)
+            else:
+                self._errors_dropped += 1
+
+    def _spill_error(self, msg):
+        """Writes an overflowing errors-section message to the sidecar file."""
+        with self._errors_spill_lock:
+            if self._errors_spill_file is None:
+                base, _ = os.path.splitext(self.path)
+                self._errors_spill_path = base + '_errors_spill.jsonl'
+                self._errors_spill_file = open(self._errors_spill_path, 'w',
+                                               encoding='UTF-8')
+            json.dump({'timestamp': msg.timestamp, 'level': msg.level,
+                       'message': msg.message, 'html': msg.html},
+                      self._errors_spill_file)
+            self._errors_spill_file.write('\n')
+
+    def _write_spilled_errors(self):
+        with self._errors_spill_lock:
+            spill_file = self._errors_spill_file
+            self._errors_spill_file = None
+        if spill_file is None:
+            return
+        spill_file.close()
+        try:
+            with open(self._errors_spill_path, encoding='UTF-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    self._write_message(Message(data['message'],
+                                                data.get('level', 'WARN'),
+                                                data.get('html', False),
+                                                data.get('timestamp')))
+            os.remove(self._errors_spill_path)
+        except Exception as err:
+            self._write_message(Message(
+                f"Reading spilled error messages from "
+                f"'{self._errors_spill_path}' failed: {err}", 'WARN'))
 
     def log_message(self, msg):
+        self._maybe_rotate()  # cuongnht add segmented output
         if self._log_message_is_logged(msg.level):
+            # A visible message inside a held-back BuiltIn.Log keyword
+            # resurrects the keyword element to keep output balanced.
+            self._flush_pending_log_kw()
             self._write_message(msg)
+
+    @property
+    def segment_paths(self):
+        # cuongnht add segmented output: sealed segments of the main writer.
+        writer = XmlLogger.thread_writer_dict.get('MainThread')
+        if isinstance(writer, _SegmentingWriter):
+            return writer.segment_paths
+        return []
+
+    def _maybe_rotate(self):
+        # cuongnht add segmented output: periodically seal the current
+        # thread's output file into a well-formed segment so that a crash
+        # during a very long run loses at most one segment interval of log
+        # data. Each thread rotates its own writer (the main writer seals
+        # output_part_NNN.xml, thread writers output_<name>_part_NNN.xml).
+        if not self._segment_interval or not self.path:
+            return
+        writer = self._writer
+        if isinstance(writer, _SegmentingWriter):
+            writer.maybe_rotate(self._segment_interval)
 
     def _write_message(self, msg):
         attrs = {'timestamp': msg.timestamp or 'N/A', 'level': msg.level}
@@ -101,97 +312,97 @@ class XmlLogger(ResultVisitor):
         self._writer.element('msg', msg.message, attrs)
 
     def start_keyword(self, kw):
+        self._maybe_rotate()  # cuongnht add segmented output
+        if self._should_suppress_log_kw(kw):
+            # this keyword has it's own log level below the XML log level:
+            # hold the element back; log_message flushes it if anything
+            # visible (e.g. a FAIL message) is logged inside it.
+            self._pending_log_kws[threading.current_thread().name] = kw
+            return
+        self._flush_pending_log_kw()
+        self._start_keyword_element(kw)
 
-        # inits
-        log_kw_start = True
-        msg_level = LOG_LEVEL_XML_FILE
+    def _should_suppress_log_kw(self, kw):
+        if not self.suppress_log_keywords or kw.name != 'BuiltIn.Log':
+            return False
+        level = self.get_level_from_kw_args(kw.args)
+        return level is not None and not self._log_message_is_logged(level)
 
-        if kw.name == 'BuiltIn.Log':
-            # this keyword has it's own log level
-            msg_level = self.get_level_from_kw_args(kw.args)
+    def _flush_pending_log_kw(self):
+        kw = self._pending_log_kws.pop(threading.current_thread().name, None)
+        if kw is not None:
+            self._start_keyword_element(kw)
 
-        if self._log_message_is_logged(msg_level):
-            log_kw_start = True
-        else:
-            # suppress the logging because the trace level does not match
-            log_kw_start = False
-
-        if log_kw_start is True:
-            attrs = {'name': kw.kwname, 'library': kw.libname}
-            if kw.type != 'KEYWORD':
-                attrs['type'] = kw.type
-            if kw.sourcename:
-                attrs['sourcename'] = kw.sourcename
-            self._writer.start('kw', attrs)
-            self._write_list('var', kw.assign)
-            self._write_list('arg', [safe_str(a) for a in kw.args])
-            self._write_list('tag', kw.tags)
-            # Must be after tags to allow adding message when using --flattenkeywords.
-            self._writer.element('doc', kw.doc)
+    def _start_keyword_element(self, kw):
+        attrs = {'name': kw.kwname, 'library': kw.libname}
+        if kw.type != 'KEYWORD':
+            attrs['type'] = kw.type
+        if kw.sourcename:
+            attrs['sourcename'] = kw.sourcename
+        self._writer.start('kw', attrs)
+        self._write_list('var', kw.assign)
+        self._write_list('arg', [safe_str(a) for a in kw.args])
+        self._write_list('tag', kw.tags)
+        # Must be after tags to allow adding message when using --flattenkeywords.
+        self._writer.element('doc', kw.doc)
 
     def end_keyword(self, kw):
-
-        # inits
-        log_kw_end = True
-        msg_level = LOG_LEVEL_XML_FILE
-
-        if kw.name == 'BuiltIn.Log':
-            # this keyword has it's own log level
-            msg_level = self.get_level_from_kw_args(kw.args)
-
-        if self._log_message_is_logged(msg_level):
-            log_kw_end = True
-        else:
-            # suppress the logging because the trace level does not match
-            log_kw_end = False
-
-        if log_kw_end is True:
-            if kw.timeout:
-                self._writer.element('timeout', attrs={'value': str(kw.timeout)})
-            self._write_status(kw)
-            self._writer.end('kw')
+        self._maybe_rotate()  # cuongnht add segmented output
+        thread_name = threading.current_thread().name
+        # NOTE: cannot compare identity - start and end may get different
+        # wrapper objects for the same keyword. BuiltIn.Log has no child
+        # items, so a pending entry here always belongs to this keyword.
+        pending = self._pending_log_kws.pop(thread_name, None)
+        if pending is not None:
+            if kw.status == 'PASS':
+                # executed successfully and nothing visible was logged
+                # inside: drop the whole element (balanced suppression).
+                return
+            # NOT RUN (e.g. dry run) or failed without a visible message:
+            # structure must stay visible, so write the element after all.
+            self._start_keyword_element(pending)
+        if kw.timeout:
+            self._writer.element('timeout', attrs={'value': str(kw.timeout)})
+        self._write_status(kw)
+        self._writer.end('kw')
 
     def start_if(self, if_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('if')
-            self._writer.element('doc', if_.doc)
+        self._writer.start('if')
+        self._writer.element('doc', if_.doc)
 
     def end_if(self, if_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(if_)
-            self._writer.end('if')
+        self._write_status(if_)
+        self._writer.end('if')
 
     def start_if_branch(self, branch):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('branch', {'type': branch.type,
-                                          'condition': branch.condition})
-            self._writer.element('doc', branch.doc)
+        self._writer.start('branch', {'type': branch.type,
+                                      'condition': branch.condition})
+        self._writer.element('doc', branch.doc)
 
     def end_if_branch(self, branch):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(branch)
-            self._writer.end('branch')
+        self._write_status(branch)
+        self._writer.end('branch')
 
     def start_for(self, for_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('for', {'flavor': for_.flavor,
-                                       'start': for_.start,
-                                       'mode': for_.mode,
-                                       'fill': for_.fill})
-            for name in for_.variables:
-                self._writer.element('var', name)
-            for value in for_.values:
-                self._writer.element('value', value)
-            self._writer.element('doc', for_.doc)
+        self._writer.start('for', {'flavor': for_.flavor,
+                                   'start': for_.start,
+                                   'mode': for_.mode,
+                                   'fill': for_.fill})
+        for name in for_.variables:
+            self._writer.element('var', name)
+        for value in for_.values:
+            self._writer.element('value', value)
+        self._writer.element('doc', for_.doc)
 
     def end_for(self, for_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(for_)
-            self._writer.end('for')
+        self._write_status(for_)
+        self._writer.end('for')
 
     def start_thread(self, thread_):
         if threading.current_thread().name == 'MainThread' and self._writer:
-            main_thread_writer = XmlLogger.thread_writer_dict['MainThread']
+            # The _writer property resolves to the main writer on the main
+            # thread and to a NullMarkupWriter when output.xml is disabled.
+            main_thread_writer = self._writer
             main_thread_writer.start('thread', {'name': thread_.name,
                                                 'daemon': str(thread_.daemon)})
             # self._writer.element('name', thread_.name)
@@ -213,98 +424,83 @@ class XmlLogger(ResultVisitor):
             self._writer.end('thread')
             thread_name = threading.current_thread().name
             if thread_name in XmlLogger.thread_writer_dict:
-                XmlLogger.thread_writer_dict.pop(thread_name)
+                # Close so the file is flushed to disk for the merger.
+                XmlLogger.thread_writer_dict.pop(thread_name).close()
 
     def start_for_iteration(self, iteration):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('iter')
-            for name, value in iteration.variables.items():
-                self._writer.element('var', value, {'name': name})
-            self._writer.element('doc', iteration.doc)
+        self._writer.start('iter')
+        for name, value in iteration.variables.items():
+            self._writer.element('var', value, {'name': name})
+        self._writer.element('doc', iteration.doc)
 
     def end_for_iteration(self, iteration):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(iteration)
-            self._writer.end('iter')
+        self._write_status(iteration)
+        self._writer.end('iter')
 
     def start_try(self, root):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('try')
+        self._writer.start('try')
 
     def end_try(self, root):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(root)
-            self._writer.end('try')
+        self._write_status(root)
+        self._writer.end('try')
 
     def start_try_branch(self, branch):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            if branch.type == branch.EXCEPT:
-                self._writer.start('branch', attrs={
-                    'type': 'EXCEPT', 'variable': branch.variable,
-                    'pattern_type': branch.pattern_type
-                })
-                self._write_list('pattern', branch.patterns)
-            else:
-                self._writer.start('branch', attrs={'type': branch.type})
+        if branch.type == branch.EXCEPT:
+            self._writer.start('branch', attrs={
+                'type': 'EXCEPT', 'variable': branch.variable,
+                'pattern_type': branch.pattern_type
+            })
+            self._write_list('pattern', branch.patterns)
+        else:
+            self._writer.start('branch', attrs={'type': branch.type})
 
     def end_try_branch(self, branch):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(branch)
-            self._writer.end('branch')
+        self._write_status(branch)
+        self._writer.end('branch')
 
     def start_while(self, while_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('while', attrs={
-                'condition': while_.condition,
-                'limit': while_.limit,
-                'on_limit': while_.on_limit,
-                'on_limit_message': while_.on_limit_message
-            })
-            self._writer.element('doc', while_.doc)
+        self._writer.start('while', attrs={
+            'condition': while_.condition,
+            'limit': while_.limit,
+            'on_limit': while_.on_limit,
+            'on_limit_message': while_.on_limit_message
+        })
+        self._writer.element('doc', while_.doc)
 
     def end_while(self, while_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(while_)
-            self._writer.end('while')
+        self._write_status(while_)
+        self._writer.end('while')
 
     def start_while_iteration(self, iteration):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('iter')
-            self._writer.element('doc', iteration.doc)
+        self._writer.start('iter')
+        self._writer.element('doc', iteration.doc)
 
     def end_while_iteration(self, iteration):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(iteration)
-            self._writer.end('iter')
+        self._write_status(iteration)
+        self._writer.end('iter')
 
     def start_return(self, return_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('return')
-            for value in return_.values:
-                self._writer.element('value', value)
+        self._writer.start('return')
+        for value in return_.values:
+            self._writer.element('value', value)
 
     def end_return(self, return_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(return_)
-            self._writer.end('return')
+        self._write_status(return_)
+        self._writer.end('return')
 
     def start_continue(self, continue_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('continue')
+        self._writer.start('continue')
 
     def end_continue(self, continue_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(continue_)
-            self._writer.end('continue')
+        self._write_status(continue_)
+        self._writer.end('continue')
 
     def start_break(self, break_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._writer.start('break')
+        self._writer.start('break')
 
     def end_break(self, break_):
-        if self._log_message_is_logged(LOG_LEVEL_XML_FILE):
-            self._write_status(break_)
-            self._writer.end('break')
+        self._write_status(break_)
+        self._writer.end('break')
 
     def start_error(self, error):
         self._writer.start('error')
@@ -390,7 +586,16 @@ class FlatXmlLogger(XmlLogger):
 
     def __init__(self, real_xml_logger):
         super().__init__(None)
-        self._writer = real_xml_logger._writer
+        # _writer is a property in this fork (per-thread writers), so it
+        # cannot be assigned like upstream does. Keep a reference to the
+        # real logger and delegate, which also stays thread-aware. Use the
+        # real logger's log level too instead of the INFO default.
+        self._real_xml_logger = real_xml_logger
+        self._log_message_is_logged = real_xml_logger._log_message_is_logged
+
+    @property
+    def _writer(self):
+        return self._real_xml_logger._writer
 
     def start_keyword(self, kw):
         pass

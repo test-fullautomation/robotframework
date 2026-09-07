@@ -17,7 +17,7 @@ Scalar Variable As List With Extended Syntax
     Test Scalar As List    @{hyvää.split(',')}    @{list[0]}
 
 Extended syntax with non-list value
-    [Documentation]    FAIL Value of variable '\@{EXTENDED.string}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{EXTENDED.string}' is not list or list-like.
     Log Many    @{EXTENDED.string}
 
 Non-alphanumeric characters in name
@@ -25,11 +25,11 @@ Non-alphanumeric characters in name
     Test Scalar As List    @{"spëciäl" ch@rs?!}
 
 String Cannot Be Used As List Variable
-    [Documentation]    FAIL Value of variable '\@{TEST NAME}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{TEST NAME}' is not list or list-like.
     Log Many    @{TEST NAME}
 
 Non-Iterables Cannot Be Used As List Variable
-    [Documentation]    FAIL Value of variable '\@{INTEGER}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{INTEGER}' is not list or list-like.
     ${integer} =    Set Variable    ${42}
     Log Many    @{INTEGER}
 

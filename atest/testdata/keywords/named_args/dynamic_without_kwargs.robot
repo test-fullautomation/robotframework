@@ -118,25 +118,25 @@ Naming without varargs works
     Should be equal    ${ret}     A, B
 
 Positional after named 1
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
     Args & Varargs    foo    b=bar    dar
 
 Positional after named 2
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' got positional argument after named arguments.
     Args & Varargs    foo    b=bar    @{EMPTY}
 
 Positional after named 3
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Two Args' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Two Args' got positional argument after named arguments.
     Two Args    first=1    oops
 
 Missing argument
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' missing value for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' missing value for argument 'a'.
     Args & Varargs    b=value
 
 Both positional and named value 1
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Two Args' got multiple values for argument 'first'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Two Args' got multiple values for argument 'first'.
     Two Args    1    first=oops
 
 Both positional and named value 2
-    [Documentation]    FAIL Keyword 'DynamicWithoutKwargs.Args & Varargs' got multiple values for argument 'a'.
+    [Documentation]    UNKNOWN Keyword 'DynamicWithoutKwargs.Args & Varargs' got multiple values for argument 'a'.
     Args & Varargs    A    B   a=ooops

@@ -26,7 +26,9 @@ Name as pattern
     s1-s2-t1-k1    s1-s2-t3-k1                    # name:nonasciilib????.PRINT*
 
 Keyword tag
-    s1-s4-t1-k3                                   # tag:tags
+    # k2, not k3: the passing 'Log ... DEBUG' before this keyword is
+    # suppressed from output.xml in this fork, shifting positional ids.
+    s1-s4-t1-k2                                   # tag:tags
 
 Tag as pattern
     s1-s4-t2-k3-k1    s1-s4-t2-k4                 # TAG:Nest*2

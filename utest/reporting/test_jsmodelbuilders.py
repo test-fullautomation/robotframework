@@ -104,7 +104,7 @@ class TestBuildTestSuite(unittest.TestCase):
     def test_warning_linking(self):
         msg = Message('Message', 'WARN', timestamp='20111204 22:04:03.210',
                       parent=TestCase().body.create_keyword())
-        self._verify_message(msg, 'Message', 3, 0)
+        self._verify_message(msg, 'Message', 4, 0)
         links = self.context._msg_links
         assert_equal(len(links), 1)
         key = (msg.message, msg.level, msg.timestamp)
@@ -113,7 +113,7 @@ class TestBuildTestSuite(unittest.TestCase):
     def test_error_linking(self):
         msg = Message('ERROR Message', 'ERROR', timestamp='20150609 01:02:03.004',
                       parent=TestCase().body.create_keyword().body.create_keyword())
-        self._verify_message(msg, 'ERROR Message', 4, 0)
+        self._verify_message(msg, 'ERROR Message', 5, 0)
         links = self.context._msg_links
         assert_equal(len(links), 1)
         key = (msg.message, msg.level, msg.timestamp)
@@ -134,7 +134,7 @@ class TestBuildTestSuite(unittest.TestCase):
         t = self._verify_test(suite.suites[0].tests[0], tags=('crit', 'xxx'))
         suite.tests = [TestCase(), TestCase(status='PASS')]
         S1 = self._verify_suite(suite.suites[0],
-                                status=0, tests=(t,), stats=(1, 0, 1, 0))
+                                status=0, tests=(t,), stats=(1, 0, 1, 0, 0))
         suite.tests[0].body = [Keyword(type=Keyword.FOR), Keyword()]
         suite.tests[0].body[0].body = [Keyword(type=Keyword.ITERATION), Message()]
         k = self._verify_keyword(suite.tests[0].body[0].body[0], type=4)
@@ -147,7 +147,7 @@ class TestBuildTestSuite(unittest.TestCase):
         T1 = self._verify_test(suite.tests[0], body=(k1, k2))
         T2 = self._verify_test(suite.tests[1], status=1)
         self._verify_suite(suite, status=0, keywords=(K1, K2), suites=(S1,),
-                           tests=(T1, T2), stats=(3, 1, 2, 0))
+                           tests=(T1, T2), stats=(3, 1, 2, 0, 0))
         self._verify_min_message_level('TRACE')
 
     def test_timestamps(self):
@@ -200,7 +200,7 @@ class TestBuildTestSuite(unittest.TestCase):
         exp_m1 = (None, 2, 'Hi from test')
         exp_kw = (0, '', '', '', '', '', '', '', (0, None, 0),
                   ((None, 2, 'Hi from keyword'),))
-        exp_m3 = (None, 3, 'Hi from test again')
+        exp_m3 = (None, 4, 'Hi from test again')
         self._verify_test(test, body=(exp_m1, exp_kw, exp_m3))
 
     def _verify_status(self, model, status=0, start=None, elapsed=0):
@@ -208,7 +208,7 @@ class TestBuildTestSuite(unittest.TestCase):
 
     def _verify_suite(self, suite, name='', doc='', metadata=(), source='',
                       relsource='', status=2, message='', start=None, elapsed=0,
-                      suites=(), tests=(), keywords=(), stats=(0, 0, 0, 0)):
+                      suites=(), tests=(), keywords=(), stats=(0, 0, 0, 0, 0)):
         status = (status, start, elapsed, message) \
                 if message else (status, start, elapsed)
         doc = '<p>%s</p>' % doc if doc else ''
@@ -340,8 +340,8 @@ class TestSplitting(unittest.TestCase):
         SuiteBuilder(context).build(suite)
         errors = ErrorsBuilder(context).build(ExecutionErrors([msg1, msg2]))
         assert_equal(remap(errors, context.strings),
-                     ((-1000, 3, 'Message 1', 's1-k1-k1'),
-                      (0, 4, 'Message 2', 's1-t1-k1')))
+                     ((-1000, 4, 'Message 1', 's1-k1-k1'),
+                      (0, 5, 'Message 2', 's1-t1-k1')))
         assert_equal(remap(context.link(msg1), context.strings), 's1-k1-k1')
         assert_equal(remap(context.link(msg2), context.strings), 's1-t1-k1')
         assert_true('*s1-k1-k1' in context.strings)
@@ -475,7 +475,8 @@ class TestBuildStatistics(unittest.TestCase):
         return suite
 
     def _verify_stat(self, stat, pass_, fail, skip, label, elapsed, **attrs):
-        attrs.update({'pass': pass_, 'fail': fail, 'skip': skip,
+        # 'unknown' added by the fork's UNKNOWN status support.
+        attrs.update({'pass': pass_, 'fail': fail, 'skip': skip, 'unknown': 0,
                       'label': label, 'elapsed': elapsed})
         assert_equal(stat, attrs)
 
@@ -491,7 +492,7 @@ class TestBuildErrors(unittest.TestCase):
         context = JsBuildingContext()
         model = ErrorsBuilder(context).build(self.errors)
         model = remap(model, context.strings)
-        assert_equal(model, ((0, 4, 'Error'), (42, 3, 'Warning')))
+        assert_equal(model, ((0, 5, 'Error'), (42, 4, 'Warning')))
 
     def test_linking(self):
         self.errors.messages.create('Linkable', 'WARN',
@@ -503,9 +504,9 @@ class TestBuildErrors(unittest.TestCase):
         MessageBuilder(context).build(msg)
         model = ErrorsBuilder(context).build(self.errors)
         model = remap(model, context.strings)
-        assert_equal(model, ((-1, 4, 'Error'),
-                             (41, 3, 'Warning'),
-                             (0, 3, 'Linkable', 's1-t1-k1')))
+        assert_equal(model, ((-1, 5, 'Error'),
+                             (41, 4, 'Warning'),
+                             (0, 4, 'Linkable', 's1-t1-k1')))
 
 
 if __name__ == '__main__':

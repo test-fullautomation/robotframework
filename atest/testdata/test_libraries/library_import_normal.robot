@@ -12,7 +12,7 @@ Normal Library Import
     Directory Should Exist    %{TEMPDIR}
 
 Library Import With Spaces In Name Does Not Work
-    [Documentation]    FAIL No keyword with name 'Get Current Date' found.
+    [Documentation]    UNKNOWN No keyword with name 'Get Current Date' found.
     Get Current Date
 
 Importing Python Class From Module

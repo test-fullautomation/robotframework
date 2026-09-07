@@ -47,6 +47,10 @@ class BodyRunner:
         errors = []
         passed = None
         for step in body:
+            # cuongnht thread scope: worker threads stop cooperatively at
+            # keyword boundaries when their scope (test/suite) has ended.
+            if self._run and self._context.thread_stop_requested():
+                raise ExecutionFailed('Thread stop requested.')
             try:
                 step.run(self._context, self._run, self._templated)
             except ExecutionPassed as exception:
@@ -528,26 +532,45 @@ class ThreadRunner(object):
     def run(self, data):
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
-            thread_worker = threading.Thread(target=self.run_worker, args=(data,))
+            # cuongnht thread scope: workers are always Python daemons so
+            # they can never block interpreter exit; their lifecycle is
+            # managed by the scope reaper in SuiteRunner instead.
+            # data.daemon selects the scope: True -> stopped when the test
+            # ends, False -> continues until the suite ends.
+            stop_event = threading.Event()
+            # Snapshot the variables here, while still in the spawning
+            # thread: taking the copy inside the worker races with this
+            # thread pushing and popping its own scope stack and could
+            # miss variables that were just set (seen on Linux runners).
+            scope_snapshot = self._context.variables.current.copy()
+            thread_worker = threading.Thread(target=self.run_worker,
+                                             args=(data, stop_event,
+                                                   scope_snapshot))
             thread_worker.name = data.name
-            thread_worker.daemon = data.daemon
+            thread_worker.daemon = True
             logger.add_thread_logging(thread_worker.name)
+            self._context.register_thread(data.name, thread_worker, stop_event,
+                                          data.daemon)
             thread_worker.start()
 
 
-    def run_worker(self, data):
+    def run_worker(self, data, stop_event, scope_snapshot=None):
         self._context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type='FIFO')
         runner = BodyRunner(self._context, self._run, self._templated)
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
-            self._context.variables.start_thread()
+            self._context.variables.start_thread(scope_snapshot)
             try:
                 runner.run(data.body)
             except ExecutionFailed as failed:
-                # AssertionError(failed.get_errors())
-                self._context.warn(
-                    f" An exception occurred in '{data.name}' thread. Exception: {failed.message}'"
-                )
+                if stop_event.is_set():
+                    # cuongnht thread scope: normal cleanup, not a failure.
+                    logger.info(f"Thread '{data.name}' stopped because its "
+                                f"scope ended.")
+                else:
+                    self._context.warn(
+                        f" An exception occurred in '{data.name}' thread. Exception: {failed.message}'"
+                    )
 
             self._context.variables.end_thread()
 
@@ -555,6 +578,7 @@ class ThreadRunner(object):
             self._context.thread_message_queue_dict.pop(data.name)
 
         logger.remove_thread_logging(data.name)
+        self._context.unregister_thread(data.name)
 
     def _run_invalid(self, data):
         error_reported = False

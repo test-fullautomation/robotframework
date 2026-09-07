@@ -11,7 +11,7 @@ Keyword From Python Class Extending Python Class
     Should Be Equal  ${value}  ${2}
 
 Method In Python Class Overriding Method Of The Parent Class
-    [Documentation]  FAIL Overridden kw executed!
+    [Documentation]  UNKNOWN Overridden kw executed!
     Print Many  Foo  bar  !
 
 Keyword In Python Class Using Method From Parent Class

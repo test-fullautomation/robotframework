@@ -1,33 +1,33 @@
 *** Test Cases ***
 Multiple conditions
-    [Documentation]    FAIL    WHILE loop cannot have more than one condition, got 'Too', 'many', 'conditions' and '!'.
+    [Documentation]    UNKNOWN    WHILE loop cannot have more than one condition, got 'Too', 'many', 'conditions' and '!'.
     WHILE    Too    many    conditions    !
         Fail    Not executed!
     END
 
 Invalid condition
-    [Documentation]    FAIL    Invalid WHILE loop condition: \
+    [Documentation]    UNKNOWN    Invalid WHILE loop condition: \
     ...    Evaluating expression 'bad' failed: NameError: name 'bad' is not defined nor importable as module
     WHILE    bad
         Fail    Not executed!
     END
 
 Non-existing ${variable} in condition
-    [Documentation]    FAIL    Invalid WHILE loop condition: \
+    [Documentation]    UNKNOWN    Invalid WHILE loop condition: \
     ...    Evaluating expression '\${bad} > 0' failed: Variable '\${bad}' not found.
     WHILE    ${bad} > 0
         Fail    Not executed!
     END
 
 Non-existing $variable in condition
-    [Documentation]    FAIL    Invalid WHILE loop condition: \
+    [Documentation]    UNKNOWN    Invalid WHILE loop condition: \
     ...    Evaluating expression '$bad > 0' failed: Variable '$bad' not found.
     WHILE    $bad > 0
         Fail    Not executed!
     END
 
 Recommend $var syntax if invalid condition contains ${var}
-    [Documentation]    FAIL    Invalid WHILE loop condition: \
+    [Documentation]    UNKNOWN    Invalid WHILE loop condition: \
     ...    Evaluating expression 'x == 'x'' failed: NameError: name 'x' is not defined nor importable as module
     ...
     ...    Variables in the original expression '\${x} == 'x'' were resolved before the expression was evaluated. \
@@ -38,7 +38,7 @@ Recommend $var syntax if invalid condition contains ${var}
     END
 
 Invalid condition on second round
-    [Documentation]    FAIL    Invalid WHILE loop condition: \
+    [Documentation]    UNKNOWN    Invalid WHILE loop condition: \
     ...    Evaluating expression 'bad' failed: NameError: name 'bad' is not defined nor importable as module
     ...
     ...    Variables in the original expression '\${condition}' were resolved before the expression was evaluated. \
@@ -53,17 +53,17 @@ Invalid condition on second round
     END
 
 No body
-    [Documentation]    FAIL WHILE loop cannot be empty.
+    [Documentation]    UNKNOWN WHILE loop cannot be empty.
     WHILE    True
     END
 
 No END
-    [Documentation]    FAIL WHILE loop must have closing END.
+    [Documentation]    UNKNOWN WHILE loop must have closing END.
     WHILE    True
         Fail    Not executed!
 
 Invalid data causes syntax error
-    [Documentation]    FAIL WHILE loop cannot be empty.
+    [Documentation]    UNKNOWN WHILE loop cannot be empty.
     TRY
         WHILE    False
         END

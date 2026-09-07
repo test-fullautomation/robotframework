@@ -7,6 +7,10 @@
             Compatible with Robot Framework 5.0 and newer. For more details see:
             https://github.com/robotframework/robotframework/tree/master/doc/schema
 
+            This fork extends the schema with the UNKNOWN status, the USER and
+            UNKNOWN message levels, the `unknown` statistics attribute and the
+            `thread` element produced by the THREAD keyword.
+
             Due to XSD 1.1 not being widely adopted, this schema is XSD 1.0 compatible.
             If you can use XSD 1.1, you can replace `xs:choice` groups with `xs:all`
             groups to make the schema more strict.
@@ -68,6 +72,7 @@
     <xs:complexType name="Test">
         <xs:choice maxOccurs="unbounded">
             <xs:element name="kw" type="Keyword" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="thread" type="Thread" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="for" type="For" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="if" type="If" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="try" type="Try" minOccurs="0" maxOccurs="unbounded" />
@@ -88,6 +93,7 @@
     <xs:complexType name="Keyword">
         <xs:choice maxOccurs="unbounded">
             <xs:element name="kw" type="Keyword" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="thread" type="Thread" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="for" type="For" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="if" type="If" minOccurs="0" maxOccurs="unbounded" />
             <xs:element name="try" type="Try" minOccurs="0" maxOccurs="unbounded" />
@@ -111,8 +117,28 @@
         <xs:restriction base="xs:string">
             <xs:enumeration value="SETUP" />
             <xs:enumeration value="TEARDOWN" />
+            <xs:enumeration value="THREAD" />  <!-- Fork extension: THREAD keyword. -->
         </xs:restriction>
     </xs:simpleType>
+    <!-- Fork extension: content produced by the THREAD keyword. Contains the
+         placeholder written at run time as well as the grafted thread body
+         after merging per-thread output files. The `daemon` attribute is the
+         Python string representation of the flag, so it is not xs:boolean. -->
+    <xs:complexType name="Thread">
+        <xs:choice maxOccurs="unbounded">
+            <xs:element name="kw" type="Keyword" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="for" type="For" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="if" type="If" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="try" type="Try" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="while" type="While" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="error" type="Error" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="msg" type="Message" minOccurs="0" maxOccurs="unbounded" />
+            <xs:element name="doc" type="xs:string" minOccurs="0" />
+            <xs:element name="status" type="BodyItemStatus" />
+        </xs:choice>
+        <xs:attribute name="name" type="xs:string" />
+        <xs:attribute name="daemon" type="xs:string" />
+    </xs:complexType>
     <xs:complexType name="For">
         <xs:choice maxOccurs="unbounded">
             <xs:element name="var" type="xs:string" minOccurs="0" maxOccurs="unbounded" />      <!-- Loop variables -->
@@ -299,6 +325,8 @@
             <xs:enumeration value="ERROR" />
             <xs:enumeration value="FAIL" />
             <xs:enumeration value="SKIP" />
+            <xs:enumeration value="USER" />     <!-- Fork extension. -->
+            <xs:enumeration value="UNKNOWN" />  <!-- Fork extension. -->
         </xs:restriction>
     </xs:simpleType>
     <xs:complexType name="Status">
@@ -318,6 +346,7 @@
             <xs:enumeration value="FAIL" />
             <xs:enumeration value="SKIP" />
             <xs:enumeration value="NOT RUN" />
+            <xs:enumeration value="UNKNOWN" />  <!-- Fork extension. -->
         </xs:restriction>
     </xs:simpleType>
     <xs:complexType name="BodyItemStatus">
@@ -337,6 +366,7 @@
             <xs:enumeration value="FAIL" />
             <xs:enumeration value="SKIP" />
             <xs:enumeration value="NOT RUN" />
+            <xs:enumeration value="UNKNOWN" />  <!-- Fork extension. -->
         </xs:restriction>
     </xs:simpleType>
     <xs:complexType name="Timeout">
@@ -370,6 +400,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>
@@ -379,6 +410,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
                 <xs:attribute name="doc" type="xs:string" />
                 <xs:attribute name="links" type="xs:string" />
                 <xs:attribute name="info" type="xs:string" />
@@ -392,6 +424,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
                 <xs:attribute name="id" type="xs:string" />
                 <xs:attribute name="name" type="xs:string" />
             </xs:extension>

@@ -93,7 +93,11 @@ Failure set by listener can initiate exit-on-failure
     ...    --ExitOnFailure --Listener ${DATADIR}/cli/runner/failtests.py
     ...    misc/pass_and_fail.robot
     Check Test Case    Pass    status=FAIL
-    Test Should Not Have Been Run    Unknown
+    # The failtests.py listener forces every test's status to FAIL in its
+    # end_test method, so the not-run test is FAIL here instead of the
+    # usual UNKNOWN.
+    ${tc} =    Check Test Case    Fail    FAIL    ${EXIT ON FAILURE}
+    Should Contain    ${tc.tags}    robot:exit
 
 *** Keywords ***
 Test Should Not Have Been Run

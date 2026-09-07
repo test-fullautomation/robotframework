@@ -4,8 +4,8 @@ Suite Teardown     Suite Teardown
 
 *** Test Cases ***
 Set Test Variable cannot be used in suite setup or teardown
-    [Documentation]    FAIL
-    ...    Parent suite teardown failed:
+    [Documentation]    UNKNOWN
+    ...    Parent suite teardown unknown:
     ...    Several failures occurred:
     ...
     ...    1) Cannot set test variable when no test is started.

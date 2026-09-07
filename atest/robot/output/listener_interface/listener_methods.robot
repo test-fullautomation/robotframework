@@ -136,7 +136,7 @@ Check Listen All File
     ...    LOG MESSAGE: [FAIL] Expected failure
     ...    KEYWORD END: FAIL
     ...    TEST END: FAIL Expected failure
-    ...    SUITE END: FAIL 2 tests, 1 passed, 1 failed
+    ...    SUITE END: FAIL 2 tests, 1 passed, 1 failed, 0 unknown
     ...    Output: output.xml    Closing...
     Check Listener File    ${filename}    @{expected}
 

@@ -925,14 +925,22 @@ class ThreadHeader(Statement):
     def name(self):
         return self.get_value(Token.THREAD_NAME, "ROBOT_THREAD1")
 
+    _TRUE_DAEMON = ('true', 'yes', 't', '1')
+    _FALSE_DAEMON = ('false', 'no', 'f', '0')
+
     @property
     def daemon(self):
-        return bool(self.get_value(Token.THREAD_DAEMON, "true"))
+        # cuongnht thread scope: daemon=True -> thread is stopped when its
+        # test ends (TEST scope); daemon=False -> thread continues over
+        # following tests and is stopped when the suite ends (SUITE scope).
+        value = str(self.get_value(Token.THREAD_DAEMON, 'true')).strip().lower()
+        return value in self._TRUE_DAEMON
 
     def validate(self, ctx: 'ValidationContext'):
         if not self.name:
             self._add_error('no thread name')
-        if not str(self.daemon).lower() in ("yes", "true", "t", "1"):
+        value = str(self.get_value(Token.THREAD_DAEMON, 'true')).strip().lower()
+        if value not in self._TRUE_DAEMON + self._FALSE_DAEMON:
             self._add_error('invalid daemon setting')
 
     def _add_error(self, error: str):

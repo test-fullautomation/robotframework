@@ -83,19 +83,19 @@ Kwargs are dot-accessible
     Should Be Equal    ${kwargs.second}    ${2}
 
 Too few positional arguments
-    [Documentation]    FAIL Keyword 'Positional and kwargs' expected 2 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'Positional and kwargs' expected 2 non-named arguments, got 1.
     Positional and kwargs    one positional is not enough
 
 Too many positional arguments
-    [Documentation]    FAIL Keyword 'Kwargs only' expected 0 non-named arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'Kwargs only' expected 0 non-named arguments, got 3.
     Kwargs only    positional    not    accepted
 
 Positional after kwargs
-    [Documentation]    FAIL Keyword 'Varags and kwargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Varags and kwargs' got positional argument after named arguments.
     Varags and kwargs    key=value    positional
 
 Non-String Keys
-    [Documentation]    FAIL Argument names must be strings.
+    [Documentation]    UNKNOWN Argument names must be strings.
     Kwargs only    ${42}=not allowed
 
 Calling using dict variables
@@ -119,11 +119,11 @@ Caller does not see modifications to kwargs
     Variable Should Not Exist    ${d2.new}
 
 Invalid arguments spec: Positional after kwargs
-    [Documentation]    FAIL Invalid argument specification: Only last argument can be kwargs.
+    [Documentation]    UNKNOWN Invalid argument specification: Only last argument can be kwargs.
     Positional after kwargs
 
 Invalid arguments spec: Varargs after kwargs
-    [Documentation]    FAIL Invalid argument specification: Only last argument can be kwargs.
+    [Documentation]    UNKNOWN Invalid argument specification: Only last argument can be kwargs.
     Varargs after kwargs
 
 *** Keywords ***

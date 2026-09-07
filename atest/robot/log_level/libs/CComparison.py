@@ -28,8 +28,13 @@
 import os, re
 
 # -- import own Python modules
-from PythonExtensionsCollection.File.CFile import CFile
-from PythonExtensionsCollection.String.CString import CString
+try:
+   from PythonExtensionsCollection.File.CFile import CFile
+   from PythonExtensionsCollection.String.CString import CString
+except ImportError:
+   # Fall back to a local, dependency-free implementation of the subset used
+   # here so the suite runs without the PythonExtensionsCollection package.
+   from _pec_compat import CFile, CString
 
 # **************************************************************************************************************
 

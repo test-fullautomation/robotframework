@@ -5,12 +5,12 @@ Library           LibraryDecoratorWithAutoKeywords.py
 
 *** Test Cases ***
 Library decorator disables automatic keyword discovery
-    [Documentation]    FAIL STARTS: No keyword with name 'Not keyword' found. Did you mean:
+    [Documentation]    UNKNOWN STARTS: No keyword with name 'Not keyword' found. Did you mean:
     Decorated method is keyword
     Not keyword
 
 Library decorator with arguments disables automatic keyword discovery by default
-    [Documentation]    FAIL No keyword with name 'Not keyword v2' found.
+    [Documentation]    UNKNOWN No keyword with name 'Not keyword v2' found.
     Decorated method is keyword v.2
     Not keyword v2
 

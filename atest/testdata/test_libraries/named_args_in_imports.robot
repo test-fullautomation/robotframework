@@ -25,6 +25,6 @@ Named Argument Syntax Doesn't Work Inside Variable
     NotNamed.Check Init Arguments  arg2\=seppo  ${NONE}
 
 WITH NAME Doesn't Work Inside Variable
-    [Documentation]  FAIL  No keyword with name 'NotWorks.Check Init Arguments' found.
+    [Documentation]  UNKNOWN  No keyword with name 'NotWorks.Check Init Arguments' found.
     NamedArgsImportLibrary.Check Init Arguments  WITH NAME  NotWorks
     NotWorks.Check Init Arguments  ${NONE}  ${NONE}

@@ -33,6 +33,10 @@ threading_base.thread3
 threading_rlock_base.thread1
     Log    Thread 1 is acquiring lock    console=True
     Thread RLock Acquire    test_lock
+    # Tell the test that the lock is held so that thread 2 can be started
+    # only now: without this the two threads race for the first acquire and
+    # the winner depends on the OS scheduler.
+    Send Thread Notification    threading_rlock_base.thread1_locked
     Append To List    ${var_thrd}    11
     Sleep    2
     Log    Thread 1 is releasing lock    console=True
@@ -77,6 +81,9 @@ threading_rlock_base.thread1_reacquire
     Append To List    ${var_thrd}    Thread_1_First
     Log    Thread 1 is releasing lock after first append    console=True
     Thread RLock Release    test_lock
+    # Deterministic ordering: thread 2 is started only after this, and the
+    # sleep gives it time to append before the lock is taken again.
+    Send Thread Notification    threading_rlock_base.thread1_first_append_done
     Sleep    1  # Simulate waiting to acquire lock again
     
     Log    Thread 1 is acquiring lock for second append    console=True
@@ -442,6 +449,11 @@ Threading RLock Basic
         threading_rlock_base.thread1
     END
 
+    # Start thread 2 only when thread 1 already holds the lock;
+    # otherwise the first acquire is a race (thread 2 often wins
+    # on Linux).
+    Wait Thread Notification    threading_rlock_base.thread1_locked    timeout=10
+
     THREAD    TEST_THREAD2    False
         threading_rlock_base.thread2
     END
@@ -463,6 +475,11 @@ Threading RLock Exceeded timeout
     THREAD    TEST_THREAD1    False
         threading_rlock_base.thread1
     END
+
+    # Start thread 2 only when thread 1 already holds the lock;
+    # otherwise the first acquire is a race (thread 2 often wins
+    # on Linux).
+    Wait Thread Notification    threading_rlock_base.thread1_locked    timeout=10
 
     THREAD    TEST_THREAD2    False
         threading_rlock_base.thread2_with_time_out
@@ -486,6 +503,11 @@ Threading RLock Non blocking
         threading_rlock_base.thread1
     END
 
+    # Start thread 2 only when thread 1 already holds the lock;
+    # otherwise the first acquire is a race (thread 2 often wins
+    # on Linux).
+    Wait Thread Notification    threading_rlock_base.thread1_locked    timeout=10
+
     THREAD    TEST_THREAD2    False
         threading_rlock_base.thread2_non_block
     END
@@ -507,6 +529,10 @@ Threading RLock Reacquire Append
     THREAD    TEST_THREAD1    False
         threading_rlock_base.thread1_reacquire
     END
+
+    # Deterministic interleaving: thread 2 appends between thread 1s
+    # two appends, so it must start only after the first one is done.
+    Wait Thread Notification    threading_rlock_base.thread1_first_append_done    timeout=10
 
     THREAD    TEST_THREAD2    False
         threading_rlock_base.thread2_reacquire

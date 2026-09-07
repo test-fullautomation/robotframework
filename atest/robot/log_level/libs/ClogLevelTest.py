@@ -143,7 +143,16 @@ class ClogLevelTest():
         listCommandLineParts = []
         PYTHON = sys.executable
         listCommandLineParts.append(f"\"{PYTHON}\"")
-        listCommandLineParts.append("-m robot")
+        # Prefer the Robot Framework from this repository so the test also
+        # works when robot is not pip-installed (e.g. CI runners execute the
+        # acceptance tests directly from the source tree). With an installed
+        # robot outside the repository the plain module invocation is used.
+        sRepoRunner = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    '..', '..', '..', '..', 'src', 'robot', 'run.py'))
+        if os.path.isfile(sRepoRunner):
+            listCommandLineParts.append(f"\"{sRepoRunner}\"")
+        else:
+            listCommandLineParts.append("-m robot")
 
         if log_level is None:
             log_level = "DEFAULT" # part of output file names

@@ -47,5 +47,5 @@ Resource with '*.json' extension
     Should Be Equal    ${JSON}    resource.json
 
 Resource with invalid extension
-    [Documentation]    FAIL    No keyword with name 'Keyword in resource.invalid' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Keyword in resource.invalid' found.
     Keyword in resource.invalid
