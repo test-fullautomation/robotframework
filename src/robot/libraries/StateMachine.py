@@ -20,7 +20,7 @@ import time
 import re
 
 from robot.api import logger
-from robot.errors import TimeoutError as RobotTimeoutError
+from robot.errors import ExecutionFailed, TimeoutError as RobotTimeoutError
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.timeouts import KeywordTimeout
 from robot.utils import is_list_like, timestr_to_secs, secs_to_timestr
@@ -685,6 +685,13 @@ class _Engine:
                 status, message = builtin.run_keyword_and_ignore_error(name, *args)
         except RobotTimeoutError as err:
             return str(err)
+        except ExecutionFailed as err:
+            # On POSIX the timeout signal fires inside the keyword and
+            # arrives wrapped as ExecutionFailed with the timeout flag set,
+            # not as a bare TimeoutError like on Windows.
+            if err.timeout:
+                return str(err)
+            raise
         return None if status == 'PASS' else message
 
     def _remaining(self, state, visit_started):

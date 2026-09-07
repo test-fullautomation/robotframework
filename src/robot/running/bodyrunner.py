@@ -538,8 +538,14 @@ class ThreadRunner(object):
             # data.daemon selects the scope: True -> stopped when the test
             # ends, False -> continues until the suite ends.
             stop_event = threading.Event()
+            # Snapshot the variables here, while still in the spawning
+            # thread: taking the copy inside the worker races with this
+            # thread pushing and popping its own scope stack and could
+            # miss variables that were just set (seen on Linux runners).
+            scope_snapshot = self._context.variables.current.copy()
             thread_worker = threading.Thread(target=self.run_worker,
-                                             args=(data, stop_event))
+                                             args=(data, stop_event,
+                                                   scope_snapshot))
             thread_worker.name = data.name
             thread_worker.daemon = True
             logger.add_thread_logging(thread_worker.name)
@@ -548,12 +554,12 @@ class ThreadRunner(object):
             thread_worker.start()
 
 
-    def run_worker(self, data, stop_event):
+    def run_worker(self, data, stop_event, scope_snapshot=None):
         self._context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type='FIFO')
         runner = BodyRunner(self._context, self._run, self._templated)
         thread_result = ThreadResult(data.name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
-            self._context.variables.start_thread()
+            self._context.variables.start_thread(scope_snapshot)
             try:
                 runner.run(data.body)
             except ExecutionFailed as failed:
