@@ -33,7 +33,7 @@ Non-Existing Environment Variable
     Log  %{NON_EXISTING}
 
 Environment Variables Are Case Sensitive
-    [Documentation]  FAIL Environment variable '%{this_env_var_is_set}' not found. Did you mean:
+    [Documentation]  UNKNOWN Environment variable '%{this_env_var_is_set}' not found. Did you mean:
     ...    ${SPACE * 4}\%{THIS_ENV_VAR_IS_SET}
     Log  %{this_env_var_is_set}
 
