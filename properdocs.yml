@@ -44,4 +44,5 @@ nav:
       - Synchronisation: thread/synchronisation.md
   - Watchdog: watchdog.md
   - StateMachine: statemachine.md
+  - Flow files: flow.md
   - Long-running tests: long-running.md

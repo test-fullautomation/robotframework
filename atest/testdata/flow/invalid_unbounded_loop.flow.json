@@ -1,0 +1,15 @@
+{
+  "flow": { "name": "Unbounded" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "loop", "kind": "loop", "every": "1s" },
+    { "id": "work", "kind": "keyword", "keyword": "Log", "args": ["work"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "loop"],
+    { "from": "loop", "to": "work", "label": "body" },
+    { "from": "work", "to": "loop", "label": "next" },
+    { "from": "loop", "to": "end", "label": "done" }
+  ]
+}

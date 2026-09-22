@@ -1,0 +1,19 @@
+{
+  "flow": { "name": "Decision" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "variables": { "MODE": "slow" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "which", "kind": "decision", "condition": "$MODE == 'fast'" },
+    { "id": "fast", "kind": "keyword", "keyword": "Log Branch", "args": ["fast"] },
+    { "id": "slow", "kind": "keyword", "keyword": "Log Branch", "args": ["slow"] },
+    { "id": "join", "kind": "keyword", "keyword": "Log", "args": ["joined"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "which"],
+    { "from": "which", "to": "fast", "label": "yes" },
+    { "from": "which", "to": "slow", "label": "no" },
+    ["fast", "join"], ["slow", "join"], ["join", "end"]
+  ]
+}

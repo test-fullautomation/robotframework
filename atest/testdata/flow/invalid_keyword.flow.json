@@ -1,0 +1,11 @@
+{
+  "flow": { "name": "Invalid Keyword" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "missing", "kind": "keyword", "keyword": "No Such Keyword" },
+    { "id": "wrong", "kind": "gate", "keyword": "Signal Should Be", "args": ["only one"], "timeout": "1s" },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [ ["start", "missing"], ["missing", "wrong"], ["wrong", "end"] ]
+}
