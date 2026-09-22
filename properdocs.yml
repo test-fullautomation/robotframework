@@ -1,0 +1,47 @@
+site_name: RobotFramework AIO — Feature Guide
+site_description: >-
+  Documentation for the RobotFramework AIO core fork: the UNKNOWN status, the
+  THREAD keyword, the StateMachine and Watchdog libraries, segmented output and
+  the long-run robustness features.
+docs_dir: docs
+use_directory_urls: true
+
+theme:
+  name: readthedocs
+  navigation_depth: 3
+
+extra_css:
+  - css/extra.css
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+  - codehilite
+  - plantuml_markdown:
+      # No quotes around the jar path; the plugin passes it literally to java.
+      # The path is resolved on the build machine: locally it is tools/plantuml.jar,
+      # and the GitHub Actions workflow fetches the same jar to that path.
+      plantuml_cmd: java -Dplantuml.include.path=docs -jar tools/plantuml.jar
+      base_dir: docs
+      format: svg
+
+plugins:
+  - search
+  - glightbox:
+      zoomable: true
+      draggable: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - UNKNOWN status: unknown-status.md
+  - THREAD keyword:
+      - Lifecycle and scopes: thread/lifecycle.md
+      - Result merging and timeline: thread/merging-timeline.md
+      - Synchronisation: thread/synchronisation.md
+  - Watchdog: watchdog.md
+  - StateMachine: statemachine.md
+  - Long-running tests: long-running.md

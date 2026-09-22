@@ -1,0 +1,85 @@
+name: Feature docs (ProperDocs -> GitHub Pages)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - ugc1hc/feat/improve_features
+    paths:
+      - 'docs/**'
+      - 'properdocs.yml'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Java runs the vendored PlantUML jar. Graphviz is a safety net; the
+      # graph diagrams use '!pragma layout smetana' and do not need it.
+      - name: Install Java and Graphviz
+        run: sudo apt-get update && sudo apt-get install -y default-jre graphviz
+
+      - name: Fetch the PlantUML jar
+        run: |
+          mkdir -p tools
+          curl -fsSL -o tools/plantuml.jar \
+            https://github.com/plantuml/plantuml/releases/download/v1.2024.3/plantuml-1.2024.3.jar
+
+      - name: Install ProperDocs and plugins
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install properdocs properdocs-theme-readthedocs plantuml-markdown mkdocs-glightbox
+
+      - name: Build the site
+        run: python -m properdocs build --clean -f properdocs.yml
+
+      - name: Verify diagrams rendered (no PlantUML errors)
+        run: |
+          python - <<'PY'
+          import glob, os, re, sys, urllib.parse
+          total = bad = 0
+          for path in glob.glob('site/**/*.html', recursive=True):
+              html = open(path, encoding='utf-8').read()
+              for u in re.findall(r'data:image/svg\+xml[^"\')]*', html):
+                  total += 1
+                  d = urllib.parse.unquote(u)
+                  if any(x in d for x in ('cannot include', 'Syntax Error',
+                                          'contains errors', 'java.lang')):
+                      bad += 1
+                      print('ERROR diagram in', path)
+          print('inline SVGs: %d, broken: %d' % (total, bad))
+          sys.exit(1 if bad else 0)
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

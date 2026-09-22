@@ -1,0 +1,6 @@
+/* The Read the Docs theme caps content at ~800px, leaving a big right gutter
+   and clipping wide diagrams. Use the full width and keep media responsive. */
+.wy-nav-content { max-width: none; }
+.rst-content img, img.uml, .rst-content svg { max-width: 100%; height: auto; }
+.rst-content table { display: block; overflow-x: auto; }
+.rst-content pre { overflow-x: auto; }
