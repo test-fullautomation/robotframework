@@ -1,0 +1,10 @@
+{
+  "flow": { "name": "Unreachable" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "a", "kind": "keyword", "keyword": "Log", "args": ["a"] },
+    { "id": "orphan", "kind": "keyword", "keyword": "Log", "args": ["never"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [ ["start", "a"], ["a", "end"], ["orphan", "end"] ]
+}

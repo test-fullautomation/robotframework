@@ -1,0 +1,21 @@
+{
+  "flow": { "name": "Gate Timeout" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "unknown", "kind": "phase", "role": "test", "name": "Unknown On Timeout" },
+    { "id": "g1", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.never", "!=", 0],
+                                  "timeout": "0.3s", "interval": "0.1s" },
+    { "id": "fail", "kind": "phase", "role": "test", "name": "Fail On Timeout" },
+    { "id": "g2", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.never", "!=", 0],
+                                  "timeout": "0.3s", "interval": "0.1s", "on_timeout": "fail" },
+    { "id": "pass", "kind": "phase", "role": "test", "name": "Passes After Retries" },
+    { "id": "g3", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.chamber.state", "==", 1],
+                                  "timeout": "5s", "interval": "0.05s" },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "unknown"], ["unknown", "g1"], ["g1", "fail"], ["fail", "g2"],
+    ["g2", "pass"], ["pass", "g3"], ["g3", "end"]
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "flow": { "name": "Recovery Abort" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "test", "kind": "phase", "role": "test", "name": "Abort After Recovery" },
+    { "id": "try", "kind": "try" },
+    { "id": "flash", "kind": "keyword", "keyword": "Break Something", "args": ["Flash failed."] },
+    { "id": "restore", "kind": "keyword", "keyword": "Execute Recovery Strategy", "args": ["ECU"] },
+    { "id": "after", "kind": "keyword", "keyword": "Log", "args": ["not reached"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "test"], ["test", "try"],
+    { "from": "try", "to": "flash", "label": "body" },
+    { "from": "flash", "to": "try", "label": "next" },
+    { "from": "try", "to": "restore", "label": "on_failure" },
+    { "from": "restore", "to": "end", "label": "abort" },
+    { "from": "try", "to": "after", "label": "done" },
+    ["after", "end"]
+  ]
+}

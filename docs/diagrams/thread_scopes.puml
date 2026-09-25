@@ -1,0 +1,29 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor transparent
+skinparam state {
+  BackgroundColor #eef4fb
+  BorderColor #0a5da8
+  FontColor #1c2430
+}
+
+[*] --> Started : THREAD name daemon\nworker starts
+
+state "daemon = True\n(TEST scope)" as TestScope {
+  Started --> RunningT : execute body
+  RunningT --> StoppedT : test ends\n(cooperative stop)
+}
+
+state "daemon = False\n(SUITE scope)" as SuiteScope {
+  Started --> RunningS : execute body
+  RunningS --> ContinuesS : test ends\n(keeps running)
+  ContinuesS --> StoppedS : suite ends
+}
+
+StoppedT --> Grace : 5s grace period
+StoppedS --> Grace
+Grace --> Reaped : stopped in time
+Grace --> Abandoned : did not stop\n-> reported UNKNOWN
+Reaped --> [*]
+Abandoned --> [*]
+@enduml

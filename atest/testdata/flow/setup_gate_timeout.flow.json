@@ -1,0 +1,19 @@
+{
+  "flow": { "name": "Setup Gate Timeout" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "setup", "kind": "phase", "role": "setup" },
+    { "id": "g", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.never", "!=", 0],
+                                 "timeout": "0.2s", "interval": "0.1s" },
+    { "id": "test", "kind": "phase", "role": "test", "name": "Never Runs" },
+    { "id": "kw", "kind": "keyword", "keyword": "Log", "args": ["should not be here"] },
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "td", "kind": "keyword", "keyword": "Before Suite Tear Down" },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "setup"], ["setup", "g"], ["g", "test"], ["test", "kw"],
+    ["kw", "teardown"], ["teardown", "td"], ["td", "end"]
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "flow": { "name": "Body Without Next" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "loop", "kind": "loop", "max_loops": 2 },
+    { "id": "work", "kind": "keyword", "keyword": "Log", "args": ["work"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "loop"],
+    { "from": "loop", "to": "work", "label": "body" },
+    ["work", "loop"],
+    { "from": "loop", "to": "end", "label": "done" }
+  ]
+}
