@@ -45,6 +45,7 @@ class KeywordStep(Step):
         super().__init__(node)
         self.keyword = node.keyword
         self.args = node.args
+        self.assign = node.assign
 
 
 class GateStep(KeywordStep):

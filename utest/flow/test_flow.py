@@ -270,6 +270,15 @@ class TestBuilder(unittest.TestCase):
         variables = [(v.name, v.value) for v in suite.resource.variables]
         self.assertEqual(variables, [('${ARG}', ('value',)), ('${N}', ('3',))])
 
+    def test_keyword_with_assign(self):
+        node = {'id': 'v', 'kind': 'keyword', 'keyword': 'Read Version', 'assign': '${V}'}
+        data = flow([START, node, END], [['start', 'v'], ['v', 'end']])
+        call = build(data).tests[0].body[0]
+        self.assertEqual((call.name, list(call.assign)), ('Read Version', ['${V}']))
+        node['assign'] = 42
+        with self.assertRaises(FlowError):
+            build(data)
+
     def test_gate_call(self):
         gate = build(PHASED_FLOW).resource.keywords[0].body[0]
         self.assertEqual(gate.name, 'Flow Gate')

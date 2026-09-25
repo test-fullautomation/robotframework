@@ -68,7 +68,7 @@ from the module search path.
 |------|------------|-----------|---------|
 | `start` / `end` | — | 1 / 0 | Exactly one start; at least one end. |
 | `phase` | `role`: setup, test, teardown; `name` for tests | 1 | Setup → suite setup, each test phase → one test case, teardown → suite teardown. Without phases the whole flow is one test named after the flow. |
-| `keyword` | `keyword`, `args` | 1 | Call a keyword; `${var}` substitution applies. |
+| `keyword` | `keyword`, `args`, `assign` | 1 | Call a keyword; `${var}` substitution applies. `assign` (`"${VERSION}"`) stores the return value for a later decision. |
 | `gate` | `keyword`, `args`, `timeout`, `interval` (2s), `on_timeout`: unknown (default) or fail | 1 | Poll the keyword until it passes. On timeout the message carries the last error and the elapsed time. |
 | `sleep` | `duration` | 1 | `Sleep`. |
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |

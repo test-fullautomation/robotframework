@@ -91,7 +91,7 @@ def _emit(body, steps):
 
 
 def _keyword(body, step):
-    body.create_keyword(name=step.keyword, args=step.args)
+    body.create_keyword(name=step.keyword, args=step.args, assign=step.assign)
 
 
 def _gate(body, step):

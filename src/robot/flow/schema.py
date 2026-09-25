@@ -70,6 +70,7 @@ class Node:
         self.name = attrs.pop('name', None)
         self.keyword = attrs.pop('keyword', None)
         self.args = attrs.pop('args', None)
+        self.assign = attrs.pop('assign', None)
         self.timeout = attrs.pop('timeout', None)
         self.interval = attrs.pop('interval', None)
         self.on_timeout = attrs.pop('on_timeout', None)
@@ -233,6 +234,18 @@ def _validate_keyword(node):
         raise FlowError("'keyword' is required.", node.id)
     node.keyword = node.keyword.strip()
     node.args = _validate_args(node)
+    node.assign = _validate_assign(node)
+
+
+def _validate_assign(node):
+    assign = node.assign
+    if assign is None:
+        return []
+    if is_string(assign):
+        assign = [assign]
+    if not isinstance(assign, list) or not all(is_string(a) and a.strip() for a in assign):
+        raise FlowError("'assign' must be a variable name or a list of them.", node.id)
+    return [a.strip() for a in assign]
 
 
 def _validate_args(node):
