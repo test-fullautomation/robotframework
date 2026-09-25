@@ -102,6 +102,20 @@ class TestSchema(unittest.TestCase):
         self._error(flow([START, {'id': 'l', 'kind': 'loop', 'max_loops': 0}, END], []),
                     "'max_loops' must be a positive integer")
 
+    def test_negative_duration(self):
+        gate = {'id': 'g', 'kind': 'gate', 'keyword': 'K', 'timeout': '-5s'}
+        self._error(flow([START, gate, END], []),
+                    "Node 'g': 'timeout' must not be negative, got '-5s'")
+
+    def test_imports_must_be_lists(self):
+        data = flow([START, END], [['start', 'end']], imports={'libraries': 'Bench'})
+        self._error(data, "'imports.libraries' must be a list")
+
+    def test_missing_file_is_a_flow_error(self):
+        with self.assertRaises(FlowError) as cm:
+            load_flow('no/such/file.flow.json')
+        self.assertIn("Reading flow file", str(cm.exception))
+
     def test_edge_to_unknown_node(self):
         self._error(flow([START, END], [['start', 'nowhere']]),
                     "refers to unknown node 'nowhere'")
@@ -241,6 +255,27 @@ class TestStructure(unittest.TestCase):
                          [['start', 'a'], ['a', 'end'], ['orphan', 'end']]),
                     'Unreachable node(s): orphan')
 
+    def test_start_cannot_have_incoming_edges(self):
+        self._error(flow([START, kw('a'), END],
+                         [['start', 'a'], ['a', 'start']]),
+                    "Node 'start': The start node cannot have incoming edges (from 'a')")
+
+    def test_nested_loops(self):
+        data = flow([START,
+                     {'id': 'outer', 'kind': 'loop', 'max_loops': 2},
+                     {'id': 'inner', 'kind': 'loop', 'max_loops': 3},
+                     kw('w', 'W'), END],
+                    [['start', 'outer'],
+                     {'from': 'outer', 'to': 'inner', 'label': 'body'},
+                     {'from': 'inner', 'to': 'w', 'label': 'body'},
+                     {'from': 'w', 'to': 'inner', 'label': 'next'},
+                     {'from': 'inner', 'to': 'outer', 'label': 'next'},
+                     {'from': 'outer', 'to': 'end', 'label': 'done'}])
+        outer = structure(load_flow(data)).tests[0].steps[0]
+        self.assertIsInstance(outer, Loop)
+        self.assertIsInstance(outer.body[0], Loop)
+        self.assertEqual(outer.body[0].body[0].keyword, 'W')
+
     def test_exactly_one_start(self):
         self._error(flow([START, {'id': 's2', 'kind': 'start'}, END],
                          [['start', 'end'], ['s2', 'end']]),
@@ -318,6 +353,50 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(list(evaluate.args), ['time.time() + 7200.0'])
         self.assertEqual(loop.condition, 'time.time() < ${flow_deadline_my_loop}')
         self.assertEqual((loop.limit, loop.on_limit), ('NONE', None))
+
+    def test_colliding_loop_ids_get_distinct_deadlines(self):
+        data = flow([START,
+                     {'id': 'a-b', 'kind': 'loop', 'max_seconds': '1h'},
+                     {'id': 'a_b', 'kind': 'loop', 'max_seconds': '1min'},
+                     kw('w', 'W'), END],
+                    [['start', 'a-b'],
+                     {'from': 'a-b', 'to': 'a_b', 'label': 'body'},
+                     {'from': 'a_b', 'to': 'w', 'label': 'body'},
+                     {'from': 'w', 'to': 'a_b', 'label': 'next'},
+                     {'from': 'a_b', 'to': 'a-b', 'label': 'next'},
+                     {'from': 'a-b', 'to': 'end', 'label': 'done'}])
+        outer_eval, outer = build(data).tests[0].body
+        inner_eval, inner = outer.body
+        self.assertEqual(list(outer_eval.assign), ['${flow_deadline_a_b}'])
+        self.assertEqual(list(inner_eval.assign), ['${flow_deadline_a_b_2}'])
+        self.assertEqual(outer.condition, 'time.time() < ${flow_deadline_a_b}')
+        self.assertEqual(inner.condition, 'time.time() < ${flow_deadline_a_b_2}')
+
+    def test_gate_with_assign(self):
+        gate = {'id': 'g', 'kind': 'gate', 'keyword': 'Read Level', 'timeout': '1s',
+                'assign': '${LEVEL}'}
+        data = flow([START, gate, END], [['start', 'g'], ['g', 'end']])
+        call = build(data).tests[0].body[0]
+        self.assertEqual((call.name, list(call.assign)), ('Flow Gate', ['${LEVEL}']))
+
+    def test_parser_applies_inherited_defaults(self):
+        import json
+        import os
+        import tempfile
+        from robot.flow import FlowParser
+        from robot.running.builder.settings import TestDefaults
+        data = flow([START, kw('a'), END], [['start', 'a'], ['a', 'end']])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'x.flow.json')
+            with open(path, 'w', encoding='UTF-8') as file:
+                json.dump(data, file)
+            defaults = TestDefaults(tags=['bench'], timeout='2h',
+                                    setup={'name': 'Prepare'})
+            suite = FlowParser().parse(path, defaults)
+        test = suite.tests[0]
+        self.assertEqual(list(test.tags), ['bench'])
+        self.assertEqual(test.timeout, '2h')
+        self.assertEqual(test.setup.name, 'Prepare')
 
     def test_decision_and_empty_branch(self):
         data = flow([START, {'id': 'd', 'kind': 'decision', 'condition': "$MODE == 'fast'"},

@@ -28,6 +28,12 @@ from .schema import (ABORT, ACTION_KINDS, BODY, CONTAINER_KINDS, CONTINUE,
                      ON_FAILURE, PHASE, SETUP, SLEEP, START, TEARDOWN, TEST, THEN, YES)
 
 
+# How a loop or try continues after its body: 'done' normally, or the label
+# an action node would carry when the container is the last node of an
+# enclosing body ('next') or recovery region ('continue', 'abort').
+EXIT_LABELS = frozenset((DONE, NEXT, CONTINUE, ABORT))
+
+
 class Step:
     """Base class of all steps. ``node`` is the originating schema node."""
 
@@ -169,6 +175,11 @@ class _Structurer:
                             f'{len(starts)}.')
         if not any(node.kind == END for node in self.nodes.values()):
             raise FlowError('Flow must have at least one end node.')
+        into_start = [edge.source for edge in self.data.edges
+                      if edge.target == starts[0].id]
+        if into_start:
+            raise FlowError(f"The start node cannot have incoming edges (from "
+                            f"{', '.join(repr(s) for s in into_start)}).", starts[0].id)
         for node in self.nodes.values():
             labels = set(self.out[node.id])
             if node.kind in (START, PHASE):
@@ -186,10 +197,23 @@ class _Structurer:
                 self._expect(node, labels, exactly={YES, NO},
                              hint="exactly two outgoing edges labelled 'yes' and 'no'")
             elif node.kind in CONTAINER_KINDS:
-                if not {BODY, DONE} <= labels <= {BODY, DONE, ON_FAILURE}:
+                exits = labels & EXIT_LABELS
+                if BODY not in labels or len(exits) != 1 \
+                        or not labels <= {BODY, ON_FAILURE} | exits:
                     self._degree_error(node, labels, "outgoing edges labelled 'body' "
-                                       "and 'done', optionally 'on_failure'")
+                                       "and exactly one of 'done', 'next', 'continue' "
+                                       "or 'abort', optionally 'on_failure'")
         return starts[0]
+
+    def _exit(self, node_id):
+        """The (label, target) a loop or try continues with after its body.
+
+        Normally ``done``; ``next``, ``continue`` or ``abort`` when the
+        container is itself the last node of an enclosing body or recovery.
+        """
+        (label, target), = [(label, target) for label, target in self.out[node_id].items()
+                            if label in EXIT_LABELS]
+        return label, target
 
     def _expect(self, node, labels, exactly, hint):
         if labels != exactly:
@@ -230,8 +254,8 @@ class _Structurer:
                 steps.append(step)
             else:
                 steps.append(self._container(node, stop, visited))
-                node_id = self.out[node.id][DONE]
-                via = THEN
+                label, node_id = self._exit(node.id)
+                via = THEN if label == DONE else label
 
     def _action(self, node):
         return {KEYWORD: KeywordStep, GATE: GateStep, SLEEP: SleepStep}[node.kind](node)
@@ -276,7 +300,7 @@ class _Structurer:
             elif node.kind == DECISION:
                 node_id = self._join(node)
             elif node.kind in CONTAINER_KINDS:
-                node_id = self.out[node_id][DONE]
+                _, node_id = self._exit(node_id)
             else:
                 node_id = None
         return chain
@@ -290,17 +314,18 @@ class _Structurer:
                             f"'{via or 'then'}'.", node.id)
         recovery = then = None
         if ON_FAILURE in out:
+            _, after = self._exit(node.id)
             recovery, exit, via = self._sequence(out[ON_FAILURE],
-                                                 stop | {node.id, out[DONE]}, visited)
+                                                 stop | {node.id, after}, visited)
             if exit == node.id and via == CONTINUE:
                 then = CONTINUE
-            elif via == ABORT and (exit == out[DONE] or self.nodes[exit].kind == END):
+            elif via == ABORT and (exit == after or self.nodes[exit].kind == END):
                 then = ABORT
                 self.seen.add(exit)
             else:
                 raise FlowError(f"The recovery of '{node.id}' must end with an edge "
                                 f"labelled 'continue' back to '{node.id}', or "
-                                f"'abort' to its 'done' target or an end node; it "
+                                f"'abort' to the node after it or an end node; it "
                                 f"ends at '{exit}' via '{via or 'then'}'.", node.id)
         cls = Loop if node.kind == LOOP else Try
         return cls(node, body, recovery, then)

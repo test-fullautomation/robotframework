@@ -64,98 +64,108 @@ def build_suite(flow, source=None):
         resource.imports.variables(name, args)
     for name, value in data.variables.items():
         resource.variables.create(name='${%s}' % name, value=[value])
+    emitter = _Emitter()
     if flow.setup:
-        _user_keyword(resource, SETUP_KEYWORD, flow.setup.steps)
+        emitter.user_keyword(resource, SETUP_KEYWORD, flow.setup.steps)
         suite.setup.config(name=SETUP_KEYWORD)
     for phase in flow.tests:
         test = suite.tests.create(name=phase.name)
-        _emit(test.body, phase.steps)
+        emitter.emit(test.body, phase.steps)
     if flow.teardown:
-        _user_keyword(resource, TEARDOWN_KEYWORD, flow.teardown.steps)
+        emitter.user_keyword(resource, TEARDOWN_KEYWORD, flow.teardown.steps)
         suite.teardown.config(name=TEARDOWN_KEYWORD)
     return suite
 
 
-def _user_keyword(resource, name, steps):
-    keyword = resource.keywords.create(name=name)
-    _emit(keyword.body, steps)
-    return keyword
+class _Emitter:
+    """Emits steps into bodies. One instance per built suite, so that the
+    variable names it invents are unique within that suite."""
 
+    def __init__(self):
+        self._deadlines = {}     # loop node id -> deadline variable name
 
-def _emit(body, steps):
-    if not steps:
-        body.create_keyword(name='No Operation')
-        return
-    for step in steps:
-        _EMITTERS[type(step)](body, step)
+    def user_keyword(self, resource, name, steps):
+        keyword = resource.keywords.create(name=name)
+        self.emit(keyword.body, steps)
+        return keyword
 
+    def emit(self, body, steps):
+        if not steps:
+            body.create_keyword(name='No Operation')
+            return
+        for step in steps:
+            self._emitters[type(step)](self, body, step)
 
-def _keyword(body, step):
-    body.create_keyword(name=step.keyword, args=step.args, assign=step.assign)
+    def _keyword(self, body, step):
+        body.create_keyword(name=step.keyword, args=step.args, assign=step.assign)
 
+    def _gate(self, body, step):
+        args = [step.timeout, step.interval, step.on_timeout, step.keyword, *step.args]
+        body.create_keyword(name=GATE_KEYWORD, args=args, assign=step.assign)
 
-def _gate(body, step):
-    args = [step.timeout, step.interval, step.on_timeout, step.keyword, *step.args]
-    body.create_keyword(name=GATE_KEYWORD, args=args)
+    def _sleep(self, body, step):
+        body.create_keyword(name='Sleep', args=[step.duration])
 
+    def _decision(self, body, step):
+        if_ = body.create_if()
+        yes = if_.body.create_branch(BodyItem.IF, condition=step.condition)
+        self.emit(yes.body, step.yes)
+        no = if_.body.create_branch(BodyItem.ELSE)
+        self.emit(no.body, step.no)
 
-def _sleep(body, step):
-    body.create_keyword(name='Sleep', args=[step.duration])
+    def _loop(self, body, step):
+        condition = 'True'
+        if step.max_seconds:
+            deadline = self._deadline_variable(step)
+            seconds = timestr_to_secs(step.max_seconds)
+            body.create_keyword(name='Evaluate', args=[f'time.time() + {seconds}'],
+                                assign=[deadline])
+            condition = f'time.time() < {deadline}'
+        if step.max_loops:
+            limit, on_limit = str(step.max_loops), 'pass'
+        else:
+            # Only a deadline bounds the loop; lift Robot's default iteration limit.
+            limit, on_limit = 'NONE', None
+        while_ = body.create_while(condition=condition, limit=limit, on_limit=on_limit)
+        self._guarded(while_.body, step)
+        if step.every:
+            while_.body.create_keyword(name='Sleep', args=[step.every])
 
+    def _deadline_variable(self, step):
+        """A variable name derived from the loop id, unique within the suite.
 
-def _decision(body, step):
-    if_ = body.create_if()
-    yes = if_.body.create_branch(BodyItem.IF, condition=step.condition)
-    _emit(yes.body, step.yes)
-    no = if_.body.create_branch(BodyItem.ELSE)
-    _emit(no.body, step.no)
+        Sanitising ids can make different ids equal (``a-b`` and ``a_b``);
+        a nested loop reusing its parent's variable would move the parent's
+        deadline, so collisions get a numeric suffix.
+        """
+        base = re.sub(r'\W', '_', step.id) or 'loop'
+        name, number = base, 1
+        while name in self._deadlines.values():
+            number += 1
+            name = f'{base}_{number}'
+        self._deadlines[step.id] = name
+        return DEADLINE_VARIABLE % name
 
+    def _try(self, body, step):
+        self._guarded(body, step)
 
-def _loop(body, step):
-    condition = 'True'
-    if step.max_seconds:
-        deadline = DEADLINE_VARIABLE % _identifier(step.id)
-        seconds = timestr_to_secs(step.max_seconds)
-        body.create_keyword(name='Evaluate', args=[f'time.time() + {seconds}'],
-                            assign=[deadline])
-        condition = f'time.time() < {deadline}'
-    if step.max_loops:
-        limit, on_limit = str(step.max_loops), 'pass'
-    else:
-        # Only a deadline bounds the loop; lift Robot's default iteration limit.
-        limit, on_limit = 'NONE', None
-    while_ = body.create_while(condition=condition, limit=limit, on_limit=on_limit)
-    _guarded(while_.body, step)
-    if step.every:
-        while_.body.create_keyword(name='Sleep', args=[step.every])
+    def _guarded(self, body, step):
+        if step.recovery is None:
+            self.emit(body, step.body)
+            return
+        try_ = body.create_try()
+        main = try_.body.create_branch(BodyItem.TRY)
+        self.emit(main.body, step.body)
+        recovery = try_.body.create_branch(BodyItem.EXCEPT, variable=ERROR_VARIABLE)
+        self.emit(recovery.body, step.recovery)
+        if step.then == ABORT:
+            recovery.body.create_keyword(name='Fail', args=[ERROR_VARIABLE])
 
-
-def _try(body, step):
-    _guarded(body, step)
-
-
-def _guarded(body, step):
-    if step.recovery is None:
-        _emit(body, step.body)
-        return
-    try_ = body.create_try()
-    main = try_.body.create_branch(BodyItem.TRY)
-    _emit(main.body, step.body)
-    recovery = try_.body.create_branch(BodyItem.EXCEPT, variable=ERROR_VARIABLE)
-    _emit(recovery.body, step.recovery)
-    if step.then == ABORT:
-        recovery.body.create_keyword(name='Fail', args=[ERROR_VARIABLE])
-
-
-def _identifier(node_id):
-    return re.sub(r'\W', '_', node_id)
-
-
-_EMITTERS = {
-    KeywordStep: _keyword,
-    GateStep: _gate,
-    SleepStep: _sleep,
-    Decision: _decision,
-    Loop: _loop,
-    Try: _try,
-}
+    _emitters = {
+        KeywordStep: _keyword,
+        GateStep: _gate,
+        SleepStep: _sleep,
+        Decision: _decision,
+        Loop: _loop,
+        Try: _try,
+    }

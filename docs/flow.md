@@ -77,7 +77,8 @@ from the module search path.
 
 A recovery region ends with `continue` back to its loop or try node, or with
 `abort` to the node after it (or an end node); `abort` re-raises the failure
-after the recovery ran.
+after the recovery ran. Loops and try regions nest: a loop that is itself the
+last node of an enclosing body leaves with `next` instead of `done`.
 
 ### Rules
 

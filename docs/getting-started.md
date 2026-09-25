@@ -8,7 +8,7 @@ standalone, install from the fork's source tree:
 ```bash
 git clone https://github.com/test-fullautomation/robotframework.git
 cd robotframework
-pip install -e src        # or add src/ to PYTHONPATH
+pip install -e .          # or add src/ to PYTHONPATH
 ```
 
 The fork targets **CPython 3.9–3.13**. On Python 3.13 the standard `Telnet`

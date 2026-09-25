@@ -120,6 +120,8 @@ def load_flow(source):
         try:
             with open(path, encoding='UTF-8') as file:
                 data = json.load(file)
+        except OSError as err:
+            raise FlowError(f"Reading flow file '{path}' failed: {err}")
         except ValueError as err:
             raise FlowError(f"Invalid JSON in '{path}': {err}")
     return validate(data)
@@ -151,6 +153,9 @@ def _validate_flow_section(flow):
 def _validate_imports(imports):
     if not isinstance(imports, dict):
         raise FlowError("'imports' must be an object.")
+    for section in ('libraries', 'resources', 'variables'):
+        if not isinstance(imports.get(section, []), list):
+            raise FlowError(f"'imports.{section}' must be a list.")
     libraries = [_name_and_args(item, 'libraries') for item in imports.get('libraries', [])]
     resources = imports.get('resources', [])
     if not all(is_string(res) for res in resources):
@@ -298,10 +303,12 @@ def _validate_time(node, attr, required=False, default=None):
         return default
     value = _stringify(value)
     try:
-        timestr_to_secs(value)
+        seconds = timestr_to_secs(value)
     except ValueError:
         raise FlowError(f"'{attr}' must be a valid time string, got {value!r}.",
                         node.id)
+    if seconds < 0:
+        raise FlowError(f"'{attr}' must not be negative, got {value!r}.", node.id)
     return value
 
 

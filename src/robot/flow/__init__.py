@@ -60,7 +60,13 @@ class FlowParser:
     EXTENSION = EXTENSION
 
     def parse(self, source, defaults=None):
-        return build_flow_suite(source)
+        suite = build_flow_suite(source)
+        if defaults:
+            # Test setup, teardown, tags and timeout inherited from __init__
+            # files apply to flow tests as to any other test.
+            for test in suite.tests:
+                defaults.set_to(test)
+        return suite
 
 
 def parse(source, defaults=None):
