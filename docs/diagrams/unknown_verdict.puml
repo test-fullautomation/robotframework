@@ -1,0 +1,21 @@
+@startuml
+!include diagrams/style.iuml
+
+start
+:A test step ends;
+switch (What happened?)
+case (the checked\ncondition held)
+  #eefaf1:**PASS**;
+case (an assertion\ndid not hold)
+  #fbeeee:**FAIL**
+  the product is wrong
+  -> look at the product;
+case (crash | missing keyword | import error\nbench not ready | unexpected exception)
+  #fdf5e6:**UNKNOWN**
+  nothing could be judged
+  -> look at the bench / the test;
+endswitch
+:return code = (unknown << 4) | failed
+CI can tell the two apart without opening the log;
+stop
+@enduml

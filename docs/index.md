@@ -1,47 +1,77 @@
-# RobotFramework AIO — Feature Guide
+# RobotFramework AIO
 
-This is the feature documentation for the **RobotFramework AIO** core, a fork of
-[Robot Framework](https://robotframework.org) 6.1 maintained by the
-[test-fullautomation](https://github.com/test-fullautomation) project. It adds
-capabilities aimed at **long-running, condition-driven and concurrent tests** —
-the kind of endurance and hardware-in-the-loop scenarios that run for hours or
-days rather than seconds.
+**Robot Framework for tests that run for hours or days, in parallel, against
+real benches — and still give an honest verdict.**
+{ .lead }
 
-Everything here is additive: existing Robot Framework test suites keep working
-unchanged. The features below are opt-in through new keywords, libraries and
-command-line options.
+A fork of [Robot Framework](https://robotframework.org) 6.1 by the
+[test-fullautomation](https://github.com/test-fullautomation) project. Your
+existing suites run unchanged; everything below is opt-in.
 
-## What the fork adds
+<div class="cards" markdown>
 
-| Feature | What it is for | Start here |
-|---------|----------------|------------|
-| **UNKNOWN status** | A fourth test status beside PASS/FAIL/SKIP for results that are neither a pass nor a genuine assertion failure — a crash, a missing keyword, an environment problem. | [UNKNOWN status](unknown-status.md) |
-| **THREAD keyword** | Run part of a test in a background worker thread, with test- or suite-scoped lifecycles and cooperative stopping. | [Lifecycle and scopes](thread/lifecycle.md) |
-| **Thread result merging + timeline** | Per-thread output is merged back into `log.html`/`report.html`, and `--timeline` renders an interactive execution timeline. | [Result merging and timeline](thread/merging-timeline.md) |
-| **StateMachine library** | State-machine-driven execution for multi-day tests, with guarded transitions, timeouts, `on_error` routing and crash-safe checkpoints. | [StateMachine](statemachine.md) |
-| **Watchdog library** | Supervise worker threads: heartbeat, stall detection and reporting. | [Watchdog](watchdog.md) |
-| **Segmented output** | Periodically seal `output.xml` into well-formed segments so a crash during a very long run loses at most one interval of log data. | [Long-running tests](long-running.md) |
-| **Bounded memory** | Caps on the message cache and error section (with spill-to-disk) so days-long runs do not grow without bound. | [Long-running tests](long-running.md) |
-| **Return-code encoding** | The process exit code encodes both the failed and the UNKNOWN test counts. | [UNKNOWN status](unknown-status.md#return-code) |
+<div class="card" markdown>
+<p class="pain-line">"My test plan is a flowchart, but I maintain it as .robot by hand."</p>
+### [Flow files](flow.md)
+Run the flowchart itself. Gates, bounded loops and recovery are built in — and
+two flows in two processes can meet and move in lockstep.
+</div>
 
-## Why UNKNOWN matters (the one-minute version)
+<div class="card" markdown>
+<p class="pain-line">"A 48-hour run crashed at hour 40. We start again from zero."</p>
+### [StateMachine](statemachine.md)
+States, guarded transitions and a checkpoint after every step. A crash costs
+one transition, not two days.
+</div>
 
-Classic Robot Framework has two outcomes for a test that did not pass: FAIL
-(an assertion was checked and did not hold) and SKIP. But a test can also end
-for reasons that are **neither** — the system under test crashed, a keyword or
-variable was missing, an import broke, an unexpected exception was raised. Those
-are not "the product is wrong", they are "we could not tell". Reporting them as
-FAIL hides real regressions in the noise; this fork reports them as **UNKNOWN**.
+<div class="card" markdown>
+<p class="pain-line">"The report is red — but half of it is the bench, not the product."</p>
+### [UNKNOWN status](unknown-status.md)
+A fourth verdict for "could not tell". Real regressions stand out, and the
+return code tells CI which is which.
+</div>
 
-!!! note "Calculator example"
-    Testing `3 + 2`: if the result is `5` the test **passes**; if it is `4` the
-    product is wrong and the test **fails**; if the calculator crashes or shows
-    nothing, there is no result to judge — that is **UNKNOWN**.
+<div class="card" markdown>
+<p class="pain-line">"I need a stimulus running beside my test — and then its log is gone."</p>
+### [THREAD keyword](thread/lifecycle.md)
+Background work with test or suite lifetime, merged back into `log.html`, plus
+a timeline that shows who ran when.
+</div>
 
-See [UNKNOWN status](unknown-status.md) for the full model and the command-line
-options that control it.
+<div class="card" markdown>
+<p class="pain-line">"Something hung on dead hardware and nobody noticed for a day."</p>
+### [Watchdog](watchdog.md)
+A supervisor thread with heartbeat, stall detection and a deadline. It fails
+the test in minutes, with the reason.
+</div>
 
-## Getting started
+<div class="card" markdown>
+<p class="pain-line">"The PC rebooted and output.xml is unreadable. Two days of log, gone."</p>
+### [Segmented output](segmented-output.md)
+The log is sealed into safe pieces as it grows. A crash loses one interval at
+most.
+</div>
 
-Head to [Getting started](getting-started.md) for installation and a first run,
-then pick the feature you need from the sidebar.
+</div>
+
+## Built to be combined
+
+```plantuml
+!include diagrams/compose_48h.puml
+```
+
+Each feature works alone; together they cover a multi-day endurance run end to
+end. [Long-running tests](long-running.md) maps each risk to the feature that
+covers it.
+
+## Try it in five minutes
+
+```bash
+git clone https://github.com/test-fullautomation/robotframework.git
+cd robotframework && pip install -e .
+robot --timeline timeline.html my_suite.robot
+```
+
+Then read [Getting started](getting-started.md), or open one of the runnable
+demos next to the repository: `demo/flow/`, `demo/statemachine/`,
+`demo/longrun/`.

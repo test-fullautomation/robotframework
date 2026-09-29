@@ -1,8 +1,30 @@
 # UNKNOWN status
 
-Robot Framework classifies a test as PASS, FAIL or SKIP. This fork adds a fourth
-status, **UNKNOWN**, for outcomes that are neither a pass nor a genuine
-assertion failure.
+**Stop chasing product bugs that are really bench problems.**
+{ .lead }
+
+!!! pain "The pain"
+    The nightly report is red: 40 failures. Three are real regressions; the rest
+    are a library that failed to import, a power supply that was switched off, a
+    keyword that was renamed. Stock Robot Framework calls them all FAIL, so every
+    morning someone digs through 40 logs to find the three that matter — and CI
+    cannot tell the difference either.
+
+!!! fix "The fix"
+    A fourth verdict beside PASS, FAIL and SKIP. **FAIL** means an assertion was
+    checked and the product was wrong. **UNKNOWN** means nothing could be judged
+    — the environment broke. The report, the statistics and the return code keep
+    them apart.
+
+```plantuml
+!include diagrams/unknown_verdict.puml
+```
+
+| The same night | Stock Robot Framework | RobotFramework AIO |
+|----------------|-----------------------|--------------------|
+| Report | 40 failed | **3 failed**, 37 unknown |
+| First question | "What broke in the product?" | "Fix the bench, then look at 3 tests" |
+| Return code | 40 | `(min(37,14) << 4) \| 3` = 227 → *3 failed, 14+ unknown* |
 
 ## The model
 

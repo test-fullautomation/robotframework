@@ -1,5 +1,21 @@
 # Thread synchronisation
 
+**Hand results back from a thread without shared-variable races.**
+{ .lead }
+
+!!! pain "The pain"
+    A background thread computed something the test needs — or the test must
+    wait until the stimulus has reached a certain point. Polling a shared
+    variable is racy, and a `Sleep` is a guess.
+
+!!! fix "The fix"
+    Named notifications with a payload, a timeout and a bounded queue, plus
+    reentrant locks for the rare case two threads must not overlap.
+
+```plantuml
+!include diagrams/sync_notify.puml
+```
+
 Workers are isolated (each has its own variable copy), so the fork provides
 explicit primitives to coordinate between threads and hand data back.
 

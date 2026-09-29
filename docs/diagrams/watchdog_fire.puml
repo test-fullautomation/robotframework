@@ -1,0 +1,20 @@
+@startuml
+!include diagrams/style.iuml
+
+participant "Main flow" as M
+participant "Watchdog\n(SUPERVISOR thread)" as W
+
+M -> W : Configure Watchdog\nstall_timeout=10 min | heartbeat=5 min
+activate W
+group healthy
+  M -> W : Feed Watchdog (every cycle)
+  W -> W : heartbeat: 5 min elapsed, 42 feed(s)
+end
+M -> M : Measure One Cycle\n**hangs on dead hardware**
+note right of W : no feed for 10 min
+W -> W : **FIRED** (WARN with the reason)
+W -> M : on_timeout: Collect Diagnostics\n(or Stop State Machine)
+deactivate W
+M -> M : teardown: Watchdog Should Not Have Fired
+note left of M #fbeeee : test FAILS with the reason\nafter 10 minutes, not 2 days
+@enduml

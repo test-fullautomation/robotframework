@@ -1,0 +1,25 @@
+@startuml
+!include diagrams/style.iuml
+
+start
+partition "phase: setup  ->  Suite Setup" {
+  #fdf5e6:gate: chamber at set point
+  (poll until ready, 30 min timeout);
+  :Set Power And Current  ${BLADE};
+}
+partition "phase: test  ->  test case 'Cycle'" {
+  repeat :Run Cycle Tests  ${BLADE};
+    if (cycle failed?) then (on_failure)
+      #fbeeee:Execute Recovery Strategy
+      then **continue**;
+    else (no)
+    endif
+  repeat while (loop: max 1000 cycles | 8 h | every 10 s) is (next)
+}
+partition "phase: teardown  ->  Suite Teardown" {
+  :Before Suite Tear Down
+  (runs even when setup failed);
+}
+#eefaf1:verdict: PASS / FAIL / UNKNOWN;
+stop
+@enduml

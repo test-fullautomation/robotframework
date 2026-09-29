@@ -1,49 +1,123 @@
 # Watchdog library
 
-The `Watchdog` library supervises long-running work — typically a worker thread
-— and detects when it stalls. It is a separate feature from the StateMachine
-library; the two are often combined but neither requires the other.
+**Find out in ten minutes that your test hung — not in two days.**
+{ .lead }
+
+!!! pain "The pain"
+    A test running for hours or days can hang silently: a keyword blocks on dead
+    hardware, a condition never becomes true, a loop stops making progress.
+    Nobody notices until the CI job times out two days later — with no
+    diagnostics and no proof-of-life trail in the log.
+
+!!! fix "The fix"
+    A supervisor thread watches the test from the side. The test *feeds* it as
+    it makes progress; when the feeding stops, the watchdog fires, runs your
+    diagnostics keyword, and the test fails with the reason. The whole contract
+    is two keyword names — it supervises anything.
+
+```plantuml
+!include diagrams/watchdog_fire.puml
+```
+
+The `Watchdog` library runs in the fork's own [`THREAD`](thread/lifecycle.md)
+block and is deliberately independent of what it supervises: a state machine, a
+measurement loop, a flashing procedure.
 
 ```robotframework
 *** Settings ***
 Library    Watchdog
 ```
 
-## Idea
+## Three mechanisms
 
-A watchdog is fed periodically by the work it supervises. If it is not fed
-within a configured stall timeout, the watchdog *fires* — that condition is
-recorded and can be asserted on. A heartbeat can also log progress at a fixed
-interval so a long run shows signs of life in the log.
+| Mechanism | Trigger | Purpose |
+|-----------|---------|---------|
+| **Heartbeat** | every `heartbeat` interval | proof-of-life message to console and log (elapsed time, feed count); optional `heartbeat_keyword`, e.g. to log system statistics |
+| **Stall detection** | no `Feed Watchdog` within `stall_timeout` | detects a flow that stopped making progress |
+| **Deadline** | `max_duration` exceeded | bounds the whole run (e.g. 48 h) |
+
+When the watchdog fires it logs a WARN with the reason and runs the
+`on_timeout` keyword in the supervisor thread.
+
+## Workflow
 
 ```robotframework
 *** Test Cases ***
-Supervised Run
-    Configure Watchdog    stall_timeout=5s    heartbeat=2s
-    THREAD    SUPERVISOR    ${True}
+Long Measurement
+    Configure Watchdog    max_duration=48h    stall_timeout=10 min
+    ...                   heartbeat=5 min     on_timeout=Collect Diagnostics
+    THREAD    SUPERVISOR    True
         Run Watchdog
     END
-    Do Long Work        # calls Feed Watchdog as it makes progress
+    FOR    ${cycle}    IN RANGE    ${CYCLES}
+        Measure One Cycle    ${cycle}
+        Feed Watchdog
+    END
     Stop Watchdog
-    Watchdog Should Not Have Fired
+    [Teardown]    Watchdog Should Not Have Fired
 ```
+
+Console during a healthy run:
+
+```text
+Watchdog 'DEFAULT' started.
+WATCHDOG DEFAULT heartbeat: 5 minutes elapsed, 42 feed(s).
+WATCHDOG DEFAULT heartbeat: 10 minutes elapsed, 84 feed(s).
+```
+
+When it fires:
+
+```text
+[ WARN ] WATCHDOG DEFAULT FIRED: no feed within stall_timeout 10 minutes.
+         -> on_timeout keyword 'Collect Diagnostics' runs in the supervisor thread
+         -> teardown: Watchdog Should Not Have Fired -> the test FAILS with the reason
+```
+
+## Who fails the test?
+
+Failures inside a `THREAD` block do **not** fail the test — the thread runner
+turns them into warnings by design. A fired watchdog therefore records its
+state and reason, and the **main flow** turns that into a verdict with
+`Watchdog Should Not Have Fired` (typically in the test teardown) or, for
+negative tests, `Watchdog Should Have Fired`.
 
 ## Keywords
 
 | Keyword | Purpose |
 |---------|---------|
-| `Configure Watchdog    stall_timeout=<time>    heartbeat=<time>` | Set the maximum allowed gap between feeds and the heartbeat interval. |
-| `Run Watchdog` | Run the supervision loop (typically inside a `THREAD` block). |
-| `Feed Watchdog` | Signal progress; resets the stall timer. Call it from the supervised work. |
-| `Get Watchdog Status` | Return the watchdog's state (e.g. running, and whether it has fired). |
-| `Stop Watchdog` | Stop the supervision loop. |
-| `Watchdog Should Not Have Fired` | Assert that no stall was detected. |
-| `Reset Watchdogs` | Clear watchdog state (suite teardown). |
+| `Configure Watchdog    name=DEFAULT    max_duration=    stall_timeout=    heartbeat=1 min    on_timeout=    heartbeat_keyword=` | Create a watchdog. Must be called before its `THREAD` starts. |
+| `Run Watchdog    name=DEFAULT` | The supervision loop; blocks until it fires or is stopped, so run it inside a `THREAD`. |
+| `Feed Watchdog    name=DEFAULT` | Signal progress; resets the stall timer. Call it from the supervised work. |
+| `Stop Watchdog    name=DEFAULT    timeout=10 s` | Stop gracefully and wait for the loop to end; fails if it does not end in time. |
+| `Get Watchdog Status    name=DEFAULT` | `CONFIGURED`, `RUNNING`, `STOPPED` or `FIRED`. |
+| `Watchdog Should Not Have Fired    name=DEFAULT` | Fail with the recorded reason if it fired. |
+| `Watchdog Should Have Fired    name=DEFAULT` | Fail unless it fired — for negative tests. |
+| `Reset Watchdogs` | Signal all running supervisors to stop and clear all configurations (teardown). |
+
+Several named watchdogs coexist through `name=`.
+
+## Loose coupling: supervising the StateMachine
+
+Watchdog and [StateMachine](statemachine.md) never reference each other — the
+wiring is one keyword name:
+
+```robotframework
+Configure Watchdog    name=SM    stall_timeout=15 min    on_timeout=Stop State Machine
+THREAD    SM_SUPERVISOR    True
+    Run Watchdog    name=SM
+END
+Run State Machine    initial=INIT    checkpoint=${OUTPUT DIR}${/}sm.json
+# The machine's during= keywords call Feed Watchdog. If it stalls, the
+# watchdog fires and the machine returns gracefully (checkpoint saved -> resumable).
+```
+
+Swap `Stop State Machine` for any other reaction keyword to supervise a
+different subsystem — that is the whole integration surface.
 
 ## Feeding safely from supervised work
 
-A common pattern is to feed only while the watchdog is actually running, so the
-same keyword works with or without supervision:
+To make a keyword work with or without supervision, feed only while a watchdog
+is actually running:
 
 ```robotframework
 *** Keywords ***
@@ -54,5 +128,13 @@ Feed If Running
     END
 ```
 
-See the [StateMachine](statemachine.md) battery-endurance example for a watchdog
-supervising a state machine's `during` keywords.
+## Implementation notes
+
+| Aspect | Choice |
+|--------|--------|
+| Scope | one shared library instance (`GLOBAL`) — the main flow and the supervisor thread see the same state |
+| Timing source | `time.monotonic()` — immune to clock adjustments during multi-day runs |
+| Poll granularity | 0.2 s (`Event.wait`) → timing precision ±0.2 s, negligible CPU |
+| Reaction keywords | `on_timeout` and `heartbeat_keyword` run in the supervisor thread; their messages appear inside the `SUPERVISOR` block in `log.html`, and their failures are logged, never swallowed |
+| Fire once | after firing the loop exits — re-arm explicitly with `Configure Watchdog` |
+| Cleanup | `Reset Watchdogs` in a teardown |

@@ -1,0 +1,22 @@
+@startuml
+!include diagrams/style.iuml
+scale 1 as 55 pixels
+
+concise "Without --segmentoutput" as N
+concise "With --segmentoutput 4h" as S
+
+@0
+N is "one open output.xml -> unreadable after the crash"
+S is "part_001 sealed"
+@4
+S is "part_002 sealed"
+@8
+S is "part_003 sealed"
+@12
+S is "live"
+@14
+N is {-}
+S is {-}
+
+highlight 13.6 to 14 #fbeeee : crash at hour 14
+@enduml

@@ -1,0 +1,24 @@
+@startuml
+!include diagrams/style.iuml
+scale 1 as 60 pixels
+
+concise "MainThread" as M
+concise "STIMULATOR (daemon=False: suite)" as S
+concise "MONITOR (daemon=True: test)" as W
+
+@0
+M is "Test 1: start both threads"
+S is "feeding CAN frames to the DUT, across all tests"
+W is "sampling current during test 1"
+@4
+M is "Test 2"
+W is {-}
+@8
+M is "Test 3"
+@12
+M is {-}
+S is {-}
+
+highlight 3.9 to 4.1 #fbeeee : test 1 ends: MONITOR stopped
+highlight 11.9 to 12.1 #fbeeee : suite ends: STIMULATOR stopped
+@enduml
