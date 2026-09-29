@@ -33,7 +33,9 @@ The pieces, in order: :mod:`~robot.flow.schema` validates the file's shape,
 :mod:`~robot.flow.graph` folds the graph into phases and structured steps,
 :mod:`~robot.flow.builder` emits the suite, :mod:`~robot.flow.keywords`
 holds the generic ``Flow Gate`` keyword, and :mod:`~robot.flow.render`
-prints the equivalent ``.robot`` text for review.
+prints the equivalent ``.robot`` text for review. :mod:`~robot.flow.signals`
+is a library flows import to talk to each other across processes (``Set
+Signal``, ``Signal Should Be``).
 """
 
 from pathlib import Path

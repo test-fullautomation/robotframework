@@ -26,6 +26,12 @@ Full example runs setup, cycles, recovery and teardown
     Check Log Message    ${loop.body[2].body[0].body[0].body[0].msgs[0]}    Cycle 3 for IVI.
     Check Log Message    ${SUITE.teardown.body[0].msgs[0]}    Bench released.
 
+Signals between flows: set, wait at a gate, read back
+    Run Tests    ${PARSER}    flow/signals.flow.json
+    Check Test Case    Set And Wait    PASS
+    Check Test Case    Unset Signal Keeps The Gate Waiting    UNKNOWN
+    ...    GLOB:Gate 'Signal Should Be' did not pass within 300 milliseconds (* attempts, waited * milliseconds). Last error: Signal 'atest.never' has not been set.
+
 Parser can be given as the class as well
     Run Tests    --parser robot.flow.FlowParser    flow/decision.flow.json
     Check Test Case    Decision    PASS
