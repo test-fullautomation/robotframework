@@ -6,7 +6,7 @@
     { "id": "test", "kind": "phase", "role": "test", "name": "Abort After Recovery" },
     { "id": "try", "kind": "try" },
     { "id": "flash", "kind": "keyword", "keyword": "Break Something", "args": ["Flash failed."] },
-    { "id": "restore", "kind": "keyword", "keyword": "Execute Recovery Strategy", "args": ["ECU"] },
+    { "id": "restore", "kind": "keyword", "keyword": "Recover DUT", "args": ["ECU"] },
     { "id": "after", "kind": "keyword", "keyword": "Log", "args": ["not reached"] },
     { "id": "end", "kind": "end" }
   ],

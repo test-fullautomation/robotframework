@@ -47,7 +47,7 @@ PHASED_FLOW = flow(
      END],
     [['start', 'setup'], ['setup', 'gate'], ['gate', 'test'], ['test', 'work'],
      ['work', 'teardown'], ['teardown', 'clean'], ['clean', 'end']],
-    imports={'libraries': ['Bench', ['Signals', '127.0.0.1:50210']],
+    imports={'libraries': ['Bench', ['Signals', '127.0.0.1:9000']],
              'resources': ['bench.resource']},
     variables={'ARG': 'value', 'N': 3}
 )
@@ -300,7 +300,7 @@ class TestBuilder(unittest.TestCase):
         imports = [(i.type, i.name, list(i.args)) for i in suite.resource.imports]
         self.assertEqual(imports, [('LIBRARY', 'robot.flow.keywords', []),
                                    ('LIBRARY', 'Bench', []),
-                                   ('LIBRARY', 'Signals', ['127.0.0.1:50210']),
+                                   ('LIBRARY', 'Signals', ['127.0.0.1:9000']),
                                    ('RESOURCE', 'bench.resource', [])])
         variables = [(v.name, v.value) for v in suite.resource.variables]
         self.assertEqual(variables, [('${ARG}', ('value',)), ('${N}', ('3',))])

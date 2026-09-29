@@ -1,29 +1,29 @@
 @startuml
 !include diagrams/style.iuml
 
-participant "**robot** process 1\n--variable BLADE:IVI" as I
+participant "**robot** process 1\n--variable RIG:RIG_A" as I
 database "**signals.json**\nROBOT_FLOW_SIGNALS\n(one file per run)" as S
-participant "**robot** process 2\n--variable BLADE:ADAS" as A
+participant "**robot** process 2\n--variable RIG:RIG_B" as A
 
 == Rendezvous: nobody starts alone ==
-I -> S : Set Signal  IVI.ready  1
-I -> S : gate: ADAS.ready == 1 ?
+I -> S : Set Signal  RIG_A.ready  1
+I -> S : gate: RIG_B.ready == 1 ?
 note left of I : waits, polling
-A -> S : Set Signal  ADAS.ready  1
-A -> S : gate: IVI.ready == 1  -> passes
-S --> I : ADAS.ready == 1  -> passes
+A -> S : Set Signal  RIG_B.ready  1
+A -> S : gate: RIG_A.ready == 1  -> passes
+S --> I : RIG_B.ready == 1  -> passes
 
 == Lockstep: every cycle, both finish before either goes on ==
 loop max_loops
   I -> I : Run Cycle Tests -> n
   A -> A : Run Cycle Tests -> n
-  I -> S : Set Signal  IVI.cycle  n
-  A -> S : Set Signal  ADAS.cycle  n
-  I -> S : gate: ADAS.cycle >= n
-  A -> S : gate: IVI.cycle >= n
+  I -> S : Set Signal  RIG_A.cycle  n
+  A -> S : Set Signal  RIG_B.cycle  n
+  I -> S : gate: RIG_B.cycle >= n
+  A -> S : gate: RIG_A.cycle >= n
 end
 
 == A peer dies ==
-I -> S : gate: ADAS.cycle >= n ...
-note over I #fdf5e6 : gate timeout -> **UNKNOWN** (rc 16)\n"Last error: Signal 'ADAS.cycle' is 2 ..."\nnot a false FAIL, not a hang
+I -> S : gate: RIG_B.cycle >= n ...
+note over I #fdf5e6 : gate timeout -> **UNKNOWN** (rc 16)\n"Last error: Signal 'RIG_B.cycle' is 2 ..."\nnot a false FAIL, not a hang
 @enduml

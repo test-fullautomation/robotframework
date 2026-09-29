@@ -243,7 +243,7 @@ With the new library ``robot.flow.signals`` two flows running as two processes c
 
    .. code::
 
-      python.exe -m robot --parser robot.flow --variable BLADE:IVI plan.flow.json
+      python.exe -m robot --parser robot.flow --variable RIG:RIG_A plan.flow.json
       python.exe -m robot.flow validate plan.flow.json
 
 **Segmented output**

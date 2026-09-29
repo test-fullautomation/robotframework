@@ -7,11 +7,11 @@ ${PARSER}         --parser robot.flow
 
 *** Test Cases ***
 Full example runs setup, cycles, recovery and teardown
-    Run Tests    ${PARSER}    flow/permanent_run.flow.json
+    Run Tests    ${PARSER}    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS
     Should Be Equal    ${SUITE.setup.name}    Flow Setup
     Should Be Equal    ${SUITE.teardown.name}    Flow Teardown
-    Check Log Message    ${SUITE.setup.body[1].msgs[0]}    Power on for IVI.
+    Check Log Message    ${SUITE.setup.body[1].msgs[0]}    Power on for RIG_A.
     ${loop} =    Set Variable    ${SUITE.tests[0].body[1]}
     Should Be Equal    ${loop.type}    WHILE
     # Three iterations, then the INFO message about reaching the limit.
@@ -22,8 +22,8 @@ Full example runs setup, cycles, recovery and teardown
     # Iteration 2 fails on purpose and runs the recovery, then the loop continues.
     ${recovery} =    Set Variable    ${loop.body[1].body[0].body[1]}
     Should Be Equal    ${recovery.type}    EXCEPT
-    Check Log Message    ${recovery.body[0].msgs[0]}    Recovery 1 for IVI.
-    Check Log Message    ${loop.body[2].body[0].body[0].body[0].msgs[0]}    Cycle 3 for IVI.
+    Check Log Message    ${recovery.body[0].msgs[0]}    Recovery 1 for RIG_A.
+    Check Log Message    ${loop.body[2].body[0].body[0].body[0].msgs[0]}    Cycle 3 for RIG_A.
     Check Log Message    ${SUITE.teardown.body[0].msgs[0]}    Bench released.
 
 Signals between flows: set, wait at a gate, read back
@@ -78,7 +78,7 @@ Loop bounded only by a deadline ends with PASS
     Should Be True    3 <= len($tc.body[1].body) <= 8
 
 Dry run validates keywords and gate arguments
-    Run Tests    ${PARSER} --dryrun    flow/permanent_run.flow.json
+    Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS
     Run Tests    ${PARSER} --dryrun    flow/invalid_keyword.flow.json
     Check Test Case    Invalid Keyword    UNKNOWN

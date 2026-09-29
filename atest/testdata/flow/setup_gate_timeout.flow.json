@@ -9,7 +9,7 @@
     { "id": "test", "kind": "phase", "role": "test", "name": "Never Runs" },
     { "id": "kw", "kind": "keyword", "keyword": "Log", "args": ["should not be here"] },
     { "id": "teardown", "kind": "phase", "role": "teardown" },
-    { "id": "td", "kind": "keyword", "keyword": "Before Suite Tear Down" },
+    { "id": "td", "kind": "keyword", "keyword": "Release Bench" },
     { "id": "end", "kind": "end" }
   ],
   "edges": [

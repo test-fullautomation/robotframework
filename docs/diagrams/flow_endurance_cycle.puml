@@ -5,19 +5,19 @@ start
 partition "phase: setup  ->  Suite Setup" {
   #fdf5e6:gate: chamber at set point
   (poll until ready, 30 min timeout);
-  :Set Power And Current  ${BLADE};
+  :Power On DUT  ${RIG};
 }
 partition "phase: test  ->  test case 'Cycle'" {
-  repeat :Run Cycle Tests  ${BLADE};
+  repeat :Run Cycle Tests  ${RIG};
     if (cycle failed?) then (on_failure)
-      #fbeeee:Execute Recovery Strategy
+      #fbeeee:Recover DUT
       then **continue**;
     else (no)
     endif
   repeat while (loop: max 1000 cycles | 8 h | every 10 s) is (next)
 }
 partition "phase: teardown  ->  Suite Teardown" {
-  :Before Suite Tear Down
+  :Release Bench
   (runs even when setup failed);
 }
 #eefaf1:verdict: PASS / FAIL / UNKNOWN;

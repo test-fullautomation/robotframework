@@ -4,13 +4,13 @@
 { .lead }
 
 !!! pain "The pain"
-    A bench run is a plan: wait for the chamber, power the blade, loop the cycle
+    A bench run is a plan: wait for the chamber, power the rig, loop the cycle
     tests for eight hours, recover when a cycle fails, release the bench. The
     team draws that plan as a flowchart and reviews it — then someone rewrites
     it by hand as `.robot` keywords, where the plan disappears into `WHILE`,
     `TRY` and `Wait Until Keyword Succeeds`. The drawing and the test drift
     apart, a bench that never became ready shows up as a product FAIL, and two
-    blades that must run in step need glue code nobody wants to own.
+    rigs that must run in step need glue code nobody wants to own.
 
 !!! fix "The fix"
     Write the flowchart down once as a *flow file* — nodes and edges — and run
@@ -27,11 +27,11 @@
 The boxes and arrows you draw are the nodes and edges of the file. Phases
 become the suite setup, the test cases and the suite teardown; a loop becomes a
 bounded `WHILE`; a failure route becomes `TRY`/`EXCEPT`; a wait becomes a
-*gate* with a real timeout. This is the customer's permanent-run as a flow —
+*gate* with a real timeout. This is a typical endurance run as a flow —
 and exactly what executes:
 
 ```plantuml
-!include diagrams/flow_permanent_run.puml
+!include diagrams/flow_endurance_cycle.puml
 ```
 
 - **Bounded by construction** — every loop has `max_loops` and/or `max_seconds`;
@@ -44,7 +44,7 @@ and exactly what executes:
 
 ## 2. Run two flows as two processes — synchronised as one test
 
-Two blades, two `robot` processes, one flow file for both (`--variable BLADE:`).
+Two rigs, two `robot` processes, one flow file for both (`--variable RIG:`).
 They meet before they start, then move in **lockstep**: each publishes the cycle
 it finished and waits until the other has caught up. They share nothing but a
 small signal file of the run — the runner itself locks nothing and holds no
@@ -56,11 +56,11 @@ bench state.
 
 ```bash
 export ROBOT_FLOW_SIGNALS=results/run42/signals.json     # one fresh file per run
-robot --parser robot.flow --variable BLADE:IVI  --variable PEER:ADAS --outputdir results/ivi  pair.flow.json &
-robot --parser robot.flow --variable BLADE:ADAS --variable PEER:IVI  --outputdir results/adas pair.flow.json
+robot --parser robot.flow --variable RIG:RIG_A  --variable PEER:RIG_B --outputdir results/rig_a  pair.flow.json &
+robot --parser robot.flow --variable RIG:RIG_B --variable PEER:RIG_A  --outputdir results/rig_b pair.flow.json
 ```
 
-If one blade dies, the other does not hang and does not report a false failure:
+If one rig dies, the other does not hang and does not report a false failure:
 its gate times out and the verdict is **UNKNOWN**, with the last value it read.
 See [Two flows](#two-flows) for the keywords and patterns.
 
@@ -79,10 +79,10 @@ See [Two flows](#two-flows) for the keywords and patterns.
 ## Quick start
 
 ```bash
-robot --parser robot.flow --variable BLADE:IVI --outputdir out/ivi flows/permanent_run.flow.json
-robot --parser robot.flow --dryrun flows/permanent_run.flow.json      # validate without touching the bench
-python -m robot.flow validate flows/permanent_run.flow.json           # shape and structure only
-python -m robot.flow render   flows/permanent_run.flow.json           # the equivalent .robot text
+robot --parser robot.flow --variable RIG:RIG_A --outputdir out/rig_a flows/endurance_cycle.flow.json
+robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # validate without touching the bench
+python -m robot.flow validate flows/endurance_cycle.flow.json           # shape and structure only
+python -m robot.flow render   flows/endurance_cycle.flow.json           # the equivalent .robot text
 ```
 
 Every `robot` option applies — `--variable`, `--outputdir`, `--dryrun`,
@@ -102,21 +102,21 @@ a flow is never run through the state-machine engine.
 
 ```json
 {
-  "flow":      { "name": "Permanent Run", "version": 1 },
-  "imports":   { "libraries": ["bench_keywords.py", ["SignalKeywords", "127.0.0.1:50210"]] },
-  "variables": { "BLADE": "IVI" },
+  "flow":      { "name": "Endurance Cycle", "version": 1 },
+  "imports":   { "libraries": ["bench_keywords.py", ["BenchSignals", "127.0.0.1:9000"]] },
+  "variables": { "RIG": "RIG_A" },
   "nodes": [
     { "id": "start",    "kind": "start" },
     { "id": "setup",    "kind": "phase", "role": "setup" },
     { "id": "chamber",  "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.chamber.state", "==", 1],
                                             "timeout": "300s", "interval": "5s" },
-    { "id": "power",    "kind": "keyword", "keyword": "Set Power And Current", "args": ["${BLADE}"] },
+    { "id": "power",    "kind": "keyword", "keyword": "Power On DUT", "args": ["${RIG}"] },
     { "id": "cycle",    "kind": "phase", "role": "test", "name": "Cycle" },
     { "id": "loop",     "kind": "loop",    "max_loops": 1000, "max_seconds": "8h", "every": "10s" },
-    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${BLADE}"] },
-    { "id": "recover",  "kind": "keyword", "keyword": "Execute Recovery Strategy", "args": ["${BLADE}"] },
+    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}"] },
+    { "id": "recover",  "kind": "keyword", "keyword": "Recover DUT", "args": ["${RIG}"] },
     { "id": "teardown", "kind": "phase", "role": "teardown" },
-    { "id": "release",  "kind": "keyword", "keyword": "Before Suite Tear Down" },
+    { "id": "release",  "kind": "keyword", "keyword": "Release Bench" },
     { "id": "end",      "kind": "end" }
   ],
   "edges": [
@@ -174,9 +174,9 @@ Cycle
     ${flow_deadline_loop}=    Evaluate    time.time() + 28800.0
     WHILE    time.time() < ${flow_deadline_loop}    limit=1000    on_limit=pass
         TRY
-            Run Cycle Tests    ${BLADE}
+            Run Cycle Tests    ${RIG}
         EXCEPT    AS    ${flow_error}
-            Execute Recovery Strategy    ${BLADE}
+            Recover DUT    ${RIG}
         END
         Sleep    10s
     END
@@ -232,17 +232,17 @@ members of a run group -- the runner ships a small library for it,
 - Numbers compare as numbers, `==` and `!=` within `tolerance`; other values
   compare as text and only with `==` and `!=`.
 - A failing comparison says what was read and how old it is —
-  `Signal 'ADAS.cycle' is 2 (set 1s 200ms ago), expected >= 3.` — and an unset signal
-  says so (`Signal 'ADAS.ready' has not been set.`), which is exactly what a
+  `Signal 'RIG_B.cycle' is 2 (set 1s 200ms ago), expected >= 3.` — and an unset signal
+  says so (`Signal 'RIG_B.ready' has not been set.`), which is exactly what a
   timed-out gate reports as its last error.
 
 ### Patterns
 
 **Rendezvous** — each flow announces itself and waits for the other; one file
-serves both sides through `--variable BLADE:` / `PEER:`:
+serves both sides through `--variable RIG:` / `PEER:`:
 
 ```json
-{ "id": "announce", "kind": "keyword", "keyword": "Set Signal",       "args": ["${BLADE}.ready", 1] },
+{ "id": "announce", "kind": "keyword", "keyword": "Set Signal",       "args": ["${RIG}.ready", 1] },
 { "id": "meet",     "kind": "gate",    "keyword": "Signal Should Be", "args": ["${PEER}.ready", "==", 1], "timeout": "5min" }
 ```
 
@@ -250,14 +250,14 @@ serves both sides through `--variable BLADE:` / `PEER:`:
 wait until the peer has reached it. A monotonic counter needs no reset:
 
 ```json
-{ "id": "run",  "kind": "keyword", "keyword": "Run Cycle Tests",  "args": ["${BLADE}"], "assign": "${n}" },
-{ "id": "tell", "kind": "keyword", "keyword": "Set Signal",       "args": ["${BLADE}.cycle", "${n}"] },
+{ "id": "run",  "kind": "keyword", "keyword": "Run Cycle Tests",  "args": ["${RIG}"], "assign": "${n}" },
+{ "id": "tell", "kind": "keyword", "keyword": "Set Signal",       "args": ["${RIG}.cycle", "${n}"] },
 { "id": "sync", "kind": "gate",    "keyword": "Signal Should Be", "args": ["${PEER}.cycle", ">=", "${n}"], "timeout": "2min" }
 ```
 
 If the peer dies, the gate times out and the verdict is UNKNOWN, not FAIL.
 Never retract a flag the peer may not have read yet — mark the end with a new
-signal (`${BLADE}.done`) instead.
+signal (`${RIG}.done`) instead.
 
 Where they live:
 
@@ -265,8 +265,8 @@ Where they live:
   (created on first write; writes are locked, readers never see half a file;
   a lock left behind by a killed process is taken over after 10 seconds).
   Whoever starts the group sets it to a file *of that run*, so two runs can
-  never read each other's signals; the Microservice Manager GUI uses
-  `results/<run>/signals.json`. Unset, it is `robot_flow_signals.json` in the
+  never read each other's signals, for example `results/<run>/signals.json`.
+  Unset, it is `robot_flow_signals.json` in the
   temporary directory, shared by every run on the machine that sets none.
 - **`ROBOT_FLOW_SIGNALS_BACKEND`** -- a class (`package.module.Class` or `package.module:Class`) for
   flows on different machines: created with the `ROBOT_FLOW_SIGNALS` value,

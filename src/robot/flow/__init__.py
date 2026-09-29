@@ -20,13 +20,13 @@ nodes and edges: setup, a bounded cycle loop, recovery, teardown. Robot
 Framework parses it directly and builds a :class:`~robot.running.TestSuite`
 in memory, so the drawing of the plan is the executable::
 
-    robot --parser robot.flow --variable BLADE:IVI flows/permanent_run.flow.json
-    robot --parser robot.flow --dryrun flows/permanent_run.flow.json
+    robot --parser robot.flow --variable RIG:RIG_A flows/endurance_cycle.flow.json
+    robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json
 
 Programmatic use::
 
     from robot.flow import build_flow_suite
-    suite = build_flow_suite('flows/permanent_run.flow.json')
+    suite = build_flow_suite('flows/endurance_cycle.flow.json')
     suite.run(outputdir='out')
 
 The pieces, in order: :mod:`~robot.flow.schema` validates the file's shape,

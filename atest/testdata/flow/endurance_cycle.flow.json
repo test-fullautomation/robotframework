@@ -1,25 +1,25 @@
 {
-  "flow": { "name": "Permanent Run", "version": 1 },
+  "flow": { "name": "Endurance Cycle", "version": 1 },
   "imports": { "libraries": ["FlowStubs.py"] },
-  "variables": { "BLADE": "IVI" },
+  "variables": { "RIG": "RIG_A" },
 
   "nodes": [
     { "id": "start",    "kind": "start" },
     { "id": "setup",    "kind": "phase", "role": "setup" },
     { "id": "chamber",  "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.chamber.state", "==", 1],
                                             "timeout": "5s", "interval": "0.1s" },
-    { "id": "power",    "kind": "keyword", "keyword": "Set Power And Current", "args": ["${BLADE}"] },
-    { "id": "mode0",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.pair.mode", "!=", 0], "timeout": "2s" },
+    { "id": "power",    "kind": "keyword", "keyword": "Power On DUT", "args": ["${RIG}"] },
+    { "id": "mode0",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.mode", "!=", 0], "timeout": "2s" },
 
     { "id": "cycle",    "kind": "phase", "role": "test", "name": "Cycle" },
     { "id": "loop",     "kind": "loop",    "max_loops": 3, "max_seconds": "1min", "every": "0.1s" },
-    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${BLADE}"] },
-    { "id": "mode1",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.pair.mode", "!=", 0], "timeout": "2s" },
-    { "id": "recover",  "kind": "keyword", "keyword": "Execute Recovery Strategy", "args": ["${BLADE}"] },
+    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}"] },
+    { "id": "mode1",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.mode", "!=", 0], "timeout": "2s" },
+    { "id": "recover",  "kind": "keyword", "keyword": "Recover DUT", "args": ["${RIG}"] },
 
     { "id": "teardown", "kind": "phase", "role": "teardown" },
-    { "id": "bstd",     "kind": "keyword", "keyword": "Before Suite Tear Down" },
-    { "id": "mode2",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.pair.mode", "!=", 0], "timeout": "2s" },
+    { "id": "bstd",     "kind": "keyword", "keyword": "Release Bench" },
+    { "id": "mode2",    "kind": "gate",    "keyword": "Signal Should Be", "args": ["bench.mode", "!=", 0], "timeout": "2s" },
     { "id": "end",      "kind": "end" }
   ],
 

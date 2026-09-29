@@ -11,7 +11,7 @@ from robot.api import logger
 # value sticks. 'bench.chamber.state' needs three reads to become ready.
 SIGNALS = {
     'bench.chamber.state': [0, 0, 1],
-    'bench.pair.mode': [3],
+    'bench.mode': [3],
     'bench.never': [0],
 }
 COUNTS = {'cycle': 0, 'recovery': 0, 'iteration': 0}
@@ -39,23 +39,23 @@ def set_signal(name, value):
     SIGNALS[name] = [value]
 
 
-def set_power_and_current(blade):
-    logger.info(f'Power on for {blade}.')
+def power_on_dut(rig):
+    logger.info(f'Power on for {rig}.')
 
 
-def run_cycle_tests(blade):
+def run_cycle_tests(rig):
     COUNTS['cycle'] += 1
-    logger.info(f"Cycle {COUNTS['cycle']} for {blade}.")
+    logger.info(f"Cycle {COUNTS['cycle']} for {rig}.")
     if COUNTS['cycle'] == 2:
         raise AssertionError('Cycle test 2 failed on purpose.')
 
 
-def execute_recovery_strategy(blade):
+def recover_dut(rig):
     COUNTS['recovery'] += 1
-    logger.info(f"Recovery {COUNTS['recovery']} for {blade}.")
+    logger.info(f"Recovery {COUNTS['recovery']} for {rig}.")
 
 
-def before_suite_tear_down():
+def release_bench():
     logger.info('Bench released.')
 
 
