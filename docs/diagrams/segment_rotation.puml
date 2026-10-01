@@ -1,0 +1,32 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam sequence {
+  ParticipantBackgroundColor #eef4fb
+  ParticipantBorderColor #0a5da8
+  LifeLineBorderColor #8fa3b8
+  ArrowColor #1c2430
+}
+
+participant "Main flow" as M
+participant "_SegmentingWriter\n(output.xml)" as W
+participant "output_part_001.xml" as P1
+participant "output_part_002.xml" as P2
+participant "segmentmerger" as G
+
+M -> W : start suite / test / kw\n(stack: robot, suite, test, kw)
+M -> W : log messages ...
+note over W : interval elapsed
+W -> W : close kw, test, suite, robot
+W -> P1 : seal (rename)
+W -> W : reopen live file, replay stack\n<suite continued="true"> ...
+M -> W : more keywords ...
+note over W : interval elapsed
+W -> P2 : seal
+M -> W : end of run: statuses,\nstatistics, errors
+W -> G : live output.xml
+P1 -> G
+P2 -> G
+G -> G : join continued chains\nin order
+G --> M : one output.xml\n(parts removed)
+@enduml

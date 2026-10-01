@@ -1,0 +1,25 @@
+@startuml
+skinparam backgroundColor transparent
+skinparam sequence {
+  ArrowColor #0a5da8
+  LifeLineBorderColor #0a5da8
+  ParticipantBackgroundColor #eef4fb
+  ParticipantBorderColor #0a5da8
+}
+
+participant "Main thread" as M
+participant "Worker\n(THREAD name)" as W
+participant "output.xml" as O
+participant "output_<name>.xml" as P
+participant "threadmerger" as T
+
+M -> O : write <thread> placeholder\nat the THREAD position
+activate W
+W -> P : stream this thread's\nkeywords to its own file
+deactivate W
+M -> O : finish the run
+O -> T : end of run
+P -> T : partial thread output
+T -> O : graft thread body into\nthe placeholder\n(synthesize UNKNOWN\nfor missing status)
+note right of O : log.html / report.html\nnow show the thread\nas one coherent block
+@enduml

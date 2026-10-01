@@ -1,0 +1,24 @@
+/* The Read the Docs theme caps content at ~800px, leaving a big right gutter
+   and clipping wide diagrams. Use the full width and keep media responsive. */
+.wy-nav-content { max-width: none; }
+.rst-content img, img.uml, .rst-content svg { max-width: 100%; height: auto; }
+.rst-content table { display: block; overflow-x: auto; }
+.rst-content pre { overflow-x: auto; }
+
+/* Pitch elements: a one-line promise under the title, "the pain" and
+   "the fix" callouts, and feature cards on the home page. */
+.rst-content p.lead { font-size: 1.25em; line-height: 1.5; color: #1c2430; margin-bottom: 1.2em; }
+
+.rst-content .admonition.pain { background: #fbeeee; }
+.rst-content .admonition.pain > .admonition-title { background: #b02a2a; }
+.rst-content .admonition.fix { background: #eefaf1; }
+.rst-content .admonition.fix > .admonition-title { background: #1d7a3e; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin: 1.2em 0 1.8em; }
+.card { border: 1px solid #d8dee6; border-radius: 10px; padding: 14px 18px 6px; background: #fff; }
+.card:hover { border-color: #0a5da8; box-shadow: 0 2px 10px rgba(10, 93, 168, .12); }
+.card .pain-line { color: #b02a2a; font-style: italic; margin-bottom: .4em; }
+.card h3 { margin: .2em 0 .4em; font-size: 1.1em; }
+.card p { margin-bottom: .6em; }
+
+.figure-caption { color: #5b6878; font-size: .9em; text-align: center; margin-top: -.6em; margin-bottom: 1.6em; }

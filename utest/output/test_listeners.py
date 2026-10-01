@@ -69,6 +69,9 @@ class ListenOutputs:
     def xunit_file(self, path):
         self._out_file('XUnit', path)
 
+    def timeline_file(self, path):
+        self._out_file('Timeline', path)
+
     def _out_file(self, name, path):
         print('%s: %s' % (name, path))
 
@@ -154,6 +157,10 @@ class TestListeners(unittest.TestCase):
     def test_xunit_file(self):
         self.listeners.output_file('XUnit', 'path/to/xunit')
         self._assert_output('XUnit: path/to/xunit')
+
+    def test_timeline_file(self):
+        self.listeners.output_file('Timeline', 'path/to/timeline')
+        self._assert_output('Timeline: path/to/timeline')
 
     def test_close(self):
         self.listeners.close()

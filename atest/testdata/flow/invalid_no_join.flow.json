@@ -1,0 +1,17 @@
+{
+  "flow": { "name": "No Join" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "which", "kind": "decision", "condition": "True" },
+    { "id": "a", "kind": "keyword", "keyword": "Log", "args": ["a"] },
+    { "id": "b", "kind": "keyword", "keyword": "Log", "args": ["b"] },
+    { "id": "end_a", "kind": "end" },
+    { "id": "end_b", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "which"],
+    { "from": "which", "to": "a", "label": "yes" },
+    { "from": "which", "to": "b", "label": "no" },
+    ["a", "end_a"], ["b", "end_b"]
+  ]
+}

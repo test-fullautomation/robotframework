@@ -1,0 +1,875 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/test-fullautomation/robotframework/flow.schema.json",
+  "title": "Robot Framework flow file",
+  "description": "A test plan as nodes and edges, run with 'robot --parser robot.flow'.",
+  "type": "object",
+  "required": [
+    "flow",
+    "nodes",
+    "edges"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "flow": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "version": {
+          "const": 1
+        }
+      }
+    },
+    "imports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "libraries": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ],
+                "additionalItems": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            ]
+          },
+          "description": "Python files or modules, optionally [name, args...]."
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                ],
+                "additionalItems": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                }
+              }
+            ]
+          },
+          "description": "Variable files."
+        }
+      }
+    },
+    "variables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ]
+      },
+      "description": "Default values; override with --variable."
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "start",
+              "end",
+              "phase",
+              "keyword",
+              "gate",
+              "sleep",
+              "decision",
+              "loop",
+              "try",
+              "flow"
+            ],
+            "description": "What the node is."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "start"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/start"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "end"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/end"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "phase"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/phase"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "keyword"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/keyword"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "gate"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/gate"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "sleep"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/sleep"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "decision"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/decision"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "loop"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/loop"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "try"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/try"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "flow"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/flow"
+            }
+          }
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "string"
+            },
+            "description": "[from, to]: plain \"then\"."
+          },
+          {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "label": {
+                "enum": [
+                  "",
+                  "body",
+                  "next",
+                  "on_failure",
+                  "continue",
+                  "abort",
+                  "done",
+                  "yes",
+                  "no"
+                ],
+                "description": "Needed only where a node has more than one way out."
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "start": {
+      "description": "Where the flow begins; exactly one.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        }
+      },
+      "additionalProperties": false
+    },
+    "end": {
+      "description": "Where the flow ends; at least one.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        }
+      },
+      "additionalProperties": false
+    },
+    "phase": {
+      "description": "A lane: setup becomes the suite setup, each test phase a test case, teardown the suite teardown (always runs).",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "role"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "role": {
+          "enum": [
+            "setup",
+            "test",
+            "teardown"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Test case name; required for a test phase."
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "role": {
+            "const": "test"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "name"
+        ]
+      }
+    },
+    "keyword": {
+      "description": "Call a keyword.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "keyword"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "keyword": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Keyword to call, e.g. a Python function 'power_on' as 'Power On'."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Arguments; '${var}' substitution applies."
+        },
+        "assign": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          ],
+          "description": "Variable(s) for the return value, e.g. '${VERSION}'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "description": "Wait until the keyword passes, at most 'timeout'.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "keyword",
+        "timeout"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "keyword": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Keyword to call, e.g. a Python function 'power_on' as 'Power On'."
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Arguments; '${var}' substitution applies."
+        },
+        "assign": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "\\S"
+              }
+            }
+          ],
+          "description": "Variable(s) for the return value, e.g. '${VERSION}'."
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Give up after this long."
+        },
+        "interval": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Time between attempts; default 2s."
+        },
+        "on_timeout": {
+          "enum": [
+            "unknown",
+            "fail"
+          ],
+          "description": "Verdict on timeout: 'unknown' (the default: nothing was tested) or 'fail'."
+        }
+      },
+      "additionalProperties": false
+    },
+    "sleep": {
+      "description": "Wait a fixed time.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "duration"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "duration": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number."
+        }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "description": "Branch: edges labelled 'yes' and 'no', which re-join later.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "condition"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "condition": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Python expression in '$var' syntax, e.g. \"$MODE == 'EMC'\"."
+        }
+      },
+      "additionalProperties": false
+    },
+    "loop": {
+      "description": "Bounded repetition: 'body' in, 'next' back, 'done' out, optional 'on_failure'.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "max_loops": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Fixed number; not a variable."
+        },
+        "max_seconds": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Time limit of the loop."
+        },
+        "every": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Minimum time per round."
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "max_loops"
+          ]
+        },
+        {
+          "required": [
+            "max_seconds"
+          ]
+        }
+      ]
+    },
+    "try": {
+      "description": "Failure routing without a loop: 'body', 'on_failure', 'done'.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        }
+      },
+      "additionalProperties": false
+    },
+    "flow": {
+      "description": "Call another flow file (a sub-flow) as one step.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "file"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "file": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "The sub-flow file, relative to this file. It has no phases; its variables are its parameters."
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Values for the sub-flow's parameters, by name: {\"VOLTS\": \"${VOLTS}\"}."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

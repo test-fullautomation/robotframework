@@ -1,0 +1,24 @@
+{
+  "flow": { "name": "Signals" },
+  "imports": { "libraries": [["robot.flow.signals.FlowSignals", "${TEMPDIR}/robot-atest-flow-signals.json"]] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "setup", "kind": "phase", "role": "setup" },
+    { "id": "reset", "kind": "keyword", "keyword": "Set Signal", "args": ["atest.cycle", "0"] },
+    { "id": "handshake", "kind": "phase", "role": "test", "name": "Set And Wait" },
+    { "id": "announce", "kind": "keyword", "keyword": "Set Signal", "args": ["atest.cycle", "3"] },
+    { "id": "arrived", "kind": "gate", "keyword": "Signal Should Be", "args": ["atest.cycle", "==", 3],
+                       "timeout": "2s", "interval": "0.05s" },
+    { "id": "read", "kind": "keyword", "keyword": "Get Signal", "args": ["atest.cycle"], "assign": ["${n}"] },
+    { "id": "check", "kind": "keyword", "keyword": "Should Be Equal", "args": ["${n}", "${3}"] },
+    { "id": "silent", "kind": "phase", "role": "test", "name": "Unset Signal Keeps The Gate Waiting" },
+    { "id": "never", "kind": "gate", "keyword": "Signal Should Be", "args": ["atest.never", "==", 1],
+                     "timeout": "0.3s", "interval": "0.1s" },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "setup"], ["setup", "reset"], ["reset", "handshake"], ["handshake", "announce"],
+    ["announce", "arrived"], ["arrived", "read"], ["read", "check"], ["check", "silent"],
+    ["silent", "never"], ["never", "end"]
+  ]
+}

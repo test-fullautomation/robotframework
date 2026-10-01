@@ -1,0 +1,25 @@
+@startuml
+!include diagrams/style.iuml
+scale 1 as 55 pixels
+
+concise "MainThread" as M
+concise "WORKER1" as W1
+concise "WORKER2" as W2
+
+@0
+M is "Setup DUT"
+@2
+M is "Start threads"
+@4
+M is "Measure"
+W1 is "Flash ECU"
+W2 is "Log bus traffic"
+@8
+W1 is "Verify"
+@10
+M is "Assert"
+W1 is {-}
+@12
+M is {-}
+W2 is {-}
+@enduml

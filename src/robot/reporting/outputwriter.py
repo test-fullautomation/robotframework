@@ -28,6 +28,20 @@ class OutputWriter(XmlLogger):
     def start_message(self, msg):
         self._write_message(msg)
 
+    # XmlLogger's thread methods implement the run-time split between the
+    # main writer (a placeholder) and the worker thread's own file. When
+    # serializing a result model there is no worker: the element is opened
+    # here, the visitor writes the body, and end_thread closes it - the same
+    # as for any other control structure.
+    def start_thread(self, thread_):
+        self._writer.start('thread', {'name': thread_.name,
+                                      'daemon': str(thread_.daemon)})
+        self._writer.element('doc', thread_.doc)
+
+    def end_thread(self, thread_):
+        self._write_status(thread_)
+        self._writer.end('thread')
+
     def close(self):
         self._writer.end('robot')
         self._writer.close()

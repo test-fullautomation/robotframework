@@ -170,7 +170,103 @@ More details can be found in `RobotFrameworkAIO_Reference.pdf <https://github.co
 
 **Optimized Wait Thread Notification Mechanism:**
 
-Replaced the `wait thread notification` mechanism to avoid continuous GIL acquisition, resulting in improved performance. 
+Replaced the `wait thread notification` mechanism to avoid continuous GIL acquisition, resulting in improved performance.
+"
+                             ],
+                   "0.14.0.": [
+"
+This release makes Robot Framework ready for **tests that run for hours or days, in parallel, against real benches** - and keeps the verdict honest.
+Existing test suites run unchanged; all new features are opt-in.
+
+**New test status UNKNOWN**
+
+Beside ``PASS``, ``FAIL`` and ``SKIP`` a fourth status ``UNKNOWN`` separates *the product is wrong* from *nothing could be judged*.
+A failed assertion is still ``FAIL``; a missing keyword or variable, a failed import, a ``DataError`` or an unexpected exception is ``UNKNOWN``.
+Real regressions no longer drown in bench and environment problems.
+
+* Which tests an import error affects:
+
+   .. code::
+
+      python.exe -m robot --importfailure suite testfile.robot     # default: the whole suite is UNKNOWN
+      python.exe -m robot --importfailure test  testfile.robot     # only tests using the failed import
+
+* The return code carries both counts, so CI can tell them apart: ``rc = (min(unknown, 14) << 4) | min(failed, 15)``
+  (decode with ``failed = rc & 0x0F`` and ``unknown = (rc >> 4) & 0x0F``).
+
+**THREAD keyword: lifecycle scopes and control**
+
+The ``daemon`` flag of a ``THREAD`` block now selects its lifetime: ``True`` stops the thread when its test ends, ``False`` keeps it running
+across tests until the suite ends. Stopping is cooperative with a 5 second grace period; a thread that cannot stop is abandoned and reported as ``UNKNOWN``.
+New keywords give deterministic control:
+
+   .. code::
+
+      Stop Thread        WORKER    timeout=10 s
+      Wait For Thread    WORKER    timeout=1 min
+
+**Thread logs in log.html and the execution timeline**
+
+Keywords, messages and statuses of every ``THREAD`` now appear in ``log.html`` and ``report.html`` as one block at the place the thread started.
+The new option ``--timeline`` writes an HTML timeline with one lane per thread on a real time axis; every bar links to its keyword in ``log.html``.
+
+   .. code::
+
+      python.exe -m robot --timeline timeline.html testfile.robot
+
+**New library StateMachine**
+
+Model very long, condition-driven tests as states and guarded transitions. After every transition a checkpoint is written, so a run that crashes
+at hour 40 resumes where it stopped instead of starting from zero. Includes per-state timeouts, error routing, machines defined in JSON/YAML files,
+several machines at once and per-state statistics.
+
+   .. code::
+
+      Define State         CHARGING    enter=Start Charging    on_error=FAULT
+      Define Transition    CHARGING    DISCHARGING    condition=$SOC >= 80
+      Run State Machine    initial=INIT    max_duration=48h    checkpoint=${OUTPUT DIR}${/}sm.json
+
+**New library Watchdog**
+
+A supervisor running in a ``THREAD`` block: heartbeat, stall detection and a deadline for any long-running work. When the test stops feeding it,
+the watchdog fires, runs a reaction keyword and the test fails with the reason - after minutes, not days.
+
+   .. code::
+
+      Configure Watchdog    stall_timeout=10 min    heartbeat=5 min    on_timeout=Collect Diagnostics
+
+**Flow files: run a test plan drawn as a flowchart**
+
+A flow file (``*.flow.json``) describes a test plan as nodes and edges - setup, gates, bounded loops, recovery, teardown - and is executed directly as a
+suite built at run time. No ``.robot`` file to maintain. Gates wait on a condition with a real timeout and report ``UNKNOWN`` when the bench is not ready.
+With the new library ``robot.flow.signals`` two flows running as two processes can meet and run in lockstep.
+
+   .. code::
+
+      python.exe -m robot --parser robot.flow --variable RIG:RIG_A plan.flow.json
+      python.exe -m robot.flow validate plan.flow.json
+
+**Segmented output**
+
+The new option ``--segmentoutput`` seals ``output.xml`` (and thread outputs) into complete, readable segments at a fixed interval.
+A crash loses at most one interval of log data; after a normal run the segments are merged back automatically.
+
+   .. code::
+
+      python.exe -m robot --segmentoutput 1h testfile.robot
+
+**Stable memory on long runs**
+
+The message cache, the collected warnings and errors (spilled to disk beyond 10000) and the thread notification queues are bounded,
+so memory stays flat over days of execution.
+
+**Bug fixes**
+
+* ``KeyError`` when a thread logs with an own log level above the configured log level (issue #109).
+* Crash with ``IndexError`` in variable scopes when threads start and end concurrently on Linux.
+* ``output.xml`` that could not be parsed at log levels above ``INFO``, and ``rebot --output`` on outputs that contain threads.
+
+More details can be found in the feature documentation (``docs`` folder of the repository, published as GitHub Pages).
 "
                              ]
                  }
