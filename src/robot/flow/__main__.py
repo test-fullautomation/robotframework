@@ -17,18 +17,22 @@
 
     python -m robot.flow validate <file.flow.json>
     python -m robot.flow render   <file.flow.json>
+    python -m robot.flow schema   [--output flow.schema.json]
 
 ``validate`` checks the file's shape and structure and prints the phases.
 ``render`` prints the equivalent ``.robot`` text of the suite that would run.
+``schema`` prints the JSON Schema of flow files, for editor support.
 Running a flow is done with ``robot --parser robot.flow <file.flow.json>``.
 """
 
 import argparse
+import json
 import sys
 
 from robot.errors import DataError
 
 from . import build_flow_suite, load_flow, render_robot, structure
+from .schema import json_schema
 
 
 def main(argv=None):
@@ -39,7 +43,11 @@ def main(argv=None):
     validate.add_argument('file')
     render = commands.add_parser('render', help='print the equivalent .robot text')
     render.add_argument('file')
+    schema = commands.add_parser('schema', help='print the JSON Schema of flow files')
+    schema.add_argument('--output', '-o', help='write it to this file instead')
     args = parser.parse_args(argv)
+    if args.command == 'schema':
+        return _schema(args.output)
     try:
         if args.command == 'validate':
             _validate(args.file)
@@ -48,6 +56,20 @@ def main(argv=None):
     except DataError as err:
         sys.stderr.write(f'{args.file}: {err}\n')
         return 1
+    return 0
+
+
+def schema_text():
+    """The JSON Schema as written to ``flow.schema.json``."""
+    return json.dumps(json_schema(), indent=2, ensure_ascii=False) + '\n'
+
+
+def _schema(output):
+    if output:
+        with open(output, 'w', encoding='UTF-8', newline='\n') as file:
+            file.write(schema_text())
+    else:
+        sys.stdout.write(schema_text())
     return 0
 
 

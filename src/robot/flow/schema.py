@@ -368,3 +368,139 @@ def _stringify(value):
     if value is None:
         return ''
     return str(value)
+
+
+# ------------------------------------------------------------------ JSON Schema
+
+def json_schema():
+    """The JSON Schema (draft-07) of flow files, for editors.
+
+    Built from the constants above so it cannot drift from :func:`validate`.
+    It is stricter in one way: unknown attributes are reported, so a typo such
+    as ``max_loop`` shows up in the editor (the runner itself ignores unknown
+    attributes). Rules about the graph's *structure* -- branches re-join,
+    loop bodies return, everything is reachable -- are not expressible in a
+    schema; ``python -m robot.flow validate`` checks them.
+    """
+    scalar = {'type': ['string', 'number', 'boolean', 'null']}
+    time = {'type': ['string', 'number'],
+            'description': "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number."}
+    named = {'oneOf': [
+        {'type': 'string', 'minLength': 1},
+        {'type': 'array', 'minItems': 1,
+         'items': [{'type': 'string', 'minLength': 1}], 'additionalItems': scalar},
+    ]}
+    common = {
+        'id': {'type': 'string', 'pattern': r'\S',
+               'description': 'Unique id of the node; edges refer to it.'},
+        'kind': {'enum': list(NODE_KINDS), 'description': 'What the node is.'},
+        'label': {'type': 'string', 'description': 'Text shown instead of the id.'},
+    }
+    keyword = {
+        'keyword': {'type': 'string', 'pattern': r'\S',
+                    'description': 'Keyword to call, e.g. a Python function '
+                                   "'power_on' as 'Power On'."},
+        'args': {'type': 'array', 'items': scalar,
+                 'description': "Arguments; '${var}' substitution applies."},
+        'assign': {'oneOf': [{'type': 'string', 'pattern': r'\S'},
+                             {'type': 'array', 'items': {'type': 'string', 'pattern': r'\S'}}],
+                   'description': "Variable(s) for the return value, e.g. '${VERSION}'."},
+    }
+
+    def kind(name, description, required=(), extra=None, **more):
+        properties = dict(common, **(extra or {}))
+        definition = {'description': description, 'type': 'object',
+                      'required': ['id', 'kind', *required],
+                      'properties': properties, 'additionalProperties': False}
+        definition.update(more)
+        return name, definition
+
+    kinds = dict([
+        kind(START, 'Where the flow begins; exactly one.'),
+        kind(END, 'Where the flow ends; at least one.'),
+        kind(PHASE, 'A lane: setup becomes the suite setup, each test phase a test '
+                    'case, teardown the suite teardown (always runs).',
+             required=('role',),
+             extra={'role': {'enum': list(PHASE_ROLES)},
+                    'name': {'type': 'string', 'pattern': r'\S',
+                             'description': 'Test case name; required for a test phase.'}},
+             **{'if': {'properties': {'role': {'const': TEST}}},
+                'then': {'required': ['name']}}),
+        kind(KEYWORD, 'Call a keyword.', required=('keyword',), extra=keyword),
+        kind(GATE, "Wait until the keyword passes, at most 'timeout'.",
+             required=('keyword', 'timeout'),
+             extra=dict(keyword,
+                        timeout=dict(time, description='Give up after this long.'),
+                        interval=dict(time, description=f'Time between attempts; '
+                                                        f'default {DEFAULT_GATE_INTERVAL}.'),
+                        on_timeout={'enum': [ON_TIMEOUT_UNKNOWN, ON_TIMEOUT_FAIL],
+                                    'description': "Verdict on timeout: 'unknown' (the "
+                                                   "default: nothing was tested) or 'fail'."})),
+        kind(SLEEP, 'Wait a fixed time.', required=('duration',),
+             extra={'duration': time}),
+        kind(DECISION, "Branch: edges labelled 'yes' and 'no', which re-join later.",
+             required=('condition',),
+             extra={'condition': {'type': 'string', 'pattern': r'\S',
+                                  'description': "Python expression in '$var' syntax, "
+                                                 "e.g. \"$MODE == 'EMC'\"."}}),
+        kind(LOOP, "Bounded repetition: 'body' in, 'next' back, 'done' out, optional "
+                   "'on_failure'.",
+             extra={'max_loops': {'type': 'integer', 'minimum': 1,
+                                  'description': 'Fixed number; not a variable.'},
+                    'max_seconds': dict(time, description='Time limit of the loop.'),
+                    'every': dict(time, description='Minimum time per round.')},
+             anyOf=[{'required': ['max_loops']}, {'required': ['max_seconds']}]),
+        kind(TRY, "Failure routing without a loop: 'body', 'on_failure', 'done'."),
+        kind(FLOW, 'Call another flow file (a sub-flow) as one step.', required=('file',),
+             extra={'file': {'type': 'string', 'pattern': r'\S',
+                             'description': 'The sub-flow file, relative to this file. '
+                                            'It has no phases; its variables are its '
+                                            'parameters.'},
+                    'args': {'type': 'object', 'additionalProperties': scalar,
+                             'description': "Values for the sub-flow's parameters, "
+                                            'by name: {"VOLTS": "${VOLTS}"}.'}}),
+    ])
+    node = {
+        'type': 'object', 'required': ['id', 'kind'],
+        'properties': {'kind': common['kind']},
+        'allOf': [{'if': {'properties': {'kind': {'const': name}}, 'required': ['kind']},
+                   'then': {'$ref': f'#/definitions/{name}'}} for name in kinds],
+    }
+    edge = {'oneOf': [
+        {'type': 'array', 'minItems': 2, 'maxItems': 2,
+         'items': {'type': 'string'}, 'description': '[from, to]: plain "then".'},
+        {'type': 'object', 'required': ['from', 'to'], 'additionalProperties': False,
+         'properties': {'from': {'type': 'string'}, 'to': {'type': 'string'},
+                        'label': {'enum': list(EDGE_LABELS),
+                                  'description': 'Needed only where a node has more '
+                                                 'than one way out.'}}},
+    ]}
+    return {
+        '$schema': 'http://json-schema.org/draft-07/schema#',
+        '$id': 'https://github.com/test-fullautomation/robotframework/flow.schema.json',
+        'title': 'Robot Framework flow file',
+        'description': 'A test plan as nodes and edges, run with '
+                       "'robot --parser robot.flow'.",
+        'type': 'object', 'required': ['flow', 'nodes', 'edges'],
+        'additionalProperties': False,
+        'properties': {
+            '$schema': {'type': 'string'},
+            'flow': {'type': 'object', 'required': ['name'], 'additionalProperties': False,
+                     'properties': {'name': {'type': 'string', 'pattern': r'\S'},
+                                    'version': {'const': FLOW_VERSION}}},
+            'imports': {'type': 'object', 'additionalProperties': False,
+                        'properties': {
+                            'libraries': {'type': 'array', 'items': named,
+                                          'description': 'Python files or modules, '
+                                                         'optionally [name, args...].'},
+                            'resources': {'type': 'array',
+                                          'items': {'type': 'string', 'minLength': 1}},
+                            'variables': {'type': 'array', 'items': named,
+                                          'description': 'Variable files.'}}},
+            'variables': {'type': 'object', 'additionalProperties': scalar,
+                          'description': 'Default values; override with --variable.'},
+            'nodes': {'type': 'array', 'minItems': 1, 'items': node},
+            'edges': {'type': 'array', 'items': edge},
+        },
+        'definitions': kinds,
+    }

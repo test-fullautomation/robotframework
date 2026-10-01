@@ -5,6 +5,12 @@ import tempfile
 import unittest
 
 from robot.flow import FlowError, build_flow_suite, load_flow, render_robot
+from robot.flow.schema import json_schema
+
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
 
 
 START = {'id': 'start', 'kind': 'start'}
@@ -163,6 +169,21 @@ class TestSubflowErrors(SubflowTestCase):
         self.assertRaises(FlowError, load_flow,
                           flow('Main', [START, {'id': 'a', 'kind': 'flow'}, END],
                                chain('start', 'a', 'end')))
+
+
+@unittest.skipIf(jsonschema is None, 'jsonschema is not installed')
+class TestSubflowSchema(unittest.TestCase):
+
+    def errors(self, node):
+        data = flow('Main', [START, node, END], chain('start', node['id'], 'end'))
+        return list(jsonschema.Draft7Validator(json_schema()).iter_errors(data))
+
+    def test_valid_call(self):
+        self.assertEqual(self.errors(call('a', 'sub/x.flow.json', VOLTS='${V}', N=3)), [])
+
+    def test_missing_file_and_list_args(self):
+        self.assertTrue(self.errors({'id': 'a', 'kind': 'flow'}))
+        self.assertTrue(self.errors({'id': 'a', 'kind': 'flow', 'file': 'x', 'args': ['1']}))
 
 
 if __name__ == '__main__':

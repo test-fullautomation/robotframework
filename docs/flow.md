@@ -89,6 +89,32 @@ Every `robot` option applies — `--variable`, `--outputdir`, `--dryrun`,
 `--segmentoutput`, listeners — because the flow becomes an ordinary
 `TestSuite` in memory.
 
+## Editor support
+
+Flow files have a JSON Schema: completion of kinds, attributes and edge
+labels, hover help, and errors underlined while you type — including typos
+such as `max_loop`, which the runner itself would silently ignore. It ships
+as `robot/flow/flow.schema.json` and can be regenerated with:
+
+```bash
+python -m robot.flow schema --output flow.schema.json
+```
+
+In VS Code, map it to every flow file of a project (`.vscode/settings.json`):
+
+```json
+{
+  "json.schemas": [
+    { "fileMatch": ["*.flow.json"], "url": "./path/to/robot/flow/flow.schema.json" }
+  ]
+}
+```
+
+or point a single file at it with a top-level `"$schema": "<path or URL>"`.
+The schema checks the *shape* of a file; whether the graph is structured
+(branches re-join, loop bodies return, every node is reachable) is still
+checked by `python -m robot.flow validate` and `--dryrun`.
+
 ## Workflow, not state machine
 
 A flow is a **workflow**: nodes are things the test *does*, edges mean
