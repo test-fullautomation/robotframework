@@ -1,11 +1,19 @@
 name: Feature docs (ProperDocs -> GitHub Pages)
 
+# The site is deployed only from the default branch: the github-pages
+# environment refuses deployments from any other branch. Pull requests into
+# it build and verify the site, and offer it as a downloadable artifact.
 on:
   push:
     branches:
-      - main
-      - master
-      - ugc1hc/feat/improve_features
+      - develop_6.1
+    paths:
+      - 'docs/**'
+      - 'properdocs.yml'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches:
+      - develop_6.1
     paths:
       - 'docs/**'
       - 'properdocs.yml'
@@ -18,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -70,14 +78,26 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
+      # On a pull request: the built site as an artifact, to look at before merging.
+      - name: Upload the site as a preview artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-preview
+          path: site
+          retention-days: 7
+
       - uses: actions/configure-pages@v5
+        if: github.ref == 'refs/heads/develop_6.1' && github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/develop_6.1' && github.event_name != 'pull_request'
         with:
           path: site
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/develop_6.1' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
