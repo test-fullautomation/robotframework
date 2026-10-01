@@ -115,6 +115,39 @@ The schema checks the *shape* of a file; whether the graph is structured
 (branches re-join, loop bodies return, every node is reachable) is still
 checked by `python -m robot.flow validate` and `--dryrun`.
 
+## Writing a flow in Python (experimental)
+
+`robot.flow.api` builds exactly the dictionary a flow file holds, from Python
+blocks that have the shape of the plan:
+
+```python
+from robot.flow.api import Flow
+
+with Flow('Lab Cycle', libraries=['checks.py'], variables={'MODE': 'EMC'}) as f:
+    with f.test('Cycles'):
+        with f.loop('cycles', max_loops=3, every='1s') as loop:
+            f.keyword('measure', 'Measure Current', assign='${I}')
+            with f.decision('emc', "$MODE == 'EMC'") as d:
+                with d.yes():
+                    f.keyword('burst', 'Run Emc Burst')
+                with d.no():
+                    f.keyword('climate', 'Run Climate Step')
+            with loop.on_failure('continue'):
+                f.keyword('recover', 'Recover Dut')
+f.save('lab_cycle.flow.json')
+```
+
+The edges and their labels (`body`, `next`, `done`, `on_failure`, `continue`,
+`abort`, `yes`, `no`) follow from the blocks. The result is validated like a
+flow file and runs, draws and reports the same.
+
+What it gives: completion and checks in any Python IDE, functions and loops
+to produce repetitive or lab-specific parts, and a debugger for the code that
+builds the flow. What it does not change: the steps still run as Robot
+keywords, so stepping through a *run* works as for any flow; and a flow
+written in Python cannot be edited back in a visual editor — keep the
+generated `.flow.json` as the file the tools share.
+
 ## Workflow, not state machine
 
 A flow is a **workflow**: nodes are things the test *does*, edges mean
