@@ -91,6 +91,21 @@ Invalid flow files are rejected naming the node
     invalid_unreachable        Unreachable node(s): orphan.
     invalid_unbounded_loop     Node 'loop': A loop needs 'max_loops' and/or 'max_seconds'; unbounded loops are not allowed.
 
+Sub-flows run as one keyword each, with parameters, nesting and recovery
+    Run Tests    ${PARSER}    flow/subflow.flow.json
+    ${tc} =    Check Test Case    Defaults And Arguments    PASS
+    Should Be Equal    ${tc.body[0].name}    Flow: Power On
+    Check Log Message    ${tc.body[0].body[0].msgs[0]}    Power on at 12 V.
+    Should Be Equal    ${tc.body[1].args}    ${{('VOLTS=\${V}',)}}
+    Check Log Message    ${tc.body[1].body[0].msgs[0]}    Power on at 9 V.
+    ${tc} =    Check Test Case    Nested Subflow    PASS
+    Should Be Equal    ${tc.body[0].body[0].name}    Flow: Power On
+    Check Log Message    ${tc.body[0].body[0].body[0].msgs[0]}    Power on at 5 V.
+    ${tc} =    Check Test Case    Failure Inside Subflow Is Recovered    PASS
+    ${try} =    Set Variable    ${tc.body[0]}
+    Should Be Equal    ${try.body[0].body[0].status}    FAIL
+    Check Log Message    ${try.body[1].body[0].msgs[0]}    Recovered: Step is broken.: yes != no
+
 *** Keywords ***
 Parsing Should Fail
     [Arguments]    ${file}    ${error}

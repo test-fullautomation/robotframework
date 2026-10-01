@@ -59,7 +59,11 @@ def _validate(path):
     phases.extend(f"test '{phase.name}'" for phase in flow.tests)
     if flow.teardown:
         phases.append('teardown')
-    print(f"{path}: OK. Flow '{flow.name}' with {', '.join(phases)}.")
+    # Building the suite also loads and checks every sub-flow file.
+    suite = build_flow_suite(path)
+    subflows = [kw.name for kw in suite.resource.keywords if kw.name.startswith('Flow: ')]
+    calls = f", calling sub-flow(s) {', '.join(n[6:] for n in subflows)}" if subflows else ''
+    print(f"{path}: OK. Flow '{flow.name}' with {', '.join(phases)}{calls}.")
 
 
 if __name__ == '__main__':

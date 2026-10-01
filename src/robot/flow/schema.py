@@ -31,11 +31,11 @@ from robot.utils import is_string, timestr_to_secs
 
 FLOW_VERSION = 1
 
-START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY = (
-    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try'
+START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW = (
+    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow'
 )
-NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY)
-ACTION_KINDS = (KEYWORD, GATE, SLEEP)
+NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW)
+ACTION_KINDS = (KEYWORD, GATE, SLEEP, FLOW)
 CONTAINER_KINDS = (LOOP, TRY)
 
 SETUP, TEST, TEARDOWN = 'setup', 'test', 'teardown'
@@ -79,6 +79,7 @@ class Node:
         self.max_loops = attrs.pop('max_loops', None)
         self.max_seconds = attrs.pop('max_seconds', None)
         self.every = attrs.pop('every', None)
+        self.file = attrs.pop('file', None)
         self.extra = attrs
 
     def __repr__(self):
@@ -215,6 +216,7 @@ def _validate_node(raw):
         START: _no_attributes, END: _no_attributes, PHASE: _validate_phase,
         KEYWORD: _validate_keyword, GATE: _validate_gate, SLEEP: _validate_sleep,
         DECISION: _validate_decision, LOOP: _validate_loop, TRY: _no_attributes,
+        FLOW: _validate_flow_call,
     }[kind]
     validator(node)
     return node
@@ -275,6 +277,28 @@ def _validate_gate(node):
 
 def _validate_sleep(node):
     node.duration = _validate_time(node, 'duration', required=True)
+
+
+def _validate_flow_call(node):
+    """A sub-flow call: 'file' (relative to the calling flow file) and named 'args'."""
+    if not is_string(node.file) or not node.file.strip():
+        raise FlowError("'file' is required: the sub-flow file to call.", node.id)
+    node.file = node.file.strip()
+    if node.assign is not None:
+        raise FlowError("A sub-flow returns nothing; 'assign' is not supported.", node.id)
+    args = node.args if node.args is not None else {}
+    if not isinstance(args, dict):
+        raise FlowError("'args' of a sub-flow must be an object mapping its parameter "
+                        "names to values.", node.id)
+    result = {}
+    for name, value in args.items():
+        if not is_string(name) or not name.strip('${} '):
+            raise FlowError(f'Invalid parameter name {name!r}.', node.id)
+        if isinstance(value, (dict, list)):
+            raise FlowError(f"Argument '{name}' must be a scalar value.", node.id)
+        result[name.strip().strip('${}')] = _stringify(value)
+    node.args = result
+    node.assign = []
 
 
 def _validate_decision(node):

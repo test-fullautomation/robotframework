@@ -28,16 +28,22 @@ Mapping:
                      condition for ``max_seconds``, ``Sleep every`` last)
 - on_failure      -> ``TRY`` / ``EXCEPT AS ${flow_error}``; ``abort`` re-raises
                      with ``Fail`` after the recovery ran
+- flow (sub-flow) -> a call of the generated user keyword ``Flow: <sub-flow name>``;
+                     each sub-flow file becomes one keyword, its variables its
+                     parameters, its imports added to the suite
 """
 
+import os
 import re
+from pathlib import Path
 
 from robot.model import BodyItem
 from robot.running import TestSuite
 from robot.utils import timestr_to_secs
 
-from .graph import Decision, GateStep, KeywordStep, Loop, SleepStep, Try
-from .schema import ABORT
+from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
+                    structure)
+from .schema import ABORT, PHASE, FlowError, load_flow
 
 
 FLOW_LIBRARY = 'robot.flow.keywords'
@@ -46,6 +52,7 @@ SETUP_KEYWORD = 'Flow Setup'
 TEARDOWN_KEYWORD = 'Flow Teardown'
 ERROR_VARIABLE = '${flow_error}'
 DEADLINE_VARIABLE = '${flow_deadline_%s}'
+SUBFLOW_KEYWORD = 'Flow: %s'
 
 
 def build_suite(flow, source=None):
@@ -64,7 +71,7 @@ def build_suite(flow, source=None):
         resource.imports.variables(name, args)
     for name, value in data.variables.items():
         resource.variables.create(name='${%s}' % name, value=[value])
-    emitter = _Emitter()
+    emitter = _Emitter(resource, source)
     if flow.setup:
         emitter.user_keyword(resource, SETUP_KEYWORD, flow.setup.steps)
         suite.setup.config(name=SETUP_KEYWORD)
@@ -81,8 +88,13 @@ class _Emitter:
     """Emits steps into bodies. One instance per built suite, so that the
     variable names it invents are unique within that suite."""
 
-    def __init__(self):
+    def __init__(self, resource=None, source=None):
         self._deadlines = {}     # loop node id -> deadline variable name
+        self._resource = resource
+        # Sub-flow files resolve relative to the file that calls them.
+        self._dirs = [Path(source).resolve().parent if source else Path.cwd()]
+        self._calling = []       # sub-flow files being built, to reject cycles
+        self._subflows = {}      # resolved sub-flow path -> (keyword name, parameters)
 
     def user_keyword(self, resource, name, steps):
         keyword = resource.keywords.create(name=name)
@@ -105,6 +117,86 @@ class _Emitter:
 
     def _sleep(self, body, step):
         body.create_keyword(name='Sleep', args=[step.duration])
+
+    def _flow(self, body, step):
+        name, parameters = self._subflow(step)
+        unknown = [arg for arg in step.args if arg not in parameters]
+        if unknown:
+            known = ', '.join(parameters) or 'none'
+            raise FlowError(f"Sub-flow '{step.file}' has no parameter(s) "
+                            f"{', '.join(unknown)}; its parameters are: {known}.", step.id)
+        args = [f'{arg}={value}' for arg, value in step.args.items()]
+        body.create_keyword(name=name, args=args)
+
+    def _subflow(self, step):
+        """The keyword built from ``step.file``, building it on first use."""
+        path = (self._dirs[-1] / step.file).resolve()
+        if path in self._calling:
+            chain = ' -> '.join(p.name for p in self._calling + [path])
+            raise FlowError(f'Sub-flows call each other in a cycle: {chain}.', step.id)
+        if path in self._subflows:
+            return self._subflows[path]
+        if not path.is_file():
+            raise FlowError(f"Sub-flow file '{step.file}' not found (looked for "
+                            f"'{path}').", step.id)
+        try:
+            data = load_flow(path)
+            phases = [node.id for node in data.nodes.values() if node.kind == PHASE]
+            if phases:
+                raise FlowError(f"A sub-flow cannot have phases; it has "
+                                f"{', '.join(phases)}.")
+            steps = structure(data).tests[0].steps
+        except FlowError as err:
+            raise FlowError(f"Sub-flow '{step.file}': {err}", step.id)
+        name = SUBFLOW_KEYWORD % data.name
+        for other, (other_name, _) in self._subflows.items():
+            if other_name.lower() == name.lower():
+                raise FlowError(f"Sub-flows '{other.name}' and '{path.name}' have the "
+                                f"same name '{data.name}'; give them different names.",
+                                step.id)
+        parameters = dict(data.variables)
+        self._subflows[path] = (name, parameters)
+        self._add_imports(data, path.parent)
+        keyword = self._resource.keywords.create(
+            name=name, args=[f'${{{param}}}={value}' for param, value in parameters.items()])
+        keyword.doc = f'Sub-flow {path.name}.'
+        self._calling.append(path)
+        self._dirs.append(path.parent)
+        try:
+            self.emit(keyword.body, steps)
+        finally:
+            self._dirs.pop()
+            self._calling.remove(path)
+        return name, parameters
+
+    def _add_imports(self, data, directory):
+        """Add a sub-flow's imports to the suite; its relative paths stay valid."""
+        imports = self._resource.imports
+        top = self._dirs[0]
+
+        def key(kind, name, args, base):
+            # The same file imported by two flows counts once, however it is spelt.
+            target = (base / name).resolve().as_posix().lower() if _is_path(name) else name
+            return kind, target, tuple(args)
+
+        existing = {key(imp.type, imp.name, imp.args, top) for imp in imports}
+
+        def add(kind, create, name, args=()):
+            identity = key(kind, name, args, directory)
+            if identity in existing:
+                return
+            existing.add(identity)
+            if _is_path(name):
+                # Written relative to the calling flow file, like its own imports.
+                name = Path(os.path.relpath((directory / name).resolve(), top)).as_posix()
+            create(name, *([list(args)] if kind != 'RESOURCE' else []))
+
+        for name, args in data.libraries:
+            add('LIBRARY', imports.library, name, args)
+        for path in data.resources:
+            add('RESOURCE', imports.resource, path)
+        for name, args in data.variable_files:
+            add('VARIABLES', imports.variables, name, args)
 
     def _decision(self, body, step):
         if_ = body.create_if()
@@ -165,7 +257,14 @@ class _Emitter:
         KeywordStep: _keyword,
         GateStep: _gate,
         SleepStep: _sleep,
+        FlowStep: _flow,
         Decision: _decision,
         Loop: _loop,
         Try: _try,
     }
+
+
+def _is_path(name):
+    """A library, resource or variable file given as a path, not a module name."""
+    return name.lower().endswith(('.py', '.resource', '.robot', '.yaml', '.yml', '.json')) \
+        or '/' in name or os.sep in name

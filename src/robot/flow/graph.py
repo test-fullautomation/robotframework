@@ -24,7 +24,7 @@ disguise and is rejected with a message naming the node.
 """
 
 from .schema import (ABORT, ACTION_KINDS, BODY, CONTAINER_KINDS, CONTINUE,
-                     DECISION, DONE, END, FlowError, GATE, KEYWORD, LOOP, NEXT, NO,
+                     DECISION, DONE, END, FLOW, FlowError, GATE, KEYWORD, LOOP, NEXT, NO,
                      ON_FAILURE, PHASE, SETUP, SLEEP, START, TEARDOWN, TEST, THEN, YES)
 
 
@@ -61,6 +61,15 @@ class GateStep(KeywordStep):
         self.timeout = node.timeout
         self.interval = node.interval
         self.on_timeout = node.on_timeout
+
+
+class FlowStep(Step):
+    """A call of a sub-flow file; the builder turns the file into a keyword."""
+
+    def __init__(self, node):
+        super().__init__(node)
+        self.file = node.file
+        self.args = node.args       # parameter name -> value
 
 
 class SleepStep(Step):
@@ -258,7 +267,8 @@ class _Structurer:
                 via = THEN if label == DONE else label
 
     def _action(self, node):
-        return {KEYWORD: KeywordStep, GATE: GateStep, SLEEP: SleepStep}[node.kind](node)
+        return {KEYWORD: KeywordStep, GATE: GateStep, SLEEP: SleepStep,
+                FLOW: FlowStep}[node.kind](node)
 
     def _decision(self, node, stop, visited):
         join = self._join(node)

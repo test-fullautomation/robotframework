@@ -148,11 +148,36 @@ from the module search path.
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |
 | `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. |
 | `try` | — | `body`, `on_failure`, `done` | Failure routing without a loop. |
+| `flow` | `file`, `args` (an object: parameter → value) | 1 | Call another flow file — a sub-flow — as one step. |
 
 A recovery region ends with `continue` back to its loop or try node, or with
 `abort` to the node after it (or an end node); `abort` re-raises the failure
 after the recovery ran. Loops and try regions nest: a loop that is itself the
 last node of an enclosing body leaves with `next` instead of `done`.
+
+### Sub-flows
+
+A bigger plan stays readable when a region becomes a file of its own and the
+plan calls it as one box:
+
+```json
+{ "id": "power", "kind": "flow", "file": "sub/safe_power_on.flow.json", "args": { "VOLTS": "${V}" } }
+```
+
+- A sub-flow is an ordinary flow file **without phases**; its `variables` are its
+  **parameters**, with their values as defaults. `args` passes values by name;
+  an unknown name is an error naming the calling node.
+- The file resolves relative to the calling file; its imports join the suite,
+  their relative paths kept valid (a file imported twice counts once).
+- Each sub-flow file becomes **one keyword**, `Flow: <its name>`, called once per
+  box: in the log it is one step that opens to show the sub-flow's steps.
+- Sub-flows may call sub-flows; a cycle is rejected, naming the chain of files.
+- A failure inside a sub-flow fails that step — the caller's `on_failure`
+  recovery catches it like any other step.
+- A sub-flow returns nothing (`assign` is rejected); share results through
+  signals or suite variables.
+
+`python -m robot.flow validate` checks every sub-flow file it reaches.
 
 ### Rules
 
