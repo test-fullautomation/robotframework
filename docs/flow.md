@@ -70,7 +70,9 @@ See [Two flows](#two-flows) for the keywords and patterns.
   the offending node: branches that never re-join, a loop body that never
   returns, an unreachable box.
 - `robot --parser robot.flow --dryrun plan.flow.json` checks every keyword and
-  its arguments — including the keyword behind each gate.
+  its arguments — including the keyword behind each gate — without running
+  any of them. It does import the libraries, so module-level code and library
+  constructors run: keep bench access out of those.
 - `python -m robot.flow render plan.flow.json` prints the equivalent `.robot`
   text: what the reviewer reads is what runs.
 - Verdicts are honest: an assertion that fails is **FAIL**; a bench or a peer
@@ -80,7 +82,7 @@ See [Two flows](#two-flows) for the keywords and patterns.
 
 ```bash
 robot --parser robot.flow --variable RIG:RIG_A --outputdir out/rig_a flows/endurance_cycle.flow.json
-robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # validate without touching the bench
+robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # check keywords and arguments without running them
 python -m robot.flow validate flows/endurance_cycle.flow.json           # shape and structure only
 python -m robot.flow render   flows/endurance_cycle.flow.json           # the equivalent .robot text
 ```

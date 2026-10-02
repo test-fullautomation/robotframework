@@ -105,10 +105,13 @@ there is no `.robot` file to keep in step with the drawing.
 
 ```
 robot --parser robot.flow endurance.flow.json            # run it; every robot option applies
-robot --parser robot.flow --dryrun endurance.flow.json   # check keywords and arguments, touch nothing
+robot --parser robot.flow --dryrun endurance.flow.json   # check keywords and arguments without running them
 python -m robot.flow validate endurance.flow.json        # check the structure, naming the faulty node
 python -m robot.flow render   endurance.flow.json        # print the equivalent .robot text
 ```
+
+A dry run executes no keyword, but it does import the libraries: module-level code and
+library constructors run, so keep bench access out of those.
 
 - **Gates instead of guessed sleeps** — a `gate` polls a keyword until it passes; on timeout
   the message carries the last error and the time waited, and the verdict is `UNKNOWN` (the
@@ -160,7 +163,9 @@ assertion failures (`Should Be Equal` etc.) remain FAIL. Test libraries can also
   the whole suite, `--importfailure test` only the tests that use the failed import.
 - **The return code carries both counts**, so CI can tell a broken bench from a regression
   without opening the log: `rc = (min(unknown, 14) << 4) | min(failed, 15)` — decode with
-  `failed = rc & 0x0F` and `unknown = (rc >> 4) & 0x0F`; `0` still means everything passed.
+  `failed = rc & 0x0F` and `unknown = (rc >> 4) & 0x0F`. `0` means no test failed and none
+  is unknown; skipped tests are not counted, so a run in which every test was skipped also
+  returns `0`.
 
 ### Further extensions
 
