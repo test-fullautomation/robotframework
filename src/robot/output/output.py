@@ -32,6 +32,7 @@ class Output(AbstractLogger, LoggerApi):
             self.log_level,
             settings.rpa,
             legacy_output=settings.legacy_output,
+            segment_interval=settings.segment_output,  # cuongnht add segmented output
         )
         self.listeners = Listeners(settings.listeners, self.log_level)
         self.library_listeners = LibraryListeners(self.log_level)
@@ -64,8 +65,25 @@ class Output(AbstractLogger, LoggerApi):
         self.output_file.statistics(result.statistics)
         self.output_file.close()
         LOGGER.unregister_output_file()
+        self._merge_output_segments()  # cuongnht add segmented output
         self._merge_thread_outputs()  # cuongnht add thread
         LOGGER.output_file(self._settings["Output"])
+
+    def _merge_output_segments(self):
+        # cuongnht add segmented output: join sealed segments and the final
+        # live file back into one complete output.xml. Runs before the
+        # thread merge so that thread placeholders are grafted into the
+        # full document.
+        path = self._settings.output
+        segments = self.output_file.segment_paths
+        if not path or not segments:
+            return
+        try:
+            from .segmentmerger import merge_segments
+
+            merge_segments(path, list(segments))
+        except Exception as err:
+            LOGGER.error(f"Merging output segments failed: {err}")
 
     def _merge_thread_outputs(self):
         # cuongnht add thread: graft per-thread output files into the main

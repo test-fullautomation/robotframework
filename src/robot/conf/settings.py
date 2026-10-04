@@ -28,7 +28,8 @@ from robot.result.flattenkeywordmatcher import validate_flatten_keyword
 from robot.result.keywordremover import KeywordRemover
 from robot.utils import (
     abspath, create_destination_directory, escape, get_link_path, html_escape,
-    is_list_like, plural_or_not as s, seq2str, split_args_from_name_or_path
+    is_list_like, plural_or_not as s, seq2str, split_args_from_name_or_path,
+    timestr_to_secs
 )
 
 from .gatherfailed import gather_failed_suites, gather_failed_tests
@@ -147,7 +148,22 @@ class _BaseSettings:
             return tuple("." + ext.lower().lstrip(".") for ext in value.split(":"))
         if name == "ImportFailure":  # cuongnht unknown state
             return self._process_import_failure(value)
+        if name == "SegmentOutput":  # cuongnht add segmented output
+            return self._process_segment_output(value)
         return value
+
+    def _process_segment_output(self, value):
+        if not value or str(value).upper() == "NONE":
+            return None
+        try:
+            secs = timestr_to_secs(value)
+        except ValueError as err:
+            self._raise_invalid("SegmentOutput", str(err))
+        if secs <= 0:
+            self._raise_invalid(
+                "SegmentOutput", f"Interval must be positive, got {value!r}."
+            )
+        return secs
 
     def _process_import_failure(self, value):
         value = str(value).lower()
@@ -504,6 +520,7 @@ class RobotSettings(_BaseSettings):
         "Extension"          : ("extension", (".robot", ".rbt", ".robot.rst", ".robot.md")),
         "Output"             : ("output", "output.xml"),
         "ImportFailure"      : ("importfailure", "suite"),  # cuongnht unknown state
+        "SegmentOutput"      : ("segmentoutput", None),  # cuongnht add segmented output
         "LogLevel"           : ("loglevel", "INFO"),
         "MaxErrorLines"      : ("maxerrorlines", 40),
         "MaxAssignLength"    : ("maxassignlength", 200),
@@ -573,6 +590,11 @@ class RobotSettings(_BaseSettings):
     def import_failure(self):
         # cuongnht unknown state: 'suite' (default) or 'test'.
         return self["ImportFailure"]
+
+    @property
+    def segment_output(self):
+        # cuongnht add segmented output: interval in seconds or None.
+        return self["SegmentOutput"]
 
     @property
     def languages(self):

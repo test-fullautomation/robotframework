@@ -36,6 +36,8 @@ import os
 import re
 from xml.etree import ElementTree as ET
 
+from .segmentmerger import merge_segments
+
 
 def merge_thread_outputs(output_path, thread_files=None, remove=True, logger=None):
     """Graft per-thread output files into ``<thread>`` placeholders.
@@ -73,6 +75,12 @@ def merge_thread_outputs(output_path, thread_files=None, remove=True, logger=Non
                 f"Multiple THREAD blocks use name '{name}'. Thread log "
                 f"is attached only to the last occurrence."
             )
+        # cuongnht add segmented output: long living threads may have been
+        # rotated into segments; join them back before grafting.
+        try:
+            merge_segments(path, remove=remove, logger=logger)
+        except Exception as err:
+            logger.warn(f"Merging segments of thread output '{path}' failed: {err}")
         thread_root = _parse_thread_file(path, logger)
         if thread_root is None:
             continue

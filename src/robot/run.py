@@ -192,6 +192,18 @@ Options
                           test:  only tests that actually use keywords or
                           variables from the failed import get status
                           UNKNOWN; unaffected tests run normally.
+    --segmentoutput time  Seal output files periodically into well-formed
+                          segment files so that a crash during a very long
+                          run loses at most the given interval of log data.
+                          The main output.xml is sealed as
+                          `output_part_NNN.xml` and outputs of long living
+                          THREAD blocks as `output_<thread>_part_NNN.xml`.
+                          Segments are merged back automatically at the end
+                          of the run. After a crash merge them manually with
+                          `python -m robot.output.segmentmerger output.xml`
+                          followed by
+                          `python -m robot.output.threadmerger output.xml`.
+                          Examples: --segmentoutput 4h --segmentoutput 30min
  -r --report file         HTML report file. Can be disabled with `NONE`
                           similarly as --log. Default: report.html
  -x --xunit file          xUnit compatible result file. Not created unless this

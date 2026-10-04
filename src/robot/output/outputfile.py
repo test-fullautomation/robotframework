@@ -70,7 +70,10 @@ class OutputFile(LoggerApi):
         log_level: LogLevel,
         rpa: bool = False,
         legacy_output: bool = False,
+        segment_interval: "float | None" = None,
     ):
+        # cuongnht add segmented output: interval in seconds or None.
+        self._segment_interval = segment_interval
         # `self.logger` is replaced with `NullLogger` when flattening.
         self.logger = self.real_logger = self._get_logger(path, rpa, legacy_output)
         self.log_level = log_level
@@ -97,17 +100,27 @@ class OutputFile(LoggerApi):
                 f"Opening output file '{path}' failed: {get_error_message()}"
             )
         if path.suffix.lower() == ".json":
+            if self._segment_interval:
+                from .logger import LOGGER
+
+                LOGGER.warn("Segmented output is not supported with JSON output.")
             return JsonLogger(file, rpa)
         # cuongnht add thread: the path is needed to derive per-thread files.
-        if legacy_output:
-            return LegacyXmlLogger(file, rpa, path=path)
-        return XmlLogger(file, rpa, path=path)
+        logger_class = LegacyXmlLogger if legacy_output else XmlLogger
+        return logger_class(
+            file, rpa, path=path, segment_interval=self._segment_interval
+        )
 
     @property
     def thread_output_files(self):
         # cuongnht add thread: {thread name: path} of the per-thread files
         # written by THREAD blocks, to be merged into the main output.
         return getattr(self.real_logger, "thread_output_files", {})
+
+    @property
+    def segment_paths(self):
+        # cuongnht add segmented output: sealed segments of the main output.
+        return getattr(self.real_logger, "segment_paths", [])
 
     @property
     @contextmanager

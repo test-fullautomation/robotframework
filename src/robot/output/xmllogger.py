@@ -15,6 +15,7 @@
 
 import os
 import threading
+import time
 from datetime import datetime
 
 from robot.result import Keyword, ResultVisitor, TestCase, TestSuite
@@ -23,24 +24,33 @@ from robot.version import get_full_version
 
 
 class _TrackingWriter:
-    """XmlWriter proxy that remembers the open elements.
+    """XmlWriter proxy that remembers the open elements and supports rotation.
 
     cuongnht add thread: used for per-thread output files so that a file of
     a thread that is still running when execution ends can be closed with
     all its open elements, which keeps it well-formed for the merger.
+
+    cuongnht add segmented output: also used for the main output.xml so that
+    during very long runs the file can periodically be sealed into a
+    well-formed segment (``<base>_part_NNN.xml``) and writing continues in a
+    fresh file with the same open element structure. Replayed elements are
+    marked with ``continued="true"`` so that the segment merger knows to
+    join them with their counterparts in the previous segment.
     """
 
-    def __init__(self, path):
-        self.path = path
-        self._writer = XmlWriter(path, usage="output", write_empty=False)
-        self._stack = []
+    def __init__(self, path, writer=None):
+        self.path = str(path)
+        self._writer = writer or XmlWriter(self.path, usage="output", write_empty=False)
+        self._stack = []  # [(tag, attrs dict), ...], root first
+        self.segment_paths = []
+        self.last_rotation = time.monotonic()
 
     def start(self, name, attrs=None, newline=True, write_empty=None):
-        self._stack.append(name)
+        self._stack.append((name, dict(attrs or {})))
         self._writer.start(name, attrs, newline, write_empty)
 
     def end(self, name, newline=True):
-        if self._stack and self._stack[-1] == name:
+        if self._stack and self._stack[-1][0] == name:
             self._stack.pop()
         self._writer.end(name, newline)
 
@@ -56,14 +66,42 @@ class _TrackingWriter:
     def finalize(self):
         """Closes all still open elements and the file itself."""
         while self._stack:
-            self.end(self._stack[-1])
+            self.end(self._stack[-1][0])
         self.close()
+
+    def rotate(self, sealed_path):
+        """Seals the current file into ``sealed_path`` and starts a new one."""
+        for name, _ in reversed(self._stack):
+            self._writer.end(name)
+        self._writer.close()
+        os.replace(self.path, sealed_path)
+        self._writer = XmlWriter(self.path, usage="output", write_empty=False)
+        for index, (name, attrs) in enumerate(self._stack):
+            attrs = dict(attrs)
+            if index > 0:  # roots of segments correspond by position
+                attrs["continued"] = "true"
+            self._writer.start(name, attrs)
+
+    def maybe_rotate(self, interval):
+        """Rotates when ``interval`` seconds have passed since the last one.
+
+        Must only be called by the thread that owns this writer.
+        """
+        if time.monotonic() - self.last_rotation < interval:
+            return
+        base, ext = os.path.splitext(self.path)
+        sealed = f"{base}_part_{len(self.segment_paths) + 1:03d}{ext}"
+        self.rotate(sealed)
+        self.segment_paths.append(sealed)
+        self.last_rotation = time.monotonic()
 
 
 class XmlLogger(ResultVisitor):
     generator = "Robot"
 
-    def __init__(self, output, rpa=False, suite_only=False, path=None):
+    def __init__(
+        self, output, rpa=False, suite_only=False, path=None, segment_interval=None
+    ):
         self._main_writer = self._get_writer(output, preamble=not suite_only)
         self._rpa = rpa
         # cuongnht add thread: every THREAD worker streams into its own file
@@ -74,8 +112,33 @@ class XmlLogger(ResultVisitor):
         self._thread_writers = {}
         self._thread_writers_lock = threading.Lock()
         self.thread_output_files = {}
+        # cuongnht add segmented output: with an interval the main writer
+        # tracks open elements so that the output can be rotated into
+        # segments during long runs (`<base>_part_NNN<ext>`).
+        self._segment_interval = segment_interval
+        if segment_interval and self._path and not suite_only:
+            self._main_writer = _TrackingWriter(self._path, writer=self._main_writer)
         if not suite_only:
             self._writer.start("robot", self._get_start_attrs(rpa))
+
+    @property
+    def segment_paths(self):
+        # cuongnht add segmented output: sealed segments of the main writer.
+        if isinstance(self._main_writer, _TrackingWriter):
+            return self._main_writer.segment_paths
+        return []
+
+    def _maybe_rotate(self):
+        # cuongnht add segmented output: periodically seal the current
+        # thread's output file into a well-formed segment so that a crash
+        # during a very long run loses at most one segment interval of log
+        # data. Each thread rotates its own writer (the main writer seals
+        # output_part_NNN.xml, thread writers output_<name>_part_NNN.xml).
+        if not self._segment_interval or not self._path:
+            return
+        writer = self._writer
+        if isinstance(writer, _TrackingWriter):
+            writer.maybe_rotate(self._segment_interval)
 
     def _get_writer(self, output, preamble=True):
         return XmlWriter(output, usage="output", write_empty=False, preamble=preamble)
@@ -163,6 +226,7 @@ class XmlLogger(ResultVisitor):
         self._write_message(msg)
 
     def _write_message(self, msg):
+        self._maybe_rotate()  # cuongnht add segmented output
         attrs = {
             "time": msg.timestamp.isoformat() if msg.timestamp else None,
             "level": msg.level,
@@ -172,6 +236,7 @@ class XmlLogger(ResultVisitor):
         self._writer.element("msg", msg.message, attrs)
 
     def start_keyword(self, kw):
+        self._maybe_rotate()  # cuongnht add segmented output
         self._writer.start("kw", self._get_start_keyword_attrs(kw))
 
     def _get_start_keyword_attrs(self, kw):
@@ -183,6 +248,7 @@ class XmlLogger(ResultVisitor):
         return attrs
 
     def end_keyword(self, kw):
+        self._maybe_rotate()  # cuongnht add segmented output
         self._write_list("var", kw.assign)
         self._write_list("arg", [str(a) for a in kw.args])
         self._write_list("tag", kw.tags)
