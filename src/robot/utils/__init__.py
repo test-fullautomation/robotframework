@@ -96,6 +96,10 @@ from .normalizing import (
     NormalizedDict as NormalizedDict,
 )
 from .notset import NOT_SET as NOT_SET, NotSet as NotSet
+from .priorityqueue import (  # cuongnht add thread
+    PriorityQueue as PriorityQueue,
+    QueuedNotification as QueuedNotification,
+)
 from .platform import (
     PY_VERSION as PY_VERSION,
     PYPY as PYPY,
@@ -158,6 +162,7 @@ from .text import (
     pad_console_length as pad_console_length,
     split_args_from_name_or_path as split_args_from_name_or_path,
 )
+from .threadsafedict import ThreadSafeDict as ThreadSafeDict  # cuongnht add thread
 from .typehints import (
     copy_signature as copy_signature,
     KnownAtRuntime as KnownAtRuntime,
