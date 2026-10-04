@@ -48,7 +48,7 @@ PACKAGE_DATA = [
     join("htmldata", directory, pattern)
     for directory in ("rebot", "libdoc", "testdoc", "lib", "common")
     for pattern in ("*.html", "*.css", "*.js")
-] + ["api/py.typed", "logo.png"]
+] + ["api/py.typed", "logo.png", "flow/flow.schema.json"]  # cuongnht add flow
 
 
 setup(

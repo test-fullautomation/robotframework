@@ -1,0 +1,11 @@
+{
+  "flow": {"name": "Checked Step"},
+  "variables": {"BROKEN": "no"},
+  "nodes": [
+    {"id": "start", "kind": "start"},
+    {"id": "power", "kind": "flow", "file": "power_on.flow.json", "args": {"VOLTS": 5}},
+    {"id": "check", "kind": "keyword", "keyword": "Should Be Equal", "args": ["${BROKEN}", "no", "Step is broken."]},
+    {"id": "end", "kind": "end"}
+  ],
+  "edges": [["start", "power"], ["power", "check"], ["check", "end"]]
+}

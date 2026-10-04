@@ -1,0 +1,16 @@
+{
+  "flow": { "name": "Deadline Loop" },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "loop", "kind": "loop", "max_seconds": "0.5s", "every": "0.1s" },
+    { "id": "count", "kind": "keyword", "keyword": "Count Iteration" },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "loop"],
+    { "from": "loop", "to": "count", "label": "body" },
+    { "from": "count", "to": "loop", "label": "next" },
+    { "from": "loop", "to": "end", "label": "done" }
+  ]
+}

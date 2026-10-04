@@ -1,0 +1,10 @@
+{
+  "flow": {"name": "Power On"},
+  "variables": {"VOLTS": 12},
+  "nodes": [
+    {"id": "start", "kind": "start"},
+    {"id": "on", "kind": "keyword", "keyword": "Log", "args": ["Power on at ${VOLTS} V."]},
+    {"id": "end", "kind": "end"}
+  ],
+  "edges": [["start", "on"], ["on", "end"]]
+}

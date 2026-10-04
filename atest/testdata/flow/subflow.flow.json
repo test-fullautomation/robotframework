@@ -1,0 +1,26 @@
+{
+  "flow": {"name": "Subflow"},
+  "variables": {"V": 9},
+  "nodes": [
+    {"id": "start", "kind": "start"},
+    {"id": "args", "kind": "phase", "role": "test", "name": "Defaults And Arguments"},
+    {"id": "default", "kind": "flow", "file": "sub/power_on.flow.json"},
+    {"id": "given", "kind": "flow", "file": "sub/power_on.flow.json", "args": {"VOLTS": "${V}"}},
+    {"id": "nested", "kind": "phase", "role": "test", "name": "Nested Subflow"},
+    {"id": "checked", "kind": "flow", "file": "sub/checked_step.flow.json"},
+    {"id": "recover", "kind": "phase", "role": "test", "name": "Failure Inside Subflow Is Recovered"},
+    {"id": "try", "kind": "try"},
+    {"id": "broken", "kind": "flow", "file": "sub/checked_step.flow.json", "args": {"BROKEN": "yes"}},
+    {"id": "recovered", "kind": "keyword", "keyword": "Log", "args": ["Recovered: ${flow_error}"]},
+    {"id": "end", "kind": "end"}
+  ],
+  "edges": [
+    ["start", "args"], ["args", "default"], ["default", "given"], ["given", "nested"],
+    ["nested", "checked"], ["checked", "recover"], ["recover", "try"],
+    {"from": "try", "to": "broken", "label": "body"},
+    {"from": "broken", "to": "try", "label": "next"},
+    {"from": "try", "to": "recovered", "label": "on_failure"},
+    {"from": "recovered", "to": "try", "label": "continue"},
+    {"from": "try", "to": "end", "label": "done"}
+  ]
+}
