@@ -475,9 +475,20 @@ class TestCheckerLibrary:
 
 
 class ProcessResults(ResultVisitor):
+    # cuongnht - add unknown state: UNKNOWN is a fourth expected status.
+    STATUSES = ("FAIL", "SKIP", "PASS", "UNKNOWN")
 
     def visit_test(self, test):
-        for status in "FAIL", "SKIP", "PASS":
+        # By convention the expected status is the first word of the
+        # documentation. Check that first: scanning the whole doc would let a
+        # status word inside the expected message win instead, which happens
+        # e.g. with UNKNOWN tests whose message quotes a failure.
+        for status in self.STATUSES:
+            if test.doc.startswith(status):
+                test.exp_status = status
+                test.exp_message = test.doc[len(status):].lstrip()
+                return
+        for status in self.STATUSES:
             if status in test.doc:
                 test.exp_status = status
                 test.exp_message = test.doc.split(status, 1)[1].lstrip()
