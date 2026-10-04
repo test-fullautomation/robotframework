@@ -37,8 +37,10 @@ STDLIBS = frozenset(
         "Process",
         "Remote",
         "Screenshot",
+        "StateMachine",  # cuongnht add state machine
         "String",
         "Telnet",
+        "Watchdog",  # cuongnht add watchdog
         "XML",
     )
 )
