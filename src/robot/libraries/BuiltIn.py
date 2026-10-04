@@ -14,7 +14,9 @@
 #  limitations under the License.
 
 import difflib
+import queue
 import re
+import threading
 import time
 from collections.abc import Collection, Mapping, Sequence, Sized
 from datetime import datetime, timedelta
@@ -25,7 +27,8 @@ from robot.api.deco import library
 from robot.api.types import KeywordArgument, KeywordName
 from robot.errors import (
     BreakLoop, ContinueLoop, DataError, ExecutionFailed, ExecutionFailures,
-    ExecutionPassed, PassExecution, ReturnFromKeyword, VariableError
+    ExecutionPassed, PassExecution, ReturnFromKeyword, UnknownAssertionError,
+    VariableError
 )
 from robot.output import SettableLevel
 from robot.running import Keyword, RUN_KW_REGISTER, TypeInfo
@@ -33,8 +36,8 @@ from robot.running.context import EXECUTION_CONTEXTS
 from robot.utils import (
     DotDict, escape, format_assign_message, get_error_message, get_time, html_escape,
     is_truthy, Matcher, normalize, normalize_whitespace, NormalizedDict, parse_re_flags,
-    parse_time, plural_or_not as s, prepr, safe_str, secs_to_timestr, seq2str,
-    split_from_equals, timestr_to_secs, type_name, unescape
+    parse_time, plural_or_not as s, prepr, PriorityQueue, QueuedNotification, safe_str,
+    secs_to_timestr, seq2str, split_from_equals, timestr_to_secs, type_name, unescape
 )
 from robot.utils.asserts import assert_equal, assert_not_equal
 from robot.variables import (
@@ -778,6 +781,38 @@ class _Verify(_BuiltInBase):
         """
         self._set_and_remove_tags(tags)
         raise AssertionError(msg) if msg is not None else AssertionError()
+
+    def unknown(self, msg: "str | None" = None, *tags: str) -> NoReturn:
+        """Marks the test or task UNKNOWN with the given message and optionally alters its tags.
+
+        Args:
+            msg: The message to use.
+            tags: Tags to set or remove. Tags starting with `-` are removed.
+
+        UNKNOWN is a RobotFramework AIO extension beside PASS, FAIL and SKIP:
+        it means that nothing could be judged, typically because the test
+        environment is not as expected. Use it when a precondition of the
+        test is not met instead of failing the test.
+
+        It is possible to use HTML in the given message, similarly as with
+        any other keyword accepting an error message, by prefixing it with
+        `*HTML*`. Tags are modified the same way as with [Fail].
+
+        Examples:
+        ```robotframework
+        *** Test Cases ***
+        Bench not ready
+            Unknown    Power supply is switched off
+
+        Add tag
+            Unknown    Bench not ready    not-ready
+        ```
+
+        Use the [Fatal Error] keyword if you need to stop the whole execution.
+        """
+        # cuongnht - add unknown state
+        self._set_and_remove_tags(tags)
+        raise UnknownAssertionError(msg) if msg else UnknownAssertionError()
 
     def fatal_error(self, msg: "str | None" = None) -> NoReturn:
         """Stops the whole execution.
@@ -3627,6 +3662,31 @@ class _RunKeyword(_BuiltInBase):
         suite = self._get_suite_in_teardown("Run Keyword If Any Tests Failed")
         return self.run_keyword(name, *args) if suite.statistics.failed > 0 else None
 
+    @run_keyword_variant(resolve=0, dry_run=True)
+    def run_keyword_if_any_tests_unknown(
+        self,
+        name: KeywordName,
+        /,
+        *args: KeywordArgument,
+    ) -> object:
+        """Runs the given keyword with the given arguments, if one or more tests are UNKNOWN.
+
+        Args:
+            name: The keyword to execute.
+            *args: Arguments passed to the keyword.
+
+        Returns:
+            The return value of the executed keyword or `None` if the keyword
+            was not executed.
+
+        This keyword can only be used in a suite teardown. Trying to use it
+        anywhere else results in an error. UNKNOWN is a RobotFramework AIO
+        extension, see the [Unknown] keyword.
+        """
+        # cuongnht - add unknown state
+        suite = self._get_suite_in_teardown("Run Keyword If Any Tests Unknown")
+        return self.run_keyword(name, *args) if suite.statistics.unknown > 0 else None
+
     def _get_suite_in_teardown(self, kw):
         if not self._context.in_suite_teardown:
             raise RuntimeError(f"Keyword '{kw}' can only be used in suite teardown.")
@@ -3935,6 +3995,294 @@ class _Misc(_BuiltInBase):
                 break
             time.sleep(min(remaining, 0.01))
 
+    # cuongnht add thread ---------------------------------------------------
+
+    def send_thread_notification(
+        self,
+        name: str,
+        params: object = None,
+        dst_thread: "str | None" = None,
+    ):
+        """Sends a notification to other `THREAD` blocks.
+
+        Args:
+            name: Name of the notification. Receiving threads identify and
+                respond to the notification by it.
+            params: Optional payload attached to the notification. Can be a
+                string or any structured data.
+            dst_thread: Name of the destination thread. When not given the
+                notification is broadcast to all other threads.
+
+        Examples:
+        ```robotframework
+        *** Test Cases ***
+        Broadcast
+            Send Thread Notification    worker_started
+
+        With payload to one thread
+            Send Thread Notification    data_ready    params=${data}    dst_thread=consumer
+        ```
+
+        Use [Wait Thread Notification] on the receiving side. This keyword is
+        a RobotFramework AIO extension.
+        """
+        queues = self._context.thread_message_queue_dict
+        if dst_thread is None:
+            current = threading.current_thread().name
+            for thread in threading.enumerate():
+                if thread.name != current and thread.name in queues:
+                    notification = QueuedNotification(name)
+                    notification.params = params
+                    try:
+                        self._put_notification(thread.name, notification)
+                    except Exception:
+                        pass
+        elif dst_thread in queues:
+            notification = QueuedNotification(name)
+            notification.params = params
+            self._put_notification(dst_thread, notification)
+        else:
+            existing = ", ".join(thread.name for thread in threading.enumerate())
+            self.log(
+                f"Unable to send notification. Thread '{dst_thread}' does not "
+                f"exist. Existing threads: {existing}",
+                "WARN",
+            )
+
+    def _put_notification(self, thread_name, notification):
+        # cuongnht memory cap: queues drop their oldest entries when full
+        # (see robot.utils.PriorityQueue.max_items); warn once per queue so
+        # a never-consuming destination becomes visible in the log.
+        thread_queue = self._context.thread_message_queue_dict[thread_name]
+        thread_queue.put(notification)
+        if thread_queue.dropped and not getattr(thread_queue, "_drop_warned", False):
+            thread_queue._drop_warned = True
+            self.log(
+                f"Notification queue of thread '{thread_name}' reached its limit "
+                f"({thread_queue.max_items}); oldest notifications are being "
+                f"dropped. Is any thread consuming them with "
+                f"'Wait Thread Notification'?",
+                "WARN",
+            )
+
+    def wait_thread_notification(
+        self,
+        name: str,
+        condition: "str | None" = None,
+        timeout: float = 5,
+    ) -> object:
+        """Waits for a notification sent by another `THREAD` block.
+
+        Args:
+            name: Name of the notification to wait for.
+            condition: Optional Python expression evaluated against the
+                notification payload, available as `$payloads`. Only
+                notifications whose payload satisfies the condition are
+                accepted, for example `condition=$payloads == 'ready'`.
+            timeout: Maximum time to wait in seconds.
+
+        Returns:
+            The payload of the accepted notification.
+
+        Examples:
+        ```robotframework
+        *** Test Cases ***
+        Wait
+            ${payload}=    Wait Thread Notification    data_ready    timeout=10
+
+        With condition
+            Wait Thread Notification    state    condition=$payloads == 'ready'
+        ```
+
+        Fails if a suitable notification is not received within the timeout.
+        Notifications with other names, or not matching the condition, are
+        kept for later waits. See also [Send Thread Notification]. This
+        keyword is a RobotFramework AIO extension.
+        """
+        timeout = float(timeout)
+        current = threading.current_thread().name
+        notification_queue = self._context.thread_message_queue_dict.get(current)
+        if notification_queue is None:
+            raise RuntimeError(
+                f"Thread '{current}' has no notification queue. 'Wait Thread "
+                f"Notification' can only be used in the main thread or inside "
+                f"a THREAD block."
+            )
+        is_receive = False
+        payloads = None
+        tmp_queue = PriorityQueue(queue_type="FIFO")
+        thread_condition = threading.Condition()
+        is_add = False
+
+        def monitor_callback(action, _value):
+            nonlocal is_add
+            if action == "put":
+                with thread_condition:
+                    is_add = True
+                    thread_condition.notify_all()
+
+        notification_queue.set_callback(monitor_callback)
+        try:
+            start_time = time.time()
+            while True:
+                elapsed = time.time() - start_time
+                if elapsed >= timeout:
+                    break
+                with thread_condition:
+                    if not is_add:
+                        thread_condition.wait_for(
+                            lambda: not notification_queue.empty(), timeout - elapsed
+                        )
+                    is_add = False
+                while not notification_queue.empty():
+                    try:
+                        priority, notification = notification_queue.get(False)
+                    except queue.Empty:
+                        break
+                    if notification.name == name:
+                        payloads = notification.params
+                        self._set_payloads(payloads)
+                        if condition is None or self._is_true(condition):
+                            is_receive = True
+                            break
+                    tmp_queue.put(notification, priority)
+                if is_receive:
+                    break
+        finally:
+            notification_queue.set_callback(None)
+            while not tmp_queue.empty():
+                try:
+                    priority, notification = tmp_queue.get(False)
+                    notification_queue.put(notification, priority)
+                except queue.Empty:
+                    break
+        if not is_receive:
+            parts = [f"Did not receive thread notification '{name}'"]
+            if condition:
+                parts.append(f"with condition '{condition}'")
+            parts.append(f"within '{timeout}' seconds.")
+            raise AssertionError(" ".join(parts))
+        return payloads
+
+    def _set_payloads(self, payloads):
+        # The payload is exposed as `${payloads}` for the `condition`. Inside
+        # a THREAD block only the worker's own scope is touched; the main
+        # thread uses the normal test scope.
+        variables = self._context.variables
+        if threading.current_thread() is threading.main_thread():
+            variables.set_test("${payloads}", payloads)
+        else:
+            variables.current["${payloads}"] = payloads
+
+    def thread_rlock_acquire(
+        self,
+        rlock_name: str,
+        blocking: bool = True,
+        timeout: float = -1,
+    ) -> bool:
+        """Acquires the re-entrant lock (RLock) with the given name.
+
+        Args:
+            rlock_name: Name of the lock. The lock is created on first use.
+            blocking: Whether to wait for the lock to become available.
+            timeout: Maximum time to wait in seconds. `-1` waits forever.
+
+        Returns:
+            `True` if the lock was acquired, `False` otherwise.
+
+        Examples:
+        ```robotframework
+        *** Test Cases ***
+        Lock
+            Thread RLock Acquire    MyLock
+            Thread RLock Acquire    MyLock    blocking=False
+            ${ok}=    Thread RLock Acquire    MyLock    timeout=5
+        ```
+
+        Release the lock with [Thread RLock Release]. This keyword is a
+        RobotFramework AIO extension.
+        """
+        locks = self._context.thread_rlock_dict
+        if rlock_name not in locks:
+            locks[rlock_name] = threading.RLock()
+        rlock_object = locks[rlock_name]
+        if not isinstance(rlock_object, type(threading.RLock())):
+            raise AssertionError(f"Unable to acquire the rlock name '{rlock_name}'!!!")
+        return rlock_object.acquire(blocking, timeout)
+
+    def thread_rlock_release(self, rlock_name: str):
+        """Releases the re-entrant lock (RLock) with the given name.
+
+        Args:
+            rlock_name: Name of the lock acquired with [Thread RLock Acquire].
+
+        The lock must be released by the same thread that acquired it.
+        Releasing a lock that is not held by the thread fails. This keyword
+        is a RobotFramework AIO extension.
+        """
+        locks = self._context.thread_rlock_dict
+        if rlock_name not in locks:
+            raise AssertionError(f"RLock '{rlock_name}' does not exist!!!")
+        rlock_object = locks[rlock_name]
+        if not isinstance(rlock_object, type(threading.RLock())):
+            raise AssertionError(f"Unable to release the rlock name '{rlock_name}'!!!")
+        rlock_object.release()
+
+    def wait_for_thread(self, name: str, timeout: "timedelta | None" = None):
+        """Waits until the `THREAD` block named `name` has finished.
+
+        Args:
+            name: Name of the thread.
+            timeout: Maximum time to wait. Waits forever by default.
+
+        Fails if the thread is still running after the timeout. Passing an
+        unknown or already finished thread name succeeds immediately. This
+        keyword is a RobotFramework AIO extension.
+        """
+        # cuongnht thread scope
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        secs = timeout.total_seconds() if timeout is not None else None
+        entry["worker"].join(secs)
+        if entry["worker"].is_alive():
+            raise AssertionError(
+                f"Thread '{name}' did not finish in {secs_to_timestr(secs)}."
+            )
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' finished.")
+
+    def stop_thread(self, name: str, timeout: timedelta = timedelta(seconds=10)):
+        """Requests the `THREAD` block named `name` to stop and waits for it.
+
+        Args:
+            name: Name of the thread.
+            timeout: Maximum time to wait for the thread to stop.
+
+        The stop is cooperative: the thread finishes its current keyword and
+        stops at the next keyword boundary. Fails if the thread is still
+        running after the timeout. Passing an unknown or already finished
+        thread name succeeds immediately. This keyword is a RobotFramework
+        AIO extension.
+        """
+        # cuongnht thread scope
+        entry = self._context.active_threads.get(name)
+        if entry is None:
+            self.log(f"Thread '{name}' is not running.")
+            return
+        entry["stop_event"].set()
+        secs = timeout.total_seconds()
+        entry["worker"].join(secs)
+        if entry["worker"].is_alive():
+            raise AssertionError(
+                f"Thread '{name}' did not stop in {secs_to_timestr(secs)}."
+            )
+        self._context.unregister_thread(name)
+        self.log(f"Thread '{name}' stopped.")
+
+    # -----------------------------------------------------------------------
+
     def catenate(self, *items: str) -> str:
         r"""Concatenates the given items together and returns the resulted string.
 
@@ -4006,7 +4354,8 @@ class _Misc(_BuiltInBase):
             repr: Deprecated. Use `formatter` instead.
             formatter: Controls how to format the logged message.
 
-        Valid levels are TRACE, DEBUG, INFO (default), WARN and ERROR.
+        Valid levels are TRACE, DEBUG, INFO (default), USER, WARN and ERROR.
+        USER is a RobotFramework AIO extension between INFO and WARN.
         In addition to that, there are pseudo log levels HTML and CONSOLE that
         both log messages using the INFO level. Non-string messages are
         converted to strings automatically.
@@ -4191,7 +4540,7 @@ class _Misc(_BuiltInBase):
 
         Messages below the level will not logged. The default logging level is
         INFO, but it can be overridden with the `--loglevel` command line option.
-        The available levels are TRACE, DEBUG, INFO (default), WARN, ERROR and
+        The available levels are TRACE, DEBUG, INFO (default), USER, WARN, ERROR and
         NONE (no logging).
 
         The old level is returned and can be used for setting the level back
