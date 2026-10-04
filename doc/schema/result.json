@@ -425,6 +425,9 @@
                 "$ref": "#/definitions/Group"
               },
               {
+                "$ref": "#/definitions/Thread"
+              },
+              {
                 "$ref": "#/definitions/If"
               },
               {
@@ -499,6 +502,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"
@@ -592,6 +598,9 @@
                 "$ref": "#/definitions/Group"
               },
               {
+                "$ref": "#/definitions/Thread"
+              },
+              {
                 "$ref": "#/definitions/If"
               },
               {
@@ -666,6 +675,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"
@@ -750,6 +762,9 @@
                 "$ref": "#/definitions/Group"
               },
               {
+                "$ref": "#/definitions/Thread"
+              },
+              {
                 "$ref": "#/definitions/If"
               },
               {
@@ -780,6 +795,99 @@
           "title": "Type",
           "default": "GROUP",
           "const": "GROUP",
+          "type": "string"
+        }
+      },
+      "required": [
+        "elapsed_time",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "Thread": {
+      "title": "Thread",
+      "type": "object",
+      "properties": {
+        "elapsed_time": {
+          "title": "Elapsed Time",
+          "type": "number"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "start_time": {
+          "title": "Start Time",
+          "type": "string",
+          "format": "date-time"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "daemon": {
+          "title": "Daemon",
+          "anyOf": [{"type": "boolean"}, {"type": "string"}]
+        },
+        "doc": {
+          "title": "Doc",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/Keyword"
+              },
+              {
+                "$ref": "#/definitions/For"
+              },
+              {
+                "$ref": "#/definitions/While"
+              },
+              {
+                "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
+              },
+              {
+                "$ref": "#/definitions/If"
+              },
+              {
+                "$ref": "#/definitions/Try"
+              },
+              {
+                "$ref": "#/definitions/Var"
+              },
+              {
+                "$ref": "#/definitions/Break"
+              },
+              {
+                "$ref": "#/definitions/Continue"
+              },
+              {
+                "$ref": "#/definitions/Return"
+              },
+              {
+                "$ref": "#/definitions/Error"
+              },
+              {
+                "$ref": "#/definitions/Message"
+              }
+            ]
+          }
+        },
+        "type": {
+          "title": "Type",
+          "default": "THREAD",
+          "const": "THREAD",
           "type": "string"
         }
       },
@@ -826,6 +934,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"
@@ -925,6 +1036,9 @@
                 "$ref": "#/definitions/Group"
               },
               {
+                "$ref": "#/definitions/Thread"
+              },
+              {
                 "$ref": "#/definitions/If"
               },
               {
@@ -1008,6 +1122,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"
@@ -1120,6 +1237,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"
@@ -1250,6 +1370,9 @@
                 "$ref": "#/definitions/Group"
               },
               {
+                "$ref": "#/definitions/Thread"
+              },
+              {
                 "$ref": "#/definitions/If"
               },
               {
@@ -1369,6 +1492,9 @@
               },
               {
                 "$ref": "#/definitions/Group"
+              },
+              {
+                "$ref": "#/definitions/Thread"
               },
               {
                 "$ref": "#/definitions/If"

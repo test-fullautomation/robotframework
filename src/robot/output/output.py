@@ -64,7 +64,24 @@ class Output(AbstractLogger, LoggerApi):
         self.output_file.statistics(result.statistics)
         self.output_file.close()
         LOGGER.unregister_output_file()
+        self._merge_thread_outputs()  # cuongnht add thread
         LOGGER.output_file(self._settings["Output"])
+
+    def _merge_thread_outputs(self):
+        # cuongnht add thread: graft per-thread output files into the main
+        # output.xml so that log/report generation sees one complete file.
+        path = self._settings.output
+        thread_files = self.output_file.thread_output_files
+        if not path or not thread_files:
+            return
+        try:
+            from .threadmerger import merge_thread_outputs
+
+            merge_thread_outputs(path, dict(thread_files))
+        except Exception as err:
+            LOGGER.error(f"Merging thread output files failed: {err}")
+        finally:
+            thread_files.clear()
 
     def start_suite(self, data, result):
         LOGGER.start_suite(data, result)
@@ -131,6 +148,13 @@ class Output(AbstractLogger, LoggerApi):
 
     def end_group(self, data, result):
         LOGGER.end_group(data, result)
+
+    def start_thread(self, data, result):
+        # cuongnht add thread
+        LOGGER.start_thread(data, result)
+
+    def end_thread(self, data, result):
+        LOGGER.end_thread(data, result)
 
     def start_if(self, data, result):
         LOGGER.start_if(data, result)

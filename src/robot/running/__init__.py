@@ -142,6 +142,7 @@ from .model import (
     Return as Return,
     TestCase as TestCase,
     TestSuite as TestSuite,
+    Thread as Thread,
     Try as Try,
     TryBranch as TryBranch,
     Var as Var,

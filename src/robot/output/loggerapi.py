@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from robot import model, result, running
 
 
-ResultFile = Literal["OUTPUT", "REPORT", "LOG", "XUNIT", "DEBUG"]
+ResultFile = Literal["OUTPUT", "REPORT", "LOG", "XUNIT", "DEBUG", "TIMELINE"]
 
 
 class LoggerApi:
@@ -137,6 +137,13 @@ class LoggerApi:
     def end_group(self, data: "running.Group", result: "result.Group"):
         self.end_body_item(data, result)
 
+    def start_thread(self, data: "running.Thread", result: "result.Thread"):
+        # cuongnht add thread
+        self.start_body_item(data, result)
+
+    def end_thread(self, data: "running.Thread", result: "result.Thread"):
+        self.end_body_item(data, result)
+
     def start_if(self, data: "running.If", result: "result.If"):
         self.start_body_item(data, result)
 
@@ -237,6 +244,13 @@ class LoggerApi:
         Calls :meth:`result_file` by default.
         """
         self.result_file("DEBUG", path)
+
+    def timeline_file(self, path: Path):
+        """Called when the timeline file is closed (RobotFramework AIO extension).
+
+        Calls :meth:`result_file` by default.
+        """
+        self.result_file("TIMELINE", path)
 
     def result_file(self, kind: ResultFile, path: Path):
         """Called when any result file is closed by default.

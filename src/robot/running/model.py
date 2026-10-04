@@ -50,7 +50,8 @@ from robot.utils import format_assign_message, setter
 from robot.variables import VariableResolver
 
 from .bodyrunner import (
-    ForRunner, GroupRunner, IfRunner, KeywordRunner, TryRunner, WhileRunner
+    ForRunner, GroupRunner, IfRunner, KeywordRunner, ThreadRunner, TryRunner,
+    WhileRunner
 )
 from .randomizer import Randomizer
 from .statusreporter import StatusReporter
@@ -326,6 +327,42 @@ class Group(model.Group, WithSource):
     def run(self, result, context, run=True, templated=False):
         result = result.body.create_group(self.name)
         return GroupRunner(context, run, templated).run(self, result)
+
+
+@Body.register
+class Thread(model.Thread, WithSource):
+    # cuongnht add thread
+    body_class = Body
+    __slots__ = ("lineno", "error")
+
+    def __init__(
+        self,
+        name: str = "ROBOT_THREAD",
+        daemon: bool = True,
+        parent: BodyItemParent = None,
+        lineno: "int | None" = None,
+        error: "str | None" = None,
+    ):
+        super().__init__(name, daemon, parent)
+        self.lineno = lineno
+        self.error = error
+
+    def to_dict(self) -> DataDict:
+        data = super().to_dict()
+        if self.lineno:
+            data["lineno"] = self.lineno
+        if self.error:
+            data["error"] = self.error
+        return data
+
+    @property
+    def result_class(self):
+        from robot.result import Thread as ThreadResult
+
+        return ThreadResult
+
+    def run(self, result, context, run=True, templated=False):
+        return ThreadRunner(context, run, templated).run(self, result)
 
 
 class IfBranch(model.IfBranch, WithSource):

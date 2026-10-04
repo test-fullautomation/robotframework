@@ -43,6 +43,7 @@ from .control import (
     If as If,
     IfBranch as IfBranch,
     Return as Return,
+    Thread as Thread,
     Try as Try,
     TryBranch as TryBranch,
     Var as Var,

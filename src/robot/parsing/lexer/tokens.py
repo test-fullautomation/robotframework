@@ -102,6 +102,10 @@ class Token:
     BREAK = "BREAK"
     OPTION = "OPTION"
     GROUP = "GROUP"
+    # cuongnht add thread
+    THREAD = "THREAD"
+    THREAD_NAME = "THREAD NAME"
+    THREAD_DAEMON = "THREAD DAEMON"
 
     SEPARATOR = "SEPARATOR"
     COMMENT = "COMMENT"
@@ -198,6 +202,7 @@ class Token:
                 Token.WITH_NAME: "AS",
                 Token.AS: "AS",
                 Token.GROUP: "GROUP",
+                Token.THREAD: "THREAD",  # cuongnht add thread
             }
             value = defaults.get(type, "")
         self.value = value

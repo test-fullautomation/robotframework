@@ -43,6 +43,7 @@ class ModelObject(metaclass=SetterAwareType):
     FINALLY: Final = "FINALLY"
     WHILE: Final = "WHILE"
     GROUP: Final = "GROUP"
+    THREAD: Final = "THREAD"  # cuongnht add thread
     VAR: Final = "VAR"
     RETURN: Final = "RETURN"
     CONTINUE: Final = "CONTINUE"

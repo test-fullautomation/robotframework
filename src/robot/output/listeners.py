@@ -248,6 +248,9 @@ class ListenerV3Facade(ListenerFacade):
         # GROUP
         self.start_group = get("start_group", start_body_item)
         self.end_group = get("end_group", end_body_item)
+        # THREAD (cuongnht add thread)
+        self.start_thread = get("start_thread", start_body_item)
+        self.end_thread = get("end_thread", end_body_item)
         # VAR
         self.start_var = get("start_var", start_body_item)
         self.end_var = get("end_var", end_body_item)
@@ -292,6 +295,10 @@ class ListenerV3Facade(ListenerFacade):
             "debug_file",
             lambda path: result_file("DEBUG", path),
         )
+        self.timeline_file = get(  # cuongnht add thread
+            "timeline_file",
+            lambda path: result_file("TIMELINE", path),
+        )
         # Close
         self.close = get("close")
 
@@ -327,6 +334,7 @@ class ListenerV2Facade(ListenerFacade):
         self._log_file = get("log_file")
         self._xunit_file = get("xunit_file")
         self._debug_file = get("debug_file")
+        self._timeline_file = get("timeline_file")  # cuongnht add thread
         # Close
         self._close = get("close")
 
@@ -412,6 +420,15 @@ class ListenerV2Facade(ListenerFacade):
     def end_group(self, data, result):
         attrs = self._attrs(data, result, name=result.name, end=True)
         self._end_kw(result._log_name, attrs)
+
+    def start_thread(self, data, result):
+        # cuongnht add thread
+        extra = {"name": result.name, "daemon": result.daemon}
+        self._start_kw(result._log_name, self._attrs(data, result, **extra))
+
+    def end_thread(self, data, result):
+        extra = {"name": result.name, "daemon": result.daemon}
+        self._end_kw(result._log_name, self._attrs(data, result, **extra, end=True))
 
     def start_if_branch(self, data, result):
         extra = {"condition": result.condition} if result.type != result.ELSE else {}
@@ -525,6 +542,10 @@ class ListenerV2Facade(ListenerFacade):
 
     def debug_file(self, path: Path):
         self._debug_file(str(path))
+
+    def timeline_file(self, path: Path):
+        # cuongnht add thread
+        self._timeline_file(str(path))
 
     def _suite_attrs(self, data, result, end=False):
         attrs = dict(

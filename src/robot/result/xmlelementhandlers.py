@@ -112,7 +112,7 @@ class RobotHandler(ElementHandler):
 class SuiteHandler(ElementHandler):
     tag = "suite"
     # "metadata" is for RF < 4 compatibility.
-    children = frozenset(("doc", "metadata", "meta", "status", "kw", "test", "suite"))
+    children = frozenset(("doc", "metadata", "meta", "status", "kw", "thread", "test", "suite"))
 
     def start(self, elem, result):
         if hasattr(result, "suite"):  # root
@@ -139,7 +139,7 @@ class TestHandler(ElementHandler):
     # "tags" is for RF < 4 compatibility.
     children = frozenset((
         "doc", "meta", "tags", "tag", "timeout", "status", "kw", "if", "for", "try", "while",
-        "group", "variable", "return", "break", "continue", "error", "msg"
+        "group", "thread", "variable", "return", "break", "continue", "error", "msg"
     ))  # fmt: skip
 
     def start(self, elem, result):
@@ -155,7 +155,7 @@ class KeywordHandler(ElementHandler):
     # "arguments", "assign" and "tags" are for RF < 4 compatibility.
     children = frozenset((
         "doc", "arguments", "arg", "assign", "var", "tags", "tag", "timeout", "status",
-        "msg", "kw", "if", "for", "try", "while", "group", "variable", "return",
+        "msg", "kw", "if", "for", "try", "while", "group", "thread", "variable", "return",
         "break", "continue", "error"
     ))  # fmt: skip
 
@@ -243,7 +243,7 @@ class WhileHandler(ElementHandler):
 class IterationHandler(ElementHandler):
     tag = "iter"
     children = frozenset((
-        "var", "doc", "status", "kw", "if", "for", "msg", "try", "while", "group",
+        "var", "doc", "status", "kw", "if", "for", "msg", "try", "while", "group", "thread",
         "variable", "return", "break", "continue", "error"
     ))  # fmt: skip
 
@@ -255,12 +255,28 @@ class IterationHandler(ElementHandler):
 class GroupHandler(ElementHandler):
     tag = "group"
     children = frozenset((
-        "status", "kw", "if", "for", "try", "while", "group", "msg", "variable",
+        "status", "kw", "if", "for", "try", "while", "group", "thread", "msg", "variable",
         "return", "break", "continue", "error"
     ))  # fmt: skip
 
     def start(self, elem, result):
         return result.body.create_group(name=elem.get("name", ""))
+
+
+@ElementHandler.register
+class ThreadHandler(ElementHandler):
+    # cuongnht add thread
+    tag = "thread"
+    children = frozenset((
+        "doc", "status", "kw", "if", "for", "try", "while", "group", "thread", "msg",
+        "variable", "return", "break", "continue", "error"
+    ))  # fmt: skip
+
+    def start(self, elem, result):
+        # The 'daemon' attribute is kept as the string the writer produced.
+        return result.body.create_thread(
+            name=elem.get("name", ""), daemon=elem.get("daemon", "True")
+        )
 
 
 @ElementHandler.register
@@ -276,7 +292,7 @@ class IfHandler(ElementHandler):
 class BranchHandler(ElementHandler):
     tag = "branch"
     children = frozenset((
-        "status", "kw", "if", "for", "try", "while", "group", "msg", "doc", "variable",
+        "status", "kw", "if", "for", "try", "while", "group", "thread", "msg", "doc", "variable",
         "return", "pattern", "break", "continue", "error"
     ))  # fmt: skip
 

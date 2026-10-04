@@ -768,6 +768,21 @@ class ListenerV3:
         """
         self.end_body_item(data, result)
 
+    def start_thread(self, data: running.Thread, result: result.Thread):
+        """Called when a THREAD starts (RobotFramework AIO extension).
+
+        Called once on the spawning thread and once more on the worker thread
+        itself. The default implementation calls :meth:`start_body_item`.
+        """
+        self.start_body_item(data, result)
+
+    def end_thread(self, data: running.Thread, result: result.Thread):
+        """Called when a THREAD ends (RobotFramework AIO extension).
+
+        The default implementation calls :meth:`end_body_item`.
+        """
+        self.end_body_item(data, result)
+
     def start_if(self, data: running.If, result: result.If):
         """Called when an IF/ELSE structure starts.
 

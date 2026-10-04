@@ -55,11 +55,17 @@ $(document).ready(function() {
     addErrors();
     addExecutionLog(topsuite);
     addLogLevelSelector(window.settings['minLevel'], window.settings['defaultLevel']);
-    if (window.location.hash) {
-        makeElementVisible(window.location.hash.substring(1));
+    if (hashTargetId()) {
+        makeElementVisible(hashTargetId());
     } else {
         expandSuite(topsuite);
     }
+    // cuongnht: navigate also when the hash changes while the page is already
+    // open, e.g. when clicking bars in timeline.html reusing the same tab.
+    window.addEventListener('hashchange', function () {
+        if (hashTargetId())
+            makeElementVisible(hashTargetId());
+    });
     setTimeout(function () { loadAndExpandElementIds(window.output['expand_keywords']); }, 100);
 });
 
@@ -90,9 +96,15 @@ function drawErrorsRecursively(errors, target) {
         setTimeout(function () { drawErrorsRecursively(errors, target); }, 0);
     else {
         // Errors may have moved scroll position. Resetting location re-scrolls.
-        if (window.location.hash)
-            window.location.replace(window.location.hash);
+        if (hashTargetId())
+            window.location.replace('#' + hashTargetId());
     }
+}
+
+function hashTargetId() {
+    // cuongnht: strip an optional '~<n>' suffix that external tools (e.g.
+    // timeline.html) append to force re-navigation to the same element.
+    return window.location.hash.substring(1).split('~')[0];
 }
 
 function popFromIterator(iterator, upTo) {

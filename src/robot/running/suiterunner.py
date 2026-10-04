@@ -13,10 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import time
 from datetime import datetime
 
 from robot.errors import ExecutionStatus, PassExecution
 from robot.model import SuiteVisitor, TagPatterns
+from robot.output import LOGGER, Message
 from robot.result import (
     Keyword as KeywordResult, Result, TestCase as TestResult, TestSuite as SuiteResult
 )
@@ -34,6 +36,10 @@ from .timeouts import TestTimeout
 
 
 class SuiteRunner(SuiteVisitor):
+
+    # cuongnht thread scope: how long to wait for a scoped thread to stop
+    # cooperatively before abandoning it (seconds).
+    thread_stop_grace = 5.0
 
     def __init__(self, output, settings):
         self.result = None
@@ -153,6 +159,11 @@ class SuiteRunner(SuiteVisitor):
                     self.suite_result.suite_teardown_failed(str(failure))
         self.suite_result.end_time = datetime.now()
         self.suite_result.message = self.suite_status.message
+        # cuongnht thread scope: stop suite-scoped (daemon=False) threads and
+        # any test-scoped leftovers before the suite context goes away.
+        self._stop_scoped_threads(
+            suite_scope_too=True, where=f"suite '{self.suite_result.name}'"
+        )
         self.context.end_suite(suite, self.suite_result)
         self._clear_result(self.suite_result)
         self.executed.pop()
@@ -187,6 +198,7 @@ class SuiteRunner(SuiteVisitor):
             )
         self.executed[-1][result.name] = True
         self.context.start_test(data, result)
+        self._report_still_running_threads()  # cuongnht thread scope
         status = TestStatus(
             self.suite_status,
             result,
@@ -249,7 +261,58 @@ class SuiteRunner(SuiteVisitor):
         if (result.failed or result.unknown) and not failed_before_listeners:
             status.failure_occurred()
         self.context.end_test(result)
+        # cuongnht thread scope: stop test-scoped (daemon=True) threads.
+        self._stop_scoped_threads(suite_scope_too=False, where=f"test '{result.name}'")
         self._clear_result(result)
+
+    def _stop_scoped_threads(self, suite_scope_too, where):
+        # cuongnht thread scope: request cooperative stop of scoped THREADs,
+        # wait a grace period, abandon (with a warning) whatever is stuck.
+        # Abandoned workers are Python daemons, so they can never block the
+        # run; their partial output files are finalized when the output is
+        # closed and reported with UNKNOWN status by the merger.
+        threads = getattr(self.context, "active_threads", None)
+        if not threads:
+            return
+        entries = [
+            (name, entry)
+            for name, entry in dict(threads).items()
+            if suite_scope_too or entry["daemon"]
+        ]
+        if not entries:
+            return
+        for name, entry in entries:
+            entry["stop_event"].set()
+        deadline = time.time() + self.thread_stop_grace
+        for name, entry in entries:
+            worker = entry["worker"]
+            worker.join(max(0.0, deadline - time.time()))
+            if worker.is_alive():
+                # Route directly to the errors section: LOGGER.log_message
+                # may be in keyword mode (a thread can be inside a keyword)
+                # and would write the message into the suite XML otherwise.
+                LOGGER.message(
+                    Message(
+                        f"Thread '{name}' did not stop within "
+                        f"{self.thread_stop_grace} seconds at the end of {where} "
+                        f"and was abandoned.",
+                        "WARN",
+                    )
+                )
+            threads.pop(name, None)
+
+    def _report_still_running_threads(self):
+        # cuongnht thread scope: make suite-scoped threads from earlier tests
+        # visible in the current test's log.
+        threads = getattr(self.context, "active_threads", None)
+        if not threads:
+            return
+        for name, entry in dict(threads).items():
+            if entry["worker"].is_alive():
+                owner = entry["owner"] or "an earlier test"
+                self.output.info(
+                    f"Thread '{name}' started in {owner!r} is still running."
+                )
 
     def _get_skipped_message(self, tags, rpa):
         kind = "tag" if getattr(tags, "is_constant", True) else "tag pattern"

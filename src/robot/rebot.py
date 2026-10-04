@@ -139,6 +139,11 @@ Options
                           similarly as --log. Default: report.html
  -x --xunit file          xUnit compatible result file. Not created unless this
                           option is specified.
+    --timeline file       HTML timeline file showing per-thread execution as
+                          parallel lanes on a common time axis. Bars link to
+                          the corresponding elements in the log file. Requires
+                          exactly one input XML. Not created unless this
+                          option is specified.
  -T --timestampoutputs    When this option is used, timestamp in a format
                           `YYYYMMDD-hhmmss` is added to all generated output
                           files between their basename and extension. For

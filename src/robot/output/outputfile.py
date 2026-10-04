@@ -98,9 +98,16 @@ class OutputFile(LoggerApi):
             )
         if path.suffix.lower() == ".json":
             return JsonLogger(file, rpa)
+        # cuongnht add thread: the path is needed to derive per-thread files.
         if legacy_output:
-            return LegacyXmlLogger(file, rpa)
-        return XmlLogger(file, rpa)
+            return LegacyXmlLogger(file, rpa, path=path)
+        return XmlLogger(file, rpa, path=path)
+
+    @property
+    def thread_output_files(self):
+        # cuongnht add thread: {thread name: path} of the per-thread files
+        # written by THREAD blocks, to be merged into the main output.
+        return getattr(self.real_logger, "thread_output_files", {})
 
     @property
     @contextmanager
@@ -232,6 +239,13 @@ class OutputFile(LoggerApi):
 
     def end_group(self, data, result):
         self.logger.end_group(result)
+
+    def start_thread(self, data, result):
+        # cuongnht add thread
+        self.logger.start_thread(result)
+
+    def end_thread(self, data, result):
+        self.logger.end_thread(result)
 
     def start_var(self, data, result):
         self.logger.start_var(result)

@@ -58,27 +58,27 @@ IT = TypeVar("IT", bound="IfBranch | TryBranch")
 FW = TypeVar("FW", bound="ForIteration | WhileIteration")
 BodyItemParent = Union[
     "TestSuite", "TestCase", "Keyword", "For", "ForIteration", "If", "IfBranch",
-    "Try", "TryBranch", "While", "WhileIteration", "Group", None
+    "Try", "TryBranch", "While", "WhileIteration", "Group", "Thread", None
 ]  # fmt: skip
 
 
 class Body(model.BaseBody[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error"
+    "Break", "Message", "Error", "Thread"
 ]):  # fmt: skip
     __slots__ = ()
 
 
 class Branches(model.BaseBranches[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error", IT
+    "Break", "Message", "Error", "Thread", IT
 ]):  # fmt: skip
     __slots__ = ()
 
 
 class Iterations(model.BaseIterations[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error", FW
+    "Break", "Message", "Error", "Thread", FW
 ]):  # fmt: skip
     __slots__ = ()
 
@@ -478,6 +478,48 @@ class Group(model.Group, StatusMixin, DeprecatedAttributesMixin):
 
     def to_dict(self) -> DataDict:
         return {**super().to_dict(), **StatusMixin.to_dict(self)}
+
+
+@Body.register
+class Thread(model.Thread, StatusMixin, DeprecatedAttributesMixin):
+    # cuongnht add thread. Result-level body so that children grafted from
+    # per-thread output files get status, timestamps etc. when parsed back
+    # with ExecutionResult. `message` is writable so that a status message
+    # (e.g. the UNKNOWN reason of an abandoned thread) survives a round-trip.
+    body_class = Body
+    __slots__ = (
+        "status", "message", "doc", "_start_time", "_end_time", "_elapsed_time"
+    )  # fmt: skip
+
+    def __init__(
+        self,
+        name: str = "ROBOT_THREAD",
+        daemon: bool = True,
+        status: str = "FAIL",
+        message: str = "",
+        start_time: "datetime | str | None" = None,
+        end_time: "datetime | str | None" = None,
+        elapsed_time: "timedelta | int | float | None" = None,
+        doc: str = "",
+        parent: BodyItemParent = None,
+    ):
+        super().__init__(name, daemon, parent)
+        self.status = status
+        self.message = message
+        self.doc = doc
+        self.start_time = start_time
+        self.end_time = end_time
+        self.elapsed_time = elapsed_time
+
+    @property
+    def _log_name(self):
+        return self.name
+
+    def to_dict(self) -> DataDict:
+        data = {**super().to_dict(), **StatusMixin.to_dict(self)}
+        if self.doc:
+            data["doc"] = self.doc
+        return data
 
 
 class IfBranch(model.IfBranch, StatusMixin, DeprecatedAttributesMixin):

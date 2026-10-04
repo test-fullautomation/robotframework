@@ -78,6 +78,9 @@ class ListenOutputs(Listener):
     def debug_file(self, path):
         self._out_file("Debug", path)
 
+    def timeline_file(self, path):
+        self._out_file("Timeline", path)
+
     def xunit_file(self, path):
         self._out_file("XUnit", path)
 

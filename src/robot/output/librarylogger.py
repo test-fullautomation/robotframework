@@ -32,6 +32,18 @@ from .loggerhelper import Message, MessageLevel, PseudoLevel, write_to_console
 LOGGING_THREADS = ["MainThread", "RobotFrameworkTimeoutThread"]
 
 
+def add_thread_logging(thread_name):
+    # cuongnht add thread: messages logged by THREAD workers must reach
+    # the output like messages from the main thread.
+    if thread_name not in LOGGING_THREADS:
+        LOGGING_THREADS.append(thread_name)
+
+
+def remove_thread_logging(thread_name):
+    while thread_name in LOGGING_THREADS:
+        LOGGING_THREADS.remove(thread_name)
+
+
 def write(
     msg: object,
     level: "MessageLevel | PseudoLevel" = "INFO",

@@ -16,6 +16,7 @@
 import os
 import re
 import tempfile
+import threading
 
 from robot.errors import DataError
 from robot.model import Tags
@@ -34,10 +35,24 @@ class VariableScopes:
         self._test = None
         self._suite_locals = []
         self._scopes = [self._global]
+        # cuongnht add thread: THREAD workers get scope stacks of their own
+        # so that they never touch the main thread's stack.
+        self._thread_scopes = {}
         self._variables_set = SetVariables()
+
+    def _current_thread_scope(self):
+        """Returns the current scope of the active worker thread, or None."""
+        stack = self._thread_scopes.get(threading.current_thread().name)
+        return stack[-1] if stack else None
+
+    def _in_worker_thread(self):
+        return threading.current_thread() is not threading.main_thread()
 
     @property
     def current(self):
+        thread_scope = self._current_thread_scope()
+        if thread_scope is not None:
+            return thread_scope
         return self._scopes[-1]
 
     @property
@@ -86,11 +101,38 @@ class VariableScopes:
         kw = self._suite.copy(update)
         self._variables_set.start_keyword()
         self._variables_set.update(kw)
-        self._scopes.append(kw)
+        if not self._in_worker_thread():
+            self._scopes.append(kw)
+        else:
+            # cuongnht add thread: worker threads must never touch the main
+            # scope stack. A worker without a registered scope (e.g. a
+            # keyword still unwinding after its thread scope was reaped)
+            # gets its own stack created on the fly.
+            name = threading.current_thread().name
+            self._thread_scopes.setdefault(name, []).append(kw)
 
     def end_keyword(self):
-        self._scopes.pop()
-        self._variables_set.end_keyword()
+        if not self._in_worker_thread():
+            self._scopes.pop()
+            self._variables_set.end_keyword()
+        else:
+            stack = self._thread_scopes.get(threading.current_thread().name)
+            if stack:
+                stack.pop()
+                self._variables_set.end_keyword()
+
+    def start_thread(self, scope=None):
+        """Starts a scope stack for the current worker thread.
+
+        ``scope`` should be a snapshot taken in the spawning thread: copying
+        ``current`` from the worker races with the main thread pushing and
+        popping its own stack and can miss recently set variables.
+        """
+        current = scope if scope is not None else self.current.copy()
+        self._thread_scopes[threading.current_thread().name] = [current]
+
+    def end_thread(self):
+        self._thread_scopes.pop(threading.current_thread().name, None)
 
     def __getitem__(self, name):
         return self.current[name]
@@ -129,6 +171,9 @@ class VariableScopes:
     def set_global(self, name, value):
         for scope in self._all_scopes:
             name, value = self._set_global_suite_or_test(scope, name, value)
+        for stack in list(self._thread_scopes.values()):  # cuongnht add thread
+            for scope in stack:
+                name, value = self._set_global_suite_or_test(scope, name, value)
         self._variables_set.set_global(name, value)
 
     def _set_global_suite_or_test(self, scope, name, value):

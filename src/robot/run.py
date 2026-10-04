@@ -196,6 +196,10 @@ Options
                           similarly as --log. Default: report.html
  -x --xunit file          xUnit compatible result file. Not created unless this
                           option is specified.
+    --timeline file       HTML timeline file showing per-thread execution as
+                          parallel lanes on a common time axis. Bars link to
+                          the corresponding elements in the log file. Not
+                          created unless this option is specified.
  -b --debugfile file      Debug file written during execution. Not created
                           unless this option is specified.
  -T --timestampoutputs    When this option is used, timestamp in a format
@@ -511,8 +515,11 @@ class RobotFramework(Application):
             LOGGER.info(
                 f"Tests execution ended. Statistics:\n{result.suite.stat_message}"
             )
-            if settings.log or settings.report or settings.xunit:
-                writer = ResultWriter(settings.output if settings.log else result)
+            if settings.log or settings.report or settings.xunit or settings.timeline:
+                # cuongnht add thread: the timeline is generated from output.xml.
+                writer = ResultWriter(
+                    settings.output if settings.log or settings.timeline else result
+                )
                 writer.write_results(settings.get_rebot_settings())
         return result.return_code
 

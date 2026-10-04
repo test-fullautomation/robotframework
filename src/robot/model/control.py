@@ -34,14 +34,14 @@ FW = TypeVar("FW", bound="ForIteration | WhileIteration")
 
 class Branches(BaseBranches[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error", IT
+    "Break", "Message", "Error", "Thread", IT
 ]):  # fmt: skip
     __slots__ = ()
 
 
 class Iterations(BaseIterations[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error", FW
+    "Break", "Message", "Error", "Thread", FW
 ]):  # fmt: skip
     __slots__ = ()
 
@@ -286,6 +286,51 @@ class Group(BodyItem):
         if self.name:
             parts.append(self.name)
         return "    ".join(parts)
+
+
+@Body.register
+class Thread(BodyItem):
+    """Represents ``THREAD``, a RobotFramework AIO extension.
+
+    The body is executed in a worker thread. ``daemon`` selects the scope:
+    ``True`` stops the thread when the test ends, ``False`` lets it continue
+    until the suite ends.
+    """
+
+    # cuongnht add thread
+    type = BodyItem.THREAD
+    body_class = Body
+    repr_args = ("name", "daemon")
+    __slots__ = ("name", "daemon")
+
+    def __init__(
+        self,
+        name: str = "ROBOT_THREAD",
+        daemon: bool = True,
+        parent: BodyItemParent = None,
+    ):
+        self.name = name
+        self.daemon = daemon
+        self.parent = parent
+        self.body = ()
+
+    @setter
+    def body(self, body: "Sequence[BodyItem | DataDict]") -> Body:
+        return self.body_class(self, body)
+
+    def visit(self, visitor: SuiteVisitor):
+        visitor.visit_thread(self)
+
+    def to_dict(self) -> DataDict:
+        return {
+            "type": self.type,
+            "name": self.name,
+            "daemon": self.daemon,
+            "body": self.body.to_dicts(),
+        }
+
+    def __str__(self) -> str:
+        return f"THREAD    name={self.name}    daemon={self.daemon}"
 
 
 class IfBranch(BodyItem):

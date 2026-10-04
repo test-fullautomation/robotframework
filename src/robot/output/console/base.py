@@ -76,7 +76,10 @@ class BaseConsole:
         Called when result files are finished unless they are disabled.
         """
         kind = kind.title() if kind != "XUNIT" else "XUnit"
-        self.write(f"{kind + ':':9}")
+        label = f"{kind + ':':9}"
+        if not label.endswith(" "):
+            label += " "  # cuongnht add thread: 'Timeline:' is wider than the column.
+        self.write(label)
         self.link(path)
         self.write("\n")
 

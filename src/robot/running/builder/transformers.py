@@ -21,11 +21,13 @@ from robot.parsing import File, ModelVisitor, Token
 from robot.utils import NormalizedDict
 from robot.variables import VariableMatches
 
-from ..model import For, Group, If, IfBranch, TestCase, TestSuite, Try, TryBranch, While
+from ..model import (
+    For, Group, If, IfBranch, TestCase, TestSuite, Thread, Try, TryBranch, While
+)
 from ..resourcemodel import ResourceFile, UserKeyword
 from .settings import FileSettings
 
-HasBody = Union[TestCase, UserKeyword, For, If, Try, While, Group]
+HasBody = Union[TestCase, UserKeyword, For, If, Try, While, Group, Thread]
 
 
 class SettingsBuilder(ModelVisitor):
@@ -209,6 +211,9 @@ class BodyBuilder(ModelVisitor):
     def visit_Group(self, node):
         GroupBuilder(self.model).build(node)
 
+    def visit_Thread(self, node):
+        ThreadBuilder(self.model).build(node)
+
     def visit_If(self, node):
         IfBuilder(self.model).build(node)
 
@@ -296,7 +301,7 @@ class TestCaseBuilder(BodyBuilder):
 
     def _set_template(self, parent, template):
         for item in parent.body:
-            if item.type in (item.FOR, item.GROUP):
+            if item.type in (item.FOR, item.GROUP, item.THREAD):
                 self._set_template(item, template)
             elif item.type == item.IF_ELSE_ROOT:
                 for branch in item.body:
@@ -559,6 +564,29 @@ class GroupBuilder(BodyBuilder):
     def build(self, node):
         error = format_error(self._get_errors(node))
         self.model.config(name=node.name, lineno=node.lineno, error=error)
+        for step in node.body:
+            self.visit(step)
+        return self.model
+
+    def _get_errors(self, node):
+        errors = node.header.errors + node.errors
+        if node.end:
+            errors += node.end.errors
+        return errors
+
+
+class ThreadBuilder(BodyBuilder):
+    # cuongnht add thread
+    model: Thread
+
+    def __init__(self, parent: HasBody):
+        super().__init__(parent.body.create_thread())
+
+    def build(self, node):
+        error = format_error(self._get_errors(node))
+        self.model.config(
+            name=node.name, daemon=node.daemon, lineno=node.lineno, error=error
+        )
         for step in node.body:
             self.visit(step)
         return self.model

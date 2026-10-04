@@ -162,6 +162,23 @@ class JsonLogger:
     def end_group(self, item):
         self._end(name=item.name, **self._status(item))
 
+    def start_thread(self, item):
+        # cuongnht add thread: JSON output cannot be written concurrently by
+        # several threads, so only the THREAD element itself is recorded
+        # from the main thread; what the worker does is not logged.
+        if self._on_worker_thread():
+            return
+        self._start(type=item.type)
+        self._end(name=item.name, daemon=item.daemon, **self._status(item))
+
+    def end_thread(self, item):
+        pass
+
+    def _on_worker_thread(self):
+        import threading
+
+        return threading.current_thread() is not threading.main_thread()
+
     def start_var(self, item):
         self._start(type=item.type)
 
@@ -199,6 +216,8 @@ class JsonLogger:
         self._end(values=item.values, **self._status(item))
 
     def message(self, msg):
+        if self._on_worker_thread():
+            return
         self._dict(**msg.to_dict())
 
     def errors(self, messages):
@@ -247,6 +266,8 @@ class JsonLogger:
         /,
         **items,
     ):
+        if self._on_worker_thread():
+            return
         if container:
             self._start_container(container)
         self.writer.start_dict(name, **items)
@@ -260,6 +281,8 @@ class JsonLogger:
             self.containers[-1] = container
 
     def _end(self, **items):
+        if self._on_worker_thread():
+            return
         self._end_container()
         self.containers.pop()
         self.writer.end_dict(**items)

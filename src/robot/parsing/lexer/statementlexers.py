@@ -350,6 +350,24 @@ class GroupHeaderLexer(TypeAndArguments):
         return statement[0].value == "GROUP"
 
 
+class ThreadHeaderLexer(StatementLexer):
+    # cuongnht add thread: `THREAD    name    daemon`
+    token_type = Token.THREAD
+
+    def handles(self, statement: StatementTokens) -> bool:
+        return statement[0].value == "THREAD"
+
+    def lex(self):
+        self.statement[0].type = Token.THREAD
+        name_seen = False
+        for token in self.statement[1:]:
+            if not name_seen:
+                token.type = Token.THREAD_NAME
+                name_seen = True
+            else:
+                token.type = Token.THREAD_DAEMON
+
+
 class EndLexer(TypeAndArguments):
     token_type = Token.END
 

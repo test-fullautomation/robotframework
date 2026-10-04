@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
+import threading
 from datetime import datetime
 
 from robot.result import Keyword, ResultVisitor, TestCase, TestSuite
@@ -20,16 +22,126 @@ from robot.utils import NullMarkupWriter, XmlWriter
 from robot.version import get_full_version
 
 
+class _TrackingWriter:
+    """XmlWriter proxy that remembers the open elements.
+
+    cuongnht add thread: used for per-thread output files so that a file of
+    a thread that is still running when execution ends can be closed with
+    all its open elements, which keeps it well-formed for the merger.
+    """
+
+    def __init__(self, path):
+        self.path = path
+        self._writer = XmlWriter(path, usage="output", write_empty=False)
+        self._stack = []
+
+    def start(self, name, attrs=None, newline=True, write_empty=None):
+        self._stack.append(name)
+        self._writer.start(name, attrs, newline, write_empty)
+
+    def end(self, name, newline=True):
+        if self._stack and self._stack[-1] == name:
+            self._stack.pop()
+        self._writer.end(name, newline)
+
+    def element(self, name, content=None, attrs=None, escape=True, newline=True):
+        self._writer.element(name, content, attrs, escape, newline)
+
+    def content(self, content=None, escape=True, newline=False):
+        self._writer.content(content, escape, newline)
+
+    def close(self):
+        self._writer.close()
+
+    def finalize(self):
+        """Closes all still open elements and the file itself."""
+        while self._stack:
+            self.end(self._stack[-1])
+        self.close()
+
+
 class XmlLogger(ResultVisitor):
     generator = "Robot"
 
-    def __init__(self, output, rpa=False, suite_only=False):
-        self._writer = self._get_writer(output, preamble=not suite_only)
+    def __init__(self, output, rpa=False, suite_only=False, path=None):
+        self._main_writer = self._get_writer(output, preamble=not suite_only)
+        self._rpa = rpa
+        # cuongnht add thread: every THREAD worker streams into its own file
+        # `<base>_<thread name><ext>` next to the main output. The files are
+        # merged into the main output when execution ends (threadmerger).
+        self._path = str(path) if path else None
+        self._main_thread = threading.main_thread()
+        self._thread_writers = {}
+        self._thread_writers_lock = threading.Lock()
+        self.thread_output_files = {}
         if not suite_only:
             self._writer.start("robot", self._get_start_attrs(rpa))
 
     def _get_writer(self, output, preamble=True):
         return XmlWriter(output, usage="output", write_empty=False, preamble=preamble)
+
+    @property
+    def _writer(self):
+        # cuongnht add thread: the main thread writes into the main file,
+        # a THREAD worker into its own file created on first use.
+        thread = threading.current_thread()
+        if thread is self._main_thread or not self._path:
+            return self._main_writer
+        with self._thread_writers_lock:
+            writer = self._thread_writers.get(thread.name)
+            if writer is None:
+                writer = self._create_thread_writer(thread.name)
+                self._thread_writers[thread.name] = writer
+            return writer
+
+    def _create_thread_writer(self, name):
+        base, ext = os.path.splitext(self._path)
+        path = f"{base}_{name}{ext}"
+        self.thread_output_files[name] = path
+        writer = _TrackingWriter(path)
+        attrs = {"name": name, **self._get_start_attrs(self._rpa)}
+        writer.start("thread", attrs)
+        return writer
+
+    def start_thread(self, thread):
+        # cuongnht add thread. Called twice: on the spawning thread (write
+        # a placeholder that the merger fills later) and on the worker (its
+        # own file is opened lazily by the `_writer` property, nothing to do).
+        if threading.current_thread() is not self._main_thread:
+            return
+        writer = self._writer
+        writer.start("thread", {"name": thread.name, "daemon": str(thread.daemon)})
+        writer.element("doc", thread.doc)
+        attrs = {
+            "status": thread.PASS,
+            "start": thread.start_time.isoformat() if thread.start_time else None,
+            "elapsed": "0",
+        }
+        writer.element("status", thread.message, attrs)
+        writer.end("thread")
+
+    def end_thread(self, thread):
+        if threading.current_thread() is self._main_thread:
+            return
+        self._write_status(thread)
+        writer = self._writer
+        writer.end("thread")
+        writer.close()
+        with self._thread_writers_lock:
+            self._thread_writers.pop(threading.current_thread().name, None)
+
+    def _close_leftover_thread_writers(self):
+        # cuongnht add thread: threads still running when execution ends
+        # leave their writers open. Finalize the files so they are well-formed
+        # XML and can be merged; the merger reports such threads as UNKNOWN.
+        with self._thread_writers_lock:
+            writers = list(self._thread_writers.values())
+            self._thread_writers.clear()
+        for writer in writers:
+            try:
+                writer.finalize()
+            except Exception:
+                pass
 
     def _get_start_attrs(self, rpa):
         return {
@@ -40,8 +152,9 @@ class XmlLogger(ResultVisitor):
         }
 
     def close(self):
-        self._writer.end("robot")
-        self._writer.close()
+        self._main_writer.end("robot")
+        self._main_writer.close()
+        self._close_leftover_thread_writers()
 
     def visit_message(self, msg):
         self._write_message(msg)
@@ -298,6 +411,18 @@ class XmlLogger(ResultVisitor):
 
 class LegacyXmlLogger(XmlLogger):
 
+    def start_thread(self, thread):
+        # cuongnht add thread: legacy format placeholder.
+        if threading.current_thread() is not self._main_thread:
+            return
+        writer = self._writer
+        writer.start("thread", {"name": thread.name, "daemon": str(thread.daemon)})
+        writer.element("doc", thread.doc)
+        ts = self._datetime_to_timestamp(thread.start_time)
+        attrs = {"status": thread.PASS, "starttime": ts, "endtime": ts}
+        writer.element("status", thread.message, attrs)
+        writer.end("thread")
+
     def _get_start_attrs(self, rpa):
         return {
             "generator": get_full_version(self.generator),
@@ -350,3 +475,9 @@ class NullLogger(XmlLogger):
 
     def _get_writer(self, output, preamble=True):
         return NullMarkupWriter()
+
+    def start_thread(self, thread):
+        pass
+
+    def end_thread(self, thread):
+        pass

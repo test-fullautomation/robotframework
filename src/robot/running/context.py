@@ -16,9 +16,11 @@
 import asyncio
 import inspect
 import sys
+import threading
 from contextlib import contextmanager
 
 from robot.errors import DataError, ExecutionFailed
+from robot.utils import PriorityQueue, ThreadSafeDict
 
 
 class Asynchronous:
@@ -115,6 +117,15 @@ class _ExecutionContext:
         self.steps = []
         self.user_keywords = []
         self.asynchronous = asynchronous
+        # cuongnht add thread: notification queues and locks shared by the
+        # `Send/Wait Thread Notification` and `Thread RLock` keywords.
+        self.thread_message_queue_dict = ThreadSafeDict()
+        self.thread_message_queue_dict["MainThread"] = PriorityQueue(queue_type="FIFO")
+        self.thread_rlock_dict = ThreadSafeDict()
+        # cuongnht thread scope: registry of THREADs started in this context.
+        # name -> {'worker': Thread, 'stop_event': Event, 'daemon': bool,
+        #          'owner': name of the test that started it}
+        self.active_threads = ThreadSafeDict()
 
     @property
     def languages(self):
@@ -271,6 +282,9 @@ class _ExecutionContext:
         self.variables.set_test("${TEST_DOCUMENTATION}", result.doc)
         self.variables.set_test("${TEST_METADATA}", result.metadata.copy())
         self.variables.set_test("@{TEST_TAGS}", list(result.tags))
+        # cuongnht add thread: notifications do not survive the test.
+        self.thread_message_queue_dict.clear()
+        self.thread_message_queue_dict["MainThread"] = PriorityQueue(queue_type="FIFO")
         self.output.start_test(data, result)
 
     def _add_timeout(self, timeout):
@@ -316,6 +330,7 @@ class _ExecutionContext:
                 result.FOR: output.start_for,
                 result.WHILE: output.start_while,
                 result.GROUP: output.start_group,
+                result.THREAD: output.start_thread,  # cuongnht add thread
                 result.IF_ELSE_ROOT: output.start_if,
                 result.IF: output.start_if_branch,
                 result.ELSE: output.start_if_branch,
@@ -363,6 +378,7 @@ class _ExecutionContext:
                 result.FOR: output.end_for,
                 result.WHILE: output.end_while,
                 result.GROUP: output.end_group,
+                result.THREAD: output.end_thread,  # cuongnht add thread
                 result.IF_ELSE_ROOT: output.end_if,
                 result.IF: output.end_if_branch,
                 result.ELSE: output.end_if_branch,
@@ -382,6 +398,26 @@ class _ExecutionContext:
 
     def get_runner(self, name, recommend_on_failure=True):
         return self.namespace.get_runner(name, recommend_on_failure)
+
+    # cuongnht thread scope -------------------------------------------------
+
+    def register_thread(self, name, worker, stop_event, daemon):
+        self.active_threads[name] = {
+            "worker": worker,
+            "stop_event": stop_event,
+            "daemon": daemon,
+            "owner": self.test.name if self.test is not None else None,
+        }
+
+    def unregister_thread(self, name):
+        self.active_threads.pop(name, None)
+
+    def thread_stop_requested(self):
+        """True if the current worker thread has been asked to stop."""
+        entry = self.active_threads.get(threading.current_thread().name)
+        return bool(entry and entry["stop_event"].is_set())
+
+    # -----------------------------------------------------------------------
 
     def trace(self, message):
         self.output.trace(message)

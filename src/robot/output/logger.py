@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import os
+import threading
 from contextlib import contextmanager
 
 from robot.errors import DataError
@@ -35,9 +36,50 @@ def start_body_item(method):
 def end_body_item(method):
     def wrapper(self, *args):
         method(self, *args)
-        self._log_message_parents.pop()
+        parents = self._log_message_parents
+        if parents:
+            parents.pop()
 
     return wrapper
+
+
+class _ThreadParents:
+    """Per-thread stacks of body items that receive logged messages.
+
+    cuongnht add thread: THREAD workers push and pop their own body items
+    concurrently with the main thread. One shared stack would be corrupted
+    by the interleaving, so every thread gets a stack of its own. The main
+    thread's stack is the one created at construction time.
+    """
+
+    def __init__(self):
+        self._main = []
+        self._main_thread = threading.main_thread()
+        self._others = {}
+        self._lock = threading.Lock()
+
+    def _current(self):
+        thread = threading.current_thread()
+        if thread is self._main_thread:
+            return self._main
+        with self._lock:
+            return self._others.setdefault(thread.name, [])
+
+    def append(self, item):
+        self._current().append(item)
+
+    def pop(self):
+        return self._current().pop()
+
+    def discard_current_thread(self):
+        with self._lock:
+            self._others.pop(threading.current_thread().name, None)
+
+    def __bool__(self):
+        return bool(self._current())
+
+    def __getitem__(self, index):
+        return self._current()[index]
 
 
 class Logger(AbstractLogger):
@@ -66,7 +108,7 @@ class Logger(AbstractLogger):
         self._other_loggers = []
         self._message_cache = []
         self._message_cache_dropped = 0
-        self._log_message_parents = []
+        self._log_message_parents = _ThreadParents()
         self._library_import_logging = 0
         self._error_occurred = False
         self._error_listener = None
@@ -352,6 +394,19 @@ class Logger(AbstractLogger):
             logger.end_group(data, result)
 
     @start_body_item
+    def start_thread(self, data, result):
+        # cuongnht add thread
+        for logger in self.start_loggers:
+            logger.start_thread(data, result)
+
+    @end_body_item
+    def end_thread(self, data, result):
+        for logger in self.end_loggers:
+            logger.end_thread(data, result)
+        if threading.current_thread() is not threading.main_thread():
+            self._log_message_parents.discard_current_thread()
+
+    @start_body_item
     def start_if(self, data, result):
         for logger in self.start_loggers:
             logger.start_if(data, result)
@@ -472,6 +527,11 @@ class Logger(AbstractLogger):
     def debug_file(self, path):
         for logger in self:
             logger.debug_file(path)
+
+    def timeline_file(self, path):
+        # cuongnht add thread
+        for logger in self:
+            logger.timeline_file(path)
 
     def result_file(self, kind, path):
         kind_file = getattr(self, f"{kind.lower()}_file")

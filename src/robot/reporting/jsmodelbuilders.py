@@ -41,6 +41,7 @@ KEYWORD_TYPES = {
     "CONTINUE": 15,
     "BREAK": 16,
     "ERROR": 17,
+    "THREAD": 18,  # cuongnht add thread
 }
 
 

@@ -53,6 +53,7 @@ class _BaseSettings:
         "Log"              : ("log", "log.html"),
         "Report"           : ("report", "report.html"),
         "XUnit"            : ("xunit", None),
+        "Timeline"         : ("timeline", None),  # cuongnht add thread
         "SplitLog"         : ("splitlog", False),
         "TimestampOutputs" : ("timestampoutputs", False),
         "LogTitle"         : ("logtitle", None),
@@ -77,7 +78,7 @@ class _BaseSettings:
         "StdOut"           : ("stdout", None),
         "StdErr"           : ("stderr", None),
     }  # fmt: skip
-    _output_opts = ["Output", "Log", "Report", "XUnit", "DebugFile"]
+    _output_opts = ["Output", "Log", "Report", "XUnit", "DebugFile", "Timeline"]
 
     def __init__(self, options=None, **extra_options):
         self.start_time = datetime.now()
@@ -241,9 +242,9 @@ class _BaseSettings:
         name = self._opts[option]
         if not name:
             return None
-        if option == "Log" and self._output_disabled():
-            self["Log"] = None
-            LOGGER.error("Log file cannot be created if output.xml is disabled.")
+        if option in ("Log", "Timeline") and self._output_disabled():
+            self[option] = None
+            LOGGER.error(f"{option} file cannot be created if output.xml is disabled.")
             return None
         name = self._process_output_name(option, name)
         path = self.output_directory / name
@@ -268,7 +269,7 @@ class _BaseSettings:
             return extension
         if file_type in ("Output", "XUnit"):
             return ".xml"
-        if file_type in ("Log", "Report"):
+        if file_type in ("Log", "Report", "Timeline"):
             return ".html"
         if file_type == "DebugFile":
             return ".txt"
@@ -413,6 +414,11 @@ class _BaseSettings:
     @property
     def xunit(self) -> "Path | None":
         return self["XUnit"]
+
+    @property
+    def timeline(self) -> "Path | None":
+        # cuongnht add thread
+        return self["Timeline"]
 
     @property
     def log_level(self):

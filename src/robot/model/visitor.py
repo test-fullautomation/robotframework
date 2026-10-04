@@ -107,7 +107,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from robot.model import (
         BodyItem, Break, Continue, Error, For, Group, If, IfBranch, Keyword, Message,
-        Return, TestCase, TestSuite, Try, TryBranch, Var, While
+        Return, TestCase, TestSuite, Thread, Try, TryBranch, Var, While
     )
     from robot.result import ForIteration, WhileIteration
 
@@ -449,6 +449,32 @@ class SuiteVisitor:
         By default, calls :meth:`end_body_item` which, by default, does nothing.
         """
         self.end_body_item(group)
+
+    def visit_thread(self, thread: "Thread"):
+        """Visits THREAD elements (RobotFramework AIO extension).
+
+        Can be overridden to allow modifying the passed in ``thread`` without
+        calling :meth:`start_thread` or :meth:`end_thread` nor visiting body.
+        """
+        if self.start_thread(thread) is not False:
+            thread.body.visit(self)
+            self.end_thread(thread)
+
+    def start_thread(self, thread: "Thread") -> "bool | None":
+        """Called when a THREAD element starts.
+
+        By default, calls :meth:`start_body_item` which, by default, does nothing.
+
+        Can return explicit ``False`` to stop visiting.
+        """
+        return self.start_body_item(thread)
+
+    def end_thread(self, thread: "Thread"):
+        """Called when a THREAD element ends.
+
+        By default, calls :meth:`end_body_item` which, by default, does nothing.
+        """
+        self.end_body_item(thread)
 
     def visit_var(self, var: "Var"):
         """Visits a VAR elements."""

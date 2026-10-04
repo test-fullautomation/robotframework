@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import re
+import threading
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -27,8 +28,8 @@ from robot.errors import (
 from robot.output import librarylogger as logger
 from robot.utils import (
     cut_assign_value, frange, get_error_message, is_list_like, Matcher, normalize,
-    plural_or_not as s, secs_to_timestr, seq2str, split_from_equals, timestr_to_secs,
-    type_name
+    plural_or_not as s, PriorityQueue, secs_to_timestr, seq2str, split_from_equals,
+    timestr_to_secs, type_name
 )
 from robot.variables import evaluate_expression, is_dict_variable, search_variable
 
@@ -48,6 +49,10 @@ class BodyRunner:
         errors = []
         passed = None
         for item in data.body:
+            # cuongnht thread scope: worker threads stop cooperatively at
+            # keyword boundaries when their scope (test/suite) has ended.
+            if self._run and self._context.thread_stop_requested():
+                raise ExecutionFailed("Thread stop requested.")
             try:
                 item.run(result, self._context, self._run, self._templated)
             except ExecutionPassed as exception:
@@ -573,6 +578,78 @@ class GroupRunner:
         except DataError as err:
             return err
         return None
+
+
+class ThreadRunner:
+    """Runs a THREAD block body in a worker thread (RobotFramework AIO).
+
+    cuongnht add thread. The spawning thread writes a placeholder result and
+    returns immediately; the worker gets its own result object and streams
+    its output into a per-thread file that is merged when execution ends.
+    """
+
+    def __init__(self, context, run=True, templated=False):
+        self._context = context
+        self._run = run
+        self._templated = templated
+
+    def run(self, data, result):
+        thread_result = result.body.create_thread(data.name, data.daemon)
+        with StatusReporter(data, thread_result, self._context, self._run):
+            if data.error:
+                raise DataError(data.error, syntax=True)
+            # cuongnht thread scope: workers are always Python daemons so
+            # they can never block interpreter exit; their lifecycle is
+            # managed by the scope reaper in SuiteRunner instead.
+            # data.daemon selects the scope: True -> stopped when the test
+            # ends, False -> continues until the suite ends.
+            stop_event = threading.Event()
+            # Snapshot the variables here, while still in the spawning
+            # thread: taking the copy inside the worker races with this
+            # thread pushing and popping its own scope stack and could
+            # miss variables that were just set.
+            scope_snapshot = self._context.variables.current.copy()
+            worker = threading.Thread(
+                target=self._run_worker,
+                args=(data, stop_event, scope_snapshot),
+                name=data.name,
+                daemon=True,
+            )
+            logger.add_thread_logging(data.name)
+            self._context.register_thread(data.name, worker, stop_event, data.daemon)
+            worker.start()
+
+    def _run_worker(self, data, stop_event, scope_snapshot):
+        context = self._context
+        context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type="FIFO")
+        # The worker's own result: it is not attached to the main model, the
+        # body is streamed into the thread's output file and grafted into
+        # the placeholder when the outputs are merged.
+        thread_result = data.result_class(data.name, data.daemon)
+        try:
+            with StatusReporter(data, thread_result, context, self._run):
+                context.variables.start_thread(scope_snapshot)
+                try:
+                    BodyRunner(context, self._run, self._templated).run(
+                        data, thread_result
+                    )
+                except ExecutionFailed as failed:
+                    if stop_event.is_set():
+                        # cuongnht thread scope: normal cleanup, not a failure.
+                        logger.info(
+                            f"Thread '{data.name}' stopped because its scope ended."
+                        )
+                    else:
+                        context.warn(
+                            f"An exception occurred in '{data.name}' thread. "
+                            f"Exception: {failed.message}"
+                        )
+                finally:
+                    context.variables.end_thread()
+        finally:
+            context.thread_message_queue_dict.pop(data.name, None)
+            logger.remove_thread_logging(data.name)
+            context.unregister_thread(data.name)
 
 
 class IfRunner:

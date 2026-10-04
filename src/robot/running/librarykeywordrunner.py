@@ -13,12 +13,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import threading
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from robot.errors import DataError
 from robot.result import Keyword as KeywordResult
-from robot.utils import prepr, safe_str
+from robot.utils import prepr, safe_str, WINDOWS
 from robot.variables import contains_variable, is_list_variable, VariableAssignment
 
 from .bodyrunner import BodyRunner
@@ -111,7 +112,14 @@ class LibraryKeywordRunner:
         return f"Arguments: [ {' | '.join(args)} ]"
 
     def _get_timeout(self, context):
-        return min(context.timeouts) if context.timeouts else None
+        if not context.timeouts:
+            return None
+        # cuongnht add thread: the POSIX timeout implementation relies on
+        # signals, which only work in the main thread. Keywords executed by
+        # THREAD workers run without timeouts there.
+        if not WINDOWS and threading.current_thread() is not threading.main_thread():
+            return None
+        return min(context.timeouts)
 
     def _execute(self, method, positional, named, context):
         timeout = self._get_timeout(context)

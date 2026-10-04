@@ -28,8 +28,8 @@ if TYPE_CHECKING:
     from robot.running.model import ResourceFile, UserKeyword
 
     from .control import (
-        Break, Continue, Error, For, ForIteration, Group, If, IfBranch, Return, Try,
-        TryBranch, Var, While, WhileIteration
+        Break, Continue, Error, For, ForIteration, Group, If, IfBranch, Return, Thread,
+        Try, TryBranch, Var, While, WhileIteration
     )
     from .keyword import Keyword
     from .message import Message
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 BodyItemParent = Union[
     "TestSuite", "TestCase", "UserKeyword", "For", "ForIteration", "If", "IfBranch",
     "Try", "TryBranch", "While", "Group", "WhileIteration", "Keyword", "Var",
-    "Return", "Continue", "Break", "Error", None
+    "Return", "Continue", "Break", "Error", "Thread", None
 ]  # fmt: skip
 BI = TypeVar("BI", bound="BodyItem")
 KW = TypeVar("KW", bound="Keyword")
@@ -57,6 +57,7 @@ M = TypeVar("M", bound="Message")
 E = TypeVar("E", bound="Error")
 IT = TypeVar("IT", bound="IfBranch | TryBranch")
 FW = TypeVar("FW", bound="ForIteration | WhileIteration")
+TH = TypeVar("TH", bound="Thread")  # cuongnht add thread
 
 
 class BodyItem(ModelObject):
@@ -99,7 +100,9 @@ class BodyItem(ModelObject):
         raise NotImplementedError
 
 
-class BaseBody(ItemList[BodyItem], Generic[KW, F, W, G, I, T, V, R, C, B, M, E]):
+class BaseBody(
+    ItemList[BodyItem], Generic[KW, F, W, G, I, T, V, R, C, B, M, E, TH]
+):
     """Base class for Body and Branches objects."""
 
     # Set using 'BaseBody.register' when these classes are created.
@@ -107,6 +110,7 @@ class BaseBody(ItemList[BodyItem], Generic[KW, F, W, G, I, T, V, R, C, B, M, E])
     for_class: Type[F] = KnownAtRuntime
     while_class: Type[W] = KnownAtRuntime
     group_class: Type[G] = KnownAtRuntime
+    thread_class: Type[TH] = KnownAtRuntime  # cuongnht add thread
     if_class: Type[I] = KnownAtRuntime
     try_class: Type[T] = KnownAtRuntime
     var_class: Type[V] = KnownAtRuntime
@@ -187,6 +191,10 @@ class BaseBody(ItemList[BodyItem], Generic[KW, F, W, G, I, T, V, R, C, B, M, E])
     @copy_signature(group_class)
     def create_group(self, *args, **kwargs) -> group_class:
         return self._create(self.group_class, "create_group", args, kwargs)
+
+    @copy_signature(thread_class)
+    def create_thread(self, *args, **kwargs) -> thread_class:
+        return self._create(self.thread_class, "create_thread", args, kwargs)
 
     @copy_signature(var_class)
     def create_var(self, *args, **kwargs) -> var_class:
@@ -277,7 +285,7 @@ class BaseBody(ItemList[BodyItem], Generic[KW, F, W, G, I, T, V, R, C, B, M, E])
 
 class Body(BaseBody[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "Message", "Error"
+    "Break", "Message", "Error", "Thread"
 ]):  # fmt: skip
     """A list-like object representing a body of a test, keyword, etc.
 
@@ -292,7 +300,9 @@ class BranchType(Generic[IT]):
     __slots__ = ()
 
 
-class BaseBranches(BaseBody[KW, F, W, G, I, T, V, R, C, B, M, E], BranchType[IT]):
+class BaseBranches(
+    BaseBody[KW, F, W, G, I, T, V, R, C, B, M, E, TH], BranchType[IT]
+):
     """A list-like object representing IF and TRY branches."""
 
     branch_type: Type[IT] = KnownAtRuntime
@@ -323,7 +333,9 @@ class IterationType(Generic[FW]):
     __slots__ = ()
 
 
-class BaseIterations(BaseBody[KW, F, W, G, I, T, V, R, C, B, M, E], IterationType[FW]):
+class BaseIterations(
+    BaseBody[KW, F, W, G, I, T, V, R, C, B, M, E, TH], IterationType[FW]
+):
     iteration_type: Type[FW] = KnownAtRuntime
     __slots__ = ("iteration_class",)
 

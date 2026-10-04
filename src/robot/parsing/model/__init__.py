@@ -30,6 +30,7 @@ from .blocks import (
     SettingSection as SettingSection,
     TestCase as TestCase,
     TestCaseSection as TestCaseSection,
+    Thread as Thread,
     Try as Try,
     VariableSection as VariableSection,
     While as While,

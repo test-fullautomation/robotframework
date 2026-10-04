@@ -26,7 +26,7 @@ from .statements import (
     Break, Continue, ElseHeader, ElseIfHeader, End, Error, ExceptHeader, FinallyHeader,
     ForHeader, GroupHeader, IfHeader, KeywordCall, KeywordName, Node, ReturnSetting,
     ReturnStatement, SectionHeader, Statement, TemplateArguments, TestCaseName,
-    TryHeader, Var, WhileHeader
+    ThreadHeader, TryHeader, Var, WhileHeader
 )
 from .visitor import ModelVisitor
 
@@ -459,6 +459,25 @@ class Group(NestedBlock):
             self.errors += ("GROUP cannot be empty.",)
         if not self.end:
             self.errors += ("GROUP must have closing END.",)
+
+
+class Thread(NestedBlock):
+    # cuongnht add thread
+    header: ThreadHeader
+
+    @property
+    def name(self) -> str:
+        return self.header.name
+
+    @property
+    def daemon(self) -> bool:
+        return self.header.daemon
+
+    def validate(self, ctx: "ValidationContext"):
+        if self._body_is_empty():
+            self.errors += ("THREAD has empty body.",)
+        if not self.end:
+            self.errors += ("THREAD has no closing END.",)
 
 
 class ModelWriter(ModelVisitor):

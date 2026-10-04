@@ -1525,6 +1525,52 @@ class GroupHeader(Statement):
 
 
 @Statement.register
+class ThreadHeader(Statement):
+    # cuongnht add thread
+    type = Token.THREAD
+    _TRUE_DAEMON = ("true", "yes", "t", "1")
+    _FALSE_DAEMON = ("false", "no", "f", "0")
+
+    @classmethod
+    def from_params(
+        cls,
+        name: str,
+        daemon: str = "True",
+        indent: str = FOUR_SPACES,
+        separator: str = FOUR_SPACES,
+        eol: str = EOL,
+    ) -> "ThreadHeader":
+        return cls([
+            Token(Token.SEPARATOR, indent),
+            Token(Token.THREAD),
+            Token(Token.SEPARATOR, separator),
+            Token(Token.THREAD_NAME, name),
+            Token(Token.SEPARATOR, separator),
+            Token(Token.THREAD_DAEMON, daemon),
+            Token(Token.EOL, eol),
+        ])  # fmt: skip
+
+    @property
+    def name(self) -> str:
+        return self.get_value(Token.THREAD_NAME, "ROBOT_THREAD1")
+
+    @property
+    def daemon(self) -> bool:
+        # cuongnht thread scope: daemon=True -> thread is stopped when its
+        # test ends (TEST scope); daemon=False -> thread continues over
+        # following tests and is stopped when the suite ends (SUITE scope).
+        value = str(self.get_value(Token.THREAD_DAEMON, "true")).strip().lower()
+        return value in self._TRUE_DAEMON
+
+    def validate(self, ctx: "ValidationContext"):
+        if not self.name:
+            self.errors += ("THREAD has no thread name.",)
+        value = str(self.get_value(Token.THREAD_DAEMON, "true")).strip().lower()
+        if value not in self._TRUE_DAEMON + self._FALSE_DAEMON:
+            self.errors += ("THREAD has invalid daemon setting.",)
+
+
+@Statement.register
 class Var(Statement):
     type = Token.VAR
     options = {

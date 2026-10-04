@@ -197,6 +197,7 @@ Blocks:
 - :class:`~robot.parsing.model.blocks.For`
 - :class:`~robot.parsing.model.blocks.While`
 - :class:`~robot.parsing.model.blocks.Group` (new in RF 7.2)
+- :class:`~robot.parsing.model.blocks.Thread` (RobotFramework AIO extension)
 
 Statements:
 
@@ -238,6 +239,7 @@ Statements:
 - :class:`~robot.parsing.model.statements.ForHeader`
 - :class:`~robot.parsing.model.statements.WhileHeader`
 - :class:`~robot.parsing.model.statements.GroupHeader` (new in RF 7.2)
+- :class:`~robot.parsing.model.statements.ThreadHeader` (RobotFramework AIO extension)
 - :class:`~robot.parsing.model.statements.Var` (new in RF 7.0)
 - :class:`~robot.parsing.model.statements.End`
 - :class:`~robot.parsing.model.statements.ReturnStatement`
@@ -505,6 +507,7 @@ from robot.parsing.model.blocks import (
     SettingSection as SettingSection,
     TestCase as TestCase,
     TestCaseSection as TestCaseSection,
+    Thread as Thread,
     Try as Try,
     VariableSection as VariableSection,
     While as While,
@@ -552,6 +555,7 @@ from robot.parsing.model.statements import (
     TestTeardown as TestTeardown,
     TestTemplate as TestTemplate,
     TestTimeout as TestTimeout,
+    ThreadHeader as ThreadHeader,
     Timeout as Timeout,
     TryHeader as TryHeader,
     Var as Var,

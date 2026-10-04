@@ -28,8 +28,8 @@ from .statementlexers import (
     InvalidSectionHeaderLexer, KeywordCallLexer, KeywordSectionHeaderLexer,
     KeywordSettingLexer, Lexer, ReturnLexer, SettingLexer, SettingSectionHeaderLexer,
     SyntaxErrorLexer, TaskSectionHeaderLexer, TestCaseSectionHeaderLexer,
-    TestCaseSettingLexer, TryHeaderLexer, VariableLexer, VariableSectionHeaderLexer,
-    VarLexer, WhileHeaderLexer
+    TestCaseSettingLexer, ThreadHeaderLexer, TryHeaderLexer, VariableLexer,
+    VariableSectionHeaderLexer, VarLexer, WhileHeaderLexer
 )
 from .tokens import StatementTokens, Token
 
@@ -215,6 +215,7 @@ class TestCaseLexer(TestOrKeywordLexer):
             TryLexer,
             WhileLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             VarLexer,
             SyntaxErrorLexer,
             KeywordCallLexer,
@@ -236,6 +237,7 @@ class KeywordLexer(TestOrKeywordLexer):
             TryLexer,
             WhileLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             VarLexer,
             ReturnLexer,
             SyntaxErrorLexer,
@@ -262,6 +264,7 @@ class NestedBlockLexer(BlockLexer, ABC):
             TryHeaderLexer,
             WhileHeaderLexer,
             GroupHeaderLexer,
+            ThreadHeaderLexer,  # cuongnht add thread
         )
         if isinstance(lexer, block_lexers):
             self._block_level += 1
@@ -283,6 +286,7 @@ class ForLexer(NestedBlockLexer):
             WhileLexer,
             EndLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             VarLexer,
             ReturnLexer,
             ContinueLexer,
@@ -306,6 +310,7 @@ class WhileLexer(NestedBlockLexer):
             TryLexer,
             EndLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             VarLexer,
             ReturnLexer,
             ContinueLexer,
@@ -333,6 +338,7 @@ class TryLexer(NestedBlockLexer):
             EndLexer,
             VarLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             ReturnLexer,
             BreakLexer,
             ContinueLexer,
@@ -364,6 +370,31 @@ class GroupLexer(NestedBlockLexer):
         )
 
 
+class ThreadLexer(NestedBlockLexer):
+    # cuongnht add thread
+
+    def handles(self, statement: StatementTokens) -> bool:
+        return ThreadHeaderLexer(self.ctx).handles(statement)
+
+    def lexer_classes(self) -> "tuple[type[Lexer], ...]":
+        return (
+            ThreadHeaderLexer,
+            InlineIfLexer,
+            IfLexer,
+            ForLexer,
+            TryLexer,
+            WhileLexer,
+            GroupLexer,
+            EndLexer,
+            VarLexer,
+            ReturnLexer,
+            ContinueLexer,
+            BreakLexer,
+            SyntaxErrorLexer,
+            KeywordCallLexer,
+        )
+
+
 class IfLexer(NestedBlockLexer):
 
     def handles(self, statement: StatementTokens) -> bool:
@@ -381,6 +412,7 @@ class IfLexer(NestedBlockLexer):
             EndLexer,
             VarLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             ReturnLexer,
             ContinueLexer,
             BreakLexer,
@@ -406,6 +438,7 @@ class InlineIfLexer(NestedBlockLexer):
             ElseHeaderLexer,
             VarLexer,
             GroupLexer,
+            ThreadLexer,  # cuongnht add thread
             ReturnLexer,
             ContinueLexer,
             BreakLexer,
