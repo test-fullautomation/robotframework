@@ -21,7 +21,7 @@ from robot.result import Error, Keyword, Message, Return
 from .jsbuildingcontext import JsBuildingContext
 from .jsexecutionresult import JsExecutionResult
 
-STATUSES = {"FAIL": 0, "PASS": 1, "SKIP": 2, "NOT RUN": 3}
+STATUSES = {"FAIL": 0, "PASS": 1, "SKIP": 2, "NOT RUN": 3, "UNKNOWN": 4}  # nhtcuong
 KEYWORD_TYPES = {
     "KEYWORD": 0,
     "SETUP": 1,
@@ -151,7 +151,9 @@ class SuiteBuilder(Builder):
 
     def _get_statistics(self, suite):
         stats = suite.statistics  # Access property only once
-        return (stats.total, stats.passed, stats.failed, stats.skipped)
+        return (
+            stats.total, stats.passed, stats.failed, stats.skipped, stats.unknown
+        )  # nhtcuong
 
 
 class TestBuilder(Builder):

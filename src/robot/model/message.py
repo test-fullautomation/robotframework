@@ -20,7 +20,9 @@ from robot.utils import html_escape, setter
 
 from .body import BodyItem
 
-MessageLevel = Literal["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FAIL", "SKIP"]
+MessageLevel = Literal[
+    "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FAIL", "SKIP", "UNKNOWN"
+]  # fmt: skip
 
 
 class Message(BodyItem):

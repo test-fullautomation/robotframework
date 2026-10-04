@@ -66,14 +66,16 @@ class Error(WithStatus):
 class Message(BaseModel):
     type = Field("MESSAGE", const=True)
     message: str
-    level: Literal["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FAIL", "SKIP"]
+    level: Literal[
+        "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FAIL", "SKIP", "UNKNOWN"
+    ]  # UNKNOWN is a fork extension.
     html: bool | None
     timestamp: datetime | None
 
 
 class ErrorMessage(BaseModel):
     message: str
-    level: Literal["ERROR", "WARN"]
+    level: Literal["ERROR", "WARN", "UNKNOWN"]  # UNKNOWN is a fork extension.
     html: bool | None
     timestamp: datetime | None
 
@@ -204,6 +206,7 @@ class Stat(BaseModel):
     pass_: int = Field(alias="pass")
     fail: int
     skip: int
+    unknown: int  # Fork extension: UNKNOWN status.
 
 
 class SuiteStat(Stat):

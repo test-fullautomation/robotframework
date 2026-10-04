@@ -152,10 +152,10 @@ Options
     --reporttitle title   Title for the generated report file. The default
                           title is `<SuiteName> Report`.
     --reportbackground colors  Background colors to use in the report file.
-                          Given in format `passed:failed:skipped` where the
-                          `:skipped` part can be omitted. Both color names and
-                          codes work.
-                          Examples: --reportbackground green:red:yellow
+                          Given in format `passed:failed:unknown:skipped`
+                          where the `:unknown` and `:skipped` parts can be
+                          omitted. Both color names and codes work.
+                          Examples: --reportbackground green:red:blue:yellow
                                     --reportbackground #00E:#E00
  -L --loglevel level      Threshold for selecting messages. Available levels:
                           TRACE (default), DEBUG, INFO, WARN, NONE (no msgs).

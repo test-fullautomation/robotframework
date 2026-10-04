@@ -57,7 +57,7 @@ class _BaseSettings:
         "TimestampOutputs" : ("timestampoutputs", False),
         "LogTitle"         : ("logtitle", None),
         "ReportTitle"      : ("reporttitle", None),
-        "ReportBackground" : ("reportbackground", ("#9e9", "#f66", "#fed84f")),
+        "ReportBackground" : ("reportbackground", ("#9e9", "#f66", "#66c7ff", "#fed84f")),  # nhtcuong
         "SuiteStatLevel"   : ("suitestatlevel", -1),
         "TagStatInclude"   : ("tagstatinclude", []),
         "TagStatExclude"   : ("tagstatexclude", []),
@@ -144,6 +144,16 @@ class _BaseSettings:
             self._validate_expandkeywords(value)
         if name == "Extension":
             return tuple("." + ext.lower().lstrip(".") for ext in value.split(":"))
+        if name == "ImportFailure":  # cuongnht unknown state
+            return self._process_import_failure(value)
+        return value
+
+    def _process_import_failure(self, value):
+        value = str(value).lower()
+        if value not in ("suite", "test"):
+            self._raise_invalid(
+                "ImportFailure", f"Value must be 'suite' or 'test', got '{value}'."
+            )
         return value
 
     def _process_doc(self, value):
@@ -277,14 +287,18 @@ class _BaseSettings:
         return self._split_from_colon(value)
 
     def _process_report_background(self, colors):
-        if colors.count(":") not in [1, 2]:
+        # nhtcuong: the third color is for UNKNOWN, the fourth for SKIP.
+        if colors.count(":") not in [1, 2, 3]:
             self._raise_invalid(
                 "ReportBackground",
-                f"Expected format 'pass:fail:skip' or 'pass:fail', got '{colors}'.",
+                f"Expected format 'pass:fail:unknown:skip', 'pass:fail:unknown' "
+                f"or 'pass:fail', got '{colors}'.",
             )
         colors = colors.split(":")
         if len(colors) == 2:
-            return colors[0], colors[1], "#fed84f"
+            return colors[0], colors[1], "#66c7ff", "#fed84f"
+        if len(colors) == 3:
+            return colors[0], colors[1], colors[2], "#fed84f"
         return tuple(colors)
 
     def _process_tag_stat_combine(self, pattern):
@@ -483,6 +497,7 @@ class RobotSettings(_BaseSettings):
     _extra_cli_opts = {
         "Extension"          : ("extension", (".robot", ".rbt", ".robot.rst", ".robot.md")),
         "Output"             : ("output", "output.xml"),
+        "ImportFailure"      : ("importfailure", "suite"),  # cuongnht unknown state
         "LogLevel"           : ("loglevel", "INFO"),
         "MaxErrorLines"      : ("maxerrorlines", 40),
         "MaxAssignLength"    : ("maxassignlength", 200),
@@ -547,6 +562,11 @@ class RobotSettings(_BaseSettings):
     @property
     def debug_file(self):
         return self["DebugFile"]
+
+    @property
+    def import_failure(self):
+        # cuongnht unknown state: 'suite' (default) or 'test'.
+        return self["ImportFailure"]
 
     @property
     def languages(self):
@@ -764,7 +784,12 @@ class RebotSettings(_BaseSettings):
 
     def _resolve_background_colors(self):
         colors = self["ReportBackground"]
-        return {"pass": colors[0], "fail": colors[1], "skip": colors[2]}
+        return {
+            "pass": colors[0],
+            "fail": colors[1],
+            "unknown": colors[2],  # nhtcuong
+            "skip": colors[3],
+        }
 
     @property
     def merge(self):

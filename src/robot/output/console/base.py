@@ -55,7 +55,11 @@ class BaseConsole:
 
     def message(self, msg: "Message"):
         """Hook method to handle warnings and errors."""
-        if msg.level in ("WARN", "ERROR") and msg.console and msg.message is not None:
+        if (
+            msg.level in ("WARN", "ERROR", "UNKNOWN")  # nhtcuong
+            and msg.console
+            and msg.message is not None
+        ):
             self._stderr.error(msg.message, msg.level)
 
     def output_file(self, path: "Path | None"):

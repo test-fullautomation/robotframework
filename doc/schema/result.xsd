@@ -8,6 +8,9 @@
             for older versions, go to
             https://github.com/robotframework/robotframework/tree/master/doc/schema
 
+            This fork extends the schema with the UNKNOWN status, the UNKNOWN
+            message level and the `unknown` statistics attribute.
+
             Due to XSD 1.1 not being widely adopted, this schema is XSD 1.0 compatible.
             If you can use XSD 1.1, you can replace `xs:choice` groups with `xs:all`
             groups to make the schema more strict.
@@ -336,6 +339,7 @@
             <xs:enumeration value="ERROR" />
             <xs:enumeration value="FAIL" />
             <xs:enumeration value="SKIP" />
+            <xs:enumeration value="UNKNOWN" />  <!-- Fork extension. -->
         </xs:restriction>
     </xs:simpleType>
     <xs:complexType name="Status">
@@ -353,6 +357,7 @@
             <xs:enumeration value="FAIL" />
             <xs:enumeration value="SKIP" />
             <xs:enumeration value="NOT RUN" />
+            <xs:enumeration value="UNKNOWN" />  <!-- Fork extension. -->
         </xs:restriction>
     </xs:simpleType>
     <xs:complexType name="Timeout">
@@ -386,6 +391,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
             </xs:extension>
         </xs:simpleContent>
     </xs:complexType>
@@ -395,6 +401,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
                 <xs:attribute name="doc" type="xs:string" />
                 <xs:attribute name="links" type="xs:string" />
                 <xs:attribute name="info" type="xs:string" />
@@ -408,6 +415,7 @@
                 <xs:attribute name="pass" type="xs:integer" />
                 <xs:attribute name="fail" type="xs:integer" />
                 <xs:attribute name="skip" type="xs:integer" />
+                <xs:attribute name="unknown" type="xs:integer" />  <!-- Fork extension. -->
                 <xs:attribute name="id" type="xs:string" />
                 <xs:attribute name="name" type="xs:string" />
             </xs:extension>

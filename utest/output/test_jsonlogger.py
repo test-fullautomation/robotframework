@@ -1115,7 +1115,8 @@ class TestJsonLogger(unittest.TestCase):
 "label":"All Tests",
 "pass":2,
 "fail":1,
-"skip":0
+"skip":0,
+"unknown":0
 },
 "suites":[{
 "label":"Root",
@@ -1123,38 +1124,44 @@ class TestJsonLogger(unittest.TestCase):
 "id":"s1",
 "pass":2,
 "fail":1,
-"skip":0
+"skip":0,
+"unknown":0
 },{
 "label":"Root.Child 1",
 "name":"Child 1",
 "id":"s1-s1",
 "pass":1,
 "fail":1,
-"skip":0
+"skip":0,
+"unknown":0
 },{
 "label":"Root.Child 2",
 "name":"Child 2",
 "id":"s1-s2",
 "pass":1,
 "fail":0,
-"skip":0
+"skip":0,
+"unknown":0
 }],
 "tags":[{
 "label":"t1",
 "pass":2,
 "fail":1,
-"skip":0
+"skip":0,
+"unknown":0
 },{
 "label":"t2",
 "doc":"doc for t2",
 "pass":1,
 "fail":1,
-"skip":0
+"skip":0,
+"unknown":0
 },{
 "label":"t3",
 "pass":1,
 "fail":0,
-"skip":0
+"skip":0,
+"unknown":0
 }]
 }
 """

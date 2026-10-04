@@ -64,11 +64,14 @@ $(document).ready(function () {
 
 function setStatusColor(topsuite) {
     var color;
+    // nhtcuong: UNKNOWN ranks between FAIL and PASS.
     let fail = Boolean(topsuite.fail);
-    let pass = Boolean(!topsuite.fail && topsuite.pass);
-    let skip = Boolean(!topsuite.fail && !topsuite.pass);
+    let unknow = Boolean(!topsuite.fail && topsuite.unknow);
+    let pass = Boolean(!topsuite.fail && !topsuite.unknow && topsuite.pass);
+    let skip = Boolean(!topsuite.fail && !topsuite.unknow && !topsuite.pass);
     if (theme.getPreference() === 'dark') {
         $('#status-bar').toggleClass("fail-bar", fail);
+        $('#status-bar').toggleClass("unknown-bar", unknow);
         $('#status-bar').toggleClass("pass-bar", pass);
         $('#status-bar').toggleClass("skip-bar", skip);
         $('body').css('background-color', "#1c2227");
@@ -76,12 +79,14 @@ function setStatusColor(topsuite) {
     }
     if (fail)
         color = window.settings.background.fail;
+    else if (unknow)
+        color = window.settings.background.unknown;
     else if (pass)
         color = window.settings.background.pass;
     else
         color = window.settings.background.skip;
     $('body').css('background-color', color);
-    $('#status-bar').toggleClass("fail-bar pass-bar skip-bar", false);
+    $('#status-bar').toggleClass("fail-bar unknown-bar pass-bar skip-bar", false);
 }
 
 function addSummary(topsuite) {
@@ -105,7 +110,7 @@ function addCustomSortersForDetails() {
             return false;  // do not auto-detect
         },
         format: function(s) {
-            return {'FAIL': -1, 'SKIP': 0, 'PASS': 1}[s];
+            return {'UNKNOWN': -2, 'FAIL': -1, 'SKIP': 0, 'PASS': 1}[s];
         }
     });
     $.tablesorter.addParser({
@@ -310,7 +315,7 @@ function renderTestDetailsHeader() {
 function sortByStatus(t1, t2) {
     if (t1.status == t2.status)
         return t1.fullName < t2.fullName ? -1 : 1;
-    statuses = {'FAIL': -1, 'SKIP': 0, 'PASS': 1};
+    statuses = {'UNKNOWN': -2, 'FAIL': -1, 'SKIP': 0, 'PASS': 1};
     return statuses[t1.status] < statuses[t2.status] ? -1 : 1;
 }
 
@@ -332,11 +337,15 @@ function calculateStats(tests) {
     var failed = util.filter(tests, function (test) {
         return test.status == 'FAIL';
     });
+    var unknown = util.filter(tests, function (test) {
+        return test.status == 'UNKNOWN';
+    });
     return {
       total: tests.length,
       pass: passed.length,
       fail: failed.length,
-      skip: tests.length - passed.length - failed.length
+      unknow: unknown.length,
+      skip: tests.length - passed.length - failed.length - unknown.length
     };
 }
 
@@ -411,6 +420,9 @@ function hideHiddenDetailsColumns(elem) {
       {{if fail}}
       <td><a href="#totals" onclick="totalDetailSelected()"
              class="fail">${fail} {{= testOrTask('{test}')}}{{if fail != 1}}s{{/if}} failed</a></td>
+      {{else unknow}}
+      <td><a href="#totals" onclick="totalDetailSelected()"
+             class="unknown">${unknow} {{= testOrTask('{test}')}}{{if unknow != 1}}s{{/if}} unknown</a></td>
       {{else pass && skip}}
       <td><a href="#totals" onclick="totalDetailSelected()"
              class="pass">${pass} {{= testOrTask('{test}')}}{{if pass != 1}}s{{/if}} passed,

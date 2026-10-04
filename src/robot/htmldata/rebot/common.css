@@ -13,6 +13,9 @@
     --pass-link-color: #098a09;
     --warn-link-color: #927201;
     --fail-link-color: #ce3e01;
+    --unknown-color: #0080fe; /* nhtcuong */
+    --unknown-bar-color: #4f58fe;
+    --unknown-link-color: #339;
     --ascending-icon: url(data:image/gif;base64,R0lGODlhCwAJAKEAAAAAAH9/fwAAAAAAACH5BAEAAAIALAAAAAALAAkAAAIUlBWnFr3cnIr0WQOyBmvzp13CpxQAOw==);
     --descending-icon: url(data:image/gif;base64,R0lGODlhCwAJAKEAAAAAAH9/fwAAAAAAACH5BAEAAAIALAAAAAALAAkAAAIUlAWnBr3cnIr0WROyDmvzp13CpxQAOw==);
 }
@@ -33,6 +36,7 @@
     --pass-link-color: #97bd61;
     --warn-link-color: #fed84f;
     --fail-link-color: #ff9b8f;
+    --unknown-link-color: #8cc4ff; /* nhtcuong */
     --ascending-icon: url(data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAJAgMAAACZCj6+AAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAlQTFRFAAAAfn5+////f/cqYgAAAAN0Uk5TAP//RFDWIQAAACdJREFUeJxjYHBgYGAMYGBgDWFgEA1lAAOtVQwMXCsYGJgWADkNDAA78QP9oKr7vwAAAABJRU5ErkJggg==);
     --descending-icon: url(data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAJAgMAAACZCj6+AAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAlQTFRFAAAA////fn5+K6jOaAAAAAN0Uk5TAP//RFDWIQAAACdJREFUeJxjYHBgYGAMYGBgDWFgEA1lAAOtVQwMXCsYGJgWADkNDAA78QP9oKr7vwAAAABJRU5ErkJggg==);
 }
@@ -148,6 +152,11 @@ h2 {
     color: var(--warn-link-color) !important;
     font-weight: bold;
 }
+.unknown {
+    color: #339 !important; /* Fallback value */
+    color: var(--unknown-link-color) !important;
+    font-weight: bold;
+}
 .label {
     padding: 2px 5px;
     font-size: 0.75em;
@@ -168,7 +177,7 @@ h2 {
 .label.debug, .label.trace, .label.error {
     letter-spacing: 0;
 }
-.label.pass, .label.fail, .label.error, .label.skip, .label.warn {
+.label.pass, .label.fail, .label.error, .label.skip, .label.warn, .label.unknown {
     font-weight: bold;
 }
 .label.pass {
@@ -185,6 +194,11 @@ h2 {
     background-color: #fed84f; /* Fallback value */
     background-color: var(--warn-color);
     color: #000 !important;
+}
+.label.unknown {
+    background-color: #0080fe; /* Fallback value */
+    background-color: var(--unknown-color);
+    color: #fff !important;
 }
 /* Top right header */
 #top-right-header {
@@ -284,9 +298,13 @@ th.stats-col-graph:hover {
     background: #eee; /* Fallback value */
     background: var(--highlight-color);
 }
-.pass-bar, .fail-bar, .skip-bar {
+.pass-bar, .fail-bar, .skip-bar, .unknown-bar {
     float: left;
     height: 100%;
+}
+.unknown-bar {
+    background: #4f58fe; /* Fallback value */
+    background: var(--unknown-bar-color);
 }
 .fail-bar {
     background: #ce3e01; /* Fallback value */

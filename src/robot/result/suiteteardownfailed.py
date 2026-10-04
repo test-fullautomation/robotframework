@@ -23,6 +23,8 @@ class SuiteTeardownFailureHandler(SuiteVisitor):
             teardown = suite.teardown
             if teardown.status == teardown.FAIL:
                 suite.suite_teardown_failed(teardown.message)
+            if teardown.status == teardown.UNKNOWN:  # cuongnht - add unknown state
+                suite.suite_teardown_unknown(teardown.message)
             if teardown.status == teardown.SKIP:
                 suite.suite_teardown_skipped(teardown.message)
 
@@ -64,3 +66,16 @@ class SuiteTeardownFailed(SuiteVisitor):
 
     def visit_keyword(self, keyword):
         pass
+
+
+class SuiteTeardownUnknown(SuiteTeardownFailed):
+    # cuongnht - add unknown state: an UNKNOWN suite teardown makes the tests
+    # UNKNOWN, not FAIL.
+    _normal_msg = "Parent suite teardown unknown:\n%s"
+    _also_msg = "\n\nAlso parent suite teardown unknown:\n%s"
+
+    def _suite_teardown_failed(self, test):
+        if not test.skipped:
+            test.status = test.UNKNOWN
+        prefix = self._also_msg if test.message else self._normal_msg
+        test.message += prefix % self.message

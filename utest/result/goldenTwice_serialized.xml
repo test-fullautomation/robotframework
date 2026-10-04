@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Rebot 7.0.dev1 (Python 3.12.0rc2 on linux)" generated="2023-09-08T12:01:30.419054" rpa="false" schemaversion="5">
+<suite id="s1" name="Normal &amp; Normal">
+<suite id="s1-s1" name="Normal" source="normal.html">
+<kw name="my setup" type="SETUP">
+<timeout value="1 year"/>
+<status status="PASS" start="2011-10-24T13:41:20.886000" elapsed="0.002000"/>
+</kw>
+<test id="s1-s1-t1" name="First One">
+<kw name="Log" owner="BuiltIn">
+<msg time="2011-10-24T13:41:20.927000" level="INFO">Test 1</msg>
+<arg>Test 1</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2011-10-24T13:41:20.926000" elapsed="0.002000"/>
+</kw>
+<kw name="logs on trace">
+<kw name="Log" owner="BuiltIn">
+<arg>Log on ${TEST NAME}</arg>
+<arg>TRACE</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2011-10-24T13:41:20.931000" elapsed="0.001000"/>
+</kw>
+<var>${not really in source}</var>
+<tag>tag not in source</tag>
+<status status="PASS" start="2011-10-24T13:41:20.930000" elapsed="0.003000"/>
+</kw>
+<for flavor="IN">
+<iter>
+<kw name="Log" owner="BuiltIn">
+<msg time="2021-03-29T17:05:45.267000" level="INFO">not in source</msg>
+<arg>${x}</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<var name="${x}">not in source</var>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</iter>
+<var>${x}</var>
+<value>not in source</value>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</for>
+<if>
+<branch type="IF" condition="'IF' == 'WRONG'">
+<kw name="Fail" owner="BuiltIn">
+<arg>not going here</arg>
+<doc>Fails the test with the given message and optionally alters its tags.</doc>
+<status status="NOT RUN" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<status status="NOT RUN" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</branch>
+<branch type="ELSE">
+<kw name="No Operation" owner="BuiltIn">
+<doc>Not in source.</doc>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</branch>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</if>
+<while condition="$variable &lt; 6">
+<iter>
+<kw name="Log" owner="BuiltIn">
+<msg time="2024-08-26T13:34:29.548081" level="INFO">1</msg>
+<arg>${variable}</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2024-08-26T13:34:29.547953" elapsed="0.000198"/>
+</kw>
+<kw name="Evaluate" owner="BuiltIn">
+<msg time="2024-08-26T13:34:29.548424" level="INFO">${variable} = 2</msg>
+<var>${variable}</var>
+<arg>$variable + 1</arg>
+<doc>Evaluates the given expression in Python and returns the result.</doc>
+<status status="PASS" start="2024-08-26T13:34:29.548256" elapsed="0.000186"/>
+</kw>
+<status status="PASS" start="2024-08-26T13:34:29.547520" elapsed="0.000955"/>
+</iter>
+<status status="PASS" start="2024-08-26T13:34:29.547517" elapsed="0.003092"/>
+</while>
+<try>
+<branch type="TRY">
+<kw name="Log" owner="BuiltIn">
+<msg time="2024-08-26T13:43:45.268788" level="INFO">Hello!</msg>
+<arg>Hello!</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2024-08-26T13:43:45.268687" elapsed="0.000141"/>
+</kw>
+<status status="PASS" start="2024-08-26T13:43:45.268407" elapsed="0.000465"/>
+</branch>
+<branch type="EXCEPT">
+<pattern>No match</pattern>
+<kw name="Fail" owner="BuiltIn">
+<arg>Not run</arg>
+<doc>Fails the test with the given message and optionally alters its tags.</doc>
+<status status="NOT RUN" start="2024-08-26T13:43:45.268982" elapsed="0.000020"/>
+</kw>
+<status status="NOT RUN" start="2024-08-26T13:43:45.268914" elapsed="0.000116"/>
+</branch>
+<status status="PASS" start="2024-08-26T13:43:45.268361" elapsed="0.000696"/>
+</try>
+<doc>Test case documentation</doc>
+<tag>t1</tag>
+<status status="PASS" start="2011-10-24T13:41:20.925000" elapsed="0.009000"/>
+</test>
+<doc>Normal test cases</doc>
+<meta name="Nön-ÄSCÏÏ">🤖</meta>
+<meta name="Something">My Value</meta>
+<status status="PASS" start="2011-10-24T13:41:20.873000" elapsed="0.079000"/>
+</suite>
+<suite id="s1-s2" name="Normal" source="normal.html">
+<kw name="my setup" type="SETUP">
+<timeout value="1 year"/>
+<status status="PASS" start="2011-10-24T13:41:20.886000" elapsed="0.002000"/>
+</kw>
+<test id="s1-s2-t1" name="First One">
+<kw name="Log" owner="BuiltIn">
+<msg time="2011-10-24T13:41:20.927000" level="INFO">Test 1</msg>
+<arg>Test 1</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2011-10-24T13:41:20.926000" elapsed="0.002000"/>
+</kw>
+<kw name="logs on trace">
+<kw name="Log" owner="BuiltIn">
+<arg>Log on ${TEST NAME}</arg>
+<arg>TRACE</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2011-10-24T13:41:20.931000" elapsed="0.001000"/>
+</kw>
+<var>${not really in source}</var>
+<tag>tag not in source</tag>
+<status status="PASS" start="2011-10-24T13:41:20.930000" elapsed="0.003000"/>
+</kw>
+<for flavor="IN">
+<iter>
+<kw name="Log" owner="BuiltIn">
+<msg time="2021-03-29T17:05:45.267000" level="INFO">not in source</msg>
+<arg>${x}</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<var name="${x}">not in source</var>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</iter>
+<var>${x}</var>
+<value>not in source</value>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</for>
+<if>
+<branch type="IF" condition="'IF' == 'WRONG'">
+<kw name="Fail" owner="BuiltIn">
+<arg>not going here</arg>
+<doc>Fails the test with the given message and optionally alters its tags.</doc>
+<status status="NOT RUN" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<status status="NOT RUN" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</branch>
+<branch type="ELSE">
+<kw name="No Operation" owner="BuiltIn">
+<doc>Not in source.</doc>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</kw>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</branch>
+<status status="PASS" start="2021-03-29T17:05:45.266000" elapsed="0.001000"/>
+</if>
+<while condition="$variable &lt; 6">
+<iter>
+<kw name="Log" owner="BuiltIn">
+<msg time="2024-08-26T13:34:29.548081" level="INFO">1</msg>
+<arg>${variable}</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2024-08-26T13:34:29.547953" elapsed="0.000198"/>
+</kw>
+<kw name="Evaluate" owner="BuiltIn">
+<msg time="2024-08-26T13:34:29.548424" level="INFO">${variable} = 2</msg>
+<var>${variable}</var>
+<arg>$variable + 1</arg>
+<doc>Evaluates the given expression in Python and returns the result.</doc>
+<status status="PASS" start="2024-08-26T13:34:29.548256" elapsed="0.000186"/>
+</kw>
+<status status="PASS" start="2024-08-26T13:34:29.547520" elapsed="0.000955"/>
+</iter>
+<status status="PASS" start="2024-08-26T13:34:29.547517" elapsed="0.003092"/>
+</while>
+<try>
+<branch type="TRY">
+<kw name="Log" owner="BuiltIn">
+<msg time="2024-08-26T13:43:45.268788" level="INFO">Hello!</msg>
+<arg>Hello!</arg>
+<doc>Logs the given message with the given level.</doc>
+<status status="PASS" start="2024-08-26T13:43:45.268687" elapsed="0.000141"/>
+</kw>
+<status status="PASS" start="2024-08-26T13:43:45.268407" elapsed="0.000465"/>
+</branch>
+<branch type="EXCEPT">
+<pattern>No match</pattern>
+<kw name="Fail" owner="BuiltIn">
+<arg>Not run</arg>
+<doc>Fails the test with the given message and optionally alters its tags.</doc>
+<status status="NOT RUN" start="2024-08-26T13:43:45.268982" elapsed="0.000020"/>
+</kw>
+<status status="NOT RUN" start="2024-08-26T13:43:45.268914" elapsed="0.000116"/>
+</branch>
+<status status="PASS" start="2024-08-26T13:43:45.268361" elapsed="0.000696"/>
+</try>
+<doc>Test case documentation</doc>
+<tag>t1</tag>
+<status status="PASS" start="2011-10-24T13:41:20.925000" elapsed="0.009000"/>
+</test>
+<doc>Normal test cases</doc>
+<meta name="Nön-ÄSCÏÏ">🤖</meta>
+<meta name="Something">My Value</meta>
+<status status="PASS" start="2011-10-24T13:41:20.873000" elapsed="0.079000"/>
+</suite>
+<status status="PASS" elapsed="0.158000"/>
+</suite>
+<statistics>
+<total>
+<stat pass="2" fail="0" skip="0" unknown="0">All Tests</stat>
+</total>
+<tag>
+<stat pass="2" fail="0" skip="0" unknown="0">t1</stat>
+</tag>
+<suite>
+<stat name="Normal &amp; Normal" id="s1" pass="2" fail="0" skip="0" unknown="0">Normal &amp; Normal</stat>
+<stat name="Normal" id="s1-s1" pass="1" fail="0" skip="0" unknown="0">Normal &amp; Normal.Normal</stat>
+<stat name="Normal" id="s1-s2" pass="1" fail="0" skip="0" unknown="0">Normal &amp; Normal.Normal</stat>
+</suite>
+</statistics>
+<errors>
+<msg time="2011-10-24T13:41:20.873000" level="ERROR">Error in file 'normal.html' in table 'Settings': Resource file 'nope' does not exist.</msg>
+<msg time="2011-10-24T13:41:20.873000" level="ERROR">Error in file 'normal.html' in table 'Settings': Resource file 'nope' does not exist.</msg>
+</errors>
+</robot>

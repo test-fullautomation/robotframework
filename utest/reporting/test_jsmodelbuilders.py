@@ -238,7 +238,7 @@ class TestBuildTestSuite(unittest.TestCase):
         t = self._verify_test(suite.suites[0].tests[0], tags=("crit", "xxx"))
         suite.tests = [TestCase(), TestCase(status="PASS")]
         s1 = self._verify_suite(
-            suite.suites[0], status=0, tests=(t,), stats=(1, 0, 1, 0)
+            suite.suites[0], status=0, tests=(t,), stats=(1, 0, 1, 0, 0)
         )
         suite.tests[0].body = [
             For(assign=["${x}"], values=["1", "2"], message="x"),
@@ -262,7 +262,7 @@ class TestBuildTestSuite(unittest.TestCase):
             keywords=(ss, st),
             suites=(s1,),
             tests=(t1, t2),
-            stats=(3, 1, 2, 0),
+            stats=(3, 1, 2, 0, 0),
         )
         self._verify_min_message_level("TRACE")
 
@@ -366,7 +366,7 @@ class TestBuildTestSuite(unittest.TestCase):
         suites=(),
         tests=(),
         keywords=(),
-        stats=(0, 0, 0, 0),
+        stats=(0, 0, 0, 0, 0),
     ):
         status = (status, start, elapsed)
         if message:
@@ -730,6 +730,7 @@ class TestBuildStatistics(unittest.TestCase):
             "pass": pass_,
             "fail": fail,
             "skip": skip,
+            "unknown": 0,  # added by the fork's UNKNOWN status support
             "label": label,
             "elapsed": elapsed,
             **extra,

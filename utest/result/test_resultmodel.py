@@ -1443,7 +1443,7 @@ class TestJsonResult(unittest.TestCase):
         assert_equal(
             data["statistics"],
             {
-                "total": {"pass": 1, "fail": 1, "skip": 1, "label": "All Tests"},
+                "total": {"pass": 1, "fail": 1, "skip": 1, "unknown": 0, "label": "All Tests"},
                 "suites": [
                     {
                         "name": "S",
@@ -1451,10 +1451,10 @@ class TestJsonResult(unittest.TestCase):
                         "id": "s1",
                         "pass": 1,
                         "fail": 1,
-                        "skip": 1,
+                        "skip": 1, "unknown": 0,
                     }
                 ],
-                "tags": [{"pass": 1, "fail": 0, "skip": 0, "label": "tag"}],
+                "tags": [{"pass": 1, "fail": 0, "skip": 0, "unknown": 0, "label": "tag"}],
             },
         )
         assert_equal(

@@ -124,11 +124,27 @@ class Result:
     def return_code(self) -> int:
         """Execution return code.
 
-        By default, returns the number of failed tests or tasks (max 250),
-        but can be :func:`configured <configure>` to always return 0.
+        By default encodes both the number of failed and the number of
+        UNKNOWN tests or tasks, but can be :func:`configured <configure>`
+        to always return 0.
+
+        The counts are combined with a bitwise shift and can be extracted
+        with::
+
+            failed_count  = return_code & 0xF          # capped at 15
+            unknown_count = (return_code >> 4) & 0xF   # capped at 14
+
+        The value stays below 240, so it survives the 8-bit exit codes of
+        POSIX systems and never collides with the framework's reserved
+        codes 251-255. Zero means that there are neither failed nor
+        UNKNOWN tests; the exact counts are always available in the
+        outputs and on the console.
         """
         if self._status_rc:
-            return min(self.suite.statistics.failed, 250)
+            # cuongnht - add unknown state
+            failed = min(self.suite.statistics.failed, 15)
+            unknown = min(self.suite.statistics.unknown, 14)
+            return (unknown << 4) | failed
         return 0
 
     @property

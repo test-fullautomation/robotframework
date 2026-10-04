@@ -120,12 +120,12 @@ class TestStatisticsSimple(unittest.TestCase):
         assert_equal(
             self.statistics.to_dict(),
             {
-                "total": {"pass": 2, "fail": 1, "skip": 1, "label": "All Tests"},
+                "total": {"pass": 2, "fail": 1, "skip": 1, "unknown": 0, "label": "All Tests"},
                 "suites": [
                     {
                         "pass": 2,
                         "fail": 1,
-                        "skip": 1,
+                        "skip": 1, "unknown": 0,
                         "label": "Hello",
                         "name": "Hello",
                         "id": "s1",
@@ -178,12 +178,12 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
         assert_equal(
             self.statistics.to_dict(),
             {
-                "total": {"pass": 4, "fail": 3, "skip": 2, "label": "All Tests"},
+                "total": {"pass": 4, "fail": 3, "skip": 2, "unknown": 0, "label": "All Tests"},
                 "suites": [
                     {
                         "pass": 4,
                         "fail": 3,
-                        "skip": 2,
+                        "skip": 2, "unknown": 0,
                         "id": "s1",
                         "name": "Root Suite",
                         "label": "Root Suite",
@@ -191,7 +191,7 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
                     {
                         "pass": 4,
                         "fail": 2,
-                        "skip": 1,
+                        "skip": 1, "unknown": 0,
                         "label": "Root Suite.First Sub Suite",
                         "id": "s1-s1",
                         "name": "First Sub Suite",
@@ -199,7 +199,7 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
                     {
                         "pass": 0,
                         "fail": 1,
-                        "skip": 1,
+                        "skip": 1, "unknown": 0,
                         "label": "Root Suite.Second Sub Suite",
                         "id": "s1-s2",
                         "name": "Second Sub Suite",
@@ -209,7 +209,7 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
                     {
                         "pass": 0,
                         "fail": 0,
-                        "skip": 0,
+                        "skip": 0, "unknown": 0,
                         "label": "a title",
                         "info": "combined",
                         "combined": "none NOT t1",
@@ -217,7 +217,7 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
                     {
                         "pass": 2,
                         "fail": 2,
-                        "skip": 0,
+                        "skip": 0, "unknown": 0,
                         "label": "t? AND smoke",
                         "info": "combined",
                         "combined": "t? AND smoke",
@@ -225,21 +225,21 @@ class TestStatisticsNotSoSimple(unittest.TestCase):
                     {
                         "pass": 2,
                         "fail": 2,
-                        "skip": 0,
+                        "skip": 0, "unknown": 0,
                         "label": "smoke",
                         "doc": "something is burning",
                     },
                     {
                         "pass": 3,
                         "fail": 2,
-                        "skip": 1,
+                        "skip": 1, "unknown": 0,
                         "label": "t1",
                         "links": "title 1:http://uri/1",
                     },
                     {
                         "pass": 2,
                         "fail": 1,
-                        "skip": 0,
+                        "skip": 0, "unknown": 0,
                         "label": "t2",
                         "links": "title:uri:::title 2:http://uri/2",
                     },

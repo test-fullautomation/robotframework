@@ -51,6 +51,11 @@ class TotalStatistics:
     def failed(self) -> int:
         return self.stat.failed
 
+    @property
+    def unknown(self) -> int:
+        # nhtcuong
+        return self.stat.unknown
+
     def add_test(self, test):
         self.stat.add_test(test)
 
@@ -59,10 +64,13 @@ class TotalStatistics:
         """String representation of the statistics.
 
         For example::
-            2 tests, 1 passed, 1 failed
+            2 tests, 1 passed, 1 failed, 0 unknown
         """
         kind = test_or_task("test", self._rpa) + plural_or_not(self.total)
-        msg = f"{self.total} {kind}, {self.passed} passed, {self.failed} failed"
+        msg = (
+            f"{self.total} {kind}, {self.passed} passed, {self.failed} failed, "
+            f"{self.unknown} unknown"  # nhtcuong
+        )
         if self.skipped:
             msg += f", {self.skipped} skipped"
         return msg

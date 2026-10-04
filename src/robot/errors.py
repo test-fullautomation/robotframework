@@ -53,7 +53,34 @@ class FrameworkError(RobotError):
     """
 
 
-class DataError(RobotError):
+class UnknownAssertionError(RobotError):
+    """Used when a test cannot be judged at all: the environment is broken.
+
+    Raised by the `Unknown` keyword and used as the base class of
+    :class:`DataError`, so that missing keywords, failed imports and other
+    data problems give the test the UNKNOWN status instead of FAIL.
+    """
+
+    # cuongnht - add unknown state
+    ROBOT_SUPPRESS_NAME = True
+
+    def __init__(self, msg=None, details=""):
+        self.msg = msg
+        self.details = details
+        RobotError.__init__(self, self._get_message(), self.msg)
+
+    def _get_message(self):
+        list_msg = []
+        if (not self.msg) and (not self.details):
+            list_msg.append("Exception occurred.")
+        if self.msg:
+            list_msg.append(f"{self.msg}")
+        if self.details:
+            list_msg.append(f"Details: {self.details}")
+        return "\n".join(list_msg)
+
+
+class DataError(UnknownAssertionError):
     """Used when the provided test data is invalid.
 
     DataErrors are not caught by keywords that run other keywords
@@ -142,6 +169,7 @@ class ExecutionStatus(RobotError):
         continue_on_failure: bool = False,
         skip: bool = False,
         return_value: object = None,
+        unknown: bool = False,
     ):
         from robot.utils import cut_long_message
 
@@ -154,6 +182,7 @@ class ExecutionStatus(RobotError):
         self.exit = exit
         self._continue_on_failure = continue_on_failure
         self.skip = skip
+        self.unknown = unknown  # cuongnht - add unknown state
         self.return_value = return_value
 
     @property
@@ -193,7 +222,9 @@ class ExecutionStatus(RobotError):
 
     @property
     def status(self):
-        return "FAIL" if not self.skip else "SKIP"
+        if self.skip:
+            return "SKIP"
+        return "UNKNOWN" if self.unknown else "FAIL"  # nhtcuong
 
 
 class ExecutionFailed(ExecutionStatus):
@@ -205,6 +236,14 @@ class HandlerExecutionFailed(ExecutionFailed):
     def __init__(self, details):
         error = details.error
         timeout = isinstance(error, TimeoutExceeded)
+        # cuongnht - add unknown state: data errors, bare `Exception`s and
+        # attribute errors mean the test could not be judged, not that the
+        # product failed.
+        unknown = (
+            isinstance(error, UnknownAssertionError)
+            or type(error) is Exception
+            or isinstance(error, AttributeError)
+        )
         test_timeout = timeout and error.test_timeout
         keyword_timeout = timeout and error.keyword_timeout
         syntax = isinstance(error, DataError) and error.syntax
@@ -219,6 +258,7 @@ class HandlerExecutionFailed(ExecutionFailed):
             exit_on_failure,
             continue_on_failure,
             skip,
+            unknown=unknown,
         )
 
     def _get(self, error, attr):
@@ -269,6 +309,7 @@ class ExecutionFailures(ExecutionFailed):
             "exit": any(e.exit for e in errors),
             "continue_on_failure": all(e.continue_on_failure for e in errors),
             "skip": any(e.skip for e in errors),
+            "unknown": any(e.unknown for e in errors),  # nhtcuong
         }
 
     def get_errors(self):

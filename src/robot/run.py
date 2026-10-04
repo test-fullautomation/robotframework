@@ -184,6 +184,14 @@ Options
  -l --log file            HTML log file. Can be disabled by giving a special
                           value `NONE`. Default: log.html
                           Examples: `--log mylog.html`, `-l NONE`
+    --importfailure suite|test  How Library/Resource/Variables import errors
+                          affect test statuses.
+                          suite: every test of the suite gets status UNKNOWN
+                          because the suite environment is not as specified.
+                          This is the default.
+                          test:  only tests that actually use keywords or
+                          variables from the failed import get status
+                          UNKNOWN; unaffected tests run normally.
  -r --report file         HTML report file. Can be disabled with `NONE`
                           similarly as --log. Default: report.html
  -x --xunit file          xUnit compatible result file. Not created unless this
@@ -203,10 +211,10 @@ Options
     --reporttitle title   Title for the generated report file. The default
                           title is `<SuiteName> Report`.
     --reportbackground colors  Background colors to use in the report file.
-                          Given in format `passed:failed:skipped` where the
-                          `:skipped` part can be omitted. Both color names and
-                          codes work.
-                          Examples: --reportbackground green:red:yellow
+                          Given in format `passed:failed:unknown:skipped`
+                          where the `:unknown` and `:skipped` parts can be
+                          omitted. Both color names and codes work.
+                          Examples: --reportbackground green:red:blue:yellow
                                     --reportbackground #00E:#E00
     --maxerrorlines lines  Maximum number of error message lines to show in
                           report when tests fail. Default is 40, minimum is 10
@@ -582,9 +590,11 @@ def run(*tests, **options):
     respectively.
 
     A return code is returned similarly as when running on the command line.
-    Zero means that tests were executed and no test failed, values up to 250
-    denote the number of failed tests, and values between 251-255 are for other
-    statuses documented in the Robot Framework User Guide.
+    Zero means that tests were executed and no test failed or was UNKNOWN.
+    Other values up to 239 encode the failed and UNKNOWN counts and can be
+    extracted with ``failed = rc & 0xF`` (capped at 15) and
+    ``unknown = (rc >> 4) & 0xF`` (capped at 14). Values between 251-255 are
+    for other statuses documented in the Robot Framework User Guide.
 
     Example::
 

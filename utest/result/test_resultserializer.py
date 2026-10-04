@@ -1,8 +1,17 @@
 import unittest
 from io import BytesIO, StringIO
+from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from test_resultbuilder import GOLDEN_XML, GOLDEN_XML_TWICE
+from test_resultbuilder import GOLDEN_XML
+
+# Expected serialization results with the fork's write-time behaviour:
+# statistics carry the 'unknown' attribute.
+CURDIR = Path(__file__).resolve().parent
+GOLDEN_SERIALIZED = (CURDIR / "golden_serialized.xml").read_text(encoding="UTF-8")
+GOLDEN_TWICE_SERIALIZED = (CURDIR / "goldenTwice_serialized.xml").read_text(
+    encoding="UTF-8"
+)
 
 from robot.reporting.outputwriter import OutputWriter
 from robot.result import ExecutionResult
@@ -33,7 +42,7 @@ class TestResultSerializer(unittest.TestCase):
         ExecutionResult(GOLDEN_XML).visit(writer)
         self._assert_xml_content(
             self._xml_lines(output.getvalue()),
-            self._xml_lines(GOLDEN_XML),
+            self._xml_lines(GOLDEN_SERIALIZED),
         )
 
     def _xml_lines(self, text):
@@ -58,7 +67,7 @@ class TestResultSerializer(unittest.TestCase):
         ExecutionResult(GOLDEN_XML, GOLDEN_XML).visit(writer)
         self._assert_xml_content(
             self._xml_lines(output.getvalue()),
-            self._xml_lines(GOLDEN_XML_TWICE),
+            self._xml_lines(GOLDEN_TWICE_SERIALIZED),
         )
 
 

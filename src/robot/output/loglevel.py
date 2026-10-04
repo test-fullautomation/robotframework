@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 
 SettableLevel = Literal["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "NONE"]
 LEVELS = {
-    "NONE": 7,
+    "NONE": 8,
+    "UNKNOWN": 7,  # nhtcuong - has to fit 'var LEVELS' in htmldata/rebot/testdata.js
     "SKIP": 6,
     "FAIL": 5,
     "ERROR": 4,
@@ -47,6 +48,6 @@ class LogLevel:
 
     def _validate_level(self, level) -> "tuple[SettableLevel, int]":
         upper = level.upper()
-        if upper not in LEVELS or upper in ("SKIP", "FAIL"):
+        if upper not in LEVELS or upper in ("SKIP", "FAIL", "UNKNOWN"):
             raise ValueError(f"Invalid log level '{level}'.")
         return upper, LEVELS[upper]

@@ -101,6 +101,7 @@ class HighlightingStream:
             "PASS": highlighter.green,
             "FAIL": highlighter.red,
             "SKIP": highlighter.yellow,
+            "UNKNOWN": highlighter.blue,  # nhtcuong
             "ERROR": highlighter.red,
             "WARN": highlighter.yellow,
         }[status]()
@@ -109,7 +110,7 @@ class HighlightingStream:
         finally:
             highlighter.reset()
 
-    def error(self, message: str, level: Literal["ERROR", "WARN"]):
+    def error(self, message: str, level: Literal["ERROR", "WARN", "UNKNOWN"]):
         self.write("[ ", flush=False)
         self.highlight(level, flush=False)
         self.write(f" ] {message}\n")
@@ -158,6 +159,9 @@ class Highlighter(ABC):
     def yellow(self):
         pass
 
+    def blue(self):
+        pass
+
     def reset(self):
         pass
 
@@ -173,6 +177,7 @@ class AnsiHighlighter(Highlighter):
     GREEN = "\033[32m"
     RED = "\033[31m"
     YELLOW = "\033[33m"
+    BLUE = "\033[34m"  # nhtcuong
     RESET = "\033[0m"
 
     def __init__(self, stream: TextIOBase, links: bool = True):
@@ -187,6 +192,9 @@ class AnsiHighlighter(Highlighter):
 
     def yellow(self):
         self._set_color(self.YELLOW)
+
+    def blue(self):
+        self._set_color(self.BLUE)
 
     def reset(self):
         self._set_color(self.RESET)
@@ -207,6 +215,7 @@ class AnsiHighlighter(Highlighter):
 
 
 class DosHighlighter(Highlighter):
+    FOREGROUND_BLUE = 0x1
     FOREGROUND_GREEN = 0x2
     FOREGROUND_RED = 0x4
     FOREGROUND_YELLOW = 0x6
@@ -227,6 +236,9 @@ class DosHighlighter(Highlighter):
 
     def yellow(self):
         self._set_foreground_colors(self.FOREGROUND_YELLOW)
+
+    def blue(self):
+        self._set_foreground_colors(self.FOREGROUND_BLUE)
 
     def reset(self):
         self._set_colors(self.orig_colors)

@@ -89,8 +89,22 @@ class SuiteRunner(SuiteVisitor):
         EXECUTION_CONTEXTS.start_suite(result, ns, self.output, self.settings.dry_run)
         self.context.set_suite_variables(result)
         if not self.suite_status.failed:
-            ns.handle_imports()
+            import_errors = ns.handle_imports()
             ns.variables.resolve_delayed()
+            if (
+                import_errors
+                and not self.settings.dry_run
+                and self.settings.import_failure == "suite"
+            ):
+                # cuongnht unknown state: with --importfailure suite (the
+                # default) any import error makes the whole suite UNKNOWN -
+                # the suite environment is not as specified, so no test in it
+                # gets a verdict. The error text is attached so tests show a
+                # meaningful message. With --importfailure test only tests
+                # actually using keywords or variables from the failed import
+                # become UNKNOWN via normal keyword/variable resolution.
+                self.suite_status.failure.unknown = True
+                self.suite_status.failure.setup = "\n".join(import_errors)
         result.doc = self._resolve_setting(result.doc)
         result.metadata = [
             (self._resolve_setting(n), self._resolve_setting(v))
@@ -133,6 +147,8 @@ class SuiteRunner(SuiteVisitor):
             if failure:
                 if failure.skip:
                     self.suite_result.suite_teardown_skipped(str(failure))
+                elif failure.unknown:  # cuongnht - add unknown state
+                    self.suite_result.suite_teardown_unknown(str(failure))
                 else:
                     self.suite_result.suite_teardown_failed(str(failure))
         self.suite_result.end_time = datetime.now()
@@ -178,6 +194,7 @@ class SuiteRunner(SuiteVisitor):
             settings.rpa,
         )
         if status.exit:
+            status.failure.unknown = True  # cuongnht - add unknown state
             self._add_exit_combine()
             result.tags.add("robot:exit")
         if status.passed:
@@ -226,10 +243,10 @@ class SuiteRunner(SuiteVisitor):
             result.message = status.message or result.message
         result.status = status.status
         result.end_time = datetime.now()
-        failed_before_listeners = result.failed
+        failed_before_listeners = result.failed or result.unknown
         # TODO: can this be removed to context
         self.output.end_test(data, result)
-        if result.failed and not failed_before_listeners:
+        if (result.failed or result.unknown) and not failed_before_listeners:
             status.failure_occurred()
         self.context.end_test(result)
         self._clear_result(result)

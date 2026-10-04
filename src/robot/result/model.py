@@ -50,7 +50,9 @@ from .configurer import SuiteConfigurer
 from .keywordremover import KeywordRemover
 from .messagefilter import MessageFilter
 from .modeldeprecation import DeprecatedAttributesMixin
-from .suiteteardownfailed import SuiteTeardownFailed, SuiteTeardownFailureHandler
+from .suiteteardownfailed import (
+    SuiteTeardownFailed, SuiteTeardownFailureHandler, SuiteTeardownUnknown
+)
 
 IT = TypeVar("IT", bound="IfBranch | TryBranch")
 FW = TypeVar("FW", bound="ForIteration | WhileIteration")
@@ -97,9 +99,10 @@ class StatusMixin:
     PASS: Final = "PASS"
     FAIL: Final = "FAIL"
     SKIP: Final = "SKIP"
+    UNKNOWN: Final = "UNKNOWN"  # cuongnht - add unknown state
     NOT_RUN: Final = "NOT RUN"
     NOT_SET: Final = "NOT SET"
-    status: Literal["PASS", "FAIL", "SKIP", "NOT RUN", "NOT SET"]
+    status: Literal["PASS", "FAIL", "SKIP", "UNKNOWN", "NOT RUN", "NOT SET"]
     __slots__ = ()
 
     @property
@@ -261,6 +264,15 @@ class StatusMixin:
     @failed.setter
     def failed(self, failed: bool):
         self.status = self.FAIL if failed else self.PASS
+
+    @property
+    def unknown(self) -> bool:
+        """``True`` when :attr:`status` is 'UNKNOWN', ``False`` otherwise."""
+        return self.status == self.UNKNOWN
+
+    @unknown.setter
+    def unknown(self, unknown: bool):
+        self.status = self.UNKNOWN if unknown else self.PASS
 
     @property
     def skipped(self) -> bool:
@@ -1109,15 +1121,23 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
         return False
 
     @property
-    def status(self) -> Literal["PASS", "SKIP", "FAIL"]:
-        """'PASS', 'FAIL' or 'SKIP' depending on test statuses.
+    def unknown(self) -> bool:
+        """``True`` if any test is unknown, ``False`` otherwise."""
+        return self.status == self.UNKNOWN
 
+    @property
+    def status(self) -> Literal["PASS", "SKIP", "FAIL", "UNKNOWN"]:
+        """'PASS', 'FAIL', 'UNKNOWN' or 'SKIP' depending on test statuses.
+
+        - If any test is unknown, status is 'UNKNOWN'.
         - If any test has failed, status is 'FAIL'.
         - If no test has failed but at least some test has passed, status is 'PASS'.
         - If there are no failed or passed tests, status is 'SKIP'. This covers both
           the case when all tests have been skipped and when there are no tests.
         """
         stats = self.statistics  # Local variable avoids recreating stats.
+        if stats.unknown:  # cuongnht - add unknown state
+            return self.UNKNOWN
         if stats.failed:
             return self.FAIL
         if stats.passed:
@@ -1199,6 +1219,10 @@ class TestSuite(model.TestSuite[Keyword, TestCase], StatusMixin):
     def suite_teardown_failed(self, message: str):
         """Internal usage only."""
         self.visit(SuiteTeardownFailed(message))
+
+    def suite_teardown_unknown(self, message: str):
+        """Internal usage only."""
+        self.visit(SuiteTeardownUnknown(message))
 
     def suite_teardown_skipped(self, message: str):
         """Internal usage only."""

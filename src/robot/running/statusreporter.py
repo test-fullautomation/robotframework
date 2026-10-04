@@ -79,7 +79,9 @@ class StatusReporter:
         if orig_status != (result.status, result.message):
             if result.passed or result.not_run:
                 return True
-            raise ExecutionFailed(result.message, skip=result.skipped)
+            raise ExecutionFailed(
+                result.message, skip=result.skipped, unknown=result.unknown
+            )
         if failure is not exc_value and not self.suppress:
             raise failure
         return self.suppress
@@ -91,14 +93,16 @@ class StatusReporter:
             return exc_value
         if isinstance(exc_value, DataError):
             msg = exc_value.message
-            context.fail(msg)
-            return ExecutionFailed(msg, syntax=exc_value.syntax)
+            context.unknown(msg)  # cuongnht - add unknown state
+            return ExecutionFailed(msg, syntax=exc_value.syntax, unknown=True)
         error = ErrorDetails(exc_value)
         failure = HandlerExecutionFailed(error)
         if failure.timeout:
             context.timeout_occurred = True
         if failure.skip:
             context.skip(error.message)
+        elif failure.unknown:  # cuongnht - add unknown state
+            context.unknown(error.message)
         else:
             context.fail(error.message)
         if error.traceback:

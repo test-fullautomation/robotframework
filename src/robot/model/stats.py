@@ -35,6 +35,8 @@ class Stat(Sortable):
         self.passed = 0
         self.failed = 0
         self.skipped = 0
+        #: nhtcuong Number of unknown tests.
+        self.unknown = 0
         self.elapsed = timedelta()
         self._norm_name = normalize(name, ignore="_")
 
@@ -52,6 +54,7 @@ class Stat(Sortable):
             "pass": self.passed,
             "fail": self.failed,
             "skip": self.skipped,
+            "unknown": self.unknown,  # nhtcuong Number of unknown tests.
         }
         if include_elapsed:
             attrs["elapsed"] = elapsed_time_to_string(
@@ -73,7 +76,7 @@ class Stat(Sortable):
 
     @property
     def total(self):
-        return self.passed + self.failed + self.skipped
+        return self.passed + self.failed + self.skipped + self.unknown
 
     def add_test(self, test):
         self._update_stats(test)
@@ -84,6 +87,8 @@ class Stat(Sortable):
             self.passed += 1
         elif test.skipped:
             self.skipped += 1
+        elif test.unknown:  #: nhtcuong Number of unknown tests.
+            self.unknown += 1
         else:
             self.failed += 1
 
@@ -128,6 +133,7 @@ class SuiteStat(Stat):
         self.passed += other.passed
         self.failed += other.failed
         self.skipped += other.skipped
+        self.unknown += other.unknown
 
 
 class TagStat(Stat):
