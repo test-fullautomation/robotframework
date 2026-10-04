@@ -35,9 +35,13 @@ Log levels
 ----------
 
 It is possible to log messages using levels ``TRACE``, ``DEBUG``, ``INFO``,
-``WARN`` and ``ERROR`` either using the :func:`write` function or, more
-commonly, with the log level specific :func:`trace`, :func:`debug`,
-:func:`info`, :func:`warn`, :func:`error` functions.
+``USER``, ``WARN`` and ``ERROR`` either using the :func:`write` function or,
+more commonly, with the log level specific :func:`trace`, :func:`debug`,
+:func:`info`, :func:`user`, :func:`warn`, :func:`error` functions.
+
+The ``USER`` level is an extension of this fork. It sits between ``INFO`` and
+``WARN`` so that a user's own messages stay visible when the ``INFO`` noise of
+the framework and of libraries is filtered out with ``--loglevel USER``.
 
 The trace and debug messages are not logged by default, but that can be
 changed with the ``--loglevel`` command line option. Warnings and errors are
@@ -95,7 +99,9 @@ from robot.running.context import EXECUTION_CONTEXTS
 
 # LOGLEVEL was introduced in RF 7.0 and naming convention compliant LogLevel in RF 7.4.
 # TODO: Deprecate LOGLEVEL in RF 8.0. Update the above "Log levels" section as well.
-LogLevel = Literal["TRACE", "DEBUG", "INFO", "CONSOLE", "HTML", "WARN", "ERROR"]
+LogLevel = Literal[
+    "TRACE", "DEBUG", "INFO", "USER", "CONSOLE", "HTML", "WARN", "ERROR"
+]  # fmt: skip
 LOGLEVEL = LogLevel
 
 
@@ -115,8 +121,8 @@ def write(
         to the log file. If ``None`` (default), messages with the ``ERROR`` and
         ``WARN`` level are written to the console and others are not.
 
-    Valid log levels are ``TRACE``, ``DEBUG``, ``INFO`` (default), ``WARN``,
-    and ``ERROR``. In addition to that, there are pseudo log levels ``HTML``
+    Valid log levels are ``TRACE``, ``DEBUG``, ``INFO`` (default), ``USER``,
+    ``WARN``, and ``ERROR``. In addition to that, there are pseudo log levels ``HTML``
     and ``CONSOLE`` for logging messages as HTML and for logging messages
     both to the log file and to the console, respectively. With both of these
     pseudo levels the level in the log file will be ``INFO``.
@@ -135,6 +141,7 @@ def write(
             "TRACE": logging.DEBUG // 2,
             "DEBUG": logging.DEBUG,
             "INFO": logging.INFO,
+            "USER": logging.INFO,
             "CONSOLE": logging.INFO,
             "HTML": logging.INFO,
             "WARN": logging.WARNING,
@@ -180,6 +187,21 @@ def info(
     for now, but ``also_console`` will be deprecated and removed in the future.
     """
     write(msg, "INFO", html, also_console or console)
+
+
+def user(msg: object, html: bool = False, console: bool = False):
+    """Writes the message to the log file using the ``USER`` level.
+
+    The ``USER`` level is an extension of this fork: it is above ``INFO`` and
+    below ``WARN``, so these messages survive ``--loglevel USER`` while the
+    framework's own ``INFO`` messages are filtered out.
+
+    :param msg: The message to be logged. Converted to string automatically.
+    :param html: When set to ``True``, the message is considered to be HTML.
+    :param console: When ``True``, the message is logged to the console in
+        addition to the log file.
+    """
+    write(msg, "USER", html, console)
 
 
 def warn(msg: object, html: bool = False, console: bool = True):

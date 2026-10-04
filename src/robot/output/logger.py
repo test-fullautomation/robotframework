@@ -20,7 +20,7 @@ from robot.errors import DataError
 
 from .console import ConsoleOutput
 from .filelogger import FileLogger
-from .loggerhelper import AbstractLogger, write_to_console
+from .loggerhelper import AbstractLogger, Message, write_to_console
 from .stdoutlogsplitter import StdoutLogSplitter
 
 
@@ -50,6 +50,12 @@ class Logger(AbstractLogger):
     NOTE: This is a private API and likely to change in the future.
     """
 
+    # cuongnht memory cap: the message cache exists so that loggers
+    # registering mid-run get earlier messages relayed. Without a limit it
+    # grows for the whole run (days-long runs leak memory); only the first
+    # `message_cache_limit` messages are kept, the rest are counted.
+    message_cache_limit = 10000
+
     def __init__(self, register_console_logger=True):
         self._auto_register_console_logger = register_console_logger
         self.__console = None
@@ -59,6 +65,7 @@ class Logger(AbstractLogger):
         self._lib_listeners = None
         self._other_loggers = []
         self._message_cache = []
+        self._message_cache_dropped = 0
         self._log_message_parents = []
         self._library_import_logging = 0
         self._error_occurred = False
@@ -122,6 +129,14 @@ class Logger(AbstractLogger):
         if self._message_cache:
             for msg in self._message_cache[:]:
                 logger.message(msg)
+            if self._message_cache_dropped:
+                logger.message(
+                    Message(
+                        f"{self._message_cache_dropped} further messages were "
+                        f"not cached (cache limit {self.message_cache_limit}).",
+                        "INFO",
+                    )
+                )
 
     def unregister_console_logger(self):
         self.__console = None
@@ -176,8 +191,14 @@ class Logger(AbstractLogger):
             for logger in self:
                 logger.message(msg)
         if self._message_cache is not None:
-            self._message_cache.append(msg)
-        if msg.level == "ERROR":
+            if len(self._message_cache) < self.message_cache_limit:
+                self._message_cache.append(msg)
+            else:
+                self._message_cache_dropped += 1
+        # cuongnht: import and other framework errors are reported at UNKNOWN
+        # level, but they are still errors - without this --exitonerror would
+        # never trigger on them.
+        if msg.level in ("ERROR", "UNKNOWN"):
             self._error_occurred = True
             if self._error_listener:
                 self._error_listener()

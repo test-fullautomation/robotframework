@@ -19,14 +19,17 @@ if TYPE_CHECKING:
     from .loggerhelper import Message
 
 
-SettableLevel = Literal["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "NONE"]
+SettableLevel = Literal["TRACE", "DEBUG", "INFO", "USER", "WARN", "ERROR", "NONE"]
+# nhtcuong: USER and UNKNOWN are fork extensions. The numbers have to fit
+# 'var LEVELS' in htmldata/rebot/testdata.js.
 LEVELS = {
-    "NONE": 8,
-    "UNKNOWN": 7,  # nhtcuong - has to fit 'var LEVELS' in htmldata/rebot/testdata.js
-    "SKIP": 6,
-    "FAIL": 5,
-    "ERROR": 4,
-    "WARN": 3,
+    "NONE": 9,
+    "UNKNOWN": 8,
+    "SKIP": 7,
+    "FAIL": 6,
+    "ERROR": 5,
+    "WARN": 4,
+    "USER": 3,
     "INFO": 2,
     "DEBUG": 1,
     "TRACE": 0,

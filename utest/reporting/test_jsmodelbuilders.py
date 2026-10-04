@@ -204,7 +204,7 @@ class TestBuildTestSuite(unittest.TestCase):
             timestamp="2011-12-04 22:04:03.210",
             parent=TestCase().body.create_keyword(),
         )
-        self._verify_message(msg, "Message", 3, 0)
+        self._verify_message(msg, "Message", 4, 0)  # WARN: USER level shifts indexes
         links = self.context._msg_links
         assert_equal(len(links), 1)
         key = (msg.message, msg.level, msg.timestamp)
@@ -217,7 +217,7 @@ class TestBuildTestSuite(unittest.TestCase):
             timestamp="2015-06-09 01:02:03.004",
             parent=TestCase().body.create_keyword().body.create_keyword(),
         )
-        self._verify_message(msg, "ERROR Message", 4, 0)
+        self._verify_message(msg, "ERROR Message", 5, 0)
         links = self.context._msg_links
         assert_equal(len(links), 1)
         key = (msg.message, msg.level, msg.timestamp)
@@ -345,7 +345,7 @@ class TestBuildTestSuite(unittest.TestCase):
             0, "", "", "", "", "", "", (), (0, None, 0),
             ((None, 2, 'Hi from keyword'),)
         )  # fmt: skip
-        exp_m3 = (None, 3, "Hi from test again")
+        exp_m3 = (None, 4, "Hi from test again")
         self._verify_test(test, body=(exp_m1, exp_kw, exp_m3))
 
     def _verify_status(self, model, status=0, start=None, elapsed=0):
@@ -577,7 +577,7 @@ class TestSplitting(unittest.TestCase):
         errors = ErrorsBuilder(context).build(ExecutionErrors([msg1, msg2]))
         assert_equal(
             remap(errors, context.strings),
-            ((-1000, 3, "Message 1", "s1-k1-k1"), (0, 4, "Message 2", "s1-t1-k1")),
+            ((-1000, 4, "Message 1", "s1-k1-k1"), (0, 5, "Message 2", "s1-t1-k1")),
         )
         assert_equal(remap(context.link(msg1), context.strings), "s1-k1-k1")
         assert_equal(remap(context.link(msg2), context.strings), "s1-t1-k1")
@@ -751,7 +751,7 @@ class TestBuildErrors(unittest.TestCase):
         context = JsBuildingContext()
         model = ErrorsBuilder(context).build(self.errors)
         model = remap(model, context.strings)
-        assert_equal(model, ((0, 4, "Error"), (42, 3, "Warning")))
+        assert_equal(model, ((0, 5, "Error"), (42, 4, "Warning")))
 
     def test_linking(self):
         self.errors.messages.create(
@@ -771,7 +771,7 @@ class TestBuildErrors(unittest.TestCase):
         model = remap(model, context.strings)
         assert_equal(
             model,
-            ((-1, 4, "Error"), (41, 3, "Warning"), (0, 3, "Linkable", "s1-t1-k1")),
+            ((-1, 5, "Error"), (41, 4, "Warning"), (0, 4, "Linkable", "s1-t1-k1")),
         )
 
 

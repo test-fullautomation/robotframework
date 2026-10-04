@@ -13,6 +13,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import json
+import os
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -21,11 +24,45 @@ from robot.utils import get_error_message
 
 from .jsonlogger import JsonLogger
 from .loggerapi import LoggerApi
-from .loglevel import LogLevel
+from .loggerhelper import Message
+from .loglevel import LEVELS, LogLevel
 from .xmllogger import LegacyXmlLogger, NullLogger, XmlLogger
+
+# cuongnht: levels a literal `Log` keyword argument is matched against when
+# deciding whether the keyword element is written at all. Deliberately not
+# LEVELS, which contains statuses as well.
+LOG_KEYWORD_LEVELS = ("ERROR", "WARN", "USER", "INFO", "DEBUG", "TRACE")
+
+
+def level_from_log_keyword_args(args):
+    """Returns the explicit literal level argument of a `BuiltIn.Log` call.
+
+    ``None`` when the level is absent or non-literal (e.g. a ``${variable}``
+    that cannot be resolved at write time).
+    """
+    for arg in args or ():
+        if isinstance(arg, str) and arg in LOG_KEYWORD_LEVELS:
+            return arg
+    return None
 
 
 class OutputFile(LoggerApi):
+    # cuongnht memory cap: WARN/ERROR/UNKNOWN messages are collected for the
+    # <errors> section until the run ends. Only the first `max_errors` stay
+    # in memory; further ones are spilled to a sidecar file next to the
+    # output file and read back when the section is written, so the section
+    # stays complete with bounded memory. Without an output file the
+    # overflow is only counted.
+    max_errors = 10000
+    # cuongnht log level shortening: suppress `BuiltIn.Log` keyword elements
+    # whose explicit literal level argument is below the log level. The
+    # element is only held back, not dropped outright: if anything visible is
+    # logged inside it (e.g. the FAIL message when the keyword fails), the
+    # element is written after all so the output stays balanced and failures
+    # stay visible. Applies only while executing tests; re-serializing
+    # existing results (rebot) goes through XmlLogger directly and preserves
+    # the data.
+    suppress_log_keywords = True
 
     def __init__(
         self,
@@ -36,10 +73,19 @@ class OutputFile(LoggerApi):
     ):
         # `self.logger` is replaced with `NullLogger` when flattening.
         self.logger = self.real_logger = self._get_logger(path, rpa, legacy_output)
+        self.log_level = log_level
         self.is_logged = log_level.is_logged
         self.flatten_level = 0
         self.errors = []
+        self._errors_dropped = 0
+        self._errors_spill_path = None
+        self._errors_spill_file = None
+        self._errors_spill_lock = threading.Lock()
+        self._path = path
         self._delayed_messages = None
+        # Held-back `BuiltIn.Log` keywords, keyed by thread name because
+        # each thread streams to its own writer.
+        self._pending_log_kws = {}
 
     def _get_logger(self, path, rpa, legacy_output):
         if not path:
@@ -93,17 +139,45 @@ class OutputFile(LoggerApi):
         self.logger.end_test(result)
 
     def start_keyword(self, data, result):
+        if self._should_suppress_log_kw(result):
+            # cuongnht log level shortening: hold the element back;
+            # log_message writes it if anything visible is logged inside.
+            self._pending_log_kws[threading.current_thread().name] = result
+            return
+        self._flush_pending_log_kw()
         self.logger.start_keyword(result)
         if result.tags.robot("flatten"):
             self.flatten_level += 1
             self.logger = NullLogger()
 
     def end_keyword(self, data, result):
+        # NOTE: `BuiltIn.Log` has no child items, so a pending entry here
+        # always belongs to this keyword.
+        pending = self._pending_log_kws.pop(threading.current_thread().name, None)
+        if pending is not None:
+            if result.status == "PASS":
+                # Executed successfully and nothing visible was logged
+                # inside: drop the whole element (balanced suppression).
+                return
+            # NOT RUN (e.g. dry run) or failed without a visible message:
+            # structure must stay visible, so write the element after all.
+            self.logger.start_keyword(pending)
         if self.flatten_level and result.tags.robot("flatten"):
             self.flatten_level -= 1
             if self.flatten_level == 0:
                 self.logger = self.real_logger
         self.logger.end_keyword(result)
+
+    def _should_suppress_log_kw(self, result):
+        if not self.suppress_log_keywords or result.full_name != "BuiltIn.Log":
+            return False
+        level = level_from_log_keyword_args(result.args)
+        return level is not None and LEVELS[level] < self.log_level.priority
+
+    def _flush_pending_log_kw(self):
+        kw = self._pending_log_kws.pop(threading.current_thread().name, None)
+        if kw is not None:
+            self.logger.start_keyword(kw)
 
     def start_for(self, data, result):
         self.logger.start_for(result)
@@ -192,6 +266,9 @@ class OutputFile(LoggerApi):
     def log_message(self, message, no_delay=False):
         if self.is_logged(message):
             if self._delayed_messages is None or no_delay:
+                # A visible message inside a held-back `BuiltIn.Log` keyword
+                # resurrects the keyword element to keep output balanced.
+                self._flush_pending_log_kw()
                 # Use the real logger also when flattening.
                 self.real_logger.message(message)
             else:
@@ -201,12 +278,78 @@ class OutputFile(LoggerApi):
                 self._delayed_messages.append(message)
 
     def message(self, message):
-        if message.level in ("WARN", "ERROR"):
-            self.errors.append(message)
+        # nhtcuong: UNKNOWN level messages (e.g. import errors) belong to the
+        # errors section as well.
+        if message.level in ("WARN", "ERROR", "UNKNOWN"):
+            if len(self.errors) < self.max_errors:
+                self.errors.append(message)
+            elif self._path:
+                self._spill_error(message)
+            else:
+                self._errors_dropped += 1
+
+    def _spill_error(self, message):
+        """Writes an overflowing errors-section message to the sidecar file."""
+        with self._errors_spill_lock:
+            if self._errors_spill_file is None:
+                base, _ = os.path.splitext(str(self._path))
+                self._errors_spill_path = base + "_errors_spill.jsonl"
+                self._errors_spill_file = open(
+                    self._errors_spill_path, "w", encoding="UTF-8"
+                )
+            data = {
+                "timestamp": message.timestamp.isoformat() if message.timestamp else None,
+                "level": message.level,
+                "message": message.message,
+                "html": message.html,
+            }
+            json.dump(data, self._errors_spill_file)
+            self._errors_spill_file.write("\n")
+
+    def _spilled_errors(self):
+        with self._errors_spill_lock:
+            spill_file = self._errors_spill_file
+            self._errors_spill_file = None
+        if spill_file is None:
+            return
+        spill_file.close()
+        try:
+            with open(self._errors_spill_path, encoding="UTF-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    data = json.loads(line)
+                    yield Message(
+                        data["message"],
+                        data.get("level", "WARN"),
+                        data.get("html", False),
+                        data.get("timestamp"),
+                    )
+            os.remove(self._errors_spill_path)
+        except Exception as err:
+            yield Message(
+                f"Reading spilled error messages from "
+                f"'{self._errors_spill_path}' failed: {err}",
+                "WARN",
+            )
+
+    def _all_errors(self):
+        yield from self.errors
+        yield from self._spilled_errors()
+        if self._errors_dropped:
+            # Only possible without an output file (nowhere to spill to).
+            yield Message(
+                f"{self._errors_dropped} further warning/error messages were "
+                f"not collected (in-memory limit {self.max_errors}, no "
+                f"output file to spill to).",
+                "WARN",
+            )
 
     def statistics(self, stats):
         self.logger.statistics(stats)
 
     def close(self):
-        self.logger.errors(self.errors)
+        # A generator: spilled messages are streamed, not loaded at once.
+        self.logger.errors(self._all_errors())
         self.logger.close()

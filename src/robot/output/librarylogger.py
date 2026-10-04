@@ -58,6 +58,11 @@ def info(msg, html=False, console=False):
     write(msg, "INFO", html, console)
 
 
+def user(msg, html=False):
+    # nhtcuong: fork extension, see the USER level in loglevel.py.
+    write(msg, "USER", html)
+
+
 def warn(msg, html=False):
     write(msg, "WARN", html)
 

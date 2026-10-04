@@ -158,7 +158,8 @@ Options
                           Examples: --reportbackground green:red:blue:yellow
                                     --reportbackground #00E:#E00
  -L --loglevel level      Threshold for selecting messages. Available levels:
-                          TRACE (default), DEBUG, INFO, WARN, NONE (no msgs).
+                          TRACE (default), DEBUG, INFO, USER, WARN, NONE (no
+                          msgs).
                           Use syntax `LOGLEVEL:DEFAULT` to define the default
                           visible log level in log files.
                           Examples: --loglevel DEBUG

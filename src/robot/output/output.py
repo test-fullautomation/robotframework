@@ -35,7 +35,8 @@ class Output(AbstractLogger, LoggerApi):
         )
         self.listeners = Listeners(settings.listeners, self.log_level)
         self.library_listeners = LibraryListeners(self.log_level)
-        self._register_loggers(DebugFile(settings.debug_file))
+        # cuongnht log level shortening: the debug file follows the log level.
+        self._register_loggers(DebugFile(settings.debug_file, self.log_level))
         self._settings = settings
 
     @property

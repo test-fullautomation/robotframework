@@ -20,10 +20,16 @@ from robot.utils import file_writer, seq2str2
 
 from .logger import LOGGER
 from .loggerapi import LoggerApi
-from .loglevel import LogLevel
+from .loglevel import LEVELS, LogLevel
+from .outputfile import level_from_log_keyword_args
+
+# cuongnht log level shortening: output caused by code in this file (suite,
+# test and keyword start/end lines, separators) depends on this level,
+# compared against the actual log level.
+LOG_LEVEL_DEBUG_FILE = "INFO"
 
 
-def DebugFile(path):
+def DebugFile(path, log_level=None):
     if not path:
         LOGGER.info("No debug file")
         return None
@@ -34,43 +40,67 @@ def DebugFile(path):
         return None
     else:
         LOGGER.info(f"Debug file: {path}")
-        return _DebugFileWriter(outfile)
+        return _DebugFileWriter(outfile, log_level)
 
 
 class _DebugFileWriter(LoggerApi):
     _separators = {"SUITE": "=", "TEST": "-", "KEYWORD": "~"}
 
-    def __init__(self, outfile):
+    def __init__(self, outfile, log_level=None):
         self._indent = 0
         self._kw_level = 0
         self._separator_written_last = False
         self._outfile = outfile
-        self._is_logged = LogLevel("DEBUG").is_logged
+        # cuongnht log level shortening: previously hard coded level 'DEBUG'
+        # replaced by the actual log level. The LogLevel object is shared
+        # with Output, so `Set Log Level` is honoured here as well.
+        if isinstance(log_level, str):
+            log_level = LogLevel(log_level)
+        self._log_level = log_level or LogLevel("DEBUG")
+        self._is_logged = self._log_level.is_logged
+
+    def _level_is_logged(self, level):
+        return LEVELS[level] >= self._log_level.priority
 
     def start_suite(self, data, result):
-        self._separator("SUITE")
-        self._start("SUITE", data.full_name, result.start_time)
-        self._separator("SUITE")
+        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator("SUITE")
+            self._start("SUITE", data.full_name, result.start_time)
+            self._separator("SUITE")
 
     def end_suite(self, data, result):
-        self._separator("SUITE")
-        self._end("SUITE", data.full_name, result.end_time, result.elapsed_time)
-        self._separator("SUITE")
+        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator("SUITE")
+            self._end("SUITE", data.full_name, result.end_time, result.elapsed_time)
+            self._separator("SUITE")
         if self._indent == 0:
             LOGGER.debug_file(Path(self._outfile.name))
             self.close()
 
     def start_test(self, data, result):
-        self._separator("TEST")
-        self._start("TEST", result.name, result.start_time)
-        self._separator("TEST")
+        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator("TEST")
+            self._start("TEST", result.name, result.start_time)
+            self._separator("TEST")
 
     def end_test(self, data, result):
-        self._separator("TEST")
-        self._end("TEST", result.name, result.end_time, result.elapsed_time)
-        self._separator("TEST")
+        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            self._separator("TEST")
+            self._end("TEST", result.name, result.end_time, result.elapsed_time)
+            self._separator("TEST")
+
+    def _keyword_level(self, result):
+        # `BuiltIn.Log` has its own log level: its start/end lines follow the
+        # explicit literal level argument instead of the default.
+        if result.full_name == "BuiltIn.Log":
+            level = level_from_log_keyword_args(result.args)
+            if level is not None:
+                return level
+        return LOG_LEVEL_DEBUG_FILE
 
     def start_keyword(self, data, result):
+        if not self._level_is_logged(self._keyword_level(result)):
+            return
         if self._kw_level == 0:
             self._separator("KEYWORD")
         self._start(
@@ -79,16 +109,22 @@ class _DebugFileWriter(LoggerApi):
         self._kw_level += 1
 
     def end_keyword(self, data, result):
+        if not self._level_is_logged(self._keyword_level(result)):
+            return
         self._end(result.type, result.full_name, result.end_time, result.elapsed_time)
         self._kw_level -= 1
 
     def start_body_item(self, data, result):
+        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            return
         if self._kw_level == 0:
             self._separator("KEYWORD")
         self._start(result.type, result._log_name, result.start_time)
         self._kw_level += 1
 
     def end_body_item(self, data, result):
+        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            return
         self._end(result.type, result._log_name, result.end_time, result.elapsed_time)
         self._kw_level -= 1
 

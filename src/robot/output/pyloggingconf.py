@@ -24,6 +24,7 @@ LEVELS = {
     "TRACE": logging.NOTSET,
     "DEBUG": logging.DEBUG,
     "INFO": logging.INFO,
+    "USER": logging.INFO,  # nhtcuong
     "WARN": logging.WARNING,
     "ERROR": logging.ERROR,
 }
