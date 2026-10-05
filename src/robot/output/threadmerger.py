@@ -110,10 +110,14 @@ def _discover_thread_files(output_path):
         if re.fullmatch(r"(?:.+_)?part_\d+", name):
             continue
         try:
-            for _, elem in ET.iterparse(path, events=("start",)):
-                if elem.tag == "thread":
-                    files[elem.get("name") or name] = path
-                break
+            # Opened here, not by `iterparse`: leaving its loop early would
+            # keep the file open until garbage collection, and on Windows an
+            # open file cannot be removed after the merge.
+            with open(path, "rb") as file:
+                for _, elem in ET.iterparse(file, events=("start",)):
+                    if elem.tag == "thread":
+                        files[elem.get("name") or name] = path
+                    break
         except ET.ParseError:
             # Possibly truncated (crashed/daemon thread); _parse_thread_file
             # attempts recovery later.

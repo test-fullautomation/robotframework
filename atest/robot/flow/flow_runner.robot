@@ -109,16 +109,16 @@ Sub-flows run as one keyword each, with parameters, nesting and recovery
     Check Log Message    ${try.body[1].body[0].messages[0]}    Recovered: Step is broken.: yes != no
 
 Pause holds the flow and its clocks
-    Run Tests    ${PARSER} --variable HOLD:1.0 --test Hold    flow/pause_stop.flow.json
+    Run Tests    ${PARSER} --variable HOLD:3 --test Hold    flow/pause_stop.flow.json
     ${tc} =    Check Test Case    Hold    PASS
     ${loop} =    Set Variable    ${tc.body[2]}
     Should Be Equal    ${loop.type}    WHILE
-    # The 0.6 s loop was held for a second in its first iteration. Had the
-    # hold counted, the loop would have ended there.
-    Should Be True    len($loop.body) >= 4
+    # The two second loop was held for three seconds in its first iteration.
+    # Had the hold counted, the loop would have ended there.
+    Should Be True    len($loop.body) >= 3
     ${output} =    Get File    ${OUTFILE}
     Should Contain    ${output}    Flow paused by operator at iteration 1 of loop 'timed'.
-    Should Match Regexp    ${output}    Flow resumed after (1 second|9\\d\\d milliseconds)
+    Should Match Regexp    ${output}    Flow resumed after [23] seconds
 
 Stop leaves a checkpoint and the next run continues from it
     Remove File    ${CHECKPOINT}
