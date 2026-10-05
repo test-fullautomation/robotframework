@@ -60,7 +60,7 @@ Automatic module import
     ...                                         ${True}
 
 Module imports are case-sensitive
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) Resolving variable '\${{OS.sep}}' failed: \
@@ -106,7 +106,7 @@ Escape characters and curly braces
     ...                                         12
 
 Invalid
-    [Documentation]    FAIL GLOB:
+    [Documentation]    UNKNOWN GLOB:
     ...    Several failures occurred:
     ...
     ...    1) Resolving variable '\${{$i_do_not_exist}}' failed: \

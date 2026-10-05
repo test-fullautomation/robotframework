@@ -61,27 +61,28 @@ On limit fail with continuable failure
     Fail    One more failure!
 
 Invalid on_limit
-    [Documentation]    FAIL WHILE option 'on_limit' does not accept value 'inValid'. Valid values are 'PASS' and 'FAIL'.
+    [Documentation]    UNKNOWN WHILE option 'on_limit' does not accept value 'inValid'. Valid values are 'PASS' and 'FAIL'.
     WHILE    True    limit=5    on_limit=inValid
         Fail   Should not be executed
     END
 
 Invalid on_limit from variable
-    [Documentation]    FAIL Invalid WHILE loop 'on_limit': Value 'inValid' is not accepted. Valid values are 'PASS' and 'FAIL'.
+    [Documentation]    UNKNOWN Invalid WHILE loop 'on_limit': Value 'inValid' is not accepted. Valid values are 'PASS' and 'FAIL'.
     WHILE    True    limit=5    on_limit=${{'inValid'}}
         Fail   Should not be executed
     END
 
 On limit without limit
-    [Documentation]    FAIL WHILE option 'on_limit' cannot be used without 'limit'.
+    [Documentation]    UNKNOWN WHILE option 'on_limit' cannot be used without 'limit'.
     WHILE    True    on_limit=PaSS
         Fail   Should not be executed
     END
 
 On limit with invalid variable
-    [Documentation]    FAIL Invalid WHILE loop 'on_limit': Variable '\${does not exist}' not found.
+    [Documentation]    UNKNOWN Invalid WHILE loop 'on_limit': Variable '\${does not exist}' not found.
     WHILE    True    limit=5    on_limit=${does not exist}
         Fail   Should not be executed
+    [Documentation]     UNKNOWN WHILE loop cannot have more than one condition, got '$variable < 2', 'limit=5' and 'limit_exceed_messag=Custom error message'.
     END
 
 On limit message
@@ -129,7 +130,8 @@ On limit message before limit
     END
 
 On limit message with invalid variable
-    [Documentation]     FAIL Invalid WHILE loop 'on_limit_message': 'Variable '${nonExisting}' not found.
+    [Documentation]    UNKNOWN Invalid WHILE loop 'on_limit_message': 'Variable '${nonExisting}' not found.
     WHILE    $variable < 2    on_limit_message=${nonExisting}
         Fail   Should not be executed
+    [Documentation]     UNKNOWN WHILE loop cannot have more than one condition, got '$variable < 2', 'limite=5' and 'limit_exceed_messag=Custom error message'.
     END

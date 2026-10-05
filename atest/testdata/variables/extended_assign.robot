@@ -38,7 +38,7 @@ Set item to dict attribute
     Dictionaries Should Be Equal     ${body.data}          ${{{'key': 'newVal', 0: 2, 'newKey': 'newKeyVal'}}}
 
 Set using @-syntax
-    [Documentation]    FAIL Setting '\@{VAR.fail}' failed: Expected list-like value, got string.
+    [Documentation]    UNKNOWN Setting '\@{VAR.fail}' failed: Expected list-like value, got string.
     @{DICT.key} =    Create List    1    2    3
     Should Be Equal    ${DICT}    ${{{'key': ['1', '2', '3']}}}
     @{VAR.list: int} =    Create List    1    2    3
@@ -46,7 +46,7 @@ Set using @-syntax
     @{VAR.fail} =    Set Variable    not a list
 
 Set using &-syntax
-    [Documentation]    FAIL Setting '\&{DICT.fail}' failed: Expected dictionary-like value, got integer.
+    [Documentation]    UNKNOWN Setting '\&{DICT.fail}' failed: Expected dictionary-like value, got integer.
     &{VAR.dict} =    Create Dictionary    key=value
     Should Be Equal    ${VAR.dict}    ${{{'key': 'value'}}}
     Should Be Equal    ${VAR.dict.key}    value
@@ -56,11 +56,11 @@ Set using &-syntax
     &{DICT.fail} =    Set Variable    ${666}
 
 Trying to set un-settable attribute
-    [Documentation]    FAIL STARTS: Setting '\${VAR.not_settable}' failed: AttributeError:
+    [Documentation]    UNKNOWN STARTS: Setting '\${VAR.not_settable}' failed: AttributeError:
     ${VAR.not_settable} =    Set Variable    whatever
 
 Un-settable attribute error is catchable
-    [Documentation]    FAIL GLOB:
+    [Documentation]    UNKNOWN GLOB:
     ...    Teardown failed:
     ...    Several failures occurred:
     ...

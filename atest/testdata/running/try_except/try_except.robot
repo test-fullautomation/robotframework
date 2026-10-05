@@ -86,7 +86,7 @@ Default except pattern
     END
 
 Syntax errors cannot be caught
-    [Documentation]    FAIL Assign mark '=' can be used only with the last variable.
+    [Documentation]    UNKNOWN Assign mark '=' can be used only with the last variable.
     TRY
         ${y} =    ${x}     Set Variable
     EXCEPT

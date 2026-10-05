@@ -28,16 +28,16 @@ User keyword arguments
 Invalid keyword arguments
     ${tc} =    Check Test Case    Library keyword arguments
     Check Keyword Data    ${tc[4]}    Non-existing
-    ...    args=p, n=1    status=FAIL
+    ...    args=p, n=1    status=UNKNOWN
 
 Too many arguments
     ${tc} =    Check Test Case    ${TEST NAME}
     Check Keyword Data    ${tc[0]}    Library.Library Keyword
-    ...    args=a, b, c, d, e, f, g    status=FAIL
+    ...    args=a, b, c, d, e, f, g    status=UNKNOWN
     Check Keyword Data    ${tc[1]}    User keyword
-    ...    args=a, b, c, d, e, f, g    status=FAIL
+    ...    args=a, b, c, d, e, f, g    status=UNKNOWN
     Check Keyword Data    ${tc[2]}    Library.Library Keyword
-    ...    args=${{', '.join(str(i) for i in range(100))}}    status=FAIL
+    ...    args=${{', '.join(str(i) for i in range(100))}}    status=UNKNOWN
 
 Conversion error
     ${tc} =    Check Test Case    ${TEST NAME}
@@ -49,4 +49,4 @@ Conversion error
 Positional after named
     ${tc} =    Check Test Case    ${TEST NAME}
     Check Keyword Data    ${tc[0]}    Library.Library Keyword
-    ...    args=positional, number=-1, ooops    status=FAIL
+    ...    args=positional, number=-1, ooops    status=UNKNOWN

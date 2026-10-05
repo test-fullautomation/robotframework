@@ -28,7 +28,7 @@ Set Log Level
 
 Invalid Log Level Failure Is Catchable
     [Documentation]    FAIL
-    ...    ValueError: Argument 'level' got value 'INVALID' that cannot be converted to 'TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR' or 'NONE'.
+    ...    ValueError: Argument 'level' got value 'INVALID' that cannot be converted to 'TRACE', 'DEBUG', 'INFO', 'USER', 'WARN', 'ERROR' or 'NONE'.
     Set Log Level    INVALID
 
 Reset Log Level

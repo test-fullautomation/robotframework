@@ -18,6 +18,7 @@ import threading
 from contextlib import contextmanager
 
 from robot.errors import DataError
+from robot.utils import in_worker_thread
 
 from .console import ConsoleOutput
 from .filelogger import FileLogger
@@ -54,16 +55,14 @@ class _ThreadParents:
 
     def __init__(self):
         self._main = []
-        self._main_thread = threading.main_thread()
         self._others = {}
         self._lock = threading.Lock()
 
     def _current(self):
-        thread = threading.current_thread()
-        if thread is self._main_thread:
+        if not in_worker_thread():
             return self._main
         with self._lock:
-            return self._others.setdefault(thread.name, [])
+            return self._others.setdefault(threading.current_thread().name, [])
 
     def append(self, item):
         self._current().append(item)
@@ -403,7 +402,7 @@ class Logger(AbstractLogger):
     def end_thread(self, data, result):
         for logger in self.end_loggers:
             logger.end_thread(data, result)
-        if threading.current_thread() is not threading.main_thread():
+        if in_worker_thread():
             self._log_message_parents.discard_current_thread()
 
     @start_body_item

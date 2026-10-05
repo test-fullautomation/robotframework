@@ -11,7 +11,7 @@ Test
     Fail    Should not be executed
 
 Test 2
-    [Documentation]    FAIL Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN Test execution stopped due to a fatal error.
     Fail    Should not be executed
 
 *** Keywords ***

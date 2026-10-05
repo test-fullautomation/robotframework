@@ -46,7 +46,7 @@ from robot.errors import (
 from robot.model import BodyItem, DataDict, TestSuites
 from robot.output import LOGGER, Output, pyloggingconf
 from robot.result import Result
-from robot.utils import format_assign_message, setter
+from robot.utils import format_assign_message, set_execution_thread, setter
 from robot.variables import VariableResolver
 
 from .bodyrunner import (
@@ -946,6 +946,9 @@ class TestSuite(model.TestSuite[Keyword, TestCase]):
         from .signalhandler import STOP_SIGNAL_MONITOR
         from .suiterunner import SuiteRunner
 
+        # cuongnht add thread: THREAD workers are told apart from this thread,
+        # which is not necessarily the process main thread.
+        set_execution_thread()
         with LOGGER:
             if not settings:
                 settings = RobotSettings(options)

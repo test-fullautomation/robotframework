@@ -223,13 +223,13 @@ In dry-run
     ...    FOR and CONTINUE
     ...    WHILE and BREAK
     ...    GROUP
-    ...    Second One=FAIL:Several failures occurred:\n\n1) No keyword with name 'Not executed' found.\n\n2) No keyword with name 'Not executed' found.
+    ...    Second One=UNKNOWN:Several failures occurred:\n\n1) No keyword with name 'Not executed' found.\n\n2) No keyword with name 'Not executed' found.
     ...    Test with failing setup=PASS
     ...    Test with failing teardown=PASS
     ...    Failing test with failing teardown=PASS
-    ...    FOR IN RANGE=FAIL:No keyword with name 'Not executed!' found.
+    ...    FOR IN RANGE=UNKNOWN:No keyword with name 'Not executed!' found.
     ...    Failure=PASS
-    ...    Syntax error=FAIL:Several failures occurred:\n\n1) Non-existing setting 'Bad'.\n\n2) Non-existing setting 'Ooops'.
+    ...    Syntax error=UNKNOWN:Several failures occurred:\n\n1) Non-existing setting 'Bad'.\n\n2) Non-existing setting 'Ooops'.
 
 *** Keywords ***
 Run Tests With Keyword Running Listener

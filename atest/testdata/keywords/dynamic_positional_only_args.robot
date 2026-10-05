@@ -27,11 +27,11 @@ Pos and named
     Should be equal    ${result}    with normal-('aaa',)-{'normal': '111'}
 
 Pos and names too few arguments
-    [Documentation]    FAIL Keyword 'DynamicPositionalOnly.With Normal' expected 2 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'DynamicPositionalOnly.With Normal' expected 2 arguments, got 1.
     with normal    normal=aaa
 
 Three arguments too many arguments
-    [Documentation]    FAIL Keyword 'DynamicPositionalOnly.Three Arguments' expected 3 arguments, got 4.
+    [Documentation]    UNKNOWN Keyword 'DynamicPositionalOnly.Three Arguments' expected 3 arguments, got 4.
     Three Arguments    a    b    c    /
 
 Pos with default

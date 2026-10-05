@@ -35,7 +35,8 @@ from robot.running import Keyword, RUN_KW_REGISTER, TypeInfo
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.utils import (
     DotDict, escape, format_assign_message, get_error_message, get_time, html_escape,
-    is_truthy, Matcher, normalize, normalize_whitespace, NormalizedDict, parse_re_flags,
+    in_worker_thread, is_truthy, Matcher, normalize, normalize_whitespace,
+    NormalizedDict, parse_re_flags,
     parse_time, plural_or_not as s, prepr, PriorityQueue, QueuedNotification, safe_str,
     secs_to_timestr, seq2str, split_from_equals, timestr_to_secs, type_name, unescape
 )
@@ -4169,7 +4170,7 @@ class _Misc(_BuiltInBase):
         # a THREAD block only the worker's own scope is touched; the main
         # thread uses the normal test scope.
         variables = self._context.variables
-        if threading.current_thread() is threading.main_thread():
+        if not in_worker_thread():
             variables.set_test("${payloads}", payloads)
         else:
             variables.current["${payloads}"] = payloads

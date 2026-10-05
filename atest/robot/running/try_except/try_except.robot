@@ -35,7 +35,7 @@ Default except pattern
     FAIL    PASS
 
 Syntax errors cannot be caught
-    FAIL    NOT RUN    NOT RUN
+    UNKNOWN    NOT RUN    NOT RUN    tc_status=UNKNOWN
 
 Finally block executed when no failures
     [Template]    None

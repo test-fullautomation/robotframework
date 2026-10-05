@@ -24,7 +24,7 @@ Mandatory And Named As Named
     Should Be Equal    ${ret}    1, 2, 3
 
 Same Argument As Positional And Named Fails
-    [Documentation]    FAIL Keyword 'KwargsLibrary.One Named' got multiple values for argument 'named'.
+    [Documentation]    UNKNOWN Keyword 'KwargsLibrary.One Named' got multiple values for argument 'named'.
     One Named    positional    named=named
 
 Mandatory, Named And Varargs As Positional
@@ -38,11 +38,11 @@ Naming arguments with varargs is supported when varargs are not used
     Should Be Equal    ${ret}    mandatory, d1, d2, []
 
 Naming arguments is not supported when varargs are used
-    [Documentation]    FAIL Keyword 'KwargsLibrary.Mandatory Named And Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'KwargsLibrary.Mandatory Named And Varargs' got positional argument after named arguments.
     Mandatory Named And Varargs    d1    d2=d2    vararg
 
 Naming arguments before possible varargs is not supported with empty lists either
-    [Documentation]    FAIL Keyword 'KwargsLibrary.Mandatory Named And Varargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'KwargsLibrary.Mandatory Named And Varargs' got positional argument after named arguments.
     Mandatory Named And Varargs    d1    d2=d2    @{EMPTY}
 
 Named Syntax In Variable Is Ignored
@@ -67,7 +67,7 @@ Non-existing argument does not trigger named usage
     Should Be Equal    ${ret}    ä=ö
 
 Run Keyword's own named arguments are not resolved
-    [Documentation]    FAIL No keyword with name 'name=No Operation' found.
+    [Documentation]    UNKNOWN No keyword with name 'name=No Operation' found.
     Run Keyword    name=No Operation
 
 Inside Run Keyword named arguments are resolved
@@ -99,7 +99,7 @@ Kwargs with escaped equal sign 1
     Should Be Equal    ${result}    1\\:x=y, 2=x\\:y, 3\\\\=x\\\\:y
 
 Kwargs with escaped equal sign 2
-    [Documentation]    FAIL Keyword 'python_library.Lib Kwargs' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'python_library.Lib Kwargs' expected 0 non-named arguments, got 1.
     Lib Kwargs    a\=b\\\=c\\\\\=d\\\\\\\=e
 
 Kwargs with positional and named
@@ -197,7 +197,7 @@ Multiple named with same name is allowed and last has precedence
     b, 3, c:2     a=a    ${b}=1    c=1    ${b}=2    c=2    b=3    a=${b}
 
 List variable with multiple values for same variable
-    [Documentation]    FAIL Keyword 'python_library.Lib Mandatory And Named 2' got multiple values for argument 'b'.
+    [Documentation]    UNKNOWN Keyword 'python_library.Lib Mandatory And Named 2' got multiple values for argument 'b'.
     @{foo} =    Create list    a    b
     Lib mandatory and named 2    @{foo}    b=given second time
 
@@ -210,7 +210,7 @@ Empty string is allowed in kwargs names
     Should be equal    a, b, :whut    ${res}
 
 Dict is not converted to kwargs
-    [Documentation]    FAIL Keyword 'python_library.Lib Kwargs' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'python_library.Lib Kwargs' expected 0 non-named arguments, got 1.
     ${dict} =    Create Dictionary   a=1    b=2
     lib_kwargs    ${dict}
 

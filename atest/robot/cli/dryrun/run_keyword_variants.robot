@@ -8,8 +8,8 @@ ${LISTENER}       ${DATADIR}/cli/dryrun/LinenoListener.py
 *** Test Cases ***
 Run Keyword With Keyword with Invalid Number of Arguments
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Keyword Data    ${tc[0]}       BuiltIn.Run Keyword    args=Log    status=FAIL
-    Check Keyword Data    ${tc[0, 0]}    BuiltIn.Log            args=       status=FAIL
+    Check Keyword Data    ${tc[0]}       BuiltIn.Run Keyword    args=Log    status=UNKNOWN
+    Check Keyword Data    ${tc[0, 0]}    BuiltIn.Log            args=       status=UNKNOWN
 
 Run Keyword With Missing Keyword
     Check Test Case    ${TESTNAME}

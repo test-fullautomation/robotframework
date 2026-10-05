@@ -4,7 +4,7 @@ Library         Collections
 
 *** Test Cases ***
 Integer Variables
-    [Documentation]    FAIL    Variable '${FF}' not found.
+    [Documentation]    UNKNOWN    Variable '${FF}' not found.
     ${one} =    Convert To Integer    1
     ${minus_two} =    Convert To Integer    -2
     Should Be Equal    ${1}    ${one}
@@ -14,7 +14,7 @@ Integer Variables
     Log    No automatic hex conversion ${FF}
 
 Integer Variables With Base
-    [Documentation]    FAIL STARTS:    Variable '${0b123}' not found.
+    [Documentation]    UNKNOWN STARTS:    Variable '${0b123}' not found.
     Should Be Equal    ${0xFF}    ${255}
     Should Be Equal    ${ 0 X A}    ${10}
     Should Be Equal    ${0b1010}    ${10}

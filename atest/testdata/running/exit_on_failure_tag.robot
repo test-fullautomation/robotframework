@@ -13,9 +13,9 @@ Failing test with the tag initiates exit-on-failure
     Fail    Something worse happened!
 
 Subsequent tests are not run 1
-    [Documentation]    FAIL    Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN    Test execution stopped due to a fatal error.
     Fail    Not executed.
 
 Subsequent tests are not run 2
-    [Documentation]    FAIL    Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN    Test execution stopped due to a fatal error.
     Fail    Not executed.

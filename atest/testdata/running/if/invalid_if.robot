@@ -1,12 +1,12 @@
 *** Test Cases ***
 IF without condition
-    [Documentation]    FAIL    IF must have a condition.
+    [Documentation]    UNKNOWN    IF must have a condition.
     IF
         Fail    Should not be run
     END
 
 IF without condition with ELSE
-    [Documentation]    FAIL    IF must have a condition.
+    [Documentation]    UNKNOWN    IF must have a condition.
     IF
         Fail    Should not be run
     ELSE
@@ -14,13 +14,13 @@ IF without condition with ELSE
     END
 
 IF with invalid condition
-    [Documentation]    FAIL STARTS:     Invalid IF condition: Evaluating expression "'123'=123" failed: SyntaxError:
+    [Documentation]    UNKNOWN STARTS:     Invalid IF condition: Evaluating expression "'123'=123" failed: SyntaxError:
     IF    '123'=${123}
         Fail    Should not be run
     END
 
 IF condition with non-existing ${variable}
-    [Documentation]    FAIL    Invalid IF condition: Evaluating expression '\${ooop}' failed: Variable '\${ooop}' not found.
+    [Documentation]    UNKNOWN    Invalid IF condition: Evaluating expression '\${ooop}' failed: Variable '\${ooop}' not found.
     IF    ${ooop}
         Fail    Should not be run
     ELSE IF    ${not evaluated}
@@ -28,7 +28,7 @@ IF condition with non-existing ${variable}
     END
 
 IF condition with non-existing $variable
-    [Documentation]    FAIL    Invalid IF condition: Evaluating expression '$ooop' failed: Variable '$ooop' not found.
+    [Documentation]    UNKNOWN    Invalid IF condition: Evaluating expression '$ooop' failed: Variable '$ooop' not found.
     IF    $ooop
         Fail    Should not be run
     ELSE IF    $not_evaluated
@@ -36,7 +36,7 @@ IF condition with non-existing $variable
     END
 
 IF with invalid condition with ELSE
-    [Documentation]    FAIL     Invalid IF condition: \
+    [Documentation]    UNKNOWN     Invalid IF condition: \
     ...    Evaluating expression 'ooops' failed: NameError: name 'ooops' is not defined nor importable as module
     IF    ooops
         Fail    Should not be run
@@ -45,7 +45,7 @@ IF with invalid condition with ELSE
     END
 
 ELSE IF with invalid condition
-    [Documentation]    FAIL    STARTS: Invalid ELSE IF condition: Evaluating expression '1/0' failed: ZeroDivisionError:
+    [Documentation]    UNKNOWN    STARTS: Invalid ELSE IF condition: Evaluating expression '1/0' failed: ZeroDivisionError:
     IF    False
         Fail    Should not be run
     ELSE IF    False
@@ -59,7 +59,7 @@ ELSE IF with invalid condition
     END
 
 Recommend $var syntax if invalid condition contains ${var}
-    [Documentation]    FAIL    Invalid IF condition: \
+    [Documentation]    UNKNOWN    Invalid IF condition: \
     ...    Evaluating expression "x == 'x'" failed: NameError: name 'x' is not defined nor importable as module
     ...
     ...    Variables in the original expression "\${x} == 'x'" were resolved before the expression was evaluated. \
@@ -70,7 +70,7 @@ Recommend $var syntax if invalid condition contains ${var}
     END
 
 $var recommendation with multiple variables
-    [Documentation]    FAIL    Invalid IF condition: \
+    [Documentation]    UNKNOWN    Invalid IF condition: \
     ...    Evaluating expression "x == 'x' or x == 'y'" failed: NameError: name 'x' is not defined nor importable as module
     ...
     ...    Variables in the original expression "\${x} == 'x' or \${x} == 'y'" were resolved before the expression was evaluated. \
@@ -81,7 +81,7 @@ $var recommendation with multiple variables
     END
 
 Remove quotes around variable in $var recommendation
-    [Documentation]    FAIL    GLOB: Invalid IF condition: \
+    [Documentation]    UNKNOWN    GLOB: Invalid IF condition: \
     ...    Evaluating expression '\\'\\'x"\\' == \\'x\\' or "\\'x"" == \\'x\\' or """"""y\\'\\'\\'""" == \\'y\\' or \\'\\'\\'"""y\\'\\'\\'\\'\\'\\' == \\'y\\'' failed: SyntaxError: *
     ...
     ...    Variables in the original expression '\\'\${x}\\' == \\'x\\' or "\${x}" == \\'x\\' or """\${y}""" == \\'y\\' or \\'\\'\\'\${y}\\'\\'\\' == \\'y\\'' were resolved before the expression was evaluated. \
@@ -93,24 +93,24 @@ Remove quotes around variable in $var recommendation
     END
 
 IF without END
-    [Documentation]    FAIL    IF must have closing END.
+    [Documentation]    UNKNOWN    IF must have closing END.
     IF    ${True}
         Fail    Should not be run
 
 Invalid END
-    [Documentation]    FAIL    END does not accept arguments, got 'this', 'is' and 'invalid'.
+    [Documentation]    UNKNOWN    END does not accept arguments, got 'this', 'is' and 'invalid'.
     IF    True
         Fail    Should not be run
     END    this    is    invalid
 
 IF with wrong case
-    [Documentation]    FAIL    No keyword with name 'if' found.
+    [Documentation]    UNKNOWN    No keyword with name 'if' found.
     if    ${True}
         Fail    Should not be run
     END
 
 ELSE IF without condition
-    [Documentation]    FAIL    ELSE IF must have a condition.
+    [Documentation]    UNKNOWN    ELSE IF must have a condition.
     IF    'mars' == 'mars'
         Fail    Should not be run
     ELSE IF
@@ -120,7 +120,7 @@ ELSE IF without condition
     END
 
 ELSE IF with multiple conditions
-    [Documentation]    FAIL    ELSE IF cannot have more than one condition, got '\${False}', 'ooops' and '\${True}'.
+    [Documentation]    UNKNOWN    ELSE IF cannot have more than one condition, got '\${False}', 'ooops' and '\${True}'.
     IF    'maa' == 'maa'
         Fail    Should not be run
     ELSE IF    ${False}    ooops    ${True}
@@ -130,7 +130,7 @@ ELSE IF with multiple conditions
     END
 
 ELSE with condition
-    [Documentation]    FAIL    ELSE does not accept arguments, got '\${True}'.
+    [Documentation]    UNKNOWN    ELSE does not accept arguments, got '\${True}'.
     IF    'venus' != 'mars'
         Fail    Should not be run
     ELSE    ${True}
@@ -138,19 +138,19 @@ ELSE with condition
     END
 
 IF with empty body
-    [Documentation]    FAIL    IF branch cannot be empty.
+    [Documentation]    UNKNOWN    IF branch cannot be empty.
     IF    'jupiter' == 'saturnus'
     END
 
 ELSE with empty body
-    [Documentation]    FAIL    ELSE branch cannot be empty.
+    [Documentation]    UNKNOWN    ELSE branch cannot be empty.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
     END
 
 ELSE IF with empty body
-    [Documentation]    FAIL    ELSE IF branch cannot be empty.
+    [Documentation]    UNKNOWN    ELSE IF branch cannot be empty.
     IF    'mars' == 'maa'
         Fail    Should not be run
     ELSE IF    ${False}
@@ -159,7 +159,7 @@ ELSE IF with empty body
     END
 
 ELSE after ELSE
-    [Documentation]    FAIL    Only one ELSE allowed.
+    [Documentation]    UNKNOWN    Only one ELSE allowed.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
@@ -169,7 +169,7 @@ ELSE after ELSE
     END
 
 ELSE IF after ELSE
-    [Documentation]    FAIL    ELSE IF not allowed after ELSE.
+    [Documentation]    UNKNOWN    ELSE IF not allowed after ELSE.
     IF    'kuu' == 'maa'
         Fail    Should not be run
     ELSE
@@ -179,39 +179,39 @@ ELSE IF after ELSE
     END
 
 Dangling ELSE
-    [Documentation]    FAIL    ELSE is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE is not allowed in this context.
     ELSE
 
 Dangling ELSE inside FOR
-    [Documentation]    FAIL    ELSE is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE is not allowed in this context.
     FOR    ${i}    IN    1    2
         ELSE
     END
 
 Dangling ELSE inside WHILE
-    [Documentation]    FAIL    ELSE is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE is not allowed in this context.
     WHILE    ${True}
         ELSE
     END
 
 Dangling ELSE IF
-    [Documentation]    FAIL    ELSE IF is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE IF is not allowed in this context.
     ELSE IF
 
 Dangling ELSE IF inside FOR
-    [Documentation]    FAIL    ELSE IF is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE IF is not allowed in this context.
     FOR    ${i}    IN    1    2
         ELSE IF
     END
 
 Dangling ELSE IF inside WHILE
-    [Documentation]    FAIL    ELSE IF is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE IF is not allowed in this context.
     WHILE    ${True}
         ELSE IF
     END
 
 Dangling ELSE IF inside TRY
-    [Documentation]    FAIL    ELSE IF is not allowed in this context.
+    [Documentation]    UNKNOWN    ELSE IF is not allowed in this context.
     TRY
         Fail
     EXCEPT
@@ -219,7 +219,7 @@ Dangling ELSE IF inside TRY
     END
 
 Invalid IF inside FOR
-    [Documentation]    FAIL    ELSE IF not allowed after ELSE.
+    [Documentation]    UNKNOWN    ELSE IF not allowed after ELSE.
     FOR    ${value}    IN    1    2    3
         IF    ${value} == 1
             Fail    Should not be run
@@ -231,7 +231,7 @@ Invalid IF inside FOR
     END
 
 Multiple errors
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple errors:
     ...    - IF must have a condition.
     ...    - IF branch cannot be empty.
@@ -252,7 +252,7 @@ Multiple errors
     ELSE
 
 Invalid data causes syntax error
-    [Documentation]    FAIL    IF branch cannot be empty.
+    [Documentation]    UNKNOWN    IF branch cannot be empty.
     TRY
         IF    True
         END
@@ -261,7 +261,7 @@ Invalid data causes syntax error
     END
 
 Invalid condition causes normal error
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Invalid IF condition: Evaluating expression 'bad in teardown' failed: NameError: name 'bad' is not defined nor importable as module
@@ -277,7 +277,7 @@ Invalid condition causes normal error
     [Teardown]    Invalid condition
 
 Non-existing variable in condition causes normal error
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Invalid IF condition: Evaluating expression '\${oops}' failed: Variable '\${oops}' not found.

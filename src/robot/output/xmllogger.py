@@ -108,7 +108,9 @@ class XmlLogger(ResultVisitor):
         # `<base>_<thread name><ext>` next to the main output. The files are
         # merged into the main output when execution ends (threadmerger).
         self._path = str(path) if path else None
-        self._main_thread = threading.main_thread()
+        # The logger is created by the thread executing the suite (or rebot),
+        # which is not necessarily the process main thread.
+        self._main_thread = threading.current_thread()
         self._thread_writers = {}
         self._thread_writers_lock = threading.Lock()
         self.thread_output_files = {}
@@ -496,6 +498,13 @@ class LegacyXmlLogger(XmlLogger):
             "rpa": "true" if rpa else "false",
             "schemaversion": "4",
         }
+
+    def visit_stat(self, stat):
+        # cuongnht - add unknown state: the legacy format has no UNKNOWN
+        # statistics attribute.
+        attrs = stat.get_attributes(values_as_strings=True)
+        attrs.pop("unknown", None)
+        self._writer.element("stat", stat.name, attrs)
 
     def _datetime_to_timestamp(self, dt):
         if dt is None:

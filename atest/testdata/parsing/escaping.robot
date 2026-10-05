@@ -160,7 +160,7 @@ Any Character Escaped
     Should Be Equal    \ä    ä
 
 Escaping Variables
-    [Documentation]    FAIL Variable '\${foobar}' not found.
+    [Documentation]    UNKNOWN Variable '\${foobar}' not found.
     Should Be Equal    \${foo}    $\{foo}
     Should Be Equal    \\${var}    \\\${non_existing}
     Should Be Equal    \${foobar}    ${foobar}

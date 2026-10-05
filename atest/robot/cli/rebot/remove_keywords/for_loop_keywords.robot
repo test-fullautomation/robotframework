@@ -51,7 +51,7 @@ Steps From Loops In Keywords From Loops Are Removed
 
 Empty Loops Are Handled Correctly
     ${tc}=    Check Test Case    Empty body
-    Should Be Equal    ${tc[0].status}                   FAIL
+    Should Be Equal    ${tc[0].status}                   UNKNOWN
     Should Be Equal    ${tc[0].message}                  FOR loop cannot be empty.
     Should Be Equal    ${tc[0, 0].type}                  ITERATION
     Should Be Equal    ${tc[0, 0].status}                NOT RUN

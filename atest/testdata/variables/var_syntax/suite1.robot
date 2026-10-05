@@ -51,15 +51,15 @@ Long values
     Should Be Equal    ${dict}      ${{dict(enumerate($items))}}
 
 Invalid name
-    [Documentation]    FAIL    Invalid variable name 'bad'.
+    [Documentation]    UNKNOWN    Invalid variable name 'bad'.
     VAR    bad    name
 
 No name
-    [Documentation]    FAIL    Invalid variable name ''.
+    [Documentation]    UNKNOWN    Invalid variable name ''.
     VAR
 
 No name with continuation
-    [Documentation]    FAIL    Invalid variable name ''.
+    [Documentation]    UNKNOWN    Invalid variable name ''.
     VAR
     ...
 
@@ -140,23 +140,23 @@ List and dict without value when using non-local scope creates empty value 2
     Should Be Equal    ${DICT}    ${{{}}}
 
 Invalid scope
-    [Documentation]    FAIL    VAR option 'scope' does not accept value 'invalid'. Valid values are 'LOCAL', 'TEST', 'TASK', 'SUITE', 'SUITES' and 'GLOBAL'.
+    [Documentation]    UNKNOWN    VAR option 'scope' does not accept value 'invalid'. Valid values are 'LOCAL', 'TEST', 'TASK', 'SUITE', 'SUITES' and 'GLOBAL'.
     VAR    ${x}    x    scope=invalid
 
 Invalid scope from variable
-    [Documentation]    FAIL    Invalid VAR scope: Value 'invalid' is not accepted. Valid values are 'LOCAL', 'TEST', 'TASK', 'SUITE', 'SUITES' and 'GLOBAL'.
+    [Documentation]    UNKNOWN    Invalid VAR scope: Value 'invalid' is not accepted. Valid values are 'LOCAL', 'TEST', 'TASK', 'SUITE', 'SUITES' and 'GLOBAL'.
     VAR    ${x}    x    scope=${{'invalid'}}
 
 Non-existing variable as scope
-    [Documentation]    FAIL    Invalid VAR scope: Variable '\${invalid}' not found.
+    [Documentation]    UNKNOWN    Invalid VAR scope: Variable '\${invalid}' not found.
     VAR    ${x}    x    scope=${invalid}
 
 Non-existing variable in value
-    [Documentation]    FAIL    Setting variable '\${x}' failed: Variable '\${bad}' not found.
+    [Documentation]    UNKNOWN    Setting variable '\${x}' failed: Variable '\${bad}' not found.
     VAR    ${x}    ${bad}
 
 Non-existing variable in separator
-    [Documentation]    FAIL    Setting variable '\${x}' failed: Variable '\${bad}' not found.
+    [Documentation]    UNKNOWN    Setting variable '\${x}' failed: Variable '\${bad}' not found.
     VAR    ${x}    a    b    separator=${bad}
 
 Name based on another variable
@@ -202,7 +202,7 @@ Name based on variable defined in different scope 3
     Should Be Equal    ${s-s-2}    s-4
 
 Non-existing variable in name
-    [Documentation]    FAIL    Setting variable '\${this is \${bad}}' failed: Variable '${\bad}' not found.
+    [Documentation]    UNKNOWN    Setting variable '\${this is \${bad}}' failed: Variable '${\bad}' not found.
     VAR    ${this is ${bad}}    wharever
 
 With FOR

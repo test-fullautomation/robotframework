@@ -11,7 +11,7 @@ IF failing
     FAIL
 
 IF erroring
-    FAIL
+    UNKNOWN
 
 Not executed
     NOT RUN
@@ -55,7 +55,7 @@ Assign with item
 
 Multi assign
     PASS       NOT RUN    index=0
-    FAIL       NOT RUN    index=4
+    UNKNOWN       NOT RUN    index=4
 
 List assign
     PASS       NOT RUN    index=0

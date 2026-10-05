@@ -38,7 +38,7 @@ Changing test status in end suite changes console output, but not output.xml
     Stdout Should Contain     SEPARATOR=\n
     ...    5 tests, 5 passed, 0 failed
     ${from output.xml} =    Catenate    SEPARATOR=\n
-    ...    5 tests, 2 passed, 3 failed
+    ...    5 tests, 2 passed, 3 failed, 0 unknown
     Should be equal    ${SUITE.stat_message}     ${from output.xml}
 
 Test tags can be modified
@@ -79,7 +79,7 @@ Syslog messages can be changed
     Syslog Should Contain Match    2015-12-16 15:51:20.141000 | INFO \ | TESTS EXECUTION ENDED. STATISTICS:
 
 Library import
-    Stdout Should Contain    Imported library 'BuiltIn' with 109 keywords.
+    Stdout Should Contain    Imported library 'BuiltIn' with 117 keywords.
     Stdout Should Contain    Imported library 'String' with 32 keywords.
     ${tc} =   Get Test Case    Pass [start suite]
     Check Keyword Data    ${tc[0, 0]}    BuiltIn.Log    doc=Changed!    args=Hello says "\${who}"!, \${LEVEL1}

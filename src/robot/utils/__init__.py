@@ -162,6 +162,11 @@ from .text import (
     pad_console_length as pad_console_length,
     split_args_from_name_or_path as split_args_from_name_or_path,
 )
+from .robotthread import (  # cuongnht add thread
+    get_execution_thread as get_execution_thread,
+    in_worker_thread as in_worker_thread,
+    set_execution_thread as set_execution_thread,
+)
 from .threadsafedict import ThreadSafeDict as ThreadSafeDict  # cuongnht add thread
 from .typehints import (
     copy_signature as copy_signature,

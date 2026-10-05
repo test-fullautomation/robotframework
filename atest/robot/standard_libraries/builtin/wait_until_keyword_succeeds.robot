@@ -83,14 +83,14 @@ Retry if wrong number of arguments
 
 Retry if variable is not found
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc[0, 0, 0, 0]}    Variable '\${nonexisting}' not found.    FAIL
-    Check Log Message    ${tc[0, 1, 0, 0]}    Variable '\${nonexisting}' not found.    FAIL
-    Check Log Message    ${tc[0, 2, 0, 0]}    Variable '\${nonexisting}' not found.    FAIL
+    Check Log Message    ${tc[0, 0, 0, 0]}    Variable '\${nonexisting}' not found.    UNKNOWN
+    Check Log Message    ${tc[0, 1, 0, 0]}    Variable '\${nonexisting}' not found.    UNKNOWN
+    Check Log Message    ${tc[0, 2, 0, 0]}    Variable '\${nonexisting}' not found.    UNKNOWN
     Length Should Be     ${tc[0].non_messages}    3
 
 Pass With Initially Nonexisting Variable Inside Wait Until Keyword Succeeds
     ${tc} =    Check Test Case    ${TESTNAME}
-    Check Log Message    ${tc[0, 0, 0, 0]}    Variable '\${created after accessing first time}' not found.    FAIL
+    Check Log Message    ${tc[0, 0, 0, 0]}    Variable '\${created after accessing first time}' not found.    UNKNOWN
     Check Log Message    ${tc[0, 1, 0, 0]}    created in keyword teardown
     Length Should Be     ${tc[0].body}        2
 

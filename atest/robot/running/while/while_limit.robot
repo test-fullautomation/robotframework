@@ -46,21 +46,21 @@ Continue after limit in teardown
     Check WHILE Loop    PASS    not known    teardown.body[0]
 
 Invalid limit invalid suffix
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 Invalid limit invalid value
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 Invalid limit mistyped prefix
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 Limit with non-existing variable
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 Limit used multiple times
-    ${loop}=    Check WHILE Loop    FAIL    1    not_run=True
+    ${loop}=    Check WHILE Loop    UNKNOWN    1    not_run=True
     Should Be Equal    ${loop.limit}    2
 
 Invalid values after limit
-    ${loop}=    Check WHILE Loop    FAIL    1    not_run=True
+    ${loop}=    Check WHILE Loop    UNKNOWN    1    not_run=True
     Should Be Equal    ${loop.condition}    $variable < 2, limit=2, invalid

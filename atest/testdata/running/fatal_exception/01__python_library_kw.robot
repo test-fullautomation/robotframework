@@ -10,5 +10,5 @@ Exit From Python Keyword
     Exit On Failure
 
 Test That Should Not Be Run 1
-    [Documentation]    FAIL Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN Test execution stopped due to a fatal error.
     Fail    This should not be executed

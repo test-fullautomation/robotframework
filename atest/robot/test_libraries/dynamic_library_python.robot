@@ -23,7 +23,7 @@ Non-ASCII keyword name fails when other bytes
     Check Test Case    ${TESTNAME}
     Error in file    0    test_libraries/dynamic_library_python.robot    7
     ...    Getting keyword names from library 'NonAsciiKeywordNames' failed:
-    ...    Calling dynamic method 'get_keyword_names' failed: UnicodeDecodeError*
+    ...    Calling dynamic method 'get_keyword_names' failed: UnicodeDecodeError*    level=UNKNOWN
 
 Run Keyword in Static Library
     [Documentation]    Verify that library having run_keyword method but no get_keyword_names method is not considered dynamic
@@ -49,7 +49,7 @@ Invalid get_keyword_names
     Error in file    1    test_libraries/dynamic_library_python.robot    9
     ...    Getting keyword names from library 'InvalidKeywordNames' failed:
     ...    Calling dynamic method 'get_keyword_names' failed:
-    ...    Return value must be a list of strings, got integer.
+    ...    Return value must be a list of strings, got integer.    level=UNKNOWN
 
 Dynamic async kw works
     Check Test Case    ${TESTNAME}

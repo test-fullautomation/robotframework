@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 
 from robot.errors import DataError
-from robot.utils import file_writer, seq2str2, ThreadSafeDict
+from robot.utils import file_writer, in_worker_thread, seq2str2, ThreadSafeDict
 
 from .logger import LOGGER
 from .loggerapi import LoggerApi
@@ -70,7 +70,7 @@ class _DebugFileWriter(LoggerApi):
     # cuongnht add thread: per-thread bookkeeping ---------------------------
 
     def _in_worker_thread(self):
-        return threading.current_thread() is not threading.main_thread()
+        return in_worker_thread()
 
     def _info(self):
         # Created lazily: with a log level above INFO start_thread does not
@@ -187,6 +187,12 @@ class _DebugFileWriter(LoggerApi):
             self._outfile.close()
 
     def _start(self, type, name, timestamp, extra=""):
+        # cuongnht log level shortening: START/END lines are INFO output. A
+        # `BuiltIn.Log` with an own visible level above the threshold still
+        # gets its separator and message, but no START/END lines (matches the
+        # 6.1 fork and its log level reference files).
+        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            return
         if extra:
             extra = f" {extra}"
         if self._in_worker_thread():
@@ -205,6 +211,8 @@ class _DebugFileWriter(LoggerApi):
         )
 
     def _end(self, type, name, timestamp, elapsed):
+        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+            return
         if self._in_worker_thread():
             info = self._info()
             info["indent"] = max(info["indent"] - 1, 0)

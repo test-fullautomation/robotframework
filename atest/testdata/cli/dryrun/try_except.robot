@@ -3,7 +3,7 @@ Resource        resource.robot
 
 *** Test Cases ***
 TRY
-    [Documentation]    FAIL    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN    Keyword 'resource.Anarchy in the UK' expected 3 arguments, got 2.
     TRY
         Simple UK
     EXCEPT

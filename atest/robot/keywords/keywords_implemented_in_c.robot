@@ -11,7 +11,7 @@ Use with incorrect arguments
     ${error} =    Set Variable If    ${INTERPRETER.is_pypy} or ${INTERPRETER.version_info} >= (3, 7)
     ...    Keyword 'KeywordsImplementedInC.Eq' expected 2 arguments, got 3.
     ...    STARTS: TypeError:
-    Check Test Case    ${TEST NAME}    FAIL    ${error}
+    Check Test Case    ${TEST NAME}    UNKNOWN    ${error}
 
 Built-ins not set to attributes are not exposes
     Check Test Case    ${TEST NAME}

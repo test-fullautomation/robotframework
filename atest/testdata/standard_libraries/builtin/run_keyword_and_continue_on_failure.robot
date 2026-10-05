@@ -57,7 +57,7 @@ Run Keyword And Continue On Failure with failure in keyoword teardown
     Fail    The End
 
 Run Keyword And Continue On Failure With Syntax Error
-    [Documentation]    FAIL    Assign mark '=' can be used only with the last variable.
+    [Documentation]    UNKNOWN    Assign mark '=' can be used only with the last variable.
     Run keyword And Continue On Failure    Syntax Error
     Fail    This Should Not Be Executed!
 
@@ -68,14 +68,14 @@ Run Keyword And Continue On Failure With Timeout
     Fail    This Should Not Be Executed!
 
 Run Keyword And Continue On Failure With Nonexisting Variable
-    [Documentation]    FAIL    Several failures occurred:\n\n
+    [Documentation]    UNKNOWN    Several failures occurred:\n\n
     ...    1) Variable '${nonexisting}' not found.\n\n
     ...    2) Normal failure after continuable failure
     Run keyword And Continue On Failure    Log    ${nonexisting}
     Fail    Normal failure after continuable failure
 
 Run Keyword And Continue On Failure With Nonexisting Extended Variable
-    [Documentation]    FAIL   GLOB: Several failures occurred:\n\n
+    [Documentation]    UNKNOWN   GLOB: Several failures occurred:\n\n
     ...    1) Resolving variable '\${list.nonex}' failed: AttributeError:*\n\n
     ...    2) Normal failure after continuable failure
     ${list} =  Create list    1    2
@@ -88,7 +88,7 @@ Run Keyword And Continue On Failure With Fatal Error
     Fail    This Should Not Be Executed!
 
 Run Keyword And Continue On Failure With Fatal Error 2
-    [Documentation]    FAIL    Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN    Test execution stopped due to a fatal error.
     No Operation
 
 *** Keywords ***

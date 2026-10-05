@@ -15,6 +15,8 @@ ${CLASH WITH BUILTIN}    %{TEMPDIR}${/}sys.py
 
 *** Test Cases ***
 Name clash with Python builtin-module
+    # BuiltIn.Import Library re-raises import problems as RuntimeError,
+    # so this is FAIL, not UNKNOWN like import errors in settings.
     [Documentation]    FAIL
     ...    Importing library '${CLASH WITH BUILTIN}' failed: \
     ...    Cannot import custom module with same name as Python built-in module.

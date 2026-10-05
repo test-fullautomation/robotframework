@@ -66,7 +66,7 @@ Dots in library name and keyword name with full name
     library.with.dots.in.name.Ending with a dot. In a library with dots in name.
 
 Conflicting names with dots
-    [Documentation]    This conflict cannot be resolved    FAIL
+    [Documentation]    This conflict cannot be resolved    UNKNOWN
     ...    Multiple keywords with name 'library.with.dots.in.name.Conflict' found:
     ...    ${SPACE*4}library.with.dots.In.name.conflict
     ...    ${SPACE*4}library.with.dots.in.name.Conflict

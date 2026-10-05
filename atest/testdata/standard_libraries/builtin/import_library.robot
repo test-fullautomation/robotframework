@@ -1,7 +1,7 @@
 *** Test Cases ***
 Import Library 1
     [Documentation]    Verify that keyword to be imported is not yet available
-    ...                FAIL No keyword with name 'Directory Should Exist' found.
+    ...                UNKNOWN No keyword with name 'Directory Should Exist' found.
     Directory Should Exist    ${CURDIR}
 
 Import Library 2

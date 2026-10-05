@@ -30,7 +30,7 @@ Task timeout exceeded
     1 second
 
 Invalid task timeout
-    [Documentation]    FAIL Setup failed:
+    [Documentation]    UNKNOWN Setup unknown:
     ...    Setting ${TIMEOUT.lower()} timeout failed: Invalid time string 'blaah'.
     [Timeout]     blaah
     No operation

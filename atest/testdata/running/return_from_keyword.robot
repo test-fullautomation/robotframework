@@ -91,7 +91,7 @@ Return From Keyword If
     Should Be Equal    ${ret}    something to return
 
 Return From Keyword If does not evaluate bogus arguments if condition is untrue
-    [Documentation]    FAIL Replacing variables from keyword return value failed: Variable '\${non existent 2}' not found.
+    [Documentation]    UNKNOWN Replacing variables from keyword return value failed: Variable '\${non existent 2}' not found.
     Return From Keyword If with non-existing variables in arguments
 
 *** Keywords ***

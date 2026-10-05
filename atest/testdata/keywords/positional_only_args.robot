@@ -43,25 +43,25 @@ Type conversion
     Should be equal    ${result}    ${3.5}
 
 Too few arguments 1
-    [Documentation]    FAIL Keyword 'PositionalOnly.Three Arguments' expected 3 arguments, got 2.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.Three Arguments' expected 3 arguments, got 2.
     Three arguments    1    2
 
 Too few arguments 2
-    [Documentation]    FAIL Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 0.
     Defaults
 
 Too few arguments 3
-    [Documentation]    FAIL Keyword 'PositionalOnly.With Kwargs' expected 1 non-named argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.With Kwargs' expected 1 non-named argument, got 0.
     With kwargs
 
 Too many arguments 1
-    [Documentation]    FAIL Keyword 'PositionalOnly.One Argument' expected 1 argument, got 3.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.One Argument' expected 1 argument, got 3.
     One argument    too    many    args
 
 Too many arguments 2
-    [Documentation]    FAIL Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.Defaults' expected 1 to 2 arguments, got 3.
     Defaults    too    many    args
 
 Too many arguments 3
-    [Documentation]    FAIL Keyword 'PositionalOnly.With Kwargs' expected 1 non-named argument, got 2.
+    [Documentation]    UNKNOWN Keyword 'PositionalOnly.With Kwargs' expected 1 non-named argument, got 2.
     With kwargs    one    two

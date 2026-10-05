@@ -105,4 +105,4 @@ Import Should Have Failed
     [Arguments]    ${index}    ${lineno}    ${name}    @{message}
     Error In File    ${index}    variables/variable_section.robot    ${lineno}
     ...    Replacing variables from setting '${name}' failed:
-    ...    @{message}
+    ...    @{message}    level=UNKNOWN

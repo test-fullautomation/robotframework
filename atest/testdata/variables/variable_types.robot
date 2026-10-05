@@ -104,16 +104,16 @@ VAR syntax: Dictionary
     Should be equal    ${x}    {30: {"key": 1.0}, 40: {"key": 2.3}}    type=dict
 
 VAR syntax: Invalid scalar value
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\${x: int}' failed: Value 'KALA' cannot be converted to integer.
     VAR    ${x: int}    KALA
 
 VAR syntax: Invalid scalar type
-    [Documentation]    FAIL    Invalid variable '\${x: hahaa}': Unrecognized type 'hahaa'.
+    [Documentation]    UNKNOWN    Invalid variable '\${x: hahaa}': Unrecognized type 'hahaa'.
     VAR    ${x: hahaa}    KALA
 
 VAR syntax: Type can not be set as variable
-    [Documentation]    FAIL    Invalid variable '\${x: \${type}}': Unrecognized type '\${type}'.
+    [Documentation]    UNKNOWN    Invalid variable '\${x: \${type}}': Unrecognized type '\${type}'.
     VAR    ${type}    int
     VAR    ${x: ${type}}    1
 
@@ -154,7 +154,7 @@ Variable assignment: Invalid value
     ${x: list[int]} =    Set Variable    kala
 
 Variable assignment: Invalid type
-    [Documentation]    FAIL Unrecognized type 'not_a_type'.
+    [Documentation]    UNKNOWN Unrecognized type 'not_a_type'.
     ${x: list[not_a_type]} =    Set Variable    1    2
 
 Variable assignment: Invalid variable type for list
@@ -169,7 +169,7 @@ Variable assignment: Invalid type for list
     @{x: list[int]} =    Create List    1    2    3
 
 Variable assignment: Invalid variable type for dictionary
-    [Documentation]    FAIL    Unrecognized type 'int=str'.
+    [Documentation]    UNKNOWN    Unrecognized type 'int=str'.
     ${x: int=str} =    Create dictionary    1=2    3=4
 
 Variable assignment: Multiple
@@ -195,11 +195,11 @@ Variable assignment: Multiple list and scalars
     Should be equal    ${d}    3.4    type=float
 
 Variable assignment: Invalid type for list in multiple variable assignment
-    [Documentation]    FAIL    Unrecognized type 'bad'.
+    [Documentation]    UNKNOWN    Unrecognized type 'bad'.
     ${a: int}    @{b: bad} =    Create List    9    8    7
 
 Variable assignment: Type can not be set as variable
-    [Documentation]    FAIL    Unrecognized type '\${type}'.
+    [Documentation]    UNKNOWN    Unrecognized type '\${type}'.
     VAR    ${type}    int
     ${a: ${type}} =    Set variable    123
 
@@ -253,14 +253,14 @@ User keyword: Invalid value
     Keyword    1.2    1.2    bad
 
 User keyword: Invalid type
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: \
     ...    Invalid argument '\${arg: bad}': \
     ...    Unrecognized type 'bad'.
     Bad type
 
 User keyword: Invalid assignment with kwargs k_type=v_type declaration
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid argument specification: \
     ...    Invalid argument '\&{kwargs: int=float}': \
     ...    Unrecognized type 'int=float'.
@@ -271,7 +271,7 @@ Embedded arguments
     Embedded type 1 and no type 2
 
 Embedded arguments: With custom regexp
-    [Documentation]    FAIL    No keyword with name 'Embedded type with custom regular expression 1.1' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Embedded type with custom regular expression 1.1' found.
     Embedded type with custom regular expression 111
     Embedded type with custom regular expression 1.1
 
@@ -289,16 +289,16 @@ Embedded arguments: Invalid value from variable
     Embedded 1 and ${{[2, 3]}}
 
 Embedded arguments: Invalid type
-    [Documentation]    FAIL    Invalid embedded argument '\${x: invalid}': Unrecognized type 'invalid'.
+    [Documentation]    UNKNOWN    Invalid embedded argument '\${x: invalid}': Unrecognized type 'invalid'.
     Embedded invalid type ${x: invalid}
 
 Variable usage does not support type syntax 1
-    [Documentation]    FAIL    STARTS: Resolving variable '\${x: int}' failed: SyntaxError:
+    [Documentation]    UNKNOWN    STARTS: Resolving variable '\${x: int}' failed: SyntaxError:
     VAR    ${x}    1
     Log    This fails: ${x: int}
 
 Variable usage does not support type syntax 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Resolving variable '\${abc_not_here: int}' failed: \
     ...    Variable '\${abc_not_here}' not found.
     Log    ${abc_not_here: int}: fails
@@ -422,7 +422,7 @@ FOR: Failing conversion 3
     END
 
 FOR: Invalid type
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Invalid FOR loop variable '\${item: bad}': Unrecognized type 'bad'.
     FOR    ${item: bad}    IN ENUMERATE    whatever
         Fail    Not run

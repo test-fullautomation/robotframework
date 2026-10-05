@@ -93,42 +93,42 @@ All arg types
     ...                      All arg types                    a    b    c    d    e=5    f=6    kwo2=8    kwo1=7
 
 Using Arguments When No Accepted
-    [Documentation]    FAIL Keyword 'Remote.No Arguments' expected 0 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'Remote.No Arguments' expected 0 arguments, got 1.
     [Template]    NONE
     No Arguments    not allowed
 
 Using Positional Arguments When Only Kwargs Accepted
-    [Documentation]    FAIL Keyword 'Remote.Kwargs' expected 0 non-named arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'Remote.Kwargs' expected 0 non-named arguments, got 1.
     [Template]    NONE
     Kwargs    not allowed
 
 Too Few Arguments When Using Only Required Args
-    [Documentation]    FAIL Keyword 'Remote.One Argument' expected 1 argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'Remote.One Argument' expected 1 argument, got 0.
     [Template]    NONE
     One Argument
 
 Too Many Arguments When Using Only Required Args
-    [Documentation]    FAIL Keyword 'Remote.Two Arguments' expected 2 arguments, got 3.
+    [Documentation]    UNKNOWN Keyword 'Remote.Two Arguments' expected 2 arguments, got 3.
     [Template]    NONE
     Two Arguments    too    many    arguments
 
 Too Few Arguments When Using Default Values
-    [Documentation]    FAIL Keyword 'Remote.Arguments With Default Values' expected 1 to 3 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'Remote.Arguments With Default Values' expected 1 to 3 arguments, got 0.
     [Template]    NONE
     Arguments With Default Values
 
 Too Many Arguments When Using Default Values
-    [Documentation]    FAIL Keyword 'Remote.Arguments With Default Values' expected 1 to 3 arguments, got 5.
+    [Documentation]    UNKNOWN Keyword 'Remote.Arguments With Default Values' expected 1 to 3 arguments, got 5.
     [Template]    NONE
     Arguments With Default Values    this    is    way    too    much
 
 Too Few Arguments When Using Varargs
-    [Documentation]    FAIL Keyword 'Remote.Required Defaults And Varargs' expected at least 1 argument, got 0.
+    [Documentation]    UNKNOWN Keyword 'Remote.Required Defaults And Varargs' expected at least 1 argument, got 0.
     [Template]    NONE
     Required Defaults And Varargs
 
 Named arguments before positional
-    [Documentation]    FAIL Keyword 'Remote.Args And Kwargs' got positional argument after named arguments.
+    [Documentation]    UNKNOWN Keyword 'Remote.Args And Kwargs' got positional argument after named arguments.
     [Template]    NONE
     Args and kwargs    this=wont    work
 

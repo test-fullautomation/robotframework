@@ -10,7 +10,7 @@ IF failing
     IF    '1' == '1'   Fail    Inside IF
 
 IF erroring
-    [Documentation]    FAIL No keyword with name 'Oooops, I don't exist!' found.
+    [Documentation]    UNKNOWN No keyword with name 'Oooops, I don't exist!' found.
     IF    '1' == '1'   Oooops, I don't exist!
 
 Not executed
@@ -70,7 +70,7 @@ Assign with item
     Should Be Equal    ${dict}[z]    ${3}
 
 Multi assign
-    [Documentation]    FAIL Cannot set variables: Expected 3 return values, got 2.
+    [Documentation]    UNKNOWN Cannot set variables: Expected 3 return values, got 2.
     ${x}    ${y}    ${z} =    IF    True    Create list    a    b    c    ELSE    Not run
     Should Be Equal    ${x}    a
     Should Be Equal    ${y}    b

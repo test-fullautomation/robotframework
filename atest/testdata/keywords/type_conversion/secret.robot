@@ -85,7 +85,7 @@ Variable section: Dict fail
     Variable Should Not Exist    ${DICT5}
 
 VAR: Based on existing variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '${bad: secret}' failed: \
     ...    Value must have type 'Secret', got integer.
     VAR    ${x: Secret}    ${SECRET}
@@ -97,7 +97,7 @@ VAR: Based on existing variable
     VAR    ${bad: secret}    ${666}
 
 VAR: Based on environment variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\${nonex: Secret}' failed: \
     ...    Environment variable '\%{NONEX}' not found.
     Set Environment Variable    SECRET    VALUE1
@@ -115,7 +115,7 @@ VAR: Based on environment variable
     VAR    ${nonex: Secret}    %{NONEX}
 
 VAR: Joined
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\${zz: secret}' failed: \
     ...    Value must have type 'Secret', got string.
     ${secret1} =    Library Get Secret    111
@@ -139,12 +139,12 @@ VAR: Joined
     VAR    ${zz: secret}    111${y}222
 
 VAR: Broken variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\${x: Secret}' failed: Variable '${borken' was not closed properly.
     VAR    ${x: Secret}    ${borken
 
 VAR: List
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '@{x: Secret | int}' failed: \
     ...    Value '[Secret(value=<secret>), 'this', 'fails']' (list) \
     ...    cannot be converted to list[Secret | int]: \
@@ -164,7 +164,7 @@ VAR: List
     VAR    @{x: Secret | int}    ${SECRET}    this    fails
 
 VAR: Dict 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\&{x: secret}' failed: \
     ...    Value '{'this': 'fails'}' (DotDict) cannot be converted to dict[Any, secret]: \
     ...    Item 'this' must have type 'Secret', got string.
@@ -178,7 +178,7 @@ VAR: Dict 1
     VAR    &{x: secret}    this=fails
 
 VAR: Dict 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Setting variable '\&{x: Secret=int}' failed: \
     ...    Value '{Secret(value=<secret>): '42', 'bad': '666'}' (DotDict) \
     ...    cannot be converted to dict[Secret, int]: \

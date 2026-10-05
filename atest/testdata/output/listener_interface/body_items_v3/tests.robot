@@ -13,20 +13,20 @@ User keyword
     User keyword
 
 Non-existing keyword
-    [Documentation]    FAIL No keyword with name 'Non-existing keyword' found.
+    [Documentation]    UNKNOWN No keyword with name 'Non-existing keyword' found.
     Non-existing keyword
     Non-existing keyword 2
 
 Empty keyword
-    [Documentation]    FAIL User keyword cannot be empty.
+    [Documentation]    UNKNOWN User keyword cannot be empty.
     Empty keyword
 
 Duplicate keyword
-    [Documentation]    FAIL Keyword with same name defined multiple times.
+    [Documentation]    UNKNOWN Keyword with same name defined multiple times.
     Duplicate keyword
 
 Invalid keyword
-    [Documentation]    FAIL Invalid argument specification: Invalid argument syntax 'bad'.
+    [Documentation]    UNKNOWN Invalid argument specification: Invalid argument syntax 'bad'.
     Invalid keyword
 
 IF
@@ -79,7 +79,7 @@ RETURN
     Should be equal    ${result}    value
 
 Invalid syntax
-    [Documentation]    FAIL Non-existing setting 'Bad'.
+    [Documentation]    UNKNOWN Non-existing setting 'Bad'.
     [Bad]    setting
 
 Run Keyword

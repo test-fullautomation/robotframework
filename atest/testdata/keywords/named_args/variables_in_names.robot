@@ -42,11 +42,11 @@ Named args and kwargs with variables
     Should Be Equal    ${result}    A, B, \${D}:D, c:C
 
 Non-existing variable as named arg name
-    [Documentation]    FAIL Variable '${nonexisting}' not found.
+    [Documentation]    UNKNOWN Variable '${nonexisting}' not found.
     Lib Mandatory And Named    ${nonexisting}=non-existing
 
 Non-existing variable as kwargs name
-    [Documentation]    FAIL Variable '${nonexisting}' not found.
+    [Documentation]    UNKNOWN Variable '${nonexisting}' not found.
     Lib Kwargs    ${nonexisting}=non-existing
 
 Variable with non-string value as named arg name
@@ -54,7 +54,7 @@ Variable with non-string value as named arg name
     Should Be Equal    ${result}    1=non-string, default
 
 Variable with non-string value as kwargs name
-    [Documentation]    FAIL Argument names must be strings.
+    [Documentation]    UNKNOWN Argument names must be strings.
     Lib Kwargs    ${1}=non-string
 
 Equal sign in variable name

@@ -48,7 +48,7 @@ Outside user keyword
     Fail    This is not executed
 
 With list variable containing escaped items
-    [Documentation]    FAIL No keyword with name 'c:\\temp' found.
+    [Documentation]    UNKNOWN No keyword with name 'c:\\temp' found.
     ${ret} =    Run Keyword And Return With Variables    Create List    @{ESCAPING}
     Should Be Equal    ${ret}    ${ESCAPING}
     Run Keyword And Return With Variables    @{ESCAPING}
@@ -70,7 +70,7 @@ Run Keyword And Return If
     Should Be Equal    ${ret}    1 > 0
 
 Run Keyword And Return If can have non-existing keywords and variables if condition is not true
-    [Documentation]    FAIL No keyword with name 'Non-Existing Keyword When Condition Is True' found.
+    [Documentation]    UNKNOWN No keyword with name 'Non-Existing Keyword When Condition Is True' found.
     Run Keyword And Return If With Non-Existing Keyword And Variables
 
 Run Keyword And Return If with list variable containing escaped items
@@ -94,7 +94,7 @@ Run Keyword And Return In Teardown
     [Teardown]    Run Keyword And Return In Teardown
 
 Run Keyword And Return In Teardown When Keyword Fails
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Expected error

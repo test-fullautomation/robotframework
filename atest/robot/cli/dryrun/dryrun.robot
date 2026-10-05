@@ -86,16 +86,16 @@ User keyword return value
 Non-existing variable in user keyword return value
     Check Test Case    ${TESTNAME}
 
-Test Setup and Teardown
+Test Setup And Teardown
     ${tc}=    Check Test Case    ${TESTNAME}
     Length Should Be      ${tc.body}        2
     Check Keyword Data    ${tc.setup}       BuiltIn.Log       args=Hello Setup    status=NOT RUN    type=SETUP
-    Check Keyword Data    ${tc.teardown}    Does not exist    status=FAIL         type=TEARDOWN
+    Check Keyword Data    ${tc.teardown}    Does not exist    status=UNKNOWN      type=TEARDOWN
 
 Keyword Teardown
     ${tc}=    Check Test Case    ${TESTNAME}
     Length Should Be      ${tc.body}          2
-    Check Keyword Data    ${tc[0].teardown}   Does not exist    status=FAIL    type=TEARDOWN
+    Check Keyword Data    ${tc[0].teardown}   Does not exist    status=UNKNOWN    type=TEARDOWN
 
 Keyword teardown with non-existing variable is ignored
     Check Test Case    ${TESTNAME}
@@ -130,11 +130,11 @@ Avoid keyword in dry-run
 
 Invalid imports
     Error in file    2    cli/dryrun/dryrun.robot    7
-    ...    Importing library 'DoesNotExist' failed: *Error: *
+    ...    Importing library 'DoesNotExist' failed: *Error: *    level=UNKNOWN
     Error in file    3    cli/dryrun/dryrun.robot    8
-    ...    Variable file 'wrong_path.py' does not exist.
+    ...    Variable file 'wrong_path.py' does not exist.    level=UNKNOWN
     Error in file    4    cli/dryrun/dryrun.robot    9
-    ...    Resource file 'NonExisting.robot' does not exist.
+    ...    Resource file 'NonExisting.robot' does not exist.    level=UNKNOWN
     [Teardown]    NONE
 
 Test from other suite

@@ -50,4 +50,5 @@ Resource with invalid extension
     Error in file    0    parsing/data_formats/resource_extensions/tests.robot    12
     ...    Invalid resource file extension '.invalid'.
     ...    Supported extensions are '.json', '.markdown', '.md', '.resource', '.rest', '.robot', '.rsrc', '.rst', '.tsv' and '.txt'.
+    ...    level=UNKNOWN
     Length should be    ${ERRORS}    1

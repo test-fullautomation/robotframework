@@ -536,12 +536,12 @@ Invalid kwonly
     Kwonly               argument=${NONE}          type=float    arg_type=None
 
 Invalid type spec causes error
-    [Documentation]    FAIL No keyword with name 'Invalid type spec' found.
+    [Documentation]    UNKNOWN No keyword with name 'Invalid type spec' found.
     [Tags]    negative
     Invalid type spec
 
 Non-matching argument name causes error
-    [Documentation]    FAIL No keyword with name 'Non matching name' found.
+    [Documentation]    UNKNOWN No keyword with name 'Non matching name' found.
     [Tags]    negative
     Non matching name
 

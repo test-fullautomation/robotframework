@@ -197,9 +197,9 @@ Tuple with invalid types
     ${42}    ${42}
 
 Union without types
-    [Documentation]    FAIL    No keyword with name 'Union without types' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Union without types' found.
     Union without types    whatever
 
 Empty tuple
-    [Documentation]    FAIL    No keyword with name 'Empty tuple' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Empty tuple' found.
     Empty tuple            ${666}

@@ -238,7 +238,7 @@ Template with IF inside TRY
         No Operation
 
 BREAK in FINALLY
-    [Documentation]    FAIL    BREAK cannot be used in FINALLY branch.
+    [Documentation]    UNKNOWN    BREAK cannot be used in FINALLY branch.
     WHILE    True
         TRY
             No Operation
@@ -248,7 +248,7 @@ BREAK in FINALLY
     END
 
 CONTINUE in FINALLY
-    [Documentation]    FAIL    CONTINUE cannot be used in FINALLY branch.
+    [Documentation]    UNKNOWN    CONTINUE cannot be used in FINALLY branch.
     FOR    ${i}    IN    some    values
         TRY
             No Operation
@@ -258,7 +258,7 @@ CONTINUE in FINALLY
     END
 
 RETURN in FINALLY
-    [Documentation]    FAIL    RETURN cannot be used in FINALLY branch.
+    [Documentation]    UNKNOWN    RETURN cannot be used in FINALLY branch.
     RETURN in FINALLY
 
 Invalid TRY/EXCEPT causes syntax error that cannot be caught
@@ -275,7 +275,7 @@ Invalid TRY/EXCEPT causes syntax error that cannot be caught
     END
 
 Dangling FINALLY
-    [Documentation]    FAIL FINALLY is not allowed in this context.
+    [Documentation]    UNKNOWN FINALLY is not allowed in this context.
     IF    ${True}
         FINALLY
     END

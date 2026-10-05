@@ -10,19 +10,19 @@
 
 *** Test Cases ***
 Run Keyword with Run Keywords With Arguments Inside List variable should escape AND
-    [Documentation]    FAIL No keyword with name 'AND' found.
+    [Documentation]    UNKNOWN No keyword with name 'AND' found.
     Run Keyword    Run Keywords    @{RUN KWS ARGS}
 
 Run Keyword with Run Keywords And Arguments Inside List variable should escape AND
-    [Documentation]    FAIL No keyword with name 'AND' found.
+    [Documentation]    UNKNOWN No keyword with name 'AND' found.
     Run Keyword    @{RUN KWS}
 
 Run Keyword If with Run Keywords With Arguments Inside List variable should escape AND
-    [Documentation]    FAIL No keyword with name 'AND' found.
+    [Documentation]    UNKNOWN No keyword with name 'AND' found.
     Run Keyword If    ${TRUE}    Run Keywords    @{RUN KWS ARGS}
 
 Run Keyword If with Run Keywords And Arguments Inside List variable should escape AND
-    [Documentation]    FAIL No keyword with name 'AND' found.
+    [Documentation]    UNKNOWN No keyword with name 'AND' found.
     Run Keyword If    ${TRUE}    Run Keyword    @{RUN KWS}
 
 Run Keywords With Run Keyword If should not escape ELSE and ELSE IF

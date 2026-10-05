@@ -32,7 +32,7 @@ Imported Public Keyword Has Precedence Over Imported Private Keywords
     Use Imported Public Keyword Instead Instead Of Imported Private Keyword
 
 If All Keywords Are Private Raise Multiple Keywords Found
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords with name 'Private Keyword In All Resources' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}private.Private Keyword In All Resources
@@ -41,7 +41,7 @@ If All Keywords Are Private Raise Multiple Keywords Found
     Private Keyword In All Resources
 
 If More Than Two Keywords Are Public Raise Multiple Keywords Found
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords with name 'Private In One Resource And Public In Two' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}private2.Private In One Resource And Public In Two

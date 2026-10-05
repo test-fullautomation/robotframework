@@ -31,21 +31,21 @@ Nested access with slicing
     ${MIXED}[x][0][1][y][z][-1][][0][:2]    AB
 
 Non-existing nested list item
-    [Documentation]    FAIL Tuple '\${LIST}[1][2]' has no item in index 666.
+    [Documentation]    UNKNOWN Tuple '\${LIST}[1][2]' has no item in index 666.
     ${LIST}[1][2][666]                  whatever
 
 Non-existing nested dict item
-    [Documentation]    FAIL Dictionary '\${DICT}[x][y]' has no key 'nonex'.
+    [Documentation]    UNKNOWN Dictionary '\${DICT}[x][y]' has no key 'nonex'.
     ${DICT}[x][y][nonex]                whatever
 
 Invalid nested list access
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Tuple '\${LIST}[1][2]' used with invalid index 'inv'. To use \
     ...    '[inv]' as a literal value, it needs to be escaped like '\\[inv]'.
     ${LIST}[1][2][inv]                  whatever
 
 Invalid nested dict access
-    [Documentation]    FAIL STARTS: Dictionary '\${DICT}[key]' used with invalid key:
+    [Documentation]    UNKNOWN STARTS: Dictionary '\${DICT}[key]' used with invalid key:
     ${DICT}[key][${DICT}]               whatever
 
 Invalid nested string access
@@ -53,7 +53,7 @@ Invalid nested string access
     ${LIST}[1][inv]                    whatever
 
 Nested access with non-subscriptable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Variable '\${DICT}[\${1}][\${2}]' is integer, which is not \
     ...    subscriptable, and thus accessing item '0' from it is not possible. \
     ...    To use '[0]' as a literal value, it needs to be escaped like '\\[0]'.

@@ -96,37 +96,38 @@ Continue after limit in teardown
     [Teardown]    Continue after limit
 
 Invalid limit invalid suffix
-    [Documentation]     FAIL Invalid WHILE loop limit: Invalid time string '1 bad'.
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Invalid time string '1 bad'.
     WHILE    $variable < 2    limit=1 bad
         Fail    Should not be executed
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Invalid time string '1 times'.
     END
 
 Invalid limit invalid value
-    [Documentation]     FAIL Invalid WHILE loop limit: Iteration count must be a positive integer, got '-100'.
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Iteration count must be a positive integer, got '-100'.
     WHILE    $variable < 2    limit=-100
         Fail    Should not be executed
     END
 
 Invalid limit mistyped prefix
-    [Documentation]     FAIL WHILE accepts only one condition, got 2 conditions '$variable < 2' and 'limitation=2'.
+    [Documentation]     UNKNOWN WHILE accepts only one condition, got 2 conditions '$variable < 2' and 'limitation=2'.
     WHILE    $variable < 2    limitation=2
         Fail    Should not be executed
     END
 
 Limit with non-existing variable
-    [Documentation]     FAIL Invalid WHILE loop limit: Variable '\${bad}' not found.
+    [Documentation]     UNKNOWN Invalid WHILE loop limit: Variable '\${bad}' not found.
     WHILE    limit=${bad}
         Fail    Should not be executed
     END
 
 Limit used multiple times
-    [Documentation]     FAIL WHILE accepts only one condition, got 2 conditions 'True' and 'limit=1'.
+    [Documentation]     UNKNOWN WHILE accepts only one condition, got 2 conditions 'True' and 'limit=1'.
     WHILE    True    limit=1    limit=2
         Fail    Should not be executed
     END
 
 Invalid values after limit
-    [Documentation]     FAIL WHILE accepts only one condition, got 3 conditions '$variable < 2', 'limit=2' and 'invalid'.
+    [Documentation]     UNKNOWN WHILE accepts only one condition, got 3 conditions '$variable < 2', 'limit=2' and 'invalid'.
     WHILE    $variable < 2    limit=2    invalid
         Fail    Should not be executed
     END

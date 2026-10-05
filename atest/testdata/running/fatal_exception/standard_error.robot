@@ -8,5 +8,5 @@ robot.api.FatalError
     Fail    Should not be executed
 
 Test That Should Not Be Run
-    [Documentation]    FAIL Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN Test execution stopped due to a fatal error.
     Fail    Should not be executed

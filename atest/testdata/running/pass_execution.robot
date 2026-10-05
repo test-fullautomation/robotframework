@@ -6,7 +6,7 @@ Suite Teardown    Pass Execution    Hi, tellus!
 
 *** Test Cases ***
 Message is required
-    [Documentation]    FAIL    Keyword 'BuiltIn.Pass Execution' expected at least 1 argument, got 0.
+    [Documentation]    UNKNOWN    Keyword 'BuiltIn.Pass Execution' expected at least 1 argument, got 0.
     Pass Execution
     Should Not Be Executed
 
@@ -164,7 +164,7 @@ Pass Execution If when condition is false
     Should Be Executed
 
 Pass Execution If resolves variables only condition is true
-    [Documentation]    FAIL    Variable '${this is not ok}' not found.
+    [Documentation]    UNKNOWN    Variable '${this is not ok}' not found.
     Pass Execution If    False    Message    ${ok not to exist}
     Should Be Executed
     Pass Execution If    True    Message    ${this is not ok}

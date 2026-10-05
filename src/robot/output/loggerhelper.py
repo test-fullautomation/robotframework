@@ -129,7 +129,9 @@ class Message(BaseMessage):
     ) -> "tuple[MessageLevel, bool, bool]":
         level = level.upper()
         if console is None:
-            console = level in ("WARN", "ERROR")
+            # cuongnht - add unknown state: UNKNOWN messages go to the console
+            # like errors do.
+            console = level in ("WARN", "ERROR", "UNKNOWN")
         if level == "HTML":
             return "INFO", True, console
         if level == "CONSOLE":

@@ -61,7 +61,7 @@ Custom non-ASCII name
     Custom nön-ÄSCII name
 
 Old Name Doesn't Work If Name Set Using 'robot_name'
-    [Documentation]  FAIL No keyword with name 'Name Set In Method Signature' found.
+    [Documentation]  UNKNOWN No keyword with name 'Name Set In Method Signature' found.
     Name Set In Method Signature
 
 Keyword can just be marked without changing its name

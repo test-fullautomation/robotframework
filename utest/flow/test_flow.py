@@ -330,7 +330,7 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(main.type, BodyItem.TRY)
         self.assertEqual(main.body[0].name, 'Work')
         self.assertEqual(recovery.type, BodyItem.EXCEPT)
-        self.assertEqual(recovery.variable, '${flow_error}')
+        self.assertEqual(recovery.assign, '${flow_error}')
         self.assertEqual([k.name for k in recovery.body], ['Recover'])
         self.assertEqual((sleep.name, list(sleep.args)), ('Sleep', ['1s']))
 

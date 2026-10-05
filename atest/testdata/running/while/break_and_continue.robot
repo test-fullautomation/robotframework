@@ -136,13 +136,13 @@ CONTINUE with continuable failures
     END
 
 Invalid BREAK
-    [Documentation]    FAIL    BREAK does not accept arguments, got 'bad'.
+    [Documentation]    UNKNOWN    BREAK does not accept arguments, got 'bad'.
     WHILE   True
         BREAK    bad
     END
 
 Invalid CONTINUE
-    [Documentation]    FAIL    CONTINUE does not accept arguments, got 'bad'.
+    [Documentation]    UNKNOWN    CONTINUE does not accept arguments, got 'bad'.
     WHILE   True
         CONTINUE    bad
     END

@@ -8,7 +8,7 @@ ${TEST FILE}      misc/dummy_lib_test.robot
 *** Test Cases ***
 Tests fail when library not in pythonpath
     Run Tests    ${EMPTY}    ${TEST FILE}
-    Should Be Equal    ${SUITE.status}    FAIL
+    Should Be Equal    ${SUITE.status}    UNKNOWN
     File Should Not Be Empty    ${STDERR FILE}
 
 Pythonpath option

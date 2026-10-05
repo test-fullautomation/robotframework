@@ -20,7 +20,7 @@ ${VAR}            VAR
 
 *** Test Cases ***
 No Arguments
-    [Documentation]    FAIL No keyword with name 'OperatingSystem.Should Exist' found.
+    [Documentation]    UNKNOWN No keyword with name 'OperatingSystem.Should Exist' found.
     OS.Directory Should Exist    .
     Should Exist    .
     OperatingSystem.Should Exist    .
@@ -74,7 +74,7 @@ Import Library Keyword
     My Param LibAs.Parameters should be    my first argument    second arg
 
 Correct Error When Using Keyword From Same Library With Different Names Without Prefix 2
-    [Documentation]    FAIL Multiple keywords with name 'Parameters' found. \
+    [Documentation]    UNKNOWN Multiple keywords with name 'Parameters' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}MyParamLib.Parameters
     ...    ${SPACE*4}MyParamLibAs.Parameters
@@ -85,7 +85,7 @@ Correct Error When Using Keyword From Same Library With Different Names Without 
     Parameters
 
 Dynamic Library
-    [Documentation]    FAIL No keyword with name 'RunKeywordLibrary.Run Keyword That Passes' found.
+    [Documentation]    UNKNOWN No keyword with name 'RunKeywordLibrary.Run Keyword That Passes' found.
     dynamic.Run Keyword That Passes    arg1    arg2
     RunKeywordLibrary.Run Keyword That Passes
 

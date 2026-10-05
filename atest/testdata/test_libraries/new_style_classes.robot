@@ -16,5 +16,5 @@ Keyword Created By Metaclass
     Should Be Equal    ${foo}    WORD
 
 Methods in Metaclass Are not Keywords
-    [Documentation]    FAIL No keyword with name 'Method In Metaclass' found.
+    [Documentation]    UNKNOWN No keyword with name 'Method In Metaclass' found.
     Method In Metaclass

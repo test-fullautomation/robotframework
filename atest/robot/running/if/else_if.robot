@@ -23,7 +23,7 @@ Else if else failing
     NOT RUN    NOT RUN    FAIL
 
 Invalid
-    FAIL    NOT RUN
+    UNKNOWN    NOT RUN
 
 After failure
     NOT RUN    NOT RUN    NOT RUN    index=1    run=False

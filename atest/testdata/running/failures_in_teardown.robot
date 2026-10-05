@@ -1,11 +1,11 @@
-﻿*** Settings ***
+*** Settings ***
 Suite Teardown    Suite Teardown With Failures
 Resource          ../keywords/resources/my_resource_1.robot
 Resource          ../keywords/resources/my_resource_2.robot
 
 *** Variables ***
 ${SUITE TEARDOWN FAILED}    SEPARATOR=\n
-...    Also parent suite teardown failed:
+...    Also parent suite teardown unknown:
 ...    Several failures occurred:
 ...    ${EMPTY}
 ...    1) Suite Message 1
@@ -16,7 +16,7 @@ ${SUITE TEARDOWN FAILED}    SEPARATOR=\n
 
 *** Test Cases ***
 One Failure
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Message
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -24,7 +24,7 @@ One Failure
     [Teardown]    One Failure
 
 Multiple Failures
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Message 1
@@ -36,7 +36,7 @@ Multiple Failures
     [Teardown]    Multiple Failures
 
 Failure When Setting Variables
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Return values is None
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -44,7 +44,7 @@ Failure When Setting Variables
     [Teardown]    Failure when setting variables
 
 Failure In FOR Loop
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) cat
@@ -60,7 +60,7 @@ Failure In FOR Loop
     [Teardown]    Failures In FOR Loop
 
 Execution Continues After Test Timeout
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    This should be executed
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -69,7 +69,7 @@ Execution Continues After Test Timeout
     [Teardown]    Test Timeout Occurs
 
 Execution Stops After Keyword Timeout
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Keyword timeout 42 milliseconds exceeded.
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -77,7 +77,7 @@ Execution Stops After Keyword Timeout
     [Teardown]    Keyword Timeout Occurs
 
 Execution continues if executed keyword fails for keyword timeout
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Keyword timeout 42 milliseconds exceeded.
@@ -89,7 +89,7 @@ Execution continues if executed keyword fails for keyword timeout
     [Teardown]    Keyword Timeout Occurs In Executed Keyword
 
 Execution stops after keyword timeout if keyword uses WUKS
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Keyword timeout 100 milliseconds exceeded.
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -97,7 +97,7 @@ Execution stops after keyword timeout if keyword uses WUKS
     [Teardown]    Keyword Using WUKS
 
 Execution Continues If Variable Does Not Exist
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Variable '\${this var does not exist}' not found.
@@ -109,7 +109,7 @@ Execution Continues If Variable Does Not Exist
     [Teardown]    Missing Variables
 
 Execution Continues After Keyword Errors
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) No keyword with name 'Keyword Missing' found.
@@ -123,7 +123,7 @@ Execution Continues After Keyword Errors
     [Teardown]    Keyword Errors
 
 Execution Stops After Syntax Error
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...    IF must have closing END.
     ...
     ...    ${SUITE TEARDOWN FAILED}
@@ -131,7 +131,7 @@ Execution Stops After Syntax Error
     [Teardown]    Syntax Errors
 
 Fatal Error 1
-    [Documentation]    FAIL    Teardown failed:
+    [Documentation]    UNKNOWN    Teardown failed:
     ...  The End
     ...
     ...  ${SUITE TEARDOWN FAILED}
@@ -139,7 +139,7 @@ Fatal Error 1
     [Teardown]    Keyword With Fatal Error
 
 Fatal Error 2
-    [Documentation]    FAIL    Test execution stopped due to a fatal error.
+    [Documentation]    UNKNOWN    Test execution stopped due to a fatal error.
     ...
     ...  ${SUITE TEARDOWN FAILED}
     Fail    This should not be executed

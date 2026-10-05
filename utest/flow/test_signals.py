@@ -109,7 +109,7 @@ class TestFileStore(_Base):
     def test_stale_lock_is_taken_over(self):
         store = FileStore(self.path)
         store.set('a', 1)
-        with open(store._lock_path, 'w'):
+        with open(store._lock_path, 'w', encoding='UTF-8'):
             pass
         old = time.time() - FileStore.STALE_LOCK_S - 1
         os.utime(store._lock_path, (old, old))

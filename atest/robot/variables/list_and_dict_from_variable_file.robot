@@ -64,4 +64,4 @@ Verify Error
     Error In File    ${index}    variables/list_and_dict_from_variable_file.robot    ${lineno}
     ...    Processing variable file '${path}' with arguments ${args} failed:
     ...    Invalid variable '${var}': ${error}
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN

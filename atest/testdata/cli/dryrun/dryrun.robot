@@ -47,7 +47,7 @@ Keywords that would fail
     This is validated
 
 Keywords with types that would fail
-    [Documentation]    FAIL    Several failures occurred:
+    [Documentation]    UNKNOWN    Several failures occurred:
     ...
     ...    1) Invalid variable '\${var: kala}': Unrecognized type 'kala'.
     ...
@@ -116,7 +116,7 @@ Non-existing variable in user keyword return value
     This is validated
 
 Test Setup And Teardown
-    [Documentation]    FAIL    No keyword with name 'Does not exist' found.\n\n
+    [Documentation]    UNKNOWN    No keyword with name 'Does not exist' found.\n\n
     ...    Also teardown failed:\n
     ...    No keyword with name 'Does not exist' found.
     [Setup]  Log  Hello Setup
@@ -125,7 +125,7 @@ Test Setup And Teardown
     [Teardown]  Does not exist
 
 Keyword Teardown
-    [Documentation]    FAIL    Keyword teardown failed:
+    [Documentation]    UNKNOWN    Keyword teardown failed:
     ...    No keyword with name 'Does not exist' found.
     Keyword with Teardown
     This is validated
@@ -139,12 +139,12 @@ Keyword teardown with existing variable is resolved and executed
     This is validated
 
 Non-existing keyword name
-    [Documentation]    FAIL    No keyword with name 'Does not exist' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Does not exist' found.
     Does not exist
     This is validated
 
 Invalid syntax in UK
-    [Documentation]    FAIL    Several failures occurred:
+    [Documentation]    UNKNOWN    Several failures occurred:
     ...
     ...    1) Invalid argument specification: Multiple errors:
     ...    - Invalid argument syntax '\${oops'.
@@ -158,7 +158,7 @@ Invalid syntax in UK
     This is validated
 
 Multiple Failures
-    [Documentation]    FAIL    Several failures occurred:
+    [Documentation]    UNKNOWN    Several failures occurred:
     ...
     ...    1) Keyword 'BuiltIn.Should Be Equal' expected 2 to 10 arguments, got 1.
     ...

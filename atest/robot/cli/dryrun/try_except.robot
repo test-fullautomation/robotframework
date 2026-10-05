@@ -12,5 +12,6 @@ TRY
     Check Keyword Data    ${tc[0, 1, 0]}       BuiltIn.Log    args=handling it    status=NOT RUN
     Check Keyword Data    ${tc[0, 2, 0]}       BuiltIn.Log    args=in the else    status=NOT RUN
     Check Keyword Data    ${tc[0, 3, 0]}       BuiltIn.Log    args=in the finally    status=NOT RUN
-    Check TRY Data        ${tc[1, 0]}          status=FAIL
-    Check Keyword Data    ${tc[1, 0, 0]}       resource.Anarchy in the UK    status=FAIL    args=1, 2
+    Check TRY Data        ${tc[1, 0]}          status=UNKNOWN
+    Check Keyword Data    ${tc[1, 0, 0]}       resource.Anarchy in the UK    status=UNKNOWN    args=1, 2
+    Check Keyword Data    ${tc.body[1].body[0].body[0]}    resource.Anarchy in the UK    status=UNKNOWN    args=1, 2

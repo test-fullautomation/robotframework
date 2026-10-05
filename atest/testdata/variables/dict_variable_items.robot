@@ -28,15 +28,15 @@ Valid key with square brackets
     Should Be Equal    ${SQUARES}[\[x\[y\]]    mixed
 
 Unmatched square brackets 1
-    [Documentation]    FAIL Variable item '\${SQUARES}[[]' was not closed properly.
+    [Documentation]    UNKNOWN Variable item '\${SQUARES}[[]' was not closed properly.
     Log    ${SQUARES}[[]
 
 Unmatched square brackets 2
-    [Documentation]    FAIL Variable item '\${SQUARES}[][' was not closed properly.
+    [Documentation]    UNKNOWN Variable item '\${SQUARES}[][' was not closed properly.
     Log    ${SQUARES}[][
 
 Unmatched square brackets 3
-    [Documentation]    FAIL Variable item '\${SQUARES}[[x[y]]' was not closed properly.
+    [Documentation]    UNKNOWN Variable item '\${SQUARES}[[x[y]]' was not closed properly.
     Log    ${SQUARES}[[x[y]]
 
 Index with variable
@@ -72,35 +72,35 @@ List-like values are not manipulated
     Should Be Equal    ${dict}[tuple]    ${tuple}
 
 Integer key cannot be accessed as string
-    [Documentation]    FAIL Dictionary '\${DICT}' has no key '1'.
+    [Documentation]    UNKNOWN Dictionary '\${DICT}' has no key '1'.
     Log    ${DICT}[1]
 
 String key cannot be accessed as integer
-    [Documentation]    FAIL Dictionary '\${DICT}' has no key '3'.
+    [Documentation]    UNKNOWN Dictionary '\${DICT}' has no key '3'.
     Log    ${DICT}[${3}]
 
 Invalid key
-    [Documentation]    FAIL Dictionary '\${DICT}' has no key 'nonex'.
+    [Documentation]    UNKNOWN Dictionary '\${DICT}' has no key 'nonex'.
     Log    ${DICT}[nonex]
 
 Invalid key using variable
-    [Documentation]    FAIL Dictionary '\${DICT}' has no key 'xxx'.
+    [Documentation]    UNKNOWN Dictionary '\${DICT}' has no key 'xxx'.
     Log    ${DICT}[${INVALID}]
 
 Non-hashable key
-    [Documentation]    FAIL STARTS: Dictionary '\${DICT}' used with invalid key:
+    [Documentation]    UNKNOWN STARTS: Dictionary '\${DICT}' used with invalid key:
     Log    ${DICT}[@{DICT}]
 
 Non-existing variable
-    [Documentation]    FAIL Variable '\${nonex dict}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonex dict}' not found.
     Log    ${nonex dict}[0]
 
 Non-existing index variable
-    [Documentation]    FAIL Variable '\${nonex key}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonex key}' not found.
     Log    ${DICT}[${nonex key}]
 
 Non-dict variable
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Variable '\${INT}' is integer, which is not subscriptable, and thus \
     ...    accessing item '0' from it is not possible. To use '[0]' as a \
     ...    literal value, it needs to be escaped like '\\[0]'.
@@ -123,5 +123,5 @@ Dict expansion using `&` syntax
     Should Be Equal    xxx    values=False    &{DICT}[eq]    ignore_case=False    msg=This fails
 
 Dict expansion fails if value is not dict-like
-    [Documentation]    FAIL Value of variable '\&{DICT}[eq][second]' is not dictionary or dictionary-like.
+    [Documentation]    UNKNOWN Value of variable '\&{DICT}[eq][second]' is not dictionary or dictionary-like.
     Log Many    &{DICT}[eq][second]

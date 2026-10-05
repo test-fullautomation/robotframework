@@ -4,7 +4,7 @@ Library           TestLibrary.py    Library2    WITH NAME    Library2
 
 *** Test Cases ***
 Default Library Order Should Be Suite Specific
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords with name 'Get Name' found. \
     ...    Give the full name of the keyword you want to use:
     ...    ${SPACE*4}Library1.Get Name

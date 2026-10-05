@@ -175,9 +175,9 @@ class JsonLogger:
         pass
 
     def _on_worker_thread(self):
-        import threading
+        from robot.utils import in_worker_thread
 
-        return threading.current_thread() is not threading.main_thread()
+        return in_worker_thread()
 
     def start_var(self, item):
         self._start(type=item.type)

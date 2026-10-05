@@ -13,7 +13,7 @@ Library Import With Spaces In Name Does Not Work
     Check Test Case    ${TESTNAME}
     Error In File    0    test_libraries/library_import_normal.robot    3
     ...    Importing library 'Date Time' failed: *Error: *
-    ...    traceback=None
+    ...    traceback=None    level=UNKNOWN
 
 Importing Library Class Should Have Been Syslogged
     ${source} =    Normalize Path    ${CURDIR}/../../../src/robot/libraries/OperatingSystem

@@ -46,7 +46,7 @@ Append To Environment Variable With Custom Separator
     Should Be Equal    %{${NAME}}    first-second-3rd=x
 
 Append To Environment Variable With Invalid Config
-    [Documentation]    FAIL Keyword 'OperatingSystem.Append To Environment Variable' got unexpected named argument 'not_ok'.
+    [Documentation]    UNKNOWN Keyword 'OperatingSystem.Append To Environment Variable' got unexpected named argument 'not_ok'.
     Append To Environment Variable    ${NAME}    value    separator=value    not_ok=True
 
 Append To Environment Variable With Secret Value

@@ -216,17 +216,17 @@ Incompatible nested generics
     ...    error=Item '0' got value '(1, 'x')' (tuple) that cannot be converted to tuple[int, int]: Item '1' got value 'x' that cannot be converted to integer.
 
 Invalid list
-    [Documentation]    FAIL    No keyword with name 'Invalid List' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Invalid List' found.
     Invalid List    whatever
 
 Invalid tuple
-    [Documentation]    FAIL    No keyword with name 'Invalid Tuple' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Invalid Tuple' found.
     Invalid Tuple    whatever
 
 Invalid dict
-    [Documentation]    FAIL    No keyword with name 'Invalid Dict' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Invalid Dict' found.
     Invalid Dict    whatever
 
 Invalid set
-    [Documentation]    FAIL    No keyword with name 'Invalid Set' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Invalid Set' found.
     Invalid Set    whatever

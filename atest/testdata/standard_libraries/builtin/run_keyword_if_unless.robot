@@ -39,19 +39,19 @@ Keyword Name in ELSE as list variable
     Should Be Equal    ${ret}    1 2 \${escaped} c:\\temp foo
 
 Keyword Name in ELSE as non-existing variable 1
-    [Documentation]    FAIL Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\${NON EXISTING}' not found.
     Run Keyword If    ${1}    ${NON EXISTING}    ELSE    ${FAIL}
 
 Keyword Name in ELSE as non-existing variable 2
-    [Documentation]    FAIL Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\${NON EXISTING}' not found.
     Run Keyword If    ${0}    ${FAIL}    ELSE    ${NON EXISTING}
 
 ELSE without keyword is invalid 1
-    [Documentation]    FAIL ELSE requires keyword.
+    [Documentation]    UNKNOWN ELSE requires keyword.
     Run Keyword If    ${True}    Catenate    a1    a2    ELSE
 
 ELSE without keyword is invalid 2
-    [Documentation]    FAIL ELSE requires keyword.
+    [Documentation]    UNKNOWN ELSE requires keyword.
     Run Keyword If    ${False}    Catenate    a1    a2    ELSE
 
 Only first ELSE is significant
@@ -111,31 +111,31 @@ Keyword Name in ELSE IF as list variable
     Should Be Equal    ${ret}    1 2 \${escaped} c:\\temp foo
 
 Keyword Name in ELSE IF as non-existing variable 1
-    [Documentation]    FAIL Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\${NON EXISTING}' not found.
     Run Keyword If    ${1}    ${NON EXISTING}    ELSE IF    ${1}    ${FAIL}
 
 Keyword Name in ELSE If as non-existing variable 2
-    [Documentation]    FAIL Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\${NON EXISTING}' not found.
     Run Keyword If    ${0}    ${FAIL}    ELSE IF    ${1}    ${NON EXISTING}
 
 Keyword Name in ELSE If as non-existing variable 3
-    [Documentation]    FAIL Variable '\${NON EXISTING}' not found.
+    [Documentation]    UNKNOWN Variable '\${NON EXISTING}' not found.
     Run Keyword If    ${0}    ${FAIL}    ELSE IF    ${0}    ${NON EXISTING}
 
 ELSE IF without keyword is invalid 1
-    [Documentation]    FAIL ELSE IF requires condition and keyword.
+    [Documentation]    UNKNOWN ELSE IF requires condition and keyword.
     Run Keyword If    ${True}    Catenate    a1    a2    ELSE IF
 
 ELSE IF without keyword is invalid 2
-    [Documentation]    FAIL ELSE IF requires condition and keyword.
+    [Documentation]    UNKNOWN ELSE IF requires condition and keyword.
     Run Keyword If    ${True}    Catenate    a1    a2    ELSE IF    ${True}
 
 ELSE IF without keyword is invalid 3
-    [Documentation]    FAIL ELSE IF requires condition and keyword.
+    [Documentation]    UNKNOWN ELSE IF requires condition and keyword.
     Run Keyword If    ${False}    Catenate    a1    a2    ELSE IF
 
 ELSE IF without keyword is invalid 4
-    [Documentation]    FAIL ELSE IF requires condition and keyword.
+    [Documentation]    UNKNOWN ELSE IF requires condition and keyword.
     Run Keyword If    ${False}    Catenate    a1    a2    ELSE IF    ${True}
 
 ELSE before ELSE IF is ignored

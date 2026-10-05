@@ -8,8 +8,8 @@ ${SOME_FILE}      listen_some.txt
 ${ARGS_FILE}      listener_with_args.txt
 ${MODULE_FILE}    listen_by_module.txt
 ${ATTR_TYPE_FILE}    listener_attrs.txt
-${SUITE_MSG}      2 tests, 1 passed, 1 failed
-${SUITE_MSG_2}    2 tests, 1 passed, 1 failed
+${SUITE_MSG}      2 tests, 1 passed, 1 failed, 0 unknown
+${SUITE_MSG_2}    2 tests, 1 passed, 1 failed, 0 unknown
 ${LISTENERS}      ${CURDIR}${/}..${/}..${/}..${/}testresources${/}listeners
 ${EMPTY TB}       \nTraceback (most recent call last):\n${SPACE*2}None\n
 ${LISTENER DIR}   ${DATADIR}/output/listener_interface

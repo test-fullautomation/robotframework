@@ -71,5 +71,5 @@ Processing should have failed
 Importing should have failed
     [Arguments]    ${index}    ${lineno}    @{error}    ${pattern}=True
     Error In File    ${index}    variables/json_variable_file.robot    ${lineno}
-    ...    @{error}
+    ...    @{error}    level=UNKNOWN
     ...    pattern=${pattern}

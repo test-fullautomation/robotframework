@@ -76,9 +76,9 @@ TypedDict items
     TypedDict items    {'simple': 42, 'params': [1, 2.0, '3'], 'union': 3.14}
 
 Invalid
-    [Documentation]    FAIL    No keyword with name 'Invalid' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Invalid' found.
     Invalid    whatever
 
 Bad parameters
-    [Documentation]    FAIL    No keyword with name 'Bad Params' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Bad Params' found.
     Bad Params    whatever

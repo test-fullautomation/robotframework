@@ -21,7 +21,9 @@ import threading
 from robot.errors import DataError
 from robot.model import Tags
 from robot.output import LOGGER
-from robot.utils import abspath, DotDict, find_file, get_error_details, NormalizedDict
+from robot.utils import (
+    abspath, DotDict, find_file, get_error_details, in_worker_thread, NormalizedDict
+)
 
 from .resolvable import GlobalVariableValue
 from .variables import Variables
@@ -46,7 +48,7 @@ class VariableScopes:
         return stack[-1] if stack else None
 
     def _in_worker_thread(self):
-        return threading.current_thread() is not threading.main_thread()
+        return in_worker_thread()
 
     @property
     def current(self):

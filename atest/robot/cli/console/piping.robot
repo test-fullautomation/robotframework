@@ -14,7 +14,8 @@ ${TARGET}         ${CURDIR}${/}piping.py
 *** Test Cases ***
 Pipe to command consuming all data
     Run with pipe and validate results    read_all
-    Should Be Equal    ${STDOUT}    20 lines with 'FAIL' found!
+    # Fewer than upstream: errors that are UNKNOWN in this fork are not 'FAIL' lines.
+    Should Be Equal    ${STDOUT}    15 lines with 'FAIL' found!
 
 Pipe to command consuming some data
     Run with pipe and validate results    read_some

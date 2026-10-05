@@ -22,16 +22,16 @@ On limit fail with continuable failure
     Check WHILE Loop    FAIL    2
 
 Invalid on_limit
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 Invalid on_limit from variable
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 On limit without limit
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 On limit with invalid variable
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True
 
 On limit message
     Check WHILE Loop    FAIL    11
@@ -56,4 +56,4 @@ On limit message before limit
     Check WHILE Loop    FAIL    5
 
 On limit message with invalid variable
-    Check WHILE Loop    FAIL    1    not_run=True
+    Check WHILE Loop    UNKNOWN    1    not_run=True

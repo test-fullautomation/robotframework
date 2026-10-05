@@ -28,28 +28,28 @@ Accessing Dictionary
     Should Be Equal    ${dict[42]}    b
 
 Multiply
-    [Documentation]    FAIL STARTS: Resolving variable '\${3.0 * 2}' failed: SyntaxError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${3.0 * 2}' failed: SyntaxError:
     Should Be Equal    ${SPACE * 3}    ${SPACE}${SPACE}${SPACE}
     Should Be Equal    ${3 * 42}    ${126}
     Should Be Equal    ${3 * 2.0}    ${6}
     Log Many    Having float first fails    ${3.0 * 2}
 
 Failing When Base Name Does Not Exist
-    [Documentation]    FAIL Resolving variable '\${nonexisting.whatever}' failed: Variable '\${nonexisting}' not found.
+    [Documentation]    UNKNOWN Resolving variable '\${nonexisting.whatever}' failed: Variable '\${nonexisting}' not found.
     Log    ${nonexisting.whatever}
 
 Failing When Base Name Starts With Existing Variable 1
-    [Documentation]    FAIL Variable '\${nonexisting}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonexisting}' not found.
     Log    ${None}
     Log    ${nonexisting}
 
 Failing When Base Name Starts With Existing Variable 2
-    [Documentation]    FAIL STARTS: Variable '\${lista}' not found.
+    [Documentation]    UNKNOWN STARTS: Variable '\${lista}' not found.
     Log    ${list}
     Log    ${lista}
 
 Testing Extended Var Regexp
-    [Documentation]    FAIL STARTS: Resolving variable '\${var..upper()}' failed: SyntaxError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${var..upper()}' failed: SyntaxError:
     Length Should Be    ${/*3}    ${1 * 3}
     Should Be Equal    ${/.upper()}    ${/ * 1}
     ${var}    ${var.}    ${var.upper} =    Set Variable    value    Value    VALUE
@@ -89,30 +89,30 @@ Escape characters and curly braces
     ...                       X12
 
 Failing When Attribute Does Not exists 1
-    [Documentation]    FAIL STARTS: Resolving variable '\${OBJ.nonex}' failed: AttributeError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${OBJ.nonex}' failed: AttributeError:
     Log    ${OBJ.nonex}
 
 Failing When Attribute Does Not exists 2
-    [Documentation]    FAIL STARTS: Resolving variable '\${OBJ.nonex_method()}' failed: AttributeError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${OBJ.nonex_method()}' failed: AttributeError:
     Log    ${OBJ.nonex_method()}
 
 Failing When Calling Method With Wrong Number Of Arguments
-    [Documentation]    FAIL STARTS: Resolving variable '\${OBJ.greet('too', 'many')}' failed: TypeError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${OBJ.greet('too', 'many')}' failed: TypeError:
     Log    ${OBJ.greet('too', 'many')}
 
 Failing When Method Raises Exception
-    [Documentation]    FAIL Resolving variable '\${OBJ.greet('FAIL')}' failed: ValueError
+    [Documentation]    UNKNOWN Resolving variable '\${OBJ.greet('FAIL')}' failed: ValueError
     Log    ${OBJ.greet('FAIL')}
 
 Fail When Accessing Item Not In List
-    [Documentation]    FAIL STARTS: Resolving variable '\${LIST[30]}' failed: IndexError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${LIST[30]}' failed: IndexError:
     Log    ${LIST[30]}
 
 Fail When Accessing Item Not In Dictionary
-    [Documentation]    FAIL STARTS: Resolving variable '\${dict['xxx']}' failed: KeyError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${dict['xxx']}' failed: KeyError:
     ${dict} =    Evaluate    {}
     Log    ${dict['xxx']}
 
 Failing For Syntax Error
-    [Documentation]    FAIL STARTS: Resolving variable '\${OBJ.greet('no end quote)}' failed: SyntaxError:
+    [Documentation]    UNKNOWN STARTS: Resolving variable '\${OBJ.greet('no end quote)}' failed: SyntaxError:
     Log    ${OBJ.greet('no end quote)}

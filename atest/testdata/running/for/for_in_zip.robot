@@ -79,7 +79,7 @@ List variable with iterables can be empty
     Log    Executed!
 
 Strict mode
-    [Documentation]    FAIL    FOR IN ZIP items must have equal lengths in the STRICT mode, but lengths are 3, 3 and 5.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must have equal lengths in the STRICT mode, but lengths are 3, 3 and 5.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=STRICT
         @{result} =    Create List    @{result}    ${x}:${y}
     END
@@ -89,7 +89,7 @@ Strict mode
     END
 
 Strict mode requires items to have length
-    [Documentation]    FAIL    FOR IN ZIP items must have length in the STRICT mode, but item 2 does not.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must have length in the STRICT mode, but item 2 does not.
     FOR    ${x}    ${y}    IN ZIP    ${LIST3}    ${{itertools.cycle(['A', 'B'])}}    mode=STRICT
         Fail    Not executed
     END
@@ -134,55 +134,55 @@ Longest mode with custom fill value
     Should Be True    ${result} == [(1, 'a', 1), (2, 'b', 0), (0, 'c', 0)]
 
 Invalid mode
-    [Documentation]    FAIL    FOR option 'mode' does not accept value 'bad'. Valid values are 'STRICT', 'SHORTEST' and 'LONGEST'.
+    [Documentation]    UNKNOWN    FOR option 'mode' does not accept value 'bad'. Valid values are 'STRICT', 'SHORTEST' and 'LONGEST'.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=bad
         Fail    Should not be executed
     END
 
 Invalid mode from variable
-    [Documentation]    FAIL    Invalid FOR IN ZIP mode: Value 'bad' is not accepted. Valid values are 'STRICT', 'SHORTEST' and 'LONGEST'.
+    [Documentation]    UNKNOWN    Invalid FOR IN ZIP mode: Value 'bad' is not accepted. Valid values are 'STRICT', 'SHORTEST' and 'LONGEST'.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=${{'bad'}}
         Fail    Should not be executed
     END
 
 Config more than once 1
-    [Documentation]    FAIL    FOR IN ZIP items must be list-like, but item 3 is string.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must be list-like, but item 3 is string.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=longest    mode=shortest
         Fail    Should not be executed
     END
 
 Config more than once 2
-    [Documentation]    FAIL    FOR IN ZIP items must be list-like, but item 4 is string.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must be list-like, but item 4 is string.
     FOR    ${items}    IN ZIP    ${LIST1}    ${LIST2}    ${LIST3}    fill=x    mode=longest    fill=y    fill=z
         Fail    Should not be executed
     END
 
 Non-existing variable in mode
-    [Documentation]    FAIL    Invalid FOR IN ZIP mode: Variable '\${bad}' not found.
+    [Documentation]    UNKNOWN    Invalid FOR IN ZIP mode: Variable '\${bad}' not found.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=${bad}    fill=${ignored}
         Fail    Should not be executed
     END
 
 Non-existing variable in fill value
-    [Documentation]    FAIL    Invalid FOR IN ZIP fill value: Variable '\${bad}' not found.
+    [Documentation]    UNKNOWN    Invalid FOR IN ZIP fill value: Variable '\${bad}' not found.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    mode=longest    fill=${bad}
         Fail    Should not be executed
     END
 
 Not iterable value
-    [Documentation]    FAIL    FOR IN ZIP items must be list-like, but item 2 is integer.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must be list-like, but item 2 is integer.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${42}
         Fail    Should not be executed
     END
 
 Strings are not considered iterables
-    [Documentation]    FAIL    FOR IN ZIP items must be list-like, but item 3 is string.
+    [Documentation]    UNKNOWN    FOR IN ZIP items must be list-like, but item 3 is string.
     FOR    ${x}    ${y}    IN ZIP    ${LIST1}    ${LIST2}    not list
         Fail    Should not be executed
     END
 
 Too few variables 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop values should be multiple of its variables. \
     ...    Got 2 variables but 3 values.
     FOR    ${too}    ${few}    IN ZIP   ${LIST1}    ${LIST1}    ${LIST1}
@@ -190,7 +190,7 @@ Too few variables 1
     END
 
 Too few variables 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop values should be multiple of its variables. \
     ...    Got 3 variables but 4 values.
     @{items} =    Create List    ${LIST1}    ${LIST1}    ${LIST1}    ${LIST1}
@@ -199,7 +199,7 @@ Too few variables 2
     END
 
 Too many variables 1
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop values should be multiple of its variables. \
     ...    Got 3 variables but 2 values.
     FOR    ${too}    ${many}    ${variables}    IN ZIP    ${LIST1}    ${LIST2}
@@ -207,7 +207,7 @@ Too many variables 1
     END
 
 Too many variables 2
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR loop values should be multiple of its variables. \
     ...    Got 4 variables but 1 value.
     @{items} =    Create List    ${LIST1}

@@ -54,6 +54,7 @@ Import error
     Error In File    ${index}    variables/recursive_definition.robot    ${lineno}
     ...    Replacing variables from setting '${setting}' failed:
     ...    Variable '${variable}' not found.
+    ...    level=UNKNOWN
 
 Get recommendations
     [Arguments]    @{recommendations}

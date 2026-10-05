@@ -12,7 +12,7 @@ List can overwrite scalar
     Should be equal    ${foo}      ${VARIABLE}
 
 Scalar can overwrite list
-    [Documentation]    FAIL Value of variable '\@{VARIABLE}' is not list or list-like.
+    [Documentation]    UNKNOWN Value of variable '\@{VARIABLE}' is not list or list-like.
     ${variable}=    Set variable   scalar
     Log Many    @{VARIABLE}
 

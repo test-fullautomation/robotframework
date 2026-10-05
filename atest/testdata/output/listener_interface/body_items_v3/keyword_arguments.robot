@@ -6,14 +6,14 @@ ${STATE}               new
 
 *** Test Cases ***
 Library keyword arguments
-    [Documentation]    FAIL    No keyword with name 'Non-existing' found.
+    [Documentation]    UNKNOWN    No keyword with name 'Non-existing' found.
     Library keyword    initial    args    are    overwritten
 
 User keyword arguments
     User keyword    initial    args    are    overwritten
 
 Too many arguments
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Several failures occurred:
     ...
     ...    1) Keyword 'Library.Library Keyword' expected 0 to 4 arguments, got 7.
@@ -34,7 +34,7 @@ Conversion error
     Library keyword    initial    args    are    overwritten
 
 Positional after named
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Keyword 'Library.Library Keyword' got positional argument after named arguments.
     Library keyword    initial    args    are    overwritten
 

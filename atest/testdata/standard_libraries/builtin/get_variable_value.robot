@@ -86,13 +86,13 @@ List and dict variable items
     Should Be Equal    ${x}    default
 
 Invalid variable syntax 1
-    [Documentation]    FAIL Invalid variable name 'notvar'.
+    [Documentation]    UNKNOWN Invalid variable name 'notvar'.
     Get Variable Value    notvar
 
 Invalid variable syntax 2
-    [Documentation]    FAIL Invalid variable name '\\'.
+    [Documentation]    UNKNOWN Invalid variable name '\\'.
     Get Variable Value    \
 
 Invalid variable syntax 3
-    [Documentation]    FAIL Invalid variable name '\%{X}'.
+    [Documentation]    UNKNOWN Invalid variable name '\%{X}'.
     Get Variable Value    %{X}

@@ -38,10 +38,10 @@ CONTINUE with continuable failures
     FAIL    2
 
 Invalid BREAK
-    FAIL    1
+    UNKNOWN    1
 
 Invalid CONTINUE
-    FAIL    1
+    UNKNOWN    1
 
 Invalid BREAK not executed
     PASS    1

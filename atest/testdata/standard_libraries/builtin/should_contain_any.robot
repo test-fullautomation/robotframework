@@ -147,7 +147,7 @@ Should Contain Any without items fails
     Should Contain Any    foo
 
 Should Contain Any with invalid configuration
-    [Documentation]    FAIL    Keyword 'BuiltIn.Should Contain Any' got unexpected named arguments 'bad parameter' and 'шта'.
+    [Documentation]    UNKNOWN    Keyword 'BuiltIn.Should Contain Any' got unexpected named arguments 'bad parameter' and 'шта'.
     Should Contain Any    abcdefg    +    ok=True    msg=Message    bad parameter=True    шта=?
 
 Should Not Contain Any
@@ -296,5 +296,5 @@ Should Not Contain Any without items fails
     Should Not Contain Any    foo
 
 Should Not Contain Any with invalid configuration
-    [Documentation]    FAIL    Keyword 'BuiltIn.Should Not Contain Any' got unexpected named argument 'bad parameter'.
+    [Documentation]    UNKNOWN    Keyword 'BuiltIn.Should Not Contain Any' got unexpected named argument 'bad parameter'.
     Should Not Contain Any    abcdefg    +    ok=True    msg=Message    bad parameter=True

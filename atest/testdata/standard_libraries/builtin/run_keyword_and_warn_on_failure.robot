@@ -18,7 +18,7 @@ Run User keyword And Warn On Failure
     Log    This should be executed
 
 Run Keyword And Warn On Failure With Syntax Error
-    [Documentation]    FAIL    Assign mark '=' can be used only with the last variable.
+    [Documentation]    UNKNOWN    Assign mark '=' can be used only with the last variable.
     Run keyword And Continue On Failure    Syntax Error
     Fail    This Should Not Be Executed!
 

@@ -57,7 +57,7 @@ Variable Inside Variable And Extended Variable Syntax
     Should Be Equal    ${ ${ ${PERSON${3*2-4}} HOME.split('/')[${i}] } [-4:].capitalize() }    John
 
 Non-Existing Variable Inside Variable
-    [Documentation]    FAIL Variable '\${nonexisting1}' not found.
+    [Documentation]    UNKNOWN Variable '\${nonexisting1}' not found.
     Log    ${whatever ${nonexisting${${i}}}}
 
 *** Keywords ***

@@ -64,7 +64,7 @@ Test teardown fails
     [Setup]    Run Tests
     ...    --ExitOnFail --variable TEST_TEARDOWN:NonExistingKeyword
     ...    misc/setups_and_teardowns.robot
-    Check Test Case    Test with setup and teardown    FAIL    Teardown failed:\nNo keyword with name 'NonExistingKeyword' found.
+    Check Test Case    Test with setup and teardown    UNKNOWN    Teardown failed:\nNo keyword with name 'NonExistingKeyword' found.
     Test Should Not Have Been Run    Test with failing setup
     Test Should Not Have Been Run    Test with failing teardown
     Test Should Not Have Been Run    Failing test with failing teardown
@@ -93,7 +93,11 @@ Failure set by listener can initiate exit-on-failure
     ...    --ExitOnFailure --Listener ${DATADIR}/cli/runner/failtests.py
     ...    misc/pass_and_fail.robot
     Check Test Case    Pass    status=FAIL
-    Test Should Not Have Been Run    Fail
+    # The failtests.py listener forces every test's status to FAIL in its
+    # end_test method, so the not-run test is FAIL here instead of the
+    # usual UNKNOWN.
+    ${tc} =    Check Test Case    Fail    FAIL    ${EXIT ON FAILURE}
+    Should Contain    ${tc.tags}    robot:exit
 
 *** Keywords ***
 Parent Setup Should Have Failed
@@ -103,5 +107,5 @@ Parent Setup Should Have Failed
 
 Test Should Not Have Been Run
     [Arguments]    ${name}
-    ${tc} =    Check Test Case    ${name}    FAIL    ${EXIT ON FAILURE}
+    ${tc} =    Check Test Case    ${name}    UNKNOWN    ${EXIT ON FAILURE}
     Should Contain    ${tc.tags}    robot:exit

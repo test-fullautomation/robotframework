@@ -28,8 +28,8 @@ Exit-on-failure is not initiated if suite setup fails and skip-on-failure is act
     ...    Pass
     ...    Fail
     Should Contain Tests    ${SUITE.suites[2]}
-    ...    Pass=FAIL:Failure occurred and exit-on-failure mode is in use.
-    ...    Fail=FAIL:Failure occurred and exit-on-failure mode is in use.
+    ...    Pass=UNKNOWN:Failure occurred and exit-on-failure mode is in use.
+    ...    Fail=UNKNOWN:Failure occurred and exit-on-failure mode is in use.
 
 Exit-on-failure is initiated if suite setup fails and skip-on-failure is not active with all tests
     Run Tests    --exit-on-failure --skip-on-failure tag2 --variable SUITE_SETUP:Fail
@@ -45,5 +45,5 @@ Exit-on-failure is initiated if suite setup fails and skip-on-failure is not act
     ...    Test with failing teardown=SKIP:${prefix}\nFailure occurred and exit-on-failure mode is in use.
     ...    Failing test with failing teardown=SKIP:${prefix}\nFailure occurred and exit-on-failure mode is in use.
     Should Contain Tests    ${SUITE.suites[1]}
-    ...    Pass=FAIL:Failure occurred and exit-on-failure mode is in use.
-    ...    Fail=FAIL:Failure occurred and exit-on-failure mode is in use.
+    ...    Pass=UNKNOWN:Failure occurred and exit-on-failure mode is in use.
+    ...    Fail=UNKNOWN:Failure occurred and exit-on-failure mode is in use.

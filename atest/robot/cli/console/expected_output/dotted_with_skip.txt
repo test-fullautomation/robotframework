@@ -8,6 +8,6 @@ Expected
 Run suite 'X' with 15 tests in *.
 
 FAILED
-15 tests, 13 passed, 1 failed, 1 skipped
+15 tests, 13 passed, 1 failed, 0 unknown, 1 skipped
 
 Output:  *.xml

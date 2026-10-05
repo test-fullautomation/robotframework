@@ -92,7 +92,7 @@ GROUP
     END
 
 Syntax error
-    [Documentation]    FAIL    Non-existing setting 'Bad'.
+    [Documentation]    UNKNOWN    Non-existing setting 'Bad'.
     [Bad]      Setting
     [Ooops]    I did it again
 

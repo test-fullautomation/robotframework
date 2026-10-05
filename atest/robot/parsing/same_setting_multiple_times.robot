@@ -37,7 +37,7 @@ Test Timeout
 Test [Documentation]
     ${tc} =    Check Test Case    Test Settings
     Should Be Equal    ${tc[0].type}    ERROR
-    Should Be Equal    ${tc[0].status}    FAIL
+    Should Be Equal    ${tc[0].status}    UNKNOWN
     Should Be Equal     ${tc[0].values[0]}    [Documentation]
 
 Test [Tags]
@@ -61,7 +61,7 @@ Test [Timeout]
 
 Keyword [Arguments]
     ${tc} =    Check Test Case    Keyword Settings
-    Check Keyword Data    ${tc[0]}    Keyword Settings    assign=\${ret}    args=1, 2, 3    tags=K1    status=FAIL
+    Check Keyword Data    ${tc[0]}    Keyword Settings    assign=\${ret}    args=1, 2, 3    tags=K1    status=UNKNOWN
     Check Log Message    ${tc[0, 0]}    Arguments: [ \${a1}='1' | \${a2}='2' | \${a3}='3' ]    TRACE
 
 Keyword [Documentation]

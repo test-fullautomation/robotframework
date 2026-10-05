@@ -107,7 +107,7 @@ Retry count must be positive 2
     Wait Until Keyword Succeeds    -8x    1s    No Operation
 
 No retry after syntax error
-    [Documentation]    FAIL FOR loop cannot be empty.
+    [Documentation]    UNKNOWN FOR loop cannot be empty.
     Wait Until Keyword Succeeds    10 second    1s    Syntax Error
 
 No retry if keyword name is not string

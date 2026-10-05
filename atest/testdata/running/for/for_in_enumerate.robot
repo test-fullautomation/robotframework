@@ -34,13 +34,13 @@ Escape start
     Should Be True    ${result} == [0, 1]
 
 Invalid start
-    [Documentation]    FAIL    Invalid FOR IN ENUMERATE start value: Value must be an integer, got 'invalid'.
+    [Documentation]    UNKNOWN    Invalid FOR IN ENUMERATE start value: Value must be an integer, got 'invalid'.
     FOR    ${index}    ${item}    IN ENUMERATE    xxx    start=invalid
         Fail    Should not be executed
     END
 
 Invalid variable in start
-    [Documentation]    FAIL    Invalid FOR IN ENUMERATE start value: Variable '\${invalid}' not found.
+    [Documentation]    UNKNOWN    Invalid FOR IN ENUMERATE start value: Variable '\${invalid}' not found.
     FOR    ${index}    ${item}    IN ENUMERATE    xxx    start=${invalid}
         Fail    Should not be executed
     END
@@ -81,7 +81,7 @@ One variable only
     Should Be True    ${result} == ['0:a', '1:b', '2:c']
 
 Wrong number of variables
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Number of FOR IN ENUMERATE loop values should be multiple of its \
     ...    variables (excluding the index). Got 3 variables but 4 values.
     FOR    ${index}    ${item1}    ${item2}    ${item3}    IN ENUMERATE    @{VALUES}
@@ -89,13 +89,13 @@ Wrong number of variables
     END
 
 No values
-    [Documentation]    FAIL    FOR loop has no values.
+    [Documentation]    UNKNOWN    FOR loop has no values.
     FOR    ${index}    ${item}    IN ENUMERATE
         Fail    Should not be executed.
     END
 
 No values with start
-    [Documentation]    FAIL    FOR loop has no values.
+    [Documentation]    UNKNOWN    FOR loop has no values.
     FOR    ${index}    ${item}    IN ENUMERATE    start=0
         Fail    Should not be executed.
     END

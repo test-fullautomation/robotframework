@@ -40,7 +40,7 @@ Non-existing variable in condition causes normal error
 Templatest are not supported
     ${tc} =    Check Test Case    ${TEST NAME}
     Should Be Equal       ${tc[0].type}         WHILE
-    Should Be Equal       ${tc[0].status}       FAIL
+    Should Be Equal       ${tc[0].status}       UNKNOWN
     Should Be Equal       ${tc[0, 0].type}      ITERATION
     Should Be Equal       ${tc[0, 0].status}    NOT RUN
     Check Keyword Data    ${tc[0, 0, 0]}        ${EMPTY}    args=1    status=NOT RUN
@@ -51,7 +51,7 @@ Check Invalid WHILE Test Case
     [Arguments]    ${body}=True
     ${tc} =    Check Test Case    ${TESTNAME}
     Should Be Equal    ${tc[0].type}         WHILE
-    Should Be Equal    ${tc[0].status}       FAIL
+    Should Be Equal    ${tc[0].status}    UNKNOWN
     Should Be Equal    ${tc[0, 0].type}      ITERATION
     Should Be Equal    ${tc[0, 0].status}    NOT RUN
     IF    ${body}

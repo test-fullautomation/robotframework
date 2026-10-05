@@ -308,7 +308,7 @@ class _BaseSettings:
         if colors.count(":") not in [1, 2, 3]:
             self._raise_invalid(
                 "ReportBackground",
-                f"Expected format 'pass:fail:unknown:skip', 'pass:fail:unknown' "
+                f"Expected format 'pass:fail:unknown:skip' or 'pass:fail:unknown' "
                 f"or 'pass:fail', got '{colors}'.",
             )
         colors = colors.split(":")

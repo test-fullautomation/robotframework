@@ -26,4 +26,4 @@ Failing argument conversion
     Error In File    0    variables/dynamic_variable_files/getting_vars_from_dynamic_var_file.robot    8
     ...    Processing variable file '${path}' with arguments ['ok', 'bad'] failed:
     ...    ValueError: Argument 'number' got value 'bad' that cannot be converted to integer or float.
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN

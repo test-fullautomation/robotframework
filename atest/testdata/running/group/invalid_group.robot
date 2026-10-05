@@ -1,24 +1,24 @@
 *** Test Cases ***
 END missing
-    [Documentation]    FAIL    GROUP must have closing END.
+    [Documentation]    UNKNOWN    GROUP must have closing END.
     GROUP    This is not closed
         Fail    Not run
 
 Empty
-    [Documentation]    FAIL    GROUP cannot be empty.
+    [Documentation]    UNKNOWN    GROUP cannot be empty.
     GROUP    This is empty
     END
     Log    Outside
 
 Multiple parameters
-    [Documentation]    FAIL    GROUP accepts only one argument as name, got 3 arguments 'Too', 'many' and 'values'.
+    [Documentation]    UNKNOWN    GROUP accepts only one argument as name, got 3 arguments 'Too', 'many' and 'values'.
     GROUP    Too    many    values
         Fail    Not run
     END
     Log   Last Keyword
 
 Non-existing variable in name
-    [Documentation]    FAIL    Variable '\${non_existing_var}' not found.
+    [Documentation]    UNKNOWN    Variable '\${non_existing_var}' not found.
     GROUP    ${non_existing_var} in name
         Fail    Not run
     END

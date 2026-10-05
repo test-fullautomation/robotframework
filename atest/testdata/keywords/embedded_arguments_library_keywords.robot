@@ -65,11 +65,11 @@ Embedded Arguments as List And Dict Variables
     Should Be Equal    ${out2.b}    ${2}
 
 Non-Existing Variable in Embedded Arguments
-    [Documentation]    FAIL Variable '${non existing}' not found.
+    [Documentation]    UNKNOWN Variable '${non existing}' not found.
     User ${non existing} Selects ${variables} From Webshop
 
 Custom Embedded Argument Regexp
-    [Documentation]    FAIL No keyword with name 'Result of a + b is fail' found.
+    [Documentation]    UNKNOWN No keyword with name 'Result of a + b is fail' found.
     I execute "foo"
     I execute "bar" with "zap"
     Result of 1 + 1 is 2
@@ -133,17 +133,17 @@ Escaping Values Given As Embedded Arguments
     Should Be Equal    ${name}-${item}    ${EMPTY}-${SPACE}
 
 Embedded Arguments Syntax is Space Sensitive
-    [Documentation]    FAIL No keyword with name 'User Janne Selects x fromwebshop' found.
+    [Documentation]    UNKNOWN No keyword with name 'User Janne Selects x fromwebshop' found.
     User Janne Selects x from webshop
     User Janne Selects x fromwebshop
 
 Embedded Arguments Syntax is Underscore Sensitive
-    [Documentation]    FAIL No keyword with name 'User Janne Selects x from_webshop' found.
+    [Documentation]    UNKNOWN No keyword with name 'User Janne Selects x from_webshop' found.
     User Janne Selects x from webshop
     User Janne Selects x from_webshop
 
 Keyword Matching Multiple Keywords In Library File
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'foo+lib+bar-lib-zap' found:
     ...    ${INDENT}embedded_args_in_lk_1.\${a}+lib+\${b}
     ...    ${INDENT}embedded_args_in_lk_1.\${a}-lib-\${b}
@@ -153,19 +153,19 @@ Keyword Matching Multiple Keywords In Library File
     foo+lib+bar-lib-zap
 
 Keyword Matching Multiple Keywords In Different Library Files
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'foo*lib*bar' found:
     ...    ${INDENT}embedded_args_in_lk_1.\${a}*lib*\${b}
     ...    ${INDENT}embedded_args_in_lk_2.\${a}*lib*\${b}
     foo*lib*bar
 
 Keyword with only embedded arguments doesn't accept normal arguments
-    [Documentation]    FAIL Keyword 'embedded_args_in_lk_1.User \${user} Selects \${item} From Webshop' expected 0 arguments, got 1.
+    [Documentation]    UNKNOWN Keyword 'embedded_args_in_lk_1.User \${user} Selects \${item} From Webshop' expected 0 arguments, got 1.
     Given this "usage" with @{EMPTY} works    @{EMPTY}
     Then User Invalid Selects Invalid From Webshop    invalid
 
 Keyword with embedded args cannot be used as "normal" keyword
-    [Documentation]    FAIL Variable '\${user}' not found.
+    [Documentation]    UNKNOWN Variable '\${user}' not found.
     User ${user} Selects ${item} From Webshop
 
 Keyword with both embedded and normal arguments
@@ -179,11 +179,11 @@ Conversion with embedded and normal arguments
     Conversion with embedded bad and normal    bad
 
 Keyword with both embedded and normal arguments with too few arguments
-    [Documentation]    FAIL Keyword 'embedded_args_in_lk_1.Number of \${animals} should be' expected 1 to 2 arguments, got 0.
+    [Documentation]    UNKNOWN Keyword 'embedded_args_in_lk_1.Number of \${animals} should be' expected 1 to 2 arguments, got 0.
     Number of horses should be
 
 Must accept at least as many positional arguments as there are embedded arguments
-    [Documentation]    FAIL No keyword with name 'Wrong number of embedded args' found.
+    [Documentation]    UNKNOWN No keyword with name 'Wrong number of embedded args' found.
     Wrong number of embedded args
 
 Optional Non-Embedded Args Are Okay
@@ -210,23 +210,23 @@ Same name with different regexp works
     It is a cow
 
 Same name with different regexp matching multiple fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'It is a cat' found:
     ...    ${INDENT}embedded_args_in_lk_1.It is \${animal:a (cat|cow)}
     ...    ${INDENT}embedded_args_in_lk_1.It is \${animal:a (dog|cat)}
     It is a cat
 
 Same name with same regexp fails
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    Multiple keywords matching name 'It is totally same' found:
     ...    ${INDENT}embedded_args_in_lk_1.It is totally ${same}
     ...    ${INDENT}embedded_args_in_lk_1.It is totally ${same}
     It is totally same
 
 Embedded arguments cannot have type information
-    [Documentation]    FAIL No keyword with name 'Embedded 123 with type is not supported' found.
+    [Documentation]    UNKNOWN No keyword with name 'Embedded 123 with type is not supported' found.
     Embedded 123 with type is not supported
 
 Embedded type can nevertheless be invalid
-    [Documentation]    FAIL No keyword with name 'Embedded type can be invalid' found.
+    [Documentation]    UNKNOWN No keyword with name 'Embedded type can be invalid' found.
     Embedded type can be invalid

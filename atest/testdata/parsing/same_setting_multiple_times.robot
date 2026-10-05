@@ -28,7 +28,7 @@ Use Defaults
     Sleep    0.1s
 
 Test Settings
-    [Documentation]    FAIL Several failures occurred:\n\n
+    [Documentation]    UNKNOWN Several failures occurred:\n\n
     ...  1) Setting 'Documentation' is allowed only once. Only the first value is used.\n\n
     ...  2) Setting 'Tags' is allowed only once. Only the first value is used.\n\n
     ...  3) Setting 'Setup' is allowed only once. Only the first value is used.\n\n
@@ -53,7 +53,7 @@ Test Settings
     [Tags]    T2
 
 Keyword Settings
-    [Documentation]    FAIL Setting 'Arguments' is allowed only once. Only the first value is used.
+    [Documentation]    UNKNOWN Setting 'Arguments' is allowed only once. Only the first value is used.
     [Template]    NONE
     ${ret} =    Keyword Settings    1   2   3
     Should Be Equal    ${ret}    R0

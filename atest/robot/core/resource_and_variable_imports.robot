@@ -39,7 +39,7 @@ Invalid List Variable
     ${path} =    Normalize Path    ${RESDIR}/invalid_list_variable.py
     Error in file    17    ${DATAFILE}    48
     ...    Processing variable file '${path}' failed:
-    ...    Invalid variable 'LIST__invalid_list': Expected a list-like value, got string.
+    ...    Invalid variable 'LIST__invalid_list': Expected a list-like value, got string.    level=UNKNOWN
 
 Dynamic Variable File
     Check Test Case    ${TEST NAME}
@@ -51,38 +51,38 @@ Static variable file does not accept arguments
     ${path} =    Normalize Path    ${DATADIR}/core/resources_and_variables/variables.py
     Error in file    6    ${DATAFILE}    18
     ...    Processing variable file '${path}' with arguments ['static', 'does', 'not', 'accept', 'args'] failed: Static variable files do not accept arguments.
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Too few arguments to dynamic variable file
     ${path} =    Normalize Path    ${DATADIR}/core/resources_and_variables/dynamic_variables.py
     Error in file    7    ${DATAFILE}    19
-    ...    Processing variable file '${path}' failed: Variable file expected 1 to 4 arguments, got 0.
+    ...    Processing variable file '${path}' failed: Variable file expected 1 to 4 arguments, got 0.    level=UNKNOWN
 
 Too many arguments to dynamic variable file
     ${path} =    Normalize Path    ${DATADIR}/core/resources_and_variables/dynamic_variables.py
     Error in file    8    ${DATAFILE}    20
     ...    Processing variable file '${path}' with arguments ['More', 'than', 'four', 'arguments', 'fails'] failed: Variable file expected 1 to 4 arguments, got 5.
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Invalid return value from dynamic variable file
     ${path} =    Normalize Path    ${RESDIR}/dynamic_variables.py
     Error in file    4    ${DATAFILE}    10
     ...    Processing variable file '${path}' with arguments ['Three args', 'returns None', 'which is invalid'] failed:
     ...    Expected 'get_variables' to return a dictionary-like value, got None.
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Dynamic variable file raises exception
     ${path} =    Normalize Path    ${RESDIR}/dynamic_variables.py
     Error in file    5    ${DATAFILE}    12
     ...    Processing variable file '${path}' with arguments ['Four', 'args', 'raises', 'exception'] failed:
     ...    Ooops!
-    ...    pattern=False
+    ...    pattern=False    level=UNKNOWN
 
 Non-Existing Variable In Arguments To Dynamic Variable File
     ${path} =    Normalize Path    ${RESDIR}/dynamicVariables.py
     Error in file    16    ${DATAFILE}    47
     ...    Replacing variables from setting 'Variables' failed:
-    ...    Variable '\${non_existing_var_as_arg}' not found.
+    ...    Variable '\${non_existing_var_as_arg}' not found.    level=UNKNOWN
 
 Resource Importing Resources
     Check Test Case    ${TEST NAME}
@@ -108,11 +108,11 @@ Re-Import Variable File
 
 Non-Existing Resource File
     Error in file    9    ${DATAFILE}    39
-    ...    Resource file 'non_existing.robot' does not exist.
+    ...    Resource file 'non_existing.robot' does not exist.    level=UNKNOWN
 
 Non-Existing Variable File
     Error in file    10    ${DATAFILE}    40
-    ...    Variable file 'non_existing.py' does not exist.
+    ...    Variable file 'non_existing.py' does not exist.    level=UNKNOWN
 
 Empty Resource File
     ${path} =  Normalize Path  ${RESDIR}/empty_resource.robot
@@ -126,10 +126,10 @@ Invalid Resource Import Parameters
 Initialization file cannot be used as a resource file
     ${path} =  Normalize Path  ${DATADIR}/core/test_suite_dir_with_init_file/__init__.robot
     Error in file    12    ${DATAFILE}    43
-    ...    Initialization file '${path}' cannot be imported as a resource file.
+    ...    Initialization file '${path}' cannot be imported as a resource file.    level=UNKNOWN
     ${path} =  Normalize Path  ${DATADIR}/core/test_suite_dir_with_init_file/sub_suite_with_init_file/__INIT__.robot
     Error in file    13    ${DATAFILE}    44
-    ...    Initialization file '${path}' cannot be imported as a resource file.
+    ...    Initialization file '${path}' cannot be imported as a resource file.    level=UNKNOWN
 
 Invalid Setting In Resource File
     Error in file    1    ${RESDIR}/resources.robot    8
@@ -141,7 +141,7 @@ Resource cannot contain tests
     ${path} =    Normalize Path    ${RESDIR}/resource_with_testcase_table.robot
     Error in file    3    ${RESDIR}/resources.robot    6
     ...    Error in file '${path}' on line 4:
-    ...    Resource file with 'Test Cases' section is invalid.
+    ...    Resource file with 'Test Cases' section is invalid.    level=UNKNOWN
 
 Invalid Variable File
     ${path} =    Normalize Path    ${RESDIR}/invalid_variable_file.py
@@ -149,15 +149,15 @@ Invalid Variable File
     ...    Processing variable file '${path}' failed:
     ...    Importing variable file '${path}' failed:
     ...    This is an invalid variable file
-    ...    traceback=*
+    ...    traceback=*    level=UNKNOWN
 
 Resource Import Without Path
     Error in file    14    ${DATAFILE}    45
-    ...    Resource setting requires value.
+    ...    Resource setting requires value.    level=UNKNOWN
 
 Variable Import Without Path
     Error in file    18    ${DATAFILE}    49
-    ...    Variables setting requires value.
+    ...    Variables setting requires value.    level=UNKNOWN
 
 Resource File In PYTHONPATH
     Check Test Case    ${TEST NAME}

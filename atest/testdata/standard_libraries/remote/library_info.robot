@@ -13,7 +13,7 @@ Load large library
     Should be equal    ${ret}    9999
 
 Arguments
-    [Documentation]    FAIL Keyword 'Remote.Keyword 0' expected 0 to 1 arguments, got 2.
+    [Documentation]    UNKNOWN Keyword 'Remote.Keyword 0' expected 0 to 1 arguments, got 2.
     Some Keyword    a
     Some Keyword    a    b
     Some Keyword    a    b    c    d    e
@@ -30,9 +30,9 @@ Types
     Should be equal    ${ret}    ${-42}
 
 __intro__ is not exposed
-    [Documentation]    FAIL No keyword with name '__intro__' found.
+    [Documentation]    UNKNOWN No keyword with name '__intro__' found.
     __intro__
 
 __init__ is not exposed
-    [Documentation]    FAIL No keyword with name '__init__' found.
+    [Documentation]    UNKNOWN No keyword with name '__init__' found.
     __init__

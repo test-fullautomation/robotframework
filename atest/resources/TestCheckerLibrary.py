@@ -175,6 +175,7 @@ class TestCheckerLibrary:
                 self.validate_json_output(path)
             else:
                 self._validate_output(path)
+        error = None
         try:
             logger.info(f"Processing output '{path}'.")
             if path.suffix.lower() == ".json":
@@ -185,7 +186,14 @@ class TestCheckerLibrary:
             set_suite_variable("$SUITE", None)
             msg, details = get_error_details()
             logger.info(details)
-            raise RuntimeError(f"Processing output failed: {msg}")
+            error = msg
+        # Raise outside the except block so the original exception (whose
+        # traceback frames keep the abandoned iterparse file handle alive)
+        # is released first. Raising from inside the block chains it into
+        # __context__, and on Windows the still-open output.xml then makes
+        # every subsequent Run Tests fail with WinError 32.
+        if error is not None:
+            raise RuntimeError(f"Processing output failed: {error}")
         result.visit(ProcessResults())
         set_suite_variable("$SUITE", result.suite)
         set_suite_variable("$STATISTICS", result.statistics)

@@ -25,7 +25,7 @@ Listener methods in library are keywords
     ...                 Start kw: listenerlibrary.Events Should Be
 
 Listener methods starting with underscore are not keywords
-    [Documentation]    FAIL
+    [Documentation]    UNKNOWN
     ...    No keyword with name 'End keyword' found. Did you mean:
     ...    ${SPACE*4}BuiltIn.Run Keyword
     End keyword    bar    zap
