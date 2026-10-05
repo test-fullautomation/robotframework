@@ -26,6 +26,11 @@ Mapping:
 - decision        -> ``IF`` / ``ELSE``
 - loop            -> ``WHILE`` (``limit=max_loops on_limit=pass``, a deadline
                      condition for ``max_seconds``, ``Sleep every`` last)
+- checkpoint      -> ``Flow Phase`` first in every test, and for the loops
+                     directly in a test phase ``Flow Loop`` before the
+                     ``WHILE`` (it returns the bounds, or what an earlier
+                     run left of them) and ``Flow Iteration`` first in its
+                     body; not emitted with ``"checkpoint": false``
 - on_failure      -> ``TRY`` / ``EXCEPT AS ${flow_error}``; ``abort`` re-raises
                      with ``Fail`` after the recovery ran
 - flow (sub-flow) -> a call of the generated user keyword ``Flow: <sub-flow name>``;
@@ -52,6 +57,13 @@ SETUP_KEYWORD = 'Flow Setup'
 TEARDOWN_KEYWORD = 'Flow Teardown'
 ERROR_VARIABLE = '${flow_error}'
 DEADLINE_VARIABLE = '${flow_deadline_%s}'
+LIMIT_VARIABLE = '${flow_limit_%s}'
+PHASE_KEYWORD = 'Flow Phase'
+LOOP_KEYWORD = 'Flow Loop'
+ITERATION_KEYWORD = 'Flow Iteration'
+# The flow clock stands still while the flow is paused, so a hold does not
+# use up a loop's time.
+CLOCK = 'robot.flow.control.clock()'
 SUBFLOW_KEYWORD = 'Flow: %s'
 
 
@@ -71,13 +83,23 @@ def build_suite(flow, source=None):
         resource.imports.variables(name, args)
     for name, value in data.variables.items():
         resource.variables.create(name='${%s}' % name, value=[value])
+    tracked = data.checkpoint is not False
+    if isinstance(data.checkpoint, str):
+        resource.variables.create(name='${FLOW_CHECKPOINT}', value=[data.checkpoint])
+    if tracked and data.checkpoint_every:
+        resource.variables.create(name='${FLOW_CHECKPOINT_EVERY}',
+                                  value=[str(data.checkpoint_every)])
     emitter = _Emitter(resource, source)
     if flow.setup:
         emitter.user_keyword(resource, SETUP_KEYWORD, flow.setup.steps)
         suite.setup.config(name=SETUP_KEYWORD)
     for phase in flow.tests:
         test = suite.tests.create(name=phase.name)
-        emitter.emit(test.body, phase.steps)
+        if tracked:
+            test.body.create_keyword(name=PHASE_KEYWORD, args=[_literal(phase.name)])
+            emitter.emit_phase(test.body, phase.steps)
+        else:
+            emitter.emit(test.body, phase.steps)
     if flow.teardown:
         emitter.user_keyword(resource, TEARDOWN_KEYWORD, flow.teardown.steps)
         suite.teardown.config(name=TEARDOWN_KEYWORD)
@@ -107,6 +129,33 @@ class _Emitter:
             return
         for step in steps:
             self._emitters[type(step)](self, body, step)
+
+    def emit_phase(self, body, steps):
+        """Emit the steps of a test phase; its top-level loops are checkpointed."""
+        if not steps:
+            body.create_keyword(name='No Operation')
+            return
+        names = _assigned(steps)
+        for step in steps:
+            if isinstance(step, Loop):
+                self._tracked_loop(body, step, names)
+            else:
+                self._emitters[type(step)](self, body, step)
+
+    def _tracked_loop(self, body, step, names):
+        name = self._deadline_name(step)
+        limit, deadline = LIMIT_VARIABLE % name, DEADLINE_VARIABLE % name
+        args = [_literal(step.id), str(step.max_loops or 'NONE'),
+                step.max_seconds or 'NONE']
+        # Names, not values: the keyword reads them when a checkpoint is due.
+        args += ['\\' + name for name in names]
+        body.create_keyword(name=LOOP_KEYWORD, args=args, assign=[limit, deadline])
+        while_ = body.create_while(condition=f'{CLOCK} < ${deadline[2:-1]}',
+                                   limit=limit, on_limit='pass')
+        while_.body.create_keyword(name=ITERATION_KEYWORD, args=[_literal(step.id)])
+        self._guarded(while_.body, step)
+        if step.every:
+            while_.body.create_keyword(name='Sleep', args=[step.every])
 
     def _keyword(self, body, step):
         body.create_keyword(name=step.keyword, args=step.args, assign=step.assign)
@@ -210,9 +259,9 @@ class _Emitter:
         if step.max_seconds:
             deadline = self._deadline_variable(step)
             seconds = timestr_to_secs(step.max_seconds)
-            body.create_keyword(name='Evaluate', args=[f'time.time() + {seconds}'],
+            body.create_keyword(name='Evaluate', args=[f'{CLOCK} + {seconds}'],
                                 assign=[deadline])
-            condition = f'time.time() < {deadline}'
+            condition = f'{CLOCK} < {deadline}'
         if step.max_loops:
             limit, on_limit = str(step.max_loops), 'pass'
         else:
@@ -224,6 +273,9 @@ class _Emitter:
             while_.body.create_keyword(name='Sleep', args=[step.every])
 
     def _deadline_variable(self, step):
+        return DEADLINE_VARIABLE % self._deadline_name(step)
+
+    def _deadline_name(self, step):
         """A variable name derived from the loop id, unique within the suite.
 
         Sanitising ids can make different ids equal (``a-b`` and ``a_b``);
@@ -236,7 +288,7 @@ class _Emitter:
             number += 1
             name = f'{base}_{number}'
         self._deadlines[step.id] = name
-        return DEADLINE_VARIABLE % name
+        return name
 
     def _try(self, body, step):
         self._guarded(body, step)
@@ -263,6 +315,28 @@ class _Emitter:
         Loop: _loop,
         Try: _try,
     }
+
+
+def _literal(text):
+    """``text`` as a keyword argument that is taken as it is written."""
+    return text.replace('\\', '\\\\').replace('=', '\\=').replace('${', '\\${')
+
+
+def _assigned(steps):
+    """The variables the steps assign, in order, for the checkpoint."""
+    names = []
+
+    def collect(items):
+        for step in items or ():
+            for name in getattr(step, 'assign', None) or ():
+                name = name.rstrip('= ')
+                if name.startswith('${') and name not in names:
+                    names.append(name)
+            for attr in ('body', 'recovery', 'yes', 'no'):
+                collect(getattr(step, attr, None))
+
+    collect(steps)
+    return names
 
 
 def _is_path(name):

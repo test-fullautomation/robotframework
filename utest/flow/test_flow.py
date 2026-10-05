@@ -308,7 +308,8 @@ class TestBuilder(unittest.TestCase):
     def test_keyword_with_assign(self):
         node = {'id': 'v', 'kind': 'keyword', 'keyword': 'Read Version', 'assign': '${V}'}
         data = flow([START, node, END], [['start', 'v'], ['v', 'end']])
-        call = build(data).tests[0].body[0]
+        phase, call = build(data).tests[0].body
+        self.assertEqual((phase.name, list(phase.args)), ('Flow Phase', ['Test Flow']))
         self.assertEqual((call.name, list(call.assign)), ('Read Version', ['${V}']))
         node['assign'] = 42
         with self.assertRaises(FlowError):
@@ -321,10 +322,15 @@ class TestBuilder(unittest.TestCase):
 
     def test_loop_with_recovery(self):
         test = build(LOOP_FLOW).tests[0]
-        loop = test.body[0]
+        phase, start, loop = test.body
+        self.assertEqual((phase.name, list(phase.args)), ('Flow Phase', ['Test Flow']))
+        self.assertEqual((start.name, list(start.args)), ('Flow Loop', ['loop', '3', 'NONE']))
+        self.assertEqual(list(start.assign), ['${flow_limit_loop}', '${flow_deadline_loop}'])
         self.assertEqual(loop.type, BodyItem.WHILE)
-        self.assertEqual((loop.condition, loop.limit, loop.on_limit), ('True', '3', 'pass'))
-        try_, sleep = loop.body
+        self.assertEqual((loop.condition, loop.limit, loop.on_limit),
+                         ('robot.flow.control.clock() < $flow_deadline_loop', '${flow_limit_loop}', 'pass'))
+        iteration, try_, sleep = loop.body
+        self.assertEqual((iteration.name, list(iteration.args)), ('Flow Iteration', ['loop']))
         self.assertEqual(try_.type, BodyItem.TRY_EXCEPT_ROOT)
         main, recovery = try_.body
         self.assertEqual(main.type, BodyItem.TRY)
@@ -337,7 +343,7 @@ class TestBuilder(unittest.TestCase):
     def test_abort_reraises(self):
         data = copy.deepcopy(LOOP_FLOW)
         data['edges'][4] = {'from': 'recover', 'to': 'end', 'label': 'abort'}
-        recovery = build(data).tests[0].body[0].body[0].body[1]
+        recovery = build(data).tests[0].body[2].body[1].body[1]
         self.assertEqual([(k.name, list(k.args)) for k in recovery.body],
                          [('Recover', []), ('Fail', ['${flow_error}'])])
 
@@ -347,12 +353,39 @@ class TestBuilder(unittest.TestCase):
                     [['start', 'my-loop'], {'from': 'my-loop', 'to': 'w', 'label': 'body'},
                      {'from': 'w', 'to': 'my-loop', 'label': 'next'},
                      {'from': 'my-loop', 'to': 'end', 'label': 'done'}])
-        evaluate, loop = build(data).tests[0].body
-        self.assertEqual(evaluate.name, 'Evaluate')
-        self.assertEqual(list(evaluate.assign), ['${flow_deadline_my_loop}'])
-        self.assertEqual(list(evaluate.args), ['time.time() + 7200.0'])
-        self.assertEqual(loop.condition, 'time.time() < ${flow_deadline_my_loop}')
-        self.assertEqual((loop.limit, loop.on_limit), ('NONE', None))
+        _, start, loop = build(data).tests[0].body
+        self.assertEqual((start.name, list(start.args)), ('Flow Loop', ['my-loop', 'NONE', '2h']))
+        self.assertEqual(list(start.assign),
+                         ['${flow_limit_my_loop}', '${flow_deadline_my_loop}'])
+        self.assertEqual(loop.condition, 'robot.flow.control.clock() < $flow_deadline_my_loop')
+        self.assertEqual((loop.limit, loop.on_limit), ('${flow_limit_my_loop}', 'pass'))
+
+    def test_loop_variables_are_passed_by_name(self):
+        data = copy.deepcopy(LOOP_FLOW)
+        data['nodes'][2]['assign'] = '${count}'
+        start = build(data).tests[0].body[1]
+        self.assertEqual(list(start.args), ['loop', '3', 'NONE', '\\${count}'])
+
+    def test_without_checkpoint_nothing_is_added(self):
+        data = copy.deepcopy(LOOP_FLOW)
+        data['flow']['checkpoint'] = False
+        loop, = build(data).tests[0].body
+        self.assertEqual((loop.condition, loop.limit, loop.on_limit), ('True', '3', 'pass'))
+        self.assertEqual([item.type for item in loop.body],
+                         [BodyItem.TRY_EXCEPT_ROOT, BodyItem.KEYWORD])
+
+    def test_checkpoint_settings_become_variables(self):
+        data = copy.deepcopy(LOOP_FLOW)
+        data['flow'].update(checkpoint='state/plan.json', checkpoint_every=100)
+        variables = {v.name: v.value for v in build(data).resource.variables}
+        self.assertEqual(variables, {'${FLOW_CHECKPOINT}': ('state/plan.json',),
+                                     '${FLOW_CHECKPOINT_EVERY}': ('100',)})
+        for bad in ({'checkpoint': 42}, {'checkpoint': ''}, {'checkpoint_every': 0},
+                    {'checkpoint_every': '10'}):
+            wrong = copy.deepcopy(LOOP_FLOW)
+            wrong['flow'].update(bad)
+            with self.assertRaises(FlowError):
+                build(wrong)
 
     def test_colliding_loop_ids_get_distinct_deadlines(self):
         data = flow([START,
@@ -365,18 +398,21 @@ class TestBuilder(unittest.TestCase):
                      {'from': 'w', 'to': 'a_b', 'label': 'next'},
                      {'from': 'a_b', 'to': 'a-b', 'label': 'next'},
                      {'from': 'a-b', 'to': 'end', 'label': 'done'}])
-        outer_eval, outer = build(data).tests[0].body
-        inner_eval, inner = outer.body
-        self.assertEqual(list(outer_eval.assign), ['${flow_deadline_a_b}'])
+        # The outer loop is checkpointed, the nested one is a plain loop.
+        _, outer_start, outer = build(data).tests[0].body
+        _, inner_eval, inner = outer.body
+        self.assertEqual(list(outer_start.assign),
+                         ['${flow_limit_a_b}', '${flow_deadline_a_b}'])
         self.assertEqual(list(inner_eval.assign), ['${flow_deadline_a_b_2}'])
-        self.assertEqual(outer.condition, 'time.time() < ${flow_deadline_a_b}')
-        self.assertEqual(inner.condition, 'time.time() < ${flow_deadline_a_b_2}')
+        self.assertEqual(list(inner_eval.args), ['robot.flow.control.clock() + 60.0'])
+        self.assertEqual(outer.condition, 'robot.flow.control.clock() < $flow_deadline_a_b')
+        self.assertEqual(inner.condition, 'robot.flow.control.clock() < ${flow_deadline_a_b_2}')
 
     def test_gate_with_assign(self):
         gate = {'id': 'g', 'kind': 'gate', 'keyword': 'Read Level', 'timeout': '1s',
                 'assign': '${LEVEL}'}
         data = flow([START, gate, END], [['start', 'g'], ['g', 'end']])
-        call = build(data).tests[0].body[0]
+        call = build(data).tests[0].body[1]
         self.assertEqual((call.name, list(call.assign)), ('Flow Gate', ['${LEVEL}']))
 
     def test_parser_applies_inherited_defaults(self):
@@ -403,7 +439,7 @@ class TestBuilder(unittest.TestCase):
                      kw('y', 'Yes'), END],
                     [['start', 'd'], {'from': 'd', 'to': 'y', 'label': 'yes'},
                      {'from': 'd', 'to': 'end', 'label': 'no'}, ['y', 'end']])
-        if_ = build(data).tests[0].body[0]
+        if_ = build(data).tests[0].body[1]
         self.assertEqual(if_.type, BodyItem.IF_ELSE_ROOT)
         yes, no = if_.body
         self.assertEqual((yes.type, yes.condition), (BodyItem.IF, "$MODE == 'fast'"))
@@ -419,7 +455,10 @@ Library    robot.flow.keywords
 
 *** Test Cases ***
 Test Flow
-    WHILE    True    limit=3    on_limit=pass
+    Flow Phase    Test Flow
+    ${flow_limit_loop}    ${flow_deadline_loop}=    Flow Loop    loop    3    NONE
+    WHILE    robot.flow.control.clock() < $flow_deadline_loop    limit=${flow_limit_loop}    on_limit=pass
+        Flow Iteration    loop
         TRY
             Work
         EXCEPT    AS    ${flow_error}
@@ -444,12 +483,12 @@ class TestFlowGate(unittest.TestCase):
     def setUp(self):
         self._builtin = keywords.BuiltIn
         keywords.BuiltIn = FakeBuiltIn
-        self._sleep = keywords.time.sleep
-        keywords.time.sleep = lambda seconds: None
+        # The gate sleeps on the flow clock; here it does not sleep at all.
+        keywords._CONTROL.sleep = lambda seconds: None
 
     def tearDown(self):
         keywords.BuiltIn = self._builtin
-        keywords.time.sleep = self._sleep
+        del keywords._CONTROL.sleep
 
     def test_passes_after_retries(self):
         FakeBuiltIn.results = [('FAIL', 'not yet'), ('FAIL', 'not yet'), ('PASS', 42)]

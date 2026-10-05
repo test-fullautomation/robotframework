@@ -23,6 +23,7 @@
 |------|------------|----------|
 | Cyclic, condition-driven flow; a crash at hour 40 must resume, not restart | [StateMachine](statemachine.md) with checkpoints | — |
 | A bounded plan: setup, gates, cycle loop, recovery, teardown | [Flow files](flow.md) | — |
+| The run must be held, or stopped and continued another day | [pause, stop and restart of a flow](flow.md#pause-resume-stop-and-restart) | the run's signal store; a checkpoint file |
 | Stuck keyword or silent hang | [Watchdog](watchdog.md) in a `THREAD` block | supervised code calls `Feed Watchdog`; `on_timeout=` names the reaction keyword |
 | Log data lost on a crash | [Segmented output](segmented-output.md) | none — core output feature |
 | Unreadable two-day log | `--splitlog`, state-visit blocks, the [timeline](thread/merging-timeline.md#execution-timeline) | none |

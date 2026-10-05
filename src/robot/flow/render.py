@@ -110,7 +110,9 @@ def _format_argument(arg):
 def _body(lines, body, indent):
     for item in body:
         if isinstance(item, Keyword):
-            assign = [a if a.endswith('=') else a + '=' for a in item.assign]
+            assign = list(item.assign)
+            if assign and not assign[-1].endswith('='):
+                assign[-1] += '='           # the mark goes on the last variable only
             _row(lines, indent, *assign, item.name, *item.args)
         elif isinstance(item, If):
             for branch in item.body:

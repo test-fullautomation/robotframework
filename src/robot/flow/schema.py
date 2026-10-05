@@ -106,8 +106,11 @@ class FlowData:
     """The validated content of a flow file."""
 
     def __init__(self, name, version, libraries, resources, variable_files,
-                 variables, nodes, edges):
+                 variables, nodes, edges, checkpoint=None, checkpoint_every=None):
         self.name = name
+        # None: the default file; a string: that file; False: no checkpoint.
+        self.checkpoint = checkpoint
+        self.checkpoint_every = checkpoint_every
         self.version = version
         self.libraries = libraries          # list of (name, args)
         self.resources = resources          # list of paths
@@ -136,13 +139,13 @@ def load_flow(source):
 def validate(data):
     if not isinstance(data, dict):
         raise FlowError('Flow file must contain a JSON object at the top level.')
-    name, version = _validate_flow_section(data.get('flow'))
+    name, version, checkpoint, every = _validate_flow_section(data.get('flow'))
     libraries, resources, variable_files = _validate_imports(data.get('imports', {}))
     variables = _validate_variables(data.get('variables', {}))
     nodes = _validate_nodes(data.get('nodes'))
     edges = _validate_edges(data.get('edges'), nodes)
     return FlowData(name, version, libraries, resources, variable_files,
-                    variables, nodes, edges)
+                    variables, nodes, edges, checkpoint, every)
 
 
 def _validate_flow_section(flow):
@@ -153,7 +156,18 @@ def _validate_flow_section(flow):
     if version != FLOW_VERSION:
         raise FlowError(f"Unsupported flow version {version!r}; "
                         f"this Robot Framework supports version {FLOW_VERSION}.")
-    return flow['name'].strip(), version
+    checkpoint = flow.get('checkpoint')
+    if checkpoint is True:
+        checkpoint = None
+    if checkpoint not in (None, False) \
+            and not (is_string(checkpoint) and checkpoint.strip()):
+        raise FlowError("'flow.checkpoint' must be a file path, or false for a "
+                        "flow without a checkpoint.")
+    every = flow.get('checkpoint_every')
+    if every is not None and (isinstance(every, bool) or not isinstance(every, int)
+                              or every < 1):
+        raise FlowError("'flow.checkpoint_every' must be a positive integer.")
+    return flow['name'].strip(), version, checkpoint, every
 
 
 def _validate_imports(imports):
@@ -491,8 +505,20 @@ def json_schema():
         'properties': {
             '$schema': {'type': 'string'},
             'flow': {'type': 'object', 'required': ['name'], 'additionalProperties': False,
-                     'properties': {'name': {'type': 'string', 'pattern': r'\S'},
-                                    'version': {'const': FLOW_VERSION}}},
+                     'properties': {
+                         'name': {'type': 'string', 'pattern': r'\S'},
+                         'version': {'const': FLOW_VERSION},
+                         'checkpoint': {
+                             'type': ['string', 'boolean'],
+                             'description': 'File that records how far the flow got, '
+                                            'so a stopped or crashed run can continue. '
+                                            'Default: <flow file name>.checkpoint.json '
+                                            'in the output directory; false for none.'},
+                         'checkpoint_every': {
+                             'type': 'integer', 'minimum': 1,
+                             'description': 'Write the checkpoint every this many loop '
+                                            'iterations instead of at most once a '
+                                            'second.'}}},
             'imports': {'type': 'object', 'additionalProperties': False,
                         'properties': {
                             'libraries': {'type': 'array', 'items': named,

@@ -4,6 +4,7 @@ Resource          atest_resource.robot
 
 *** Variables ***
 ${PARSER}         --parser robot.flow
+${CHECKPOINT}     %{TEMPDIR}${/}flow_atest.checkpoint.json
 
 *** Test Cases ***
 Full example runs setup, cycles, recovery and teardown
@@ -12,18 +13,19 @@ Full example runs setup, cycles, recovery and teardown
     Should Be Equal    ${SUITE.setup.name}    Flow Setup
     Should Be Equal    ${SUITE.teardown.name}    Flow Teardown
     Check Log Message    ${SUITE.setup.body[1].messages[0]}    Power on for RIG_A.
-    ${loop} =    Set Variable    ${SUITE.tests[0].body[1]}
+    # Flow Phase, Flow Loop, then the loop; Flow Iteration leads every iteration.
+    ${loop} =    Set Variable    ${SUITE.tests[0].body[2]}
     Should Be Equal    ${loop.type}    WHILE
     # Three iterations, then the INFO message about reaching the limit.
     ${iterations} =    Evaluate    [item for item in $loop.body if item.type == 'ITERATION']
     Length Should Be    ${iterations}    3
     # Iteration 1 passes: the EXCEPT branch is not run.
-    Should Be Equal    ${loop.body[0].body[0].body[1].status}    NOT RUN
+    Should Be Equal    ${loop.body[0].body[1].body[1].status}    NOT RUN
     # Iteration 2 fails on purpose and runs the recovery, then the loop continues.
-    ${recovery} =    Set Variable    ${loop.body[1].body[0].body[1]}
+    ${recovery} =    Set Variable    ${loop.body[1].body[1].body[1]}
     Should Be Equal    ${recovery.type}    EXCEPT
     Check Log Message    ${recovery.body[0].messages[0]}    Recovery 1 for RIG_A.
-    Check Log Message    ${loop.body[2].body[0].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
+    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
     Check Log Message    ${SUITE.teardown.body[0].messages[0]}    Bench released.
 
 Signals between flows: set, wait at a gate, read back
@@ -55,27 +57,27 @@ Gate timeout in setup makes the suite unknown and still runs teardown
 Abort runs the recovery and keeps the original error
     Run Tests    ${PARSER}    flow/recovery_abort.flow.json
     ${tc} =    Check Test Case    Abort After Recovery    FAIL    Flash failed.
-    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for ECU.
-    Should Be Equal    ${tc.body[0].body[1].body[1].full_name}    BuiltIn.Fail
-    Should Be Equal    ${tc.body[1].status}    NOT RUN
+    Check Log Message    ${tc.body[1].body[1].body[0].messages[0]}    Recovery 1 for ECU.
+    Should Be Equal    ${tc.body[1].body[1].body[1].full_name}    BuiltIn.Fail
+    Should Be Equal    ${tc.body[2].status}    NOT RUN
 
 Decision takes the branch the condition selects
     Run Tests    ${PARSER} --variable MODE:fast    flow/decision.flow.json
     ${tc} =    Check Test Case    Decision    PASS
-    Check Log Message    ${tc.body[0].body[0].body[0].messages[0]}    Took the fast branch.
-    Should Be Equal    ${tc.body[0].body[1].status}    NOT RUN
+    Check Log Message    ${tc.body[1].body[0].body[0].messages[0]}    Took the fast branch.
+    Should Be Equal    ${tc.body[1].body[1].status}    NOT RUN
     Run Tests    ${PARSER}    flow/decision.flow.json
     ${tc} =    Check Test Case    Decision    PASS
-    Should Be Equal    ${tc.body[0].body[0].status}    NOT RUN
-    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Took the slow branch.
-    Check Log Message    ${tc.body[1].messages[0]}    joined
+    Should Be Equal    ${tc.body[1].body[0].status}    NOT RUN
+    Check Log Message    ${tc.body[1].body[1].body[0].messages[0]}    Took the slow branch.
+    Check Log Message    ${tc.body[2].messages[0]}    joined
 
 Loop bounded only by a deadline ends with PASS
     Run Tests    ${PARSER}    flow/deadline_loop.flow.json
     ${tc} =    Check Test Case    Deadline Loop    PASS
-    Should Be Equal    ${tc.body[0].full_name}    BuiltIn.Evaluate
-    Should Be Equal    ${tc.body[1].type}    WHILE
-    Should Be True    3 <= len($tc.body[1].body) <= 8
+    Should Be Equal    ${tc.body[1].full_name}    robot.flow.keywords.Flow Loop
+    Should Be Equal    ${tc.body[2].type}    WHILE
+    Should Be True    3 <= len($tc.body[2].body) <= 8
 
 Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
@@ -94,17 +96,71 @@ Invalid flow files are rejected naming the node
 Sub-flows run as one keyword each, with parameters, nesting and recovery
     Run Tests    ${PARSER}    flow/subflow.flow.json
     ${tc} =    Check Test Case    Defaults And Arguments    PASS
-    Should Be Equal    ${tc.body[0].name}    Flow: Power On
-    Check Log Message    ${tc.body[0].body[0].messages[0]}    Power on at 12 V.
-    Should Be Equal    ${tc.body[1].args}    ${{('VOLTS=\${V}',)}}
-    Check Log Message    ${tc.body[1].body[0].messages[0]}    Power on at 9 V.
+    Should Be Equal    ${tc.body[1].name}    Flow: Power On
+    Check Log Message    ${tc.body[1].body[0].messages[0]}    Power on at 12 V.
+    Should Be Equal    ${tc.body[2].args}    ${{('VOLTS=\${V}',)}}
+    Check Log Message    ${tc.body[2].body[0].messages[0]}    Power on at 9 V.
     ${tc} =    Check Test Case    Nested Subflow    PASS
-    Should Be Equal    ${tc.body[0].body[0].name}    Flow: Power On
-    Check Log Message    ${tc.body[0].body[0].body[0].messages[0]}    Power on at 5 V.
+    Should Be Equal    ${tc.body[1].body[0].name}    Flow: Power On
+    Check Log Message    ${tc.body[1].body[0].body[0].messages[0]}    Power on at 5 V.
     ${tc} =    Check Test Case    Failure Inside Subflow Is Recovered    PASS
-    ${try} =    Set Variable    ${tc.body[0]}
+    ${try} =    Set Variable    ${tc.body[1]}
     Should Be Equal    ${try.body[0].body[0].status}    FAIL
     Check Log Message    ${try.body[1].body[0].messages[0]}    Recovered: Step is broken.: yes != no
+
+Pause holds the flow and its clocks
+    Run Tests    ${PARSER} --variable HOLD:1.0 --test Hold    flow/pause_stop.flow.json
+    ${tc} =    Check Test Case    Hold    PASS
+    ${loop} =    Set Variable    ${tc.body[2]}
+    Should Be Equal    ${loop.type}    WHILE
+    # The 0.6 s loop was held for a second in its first iteration. Had the
+    # hold counted, the loop would have ended there.
+    Should Be True    len($loop.body) >= 4
+    ${output} =    Get File    ${OUTFILE}
+    Should Contain    ${output}    Flow paused by operator at iteration 1 of loop 'timed'.
+    Should Match Regexp    ${output}    Flow resumed after (1 second|9\\d\\d milliseconds)
+
+Stop leaves a checkpoint and the next run continues from it
+    Remove File    ${CHECKPOINT}
+    Run Tests    ${PARSER} --variable STOP_AT:3 --variable FLOW_CHECKPOINT:${CHECKPOINT}    flow/pause_stop.flow.json
+    Check Test Case    Precheck    PASS
+    Check Test Case    Hold    PASS
+    # The third iteration ran to its end, so it counts; the recovery region
+    # of the loop did not swallow the stop.
+    ${tc} =    Check Test Case    Cycle    UNKNOWN
+    ...    GLOB:Stopped by operator at iteration 4 of loop 'cycles'; resumable from *flow_atest.checkpoint.json.
+    Length Should Be    ${tc.body[3].body}    4
+    Check Test Case    Report    UNKNOWN    Test execution stopped due to a fatal error.
+    Check Log Message    ${SUITE.teardown.body[0].messages[0]}    Bench released.
+    Should Be Equal    ${SUITE.status}    UNKNOWN
+    File Should Exist    ${CHECKPOINT}
+    Run Tests    ${PARSER} --variable FLOW_CHECKPOINT:${CHECKPOINT}    flow/pause_stop.flow.json
+    Check Test Case    Precheck    SKIP    GLOB:Completed with status PASS in the run that ended ????-??-?? ??:??:?? (see *).
+    Check Test Case    Hold    SKIP    GLOB:Completed with status PASS in the run that ended *
+    ${tc} =    Check Test Case    Cycle    PASS
+    Check Log Message    ${tc.body[2].messages[1]}    Loop 'cycles' continues after 3 completed iteration(s) of the run saved *: 3 iteration(s) left.    pattern=True
+    Check Log Message    ${tc.body[2].messages[2]}    Restored variables: \${done}.
+    ${loop} =    Set Variable    ${tc.body[3]}
+    # Three iterations were left; the message about the limit follows them.
+    Should Be True    len([item for item in $loop.body if item.type == 'ITERATION']) == 3
+    Check Log Message    ${loop.body[0].body[1].body[0].body[0].messages[0]}    Work 4.
+    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Work 6.
+    Check Test Case    Report    PASS
+    Should Be Equal    ${SUITE.status}    PASS
+    File Should Not Exist    ${CHECKPOINT}
+
+Resume can be demanded
+    Remove File    ${CHECKPOINT}
+    Run Tests    ${PARSER} --variable FLOW_RESUME:always --variable FLOW_CHECKPOINT:${CHECKPOINT} --test Precheck    flow/pause_stop.flow.json
+    Check Test Case    Precheck    UNKNOWN
+    ...    GLOB:No checkpoint at '*flow_atest.checkpoint.json'; cannot resume (FLOW_RESUME is 'always').
+
+Flow without a checkpoint has no bookkeeping keywords
+    Run Tests    ${PARSER}    flow/no_checkpoint.flow.json
+    ${tc} =    Check Test Case    Plain    PASS
+    Should Be Equal    ${tc.body[0].type}    WHILE
+    # Only the node itself in an iteration: no Flow Iteration before it.
+    Length Should Be    ${tc.body[0].body[0].body}    1
 
 *** Keywords ***
 Parsing Should Fail

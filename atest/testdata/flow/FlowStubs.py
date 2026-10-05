@@ -4,6 +4,8 @@ They stand in for application libraries (signals, power, cycle tests) so the
 flows run offline and deterministically.
 """
 
+import threading
+
 from robot.api import logger
 
 
@@ -14,7 +16,7 @@ SIGNALS = {
     'bench.mode': [3],
     'bench.never': [0],
 }
-COUNTS = {'cycle': 0, 'recovery': 0, 'iteration': 0}
+COUNTS = {'cycle': 0, 'recovery': 0, 'iteration': 0, 'hold': 0}
 OPERATORS = {
     '==': lambda a, b: a == b,
     '!=': lambda a, b: a != b,
@@ -70,3 +72,23 @@ def count_iteration():
 
 def log_branch(name):
     logger.info(f'Took the {name} branch.')
+
+
+def hold_flow_once(seconds=''):
+    """Pause the flow like an operator would and resume it after ``seconds``."""
+    if not seconds or COUNTS['hold']:
+        return
+    from robot.flow.control import CONTROL
+    COUNTS['hold'] += 1
+    CONTROL.pause('operator')
+    threading.Timer(float(seconds), CONTROL.resume).start()
+
+
+def work(done, stop_at=''):
+    """One unit of work; asks the flow to stop when it is number ``stop_at``."""
+    number = int(done) + 1
+    logger.info(f'Work {number}.')
+    if str(stop_at) == str(number):
+        from robot.flow.control import CONTROL
+        CONTROL.stop('operator')
+    return number

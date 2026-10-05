@@ -1,0 +1,48 @@
+{
+  "flow": { "name": "Pause Stop", "version": 1 },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "variables": { "STOP_AT": "", "HOLD": "" },
+
+  "nodes": [
+    { "id": "start",   "kind": "start" },
+    { "id": "setup",   "kind": "phase", "role": "setup" },
+    { "id": "power",   "kind": "keyword", "keyword": "Power On DUT", "args": ["RIG_A"] },
+
+    { "id": "pre",     "kind": "phase", "role": "test", "name": "Precheck" },
+    { "id": "check",   "kind": "keyword", "keyword": "Log Branch", "args": ["precheck"] },
+
+    { "id": "hold",    "kind": "phase", "role": "test", "name": "Hold" },
+    { "id": "timed",   "kind": "loop", "max_seconds": "0.6s", "every": "0.1s" },
+    { "id": "holdit",  "kind": "keyword", "keyword": "Hold Flow Once", "args": ["${HOLD}"] },
+    { "id": "tick",    "kind": "keyword", "keyword": "Count Iteration" },
+
+    { "id": "cyc",     "kind": "phase", "role": "test", "name": "Cycle" },
+    { "id": "zero",    "kind": "keyword", "keyword": "Set Variable", "args": [0], "assign": "${done}" },
+    { "id": "cycles",  "kind": "loop", "max_loops": 6 },
+    { "id": "work",    "kind": "keyword", "keyword": "Work", "args": ["${done}", "${STOP_AT}"], "assign": "${done}" },
+    { "id": "recover", "kind": "keyword", "keyword": "Recover DUT", "args": ["RIG_A"] },
+
+    { "id": "rep",     "kind": "phase", "role": "test", "name": "Report" },
+    { "id": "report",  "kind": "keyword", "keyword": "Log Branch", "args": ["report"] },
+
+    { "id": "td",      "kind": "phase", "role": "teardown" },
+    { "id": "release", "kind": "keyword", "keyword": "Release Bench" },
+    { "id": "end",     "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "power"], ["power", "pre"], ["pre", "check"],
+    ["check", "hold"], ["hold", "timed"],
+    { "from": "timed",  "to": "holdit", "label": "body" },
+    ["holdit", "tick"],
+    { "from": "tick",   "to": "timed",  "label": "next" },
+    { "from": "timed",  "to": "cyc",    "label": "done" },
+    ["cyc", "zero"], ["zero", "cycles"],
+    { "from": "cycles",  "to": "work",    "label": "body" },
+    { "from": "work",    "to": "cycles",  "label": "next" },
+    { "from": "cycles",  "to": "recover", "label": "on_failure" },
+    { "from": "recover", "to": "cycles",  "label": "continue" },
+    { "from": "cycles",  "to": "rep",     "label": "done" },
+    ["rep", "report"], ["report", "td"], ["td", "release"], ["release", "end"]
+  ]
+}

@@ -33,6 +33,7 @@ from robot.utils import (
 )
 from robot.variables import evaluate_expression, is_dict_variable, search_variable
 
+from . import pausepoint
 from .statusreporter import StatusReporter
 
 DEFAULT_WHILE_LIMIT = 10_000
@@ -53,6 +54,10 @@ class BodyRunner:
             # keyword boundaries when their scope (test/suite) has ended.
             if self._run and self._context.thread_stop_requested():
                 raise ExecutionFailed("Thread stop requested.")
+            # cuongnht flow pause: a paused flow waits here, between two
+            # steps; a stopped one leaves here. No hook, no cost.
+            if self._run and pausepoint.hook:
+                pausepoint.hook(self._context, item)
             try:
                 item.run(result, self._context, self._run, self._templated)
             except ExecutionPassed as exception:
