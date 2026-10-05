@@ -42,7 +42,7 @@ their own block.
 
 | Option | Purpose | Details |
 |--------|---------|---------|
-| `--timeline <file>` | Write an interactive per-thread execution timeline. | [Timeline](thread/merging-timeline.md#timeline) |
+| `--timeline <file>` | Write an interactive per-thread execution timeline. | [Timeline](thread/merging-timeline.md#execution-timeline) |
 | `--segmentoutput <time>` | Seal `output.xml` into well-formed segments every `<time>` (e.g. `30s`, `5min`). | [Segmented output](long-running.md#segmented-output) |
 | `--importfailure suite\|test` | Choose whether an import error makes the whole suite UNKNOWN (`suite`, default) or only the tests that use the failed import (`test`). | [UNKNOWN status](unknown-status.md#import-failures) |
 

@@ -75,9 +75,10 @@ class TestSubflowBuild(SubflowTestCase):
                          chain('start', 'a', 'b', 'end'), variables={'V': 13.5})
         suite = build_flow_suite(path)
         body = suite.tests[0].body
-        self.assertEqual([item.name for item in body], ['Flow: Power On'] * 2)
-        self.assertEqual(list(body[0].args), ['VOLTS=${V}'])
-        self.assertEqual(list(body[1].args), [])
+        self.assertEqual([item.name for item in body],
+                         ['Flow Phase'] + ['Flow: Power On'] * 2)
+        self.assertEqual(list(body[1].args), ['VOLTS=${V}'])
+        self.assertEqual(list(body[2].args), [])
         subflows = [kw for kw in suite.resource.keywords if kw.name == 'Flow: Power On']
         self.assertEqual(len(subflows), 1, 'one keyword per sub-flow file')
         self.assertEqual(list(subflows[0].args), ['${VOLTS}=12'])

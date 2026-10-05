@@ -18,16 +18,22 @@
     python -m robot.flow validate <file.flow.json>
     python -m robot.flow render   <file.flow.json>
     python -m robot.flow schema   [--output flow.schema.json]
+    python -m robot.flow control  <signal store> pause|resume|stop|status [--rig NAME]
 
 ``validate`` checks the file's shape and structure and prints the phases.
 ``render`` prints the equivalent ``.robot`` text of the suite that would run.
 ``schema`` prints the JSON Schema of flow files, for editor support.
+``control`` pauses, resumes or stops the flows that share the signal store
+(the file in ``ROBOT_FLOW_SIGNALS``), or one of them with ``--rig``; ``status``
+shows what they are doing. A stopped flow writes a checkpoint and continues
+when it is run again.
 Running a flow is done with ``robot --parser robot.flow <file.flow.json>``.
 """
 
 import argparse
 import json
 import sys
+import time
 
 from robot.errors import DataError
 
@@ -45,9 +51,16 @@ def main(argv=None):
     render.add_argument('file')
     schema = commands.add_parser('schema', help='print the JSON Schema of flow files')
     schema.add_argument('--output', '-o', help='write it to this file instead')
+    control = commands.add_parser('control', help='pause, resume or stop running flows')
+    control.add_argument('store', help="the run's signal store (ROBOT_FLOW_SIGNALS)")
+    control.add_argument('action', choices=['pause', 'resume', 'stop', 'status'])
+    control.add_argument('--rig', help='only the flow started with this FLOW_RIG / '
+                                       'ROBOT_FLOW_RIG; default: all of them')
     args = parser.parse_args(argv)
     if args.command == 'schema':
         return _schema(args.output)
+    if args.command == 'control':
+        return _control(args.store, args.action, args.rig)
     try:
         if args.command == 'validate':
             _validate(args.file)
@@ -71,6 +84,45 @@ def _schema(output):
     else:
         sys.stdout.write(schema_text())
     return 0
+
+
+def _control(store, action, rig=None):
+    from .control import CONTROL_SIGNAL, STATE_SIGNAL
+    from .signals import FlowSignals
+
+    backend = FlowSignals(store=store)._store
+    name = f'{CONTROL_SIGNAL}.{rig}' if rig else CONTROL_SIGNAL
+    if action != 'status':
+        backend.set(name, action)
+        print(f"{action} -> {'rig ' + rig if rig else 'all flows'} of '{store}'.")
+        return 0
+    entries = backend._read() if hasattr(backend, '_read') else {}
+    commands = {key: entry for key, entry in entries.items()
+                if key == CONTROL_SIGNAL or key.startswith(CONTROL_SIGNAL + '.')}
+    states = {key: entry for key, entry in entries.items()
+              if key.startswith(STATE_SIGNAL + '.')}
+    if not commands and not states:
+        print(f"No flow has used '{store}' yet.")
+        return 0
+    for key, entry in sorted(commands.items()):
+        target = key[len(CONTROL_SIGNAL) + 1:] or 'all flows'
+        print(f"last command for {target}: {entry.get('value')} ({_age(entry)} ago)")
+    for key, entry in sorted(states.items()):
+        state = entry.get('value') or {}
+        where = ''
+        if isinstance(state, dict):
+            if state.get('phase'):
+                where = f", phase '{state['phase']}'"
+            if state.get('loop'):
+                where += f", loop '{state['loop']}' iteration {state.get('iteration', 0) + 1}"
+            state = state.get('state')
+        print(f"{key[len(STATE_SIGNAL) + 1:]}: {state}{where} ({_age(entry)} ago)")
+    return 0
+
+
+def _age(entry):
+    from robot.utils import secs_to_timestr
+    return secs_to_timestr(max(0, round(time.time() - entry.get('time', time.time()))))
 
 
 def _validate(path):

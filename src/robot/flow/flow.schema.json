@@ -27,6 +27,18 @@
         },
         "version": {
           "const": 1
+        },
+        "checkpoint": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "File that records how far the flow got, so a stopped or crashed run can continue. Default: <flow file name>.checkpoint.json in the output directory; false for none."
+        },
+        "checkpoint_every": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Write the checkpoint every this many loop iterations instead of at most once a second."
         }
       }
     },

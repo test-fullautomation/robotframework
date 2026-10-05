@@ -52,8 +52,11 @@ from .schema import (ABORT, BODY, CONTINUE, DECISION, DONE, END, FLOW, GATE, KEY
 class Flow:
     """Builds the nodes and edges of one flow. Use as a context manager."""
 
-    def __init__(self, name, libraries=(), resources=(), variable_files=(), variables=None):
+    def __init__(self, name, libraries=(), resources=(), variable_files=(), variables=None,
+                 checkpoint=None, checkpoint_every=None):
         self.name = name
+        self._checkpoint = checkpoint
+        self._checkpoint_every = checkpoint_every
         self._imports = {'libraries': list(libraries), 'resources': list(resources),
                          'variables': list(variable_files)}
         self._variables = dict(variables or {})
@@ -153,6 +156,10 @@ class Flow:
         """The flow file's content, validated."""
         self._finish()
         data = {'flow': {'name': self.name, 'version': 1}}
+        if self._checkpoint is not None:
+            data['flow']['checkpoint'] = self._checkpoint
+        if self._checkpoint_every is not None:
+            data['flow']['checkpoint_every'] = self._checkpoint_every
         imports = {k: v for k, v in self._imports.items() if v}
         if imports:
             data['imports'] = imports
