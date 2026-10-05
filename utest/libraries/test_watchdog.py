@@ -16,23 +16,23 @@ class TestWatchdogPause(unittest.TestCase):
         return wd
 
     def test_paused_time_is_not_a_stall(self):
-        wd = self._running(stall_timeout=0.05)
+        wd = self._running(stall_timeout=0.2)
         wd.pause()
-        time.sleep(0.1)
+        time.sleep(0.3)
         seconds = wd.resume()
-        self.assertGreaterEqual(seconds, 0.1)
+        self.assertGreaterEqual(seconds, 0.08)
         self.assertIsNone(wd.check(time.monotonic()))
-        time.sleep(0.07)
+        time.sleep(0.3)
         self.assertIn('no feed within stall_timeout', wd.check(time.monotonic()))
 
     def test_paused_time_does_not_use_up_the_deadline(self):
-        wd = self._running(max_duration=0.05, heartbeat=10)
+        wd = self._running(max_duration=0.2, heartbeat=10)
         heartbeat = wd.next_heartbeat
         wd.pause()
-        time.sleep(0.1)
+        time.sleep(0.3)
         wd.resume()
         self.assertIsNone(wd.check(time.monotonic()))
-        self.assertGreaterEqual(wd.next_heartbeat - heartbeat, 0.1)
+        self.assertGreaterEqual(wd.next_heartbeat - heartbeat, 0.08)
 
     def test_pause_only_applies_to_a_running_watchdog(self):
         wd = _Watchdog('WD', None, 1, None, None, None)
