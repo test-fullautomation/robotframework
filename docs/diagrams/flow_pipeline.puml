@@ -1,0 +1,14 @@
+@startuml
+!pragma layout smetana
+!include diagrams/style.iuml
+left to right direction
+
+rectangle "**Your test plan**\nthe flowchart the team\nalready draws and reviews" as D
+file "**plan.flow.json**\nthe same boxes and arrows:\nnodes + edges" as F
+rectangle "**robot --parser robot.flow**\nvalidates the graph\nbuilds a TestSuite in memory" as B
+rectangle "**Results**\nlog.html | report.html\ntimeline | return code" as R
+
+D --> F : write it down once
+F --> B : run it
+B --> R
+@enduml

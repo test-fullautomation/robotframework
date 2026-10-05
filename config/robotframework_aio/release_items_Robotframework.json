@@ -1,0 +1,273 @@
+# **************************************************************************************************************
+#
+# Copyright 2020-2023 Robert Bosch GmbH
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# **************************************************************************************************************
+#
+# ========== Release Items for component 'Robotframework' ==========
+#
+# Basically this component is stand-alone, but can also be used as part of an automation framework called
+# RobotFramework AIO. More information about this framework you can find here:
+# 
+# https://github.com/test-fullautomation/RobotFramework_AIO
+# 
+# This JSON file contains component specific release information for the RobotFramework AIO.
+# In case you use the component stand-alone only, you can ignore this file.
+# 
+# --------------------------------------------------------------------------------------------------------------
+#
+# Format: extended JSON format with the possibility to comment out lines (by '#' at the beginning of the line).
+# The reference for relative paths is the position of this file.
+#
+# --------------------------------------------------------------------------------------------------------------
+
+{
+
+# Section "COMPONENT":
+# --------------------
+
+   "COMPONENT" : "Robot Framework",
+
+
+# Section "RELEASES" for RobotFramework AIO:
+# ------------------------------------------
+
+   "RELEASES"  : {
+                   "0.10." : [
+"
+**New log level** ``USER``
+
+This release introduces a new log level ``USER``. In the hierarchy of log levels, the level ``USER`` is located between ``INFO`` and ``WARNING``.
+It can be used to have a better separation between user specific log output and standard ``INFO`` messages from Robot Framework itself.
+
+The default log level ist still ``INFO``. Therefore the log level ``USER`` has to be set explicitely. This can be done in the following ways:
+
+* *In robot code*:
+
+   .. code::
+
+      log    my log message    USER
+
+* *In command line of test execution*: 
+
+   .. code::
+
+      python.exe -m robot --loglevel USER testfile.robot
+
+More details can be found in
+`RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_
+chapter \"Logging\".
+"
+                             ],
+                   "0.11." : [
+"
+**Stabilized Threading Feature:**
+
+We have enhanced the stability of our threading feature, ensuring smoother performance and reliability in multi-threaded environments.
+
+**Bug Fixed in Threading Feature:**
+
+This release includes a fixes for a previously identified bugs in our threading feature. This fix enhances the functionality and reliability of thread-based operations.
+
+**Send Thread Notification:**
+
+A new keyword, Send Thread Notification, has been added to allow threads to send specific notifications. This is vital for synchronized operations and responsive multi-threaded interactions.
+
+* *In robot code*:
+
+   .. code::
+
+      Send Thread Notification     notification_name     params=data     dst_thread=thread_name
+  
+**Wait Thread Notification:**
+
+A new keyword, Wait Thread Notification, has been added to allow threads to wait for specific notifications. This is vital for synchronized operations and responsive multi-threaded interactions.
+
+* *In robot code*:
+
+   .. code::
+
+      Wait Thread Notification     notification_name     condition=$payloads=='expected_value'     timeout=10
+
+More details can be found in
+`RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_
+chapter \"Threading\".
+
+"
+                             ],
+                   "0.13.0.": [
+"
+**Introduction of New Thread Locking Keywords:**
+    
+In this release, we have introduced two powerful new keywords to enhance thread management and synchronization in your test automation: `Thread RLock Acquire` and `Thread RLock Release`. These keywords are essential for managing re-entrant locks (RLocks), providing greater control and safety in multi-threaded environments.
+
+**Thread RLock Acquire:**
+
+The `Thread RLock Acquire` keyword allows a thread to acquire a re-entrant lock (RLock). This is crucial for ensuring that critical sections of your code are executed by only one thread at a time, preventing race conditions and ensuring data consistency.
+
+* *In robot code*:
+
+   .. code::
+   
+      Thread RLock Acquire     rlock_name     blocking=True     timeout=-1
+
+**Thread RLock Release:**
+    
+The `Thread RLock Release` keyword allows a thread to release a previously acquired re-entrant lock (RLock). Properly releasing locks is vital for avoiding deadlocks and ensuring the smooth execution of concurrent operations.
+
+* *In robot code*:
+
+   .. code::
+   
+      Thread RLock Release     rlock_name
+
+More details can be found in `RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_ chapter \"Threading\".
+
+**Optimized Wait Thread Notification Mechanism:**
+
+Replaced the `wait thread notification` mechanism to avoid continuous GIL acquisition, resulting in improved performance. 
+"
+                             ],
+                   "0.13.1.": [
+"
+**Introduction of New Thread Locking Keywords:**
+    
+In this release, we have introduced two powerful new keywords to enhance thread management and synchronization in your test automation: `Thread RLock Acquire` and `Thread RLock Release`. These keywords are essential for managing re-entrant locks (RLocks), providing greater control and safety in multi-threaded environments.
+
+**Thread RLock Acquire:**
+
+The `Thread RLock Acquire` keyword allows a thread to acquire a re-entrant lock (RLock). This is crucial for ensuring that critical sections of your code are executed by only one thread at a time, preventing race conditions and ensuring data consistency.
+
+* *In robot code*:
+
+   .. code::
+   
+      Thread RLock Acquire     rlock_name     blocking=True     timeout=-1
+
+**Thread RLock Release:**
+    
+The `Thread RLock Release` keyword allows a thread to release a previously acquired re-entrant lock (RLock). Properly releasing locks is vital for avoiding deadlocks and ensuring the smooth execution of concurrent operations.
+
+* *In robot code*:
+
+   .. code::
+   
+      Thread RLock Release     rlock_name
+
+More details can be found in `RobotFrameworkAIO_Reference.pdf <https://github.com/test-fullautomation/robotframework-documentation/blob/develop/RobotFrameworkAIO/RobotFrameworkAIO_Reference.pdf>`_ chapter \"Threading\".
+
+**Optimized Wait Thread Notification Mechanism:**
+
+Replaced the `wait thread notification` mechanism to avoid continuous GIL acquisition, resulting in improved performance.
+"
+                             ],
+                   "0.14.0.": [
+"
+This release makes Robot Framework ready for **tests that run for hours or days, in parallel, against real benches** - and keeps the verdict honest.
+Existing test suites run unchanged; all new features are opt-in.
+
+**New test status UNKNOWN**
+
+Beside ``PASS``, ``FAIL`` and ``SKIP`` a fourth status ``UNKNOWN`` separates *the product is wrong* from *nothing could be judged*.
+A failed assertion is still ``FAIL``; a missing keyword or variable, a failed import, a ``DataError`` or an unexpected exception is ``UNKNOWN``.
+Real regressions no longer drown in bench and environment problems.
+
+* Which tests an import error affects:
+
+   .. code::
+
+      python.exe -m robot --importfailure suite testfile.robot     # default: the whole suite is UNKNOWN
+      python.exe -m robot --importfailure test  testfile.robot     # only tests using the failed import
+
+* The return code carries both counts, so CI can tell them apart: ``rc = (min(unknown, 14) << 4) | min(failed, 15)``
+  (decode with ``failed = rc & 0x0F`` and ``unknown = (rc >> 4) & 0x0F``).
+
+**THREAD keyword: lifecycle scopes and control**
+
+The ``daemon`` flag of a ``THREAD`` block now selects its lifetime: ``True`` stops the thread when its test ends, ``False`` keeps it running
+across tests until the suite ends. Stopping is cooperative with a 5 second grace period; a thread that cannot stop is abandoned and reported as ``UNKNOWN``.
+New keywords give deterministic control:
+
+   .. code::
+
+      Stop Thread        WORKER    timeout=10 s
+      Wait For Thread    WORKER    timeout=1 min
+
+**Thread logs in log.html and the execution timeline**
+
+Keywords, messages and statuses of every ``THREAD`` now appear in ``log.html`` and ``report.html`` as one block at the place the thread started.
+The new option ``--timeline`` writes an HTML timeline with one lane per thread on a real time axis; every bar links to its keyword in ``log.html``.
+
+   .. code::
+
+      python.exe -m robot --timeline timeline.html testfile.robot
+
+**New library StateMachine**
+
+Model very long, condition-driven tests as states and guarded transitions. After every transition a checkpoint is written, so a run that crashes
+at hour 40 resumes where it stopped instead of starting from zero. Includes per-state timeouts, error routing, machines defined in JSON/YAML files,
+several machines at once and per-state statistics.
+
+   .. code::
+
+      Define State         CHARGING    enter=Start Charging    on_error=FAULT
+      Define Transition    CHARGING    DISCHARGING    condition=$SOC >= 80
+      Run State Machine    initial=INIT    max_duration=48h    checkpoint=${OUTPUT DIR}${/}sm.json
+
+**New library Watchdog**
+
+A supervisor running in a ``THREAD`` block: heartbeat, stall detection and a deadline for any long-running work. When the test stops feeding it,
+the watchdog fires, runs a reaction keyword and the test fails with the reason - after minutes, not days.
+
+   .. code::
+
+      Configure Watchdog    stall_timeout=10 min    heartbeat=5 min    on_timeout=Collect Diagnostics
+
+**Flow files: run a test plan drawn as a flowchart**
+
+A flow file (``*.flow.json``) describes a test plan as nodes and edges - setup, gates, bounded loops, recovery, teardown - and is executed directly as a
+suite built at run time. No ``.robot`` file to maintain. Gates wait on a condition with a real timeout and report ``UNKNOWN`` when the bench is not ready.
+With the new library ``robot.flow.signals`` two flows running as two processes can meet and run in lockstep.
+
+   .. code::
+
+      python.exe -m robot --parser robot.flow --variable RIG:RIG_A plan.flow.json
+      python.exe -m robot.flow validate plan.flow.json
+
+**Segmented output**
+
+The new option ``--segmentoutput`` seals ``output.xml`` (and thread outputs) into complete, readable segments at a fixed interval.
+A crash loses at most one interval of log data; after a normal run the segments are merged back automatically.
+
+   .. code::
+
+      python.exe -m robot --segmentoutput 1h testfile.robot
+
+**Stable memory on long runs**
+
+The message cache, the collected warnings and errors (spilled to disk beyond 10000) and the thread notification queues are bounded,
+so memory stays flat over days of execution.
+
+**Bug fixes**
+
+* ``KeyError`` when a thread logs with an own log level above the configured log level (issue #109).
+* Crash with ``IndexError`` in variable scopes when threads start and end concurrently on Linux.
+* ``output.xml`` that could not be parsed at log levels above ``INFO``, and ``rebot --output`` on outputs that contain threads.
+
+More details can be found in the feature documentation (``docs`` folder of the repository, published as GitHub Pages).
+"
+                             ]
+                 }
+}

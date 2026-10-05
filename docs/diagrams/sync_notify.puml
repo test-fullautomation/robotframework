@@ -1,0 +1,14 @@
+@startuml
+!include diagrams/style.iuml
+
+participant "MainThread" as M
+participant "PRODUCER\n(THREAD)" as P
+
+M -> P : THREAD PRODUCER starts
+activate P
+M -> M : Wait Thread Notification\nwork_done  timeout=10
+P -> P : Do Some Work
+P -> M : Send Thread Notification\nwork_done  ${result}  MainThread
+deactivate P
+M -> M : payload = ${result}\ncontinue with the data
+@enduml

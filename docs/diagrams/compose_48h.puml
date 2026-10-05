@@ -1,0 +1,20 @@
+@startuml
+!pragma layout smetana
+!include diagrams/style.iuml
+
+rectangle "**48-hour endurance run**" as RUN #eefaf1
+
+rectangle "**StateMachine** / **Flow file**\ntest logic that resumes\nafter a crash" as L
+rectangle "**THREAD**\nstimulus and monitors\nbeside the test" as T
+rectangle "**Watchdog**\nno silent hang" as W
+rectangle "**Segmented output**\nno lost log" as S
+rectangle "**UNKNOWN status**\nhonest verdict" as U
+rectangle "**Timeline**\nreadable history" as TL
+
+L -down-> RUN
+T -down-> RUN
+W -down-> RUN
+RUN -down-> S
+RUN -down-> U
+RUN -down-> TL
+@enduml

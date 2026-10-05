@@ -1,0 +1,20 @@
+@startuml
+!pragma layout smetana
+!include diagrams/style.iuml
+
+state INIT : enter: Setup DUT\ntimeout: 10 min
+state CHARGING : enter: Start Charging\nduring: Charge Step
+state DISCHARGING : enter: Start Discharging\nduring: Discharge Step
+state FAULT #fbeeee : enter: Collect Diagnostics
+state DONE #eefaf1
+
+[*] --> INIT
+INIT --> CHARGING : $DUT_READY
+CHARGING --> DISCHARGING : $SOC >= 80
+DISCHARGING --> CHARGING : $SOC <= 20
+DISCHARGING --> DONE : $CYCLES >= 500
+CHARGING -[dashed]-> FAULT : on_error
+DISCHARGING -[dashed]-> FAULT : on_error
+DONE --> [*]
+FAULT --> [*]
+@enduml

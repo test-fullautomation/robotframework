@@ -1,0 +1,46 @@
+' Shared look for all documentation diagrams.
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontColor #1c2430
+skinparam ArrowColor #1c2430
+skinparam roundCorner 10
+skinparam sequence {
+  ParticipantBackgroundColor #eef4fb
+  ParticipantBorderColor #0a5da8
+  LifeLineBorderColor #8fa3b8
+  GroupBorderColor #8fa3b8
+  GroupBackgroundColor #f7f9fc
+  DividerBackgroundColor #eef4fb
+  DividerBorderColor #0a5da8
+}
+skinparam activity {
+  BackgroundColor #eef4fb
+  BorderColor #0a5da8
+  DiamondBackgroundColor #fdf5e6
+  DiamondBorderColor #a86500
+}
+skinparam partition {
+  BorderColor #8fa3b8
+  BackgroundColor #f7f9fc
+}
+skinparam state {
+  BackgroundColor #eef4fb
+  BorderColor #0a5da8
+}
+skinparam rectangle {
+  BackgroundColor #eef4fb
+  BorderColor #0a5da8
+}
+skinparam file {
+  BackgroundColor #fdf5e6
+  BorderColor #a86500
+}
+skinparam database {
+  BackgroundColor #fdf5e6
+  BorderColor #a86500
+}
+skinparam note {
+  BackgroundColor #fffbe6
+  BorderColor #d4a72c
+}

@@ -1,0 +1,35 @@
+@startuml
+!pragma layout smetana
+skinparam backgroundColor transparent
+skinparam activity {
+  BackgroundColor #eef4fb
+  BorderColor #0a5da8
+  FontColor #1c2430
+  DiamondBackgroundColor #fdf5e6
+  DiamondBorderColor #a86500
+}
+
+start
+:enter state\n(run "enter" keyword);
+if (keyword failed\nor visit timeout?) then (yes)
+  :go to on_error state\n(or fail if none);
+  stop
+endif
+repeat
+  :run "during" keyword;
+  if (a transition guard\nis true?) then (yes)
+    :run "exit" keyword;
+    :save checkpoint;
+    :move to target state;
+    stop
+  endif
+  if (max_visits reached\nor max_duration exceeded?) then (yes)
+    :save checkpoint and fail;
+    stop
+  endif
+  :sleep poll_interval;
+repeat while (stopped?) is (no)
+->yes;
+:save checkpoint;
+stop
+@enduml

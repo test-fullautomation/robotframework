@@ -1,0 +1,25 @@
+@startuml
+!include diagrams/style.iuml
+scale 1 as 16 pixels
+
+concise "Run 1" as R1
+concise "Run 2 (resume=AUTO)" as R2
+concise "sm.json checkpoint" as C
+
+@0
+R1 is INIT
+C is "saved after every transition: state, counters, variables"
+@3
+R1 is "CHARGING <-> DISCHARGING, cycle 1 ... 412"
+@40
+R1 is {-}
+@42
+R2 is "cycle 412, restored"
+@49
+R2 is DONE
+@52
+R2 is {-}
+C is {-}
+
+highlight 40 to 42 #fbeeee : power loss at hour 40
+@enduml
