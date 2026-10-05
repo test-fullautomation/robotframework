@@ -1,7 +1,6 @@
 import gc
 import os
 import tempfile
-import tracemalloc
 import unittest
 from pathlib import Path
 
@@ -11,6 +10,11 @@ from robot.output.loglevel import LogLevel
 from robot.output.outputfile import OutputFile
 from robot.utils import PriorityQueue
 from robot.utils.priorityqueue import QueuedNotification
+
+try:
+    import tracemalloc
+except ImportError:  # PyPy has no tracemalloc; the soak tests are skipped there.
+    tracemalloc = None
 
 
 class MessageCollector:
@@ -179,6 +183,7 @@ class NullSink:
         pass
 
 
+@unittest.skipUnless(tracemalloc, "Requires tracemalloc.")
 class TestMemorySoak(unittest.TestCase):
     """Push real workloads through the pipelines and assert flat memory.
 

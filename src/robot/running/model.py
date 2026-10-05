@@ -72,14 +72,14 @@ BodyItemParent = Union[
 
 class Body(model.BaseBody[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "model.Message", "Error"
+    "Break", "model.Message", "Error", "Thread"
 ]):  # fmt: skip
     __slots__ = ()
 
 
 class Branches(model.BaseBranches[
     "Keyword", "For", "While", "Group", "If", "Try", "Var", "Return", "Continue",
-    "Break", "model.Message", "Error", IT
+    "Break", "model.Message", "Error", "Thread", IT
 ]):  # fmt: skip
     __slots__ = ()
 
