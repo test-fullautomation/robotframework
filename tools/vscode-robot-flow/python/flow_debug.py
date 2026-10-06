@@ -334,6 +334,18 @@ def _excluded_dirs():
     return [os.path.normcase(os.path.abspath(d)) + os.sep for d in dirs]
 
 
+def _keyword_function(runner):
+    """The Python callable a library keyword's runner calls; None for a user keyword.
+
+    Robot 6 keeps it behind the runner's handler, Robot 7 on the runner's
+    keyword (a ``LibraryKeyword``; a ``UserKeyword`` has no ``method``)."""
+    handler = getattr(runner, "_handler", None)
+    if handler is not None:
+        current = getattr(handler, "current_handler", None)
+        return current() if current is not None else None
+    return getattr(getattr(runner, "keyword", None), "method", None)
+
+
 def _python_of(name):
     """``{file, line, function}`` of the Python function behind keyword ``name``
     (its first body line), when it is the user's code; else None."""
@@ -342,10 +354,10 @@ def _python_of(name):
         import inspect
         from robot.running import EXECUTION_CONTEXTS
         runner = EXECUTION_CONTEXTS.current.get_runner(name)
-        handler = getattr(runner, "_handler", None)
-        if handler is None or not hasattr(handler, "current_handler"):
+        fn = _keyword_function(runner)
+        if fn is None:
             return None               # a user keyword: Robot steps into it itself
-        fn = inspect.unwrap(handler.current_handler())
+        fn = inspect.unwrap(fn)
         code = getattr(fn, "__code__", None)
         if code is None:
             return None

@@ -98,14 +98,17 @@ def _tolerate_new_output_files():
     """Robot tells listeners about each file it wrote through ``_<type>_file``,
     for the types it knows. The fork writes more (``--timeline``) without
     such a method, and with a listener registered that ends the run in an
-    AttributeError. Unknown types are simply not announced."""
+    AttributeError. Unknown types are simply not announced.
+
+    Robot 7 announces every file through a method of its own (the fork on 7.x
+    has one for the timeline too), so there is nothing to tolerate there."""
     try:
         from robot.output.listeners import Listeners
     except ImportError:
         return
-    if getattr(Listeners.output_file, "_mm_tolerant", False):
+    announce = getattr(Listeners, "output_file", None)
+    if announce is None or getattr(announce, "_mm_tolerant", False):
         return
-    announce = Listeners.output_file
 
     def output_file(self, file_type, path):
         if hasattr(self, "_%s_file" % str(file_type).lower()):
