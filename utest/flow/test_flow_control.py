@@ -192,6 +192,25 @@ class TestControlChannel(unittest.TestCase):
         self.store.set('flow.control', 'stop')
         self._wait(lambda: self.control.stop_requested)
 
+    def test_a_stop_is_not_lost_when_another_command_follows_it(self):
+        # Both commands arrive before the flow looks at the store again.
+        self.store.set('flow.stop', 'stop')
+        self.store.set('flow.control', 'stop')
+        self.store.set('flow.control', 'resume')
+        self.control.start_polling(self.store)
+        self._wait(lambda: self.control.stop_requested)
+        self.assertFalse(self.control.paused)
+
+    def test_a_stop_for_another_rig_or_an_earlier_run_is_ignored(self):
+        self.control.rig = 'RIG_A'
+        self.store.set('flow.stop.RIG_B', 'stop')
+        self.store.data['flow.stop'] = {'value': 'stop', 'time': time.time() - 60}
+        self.control.start_polling(self.store)
+        time.sleep(0.1)
+        self.assertFalse(self.control.stop_requested)
+        self.store.set('flow.stop.RIG_A', 'stop')
+        self._wait(lambda: self.control.stop_requested)
+
     def test_commands_given_before_the_start_are_ignored(self):
         self.store.data['flow.control'] = {'value': 'stop', 'time': time.time() - 60}
         self.control.start_polling(self.store)
@@ -383,6 +402,8 @@ class TestCommandLine(unittest.TestCase):
                 self.assertEqual(main(['control', store, 'status']), 0)
             self.assertEqual(FileStore(store).get('flow.control')['value'], 'pause')
             self.assertEqual(FileStore(store).get('flow.control.RIG_A')['value'], 'stop')
+            self.assertEqual(FileStore(store).get('flow.stop.RIG_A')['value'], 'stop')
+            self.assertIsNone(FileStore(store).get('flow.stop'))
             text = out.getvalue()
             self.assertIn('No flow has used', text)
             self.assertIn('pause -> all flows of', text)
