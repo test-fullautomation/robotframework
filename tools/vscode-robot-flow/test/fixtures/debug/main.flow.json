@@ -1,0 +1,23 @@
+{
+  "flow": { "name": "Debug Me", "version": 1 },
+  "variables": { "WHO": "bench" },
+  "imports": { "resources": ["helpers.resource"] },
+
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "test",  "kind": "phase", "role": "test", "name": "Greet And Step" },
+    { "id": "greet", "kind": "keyword", "keyword": "Greet", "args": ["${WHO}"] },
+    {
+      "id": "call",
+      "kind": "flow",
+      "file": "sub/step.flow.json",
+      "args": { "LEVEL": "5" }
+    },
+    { "id": "after", "kind": "keyword", "keyword": "Log", "args": ["after the sub-flow"] },
+    { "id": "end",   "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "test"], ["test", "greet"], ["greet", "call"], ["call", "after"], ["after", "end"]
+  ]
+}

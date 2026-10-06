@@ -1,0 +1,13 @@
+{
+  "flow": { "name": "One Step", "version": 1 },
+  "variables": { "LEVEL": "1" },
+
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "say",   "kind": "keyword", "keyword": "Log", "args": ["level ${LEVEL}"] },
+    { "id": "check", "kind": "keyword", "keyword": "Should Be True", "args": ["${LEVEL} > 0"] },
+    { "id": "end",   "kind": "end" }
+  ],
+
+  "edges": [["start", "say"], ["say", "check"], ["check", "end"]]
+}

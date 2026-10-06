@@ -1,0 +1,29 @@
+{
+  "flow": { "name": "Countdown", "version": 1 },
+  "variables": { "FROM": "3" },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+
+    { "id": "setup",    "kind": "phase", "role": "setup" },
+    { "id": "hello",    "kind": "keyword", "keyword": "Log", "args": ["counting down from ${FROM}"] },
+
+    { "id": "test",     "kind": "phase", "role": "test", "name": "Count Down" },
+    { "id": "loop",     "kind": "loop",    "max_loops": 3, "every": "0.2s" },
+    { "id": "tick",     "kind": "keyword", "keyword": "Log", "args": ["tick"] },
+    { "id": "pause",    "kind": "keyword", "keyword": "Sleep", "args": ["0.3s"] },
+
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "bye",      "kind": "keyword", "keyword": "Log", "args": ["done"] },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "hello"], ["hello", "test"], ["test", "loop"],
+    { "from": "loop",  "to": "tick",     "label": "body" },
+    ["tick", "pause"],
+    { "from": "pause", "to": "loop",     "label": "next" },
+    { "from": "loop",  "to": "teardown", "label": "done" },
+    ["teardown", "bye"], ["bye", "end"]
+  ]
+}

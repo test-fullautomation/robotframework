@@ -1,0 +1,21 @@
+{
+  "flow": { "name": "Slow", "version": 1 },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+    { "id": "test",     "kind": "phase", "role": "test", "name": "Takes A While" },
+    { "id": "loop",     "kind": "loop",    "max_loops": 200, "every": "0.1s" },
+    { "id": "wait",     "kind": "keyword", "keyword": "Sleep", "args": ["0.2s"] },
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "bye",      "kind": "keyword", "keyword": "Log", "args": ["teardown ran"] },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "test"], ["test", "loop"],
+    { "from": "loop", "to": "wait",     "label": "body" },
+    { "from": "wait", "to": "loop",     "label": "next" },
+    { "from": "loop", "to": "teardown", "label": "done" },
+    ["teardown", "bye"], ["bye", "end"]
+  ]
+}

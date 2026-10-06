@@ -1,0 +1,80 @@
+name: VS Code extension
+
+# Builds the Robot Framework Grid & Flow extension (tools/vscode-robot-flow):
+# runs its tests against this repository's own src (robot.flow) and packages
+# the .vsix, kept as the run's artifact. A merged pull request is a push to
+# main; pull requests run the same build so a change is checked before
+# it is merged.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'tools/vscode-robot-flow/**'
+      - 'src/robot/flow/**'
+      - '.github/workflows/vscode_extension.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'tools/vscode-robot-flow/**'
+      - 'src/robot/flow/**'
+      - '.github/workflows/vscode_extension.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vscode-extension-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: tools/vscode-robot-flow
+
+jobs:
+  build:
+    # Windows: where the extension and the flow runs are verified.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tools/vscode-robot-flow/package-lock.json
+
+      # debugpy: the test that steps from a Robot keyword into Python.
+      - name: Install debugpy
+        run: python -m pip install debugpy
+
+      - name: Install
+        run: npm ci
+
+      # The Robot Framework is this checkout's src; the tests that need the
+      # demo projects (ROBOT_FLOW_DEMO) skip.
+      - name: Test
+        run: npm test
+        env:
+          ROBOT_FLOW_PYTHON: python
+          ROBOT_FLOW_SRC: ${{ github.workspace }}/src
+
+      - name: Package
+        id: package
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          npx --yes @vscode/vsce@3 package --out "robot-flow-$version.vsix"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: robot-flow-${{ steps.package.outputs.version }}-${{ github.run_number }}
+          path: tools/vscode-robot-flow/robot-flow-${{ steps.package.outputs.version }}.vsix
+          if-no-files-found: error

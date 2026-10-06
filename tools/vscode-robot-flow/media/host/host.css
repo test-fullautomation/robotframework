@@ -1,0 +1,170 @@
+/* The webview around a shared view. The views' own styles (vendor/*/style.js)
+   are drawn for a light page; their neutrals and tints are --fv-* / --rg-*
+   variables with the light colour as fallback. In light themes the view sits
+   on white paper; dark and high-contrast themes get the dark palette at the
+   end of this file, on the editor's own background. */
+:root {
+  --text: #1a252f;
+  --muted: #6c7a86;
+  --accent: #127A69;
+  --font-sans: var(--vscode-font-family, system-ui, sans-serif);
+}
+body {
+  margin: 0;
+  padding: 10px 14px 24px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+  font-family: var(--font-sans);
+}
+#view {
+  background: #ffffff;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-height: 3rem;
+}
+.status {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border-left: 3px solid var(--vscode-focusBorder);
+  background: var(--vscode-editorWidget-background);
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.status.error {
+  border-left-color: var(--vscode-errorForeground);
+  background: var(--vscode-inputValidation-errorBackground, var(--vscode-editorWidget-background));
+}
+.status.busy { opacity: 0.8; }
+
+/* the extension's toolbar: run, stop, live options, results */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+.toolbar[hidden] { display: none; }
+.tb-spacer { flex: 1 1 auto; }
+.tb-btn {
+  font: inherit;
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  cursor: pointer;
+}
+.tb-btn:hover:not([disabled]) { background: var(--vscode-button-secondaryHoverBackground); }
+.tb-btn[disabled] { opacity: 0.5; cursor: default; }
+.tb-btn:focus-visible, .tb-opt select:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.tb-run { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+.tb-run:hover:not([disabled]) { background: var(--vscode-button-hoverBackground); }
+.tb-status { padding: 2px 8px; border-radius: 10px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.tb-passed { background: var(--vscode-testing-iconPassed, #388a34); color: #fff; }
+.tb-failed, .tb-error { background: var(--vscode-testing-iconFailed, #c72e0f); color: #fff; }
+.tb-member {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 2px 1px 8px; border-radius: 10px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+  color: var(--vscode-foreground);
+}
+.tb-member-paused { border-color: var(--vscode-editorWarning-foreground, #cca700); }
+.tb-mini {
+  font: inherit; line-height: 1; padding: 2px 6px; border: 0; border-radius: 8px; cursor: pointer;
+  color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground);
+}
+.tb-mini:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.tb-mini:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.tb-opt { display: inline-flex; align-items: center; gap: 4px; color: var(--vscode-descriptionForeground); }
+.tb-opt select {
+  font: inherit;
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border);
+}
+
+/* Dark and high-contrast themes: the views' palette, on the editor background.
+   Strong hues (teal, purple, orange, red strokes) stay as the views draw them. */
+body.vscode-dark, body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+  --text: #dfe6ea;
+  --muted: #9aa8b3;
+  --accent: #2fb397;
+  --paper: var(--vscode-editor-background, #1e1e1e);
+
+  --fv-surface: var(--paper);
+  --fv-lane: #262d32;
+  --fv-panel: #232a2f;
+  --fv-line: #3a454d;
+  --fv-border: #56636d;
+  --fv-text: #dfe6ea;
+  --fv-text-soft: #9aa8b3;
+  --fv-slate: #a7b4bf;
+  --fv-faint: #7d8b96;
+  --fv-gate-bg: #17332d;
+  --fv-decision-bg: #3a3220;
+  --fv-loop-bg: #2e2840;
+  --fv-try-bg: #2a3138;
+  --fv-recovery-bg: #3a2f1c;
+  --fv-flow-bg: #233040;
+  --fv-toggle-hover: #2c3d52;
+  --fv-drop-bg: #18352f;
+  --fv-reczone-bg: #2f2a1e;
+  --fv-reczone-line: #8a6d3b;
+  --fv-lit-bg: #1a3b33;
+  --fv-now-bg: #1d3550;
+  --fv-now-recovery-bg: #4a3517;
+  --fv-failed-bg: #4a2522;
+  --fv-flash-bg: #24456e;
+  --fv-danger-line: #8a4a45;
+  --fv-frame-loop: #7d6a9e;
+  --fv-frame-try: #6d7b88;
+  --fv-frame-flow: #5d7699;
+  --fv-sync-text: #5fd3b8;
+  --fv-count-pass: #5cc98a;
+  --fv-danger: #f28b82;
+  --fv-paused-bg: #4a3d12;
+  --fv-bp-hint: rgba(242, 139, 130, 0.45);
+
+  --rg-surface: var(--paper);
+  --rg-warn-bg: #3a2f1c;
+  --rg-cell-line: #343e45;
+  --rg-faint: #7d8b96;
+  --rg-gutter: #252c31;
+  --rg-text-strong: #e6ecef;
+  --rg-slate: #a7b4bf;
+  --rg-error-bg: #45261f;
+  --rg-text-soft: #9aa8b3;
+  --rg-border: #4a565f;
+  --rg-doc-text: #c3ced6;
+  --rg-line-soft: #2b3338;
+  --rg-flash: #1d4a3e;
+  --rg-editor-bg: #1d2a27;
+  --rg-editor-line: #2f6b5c;
+  --rg-armed-bg: #4a2522;
+  --rg-line: #3a454d;
+  --rg-bad: #f28b82;
+}
+body.vscode-dark #view, body.vscode-high-contrast:not(.vscode-high-contrast-light) #view {
+  background: var(--paper);
+  padding: 10px 0;
+}
+body.vscode-high-contrast:not(.vscode-high-contrast-light) #view {
+  outline: 1px solid var(--vscode-contrastBorder, #6fc3df);
+  padding: 10px 12px;
+}
+/* Controls the views leave to the browser's light defaults. */
+body.vscode-dark .fv-btn:not(.fv-btn-primary), body.vscode-dark .fv-chip,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .fv-btn:not(.fv-btn-primary),
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .fv-chip { color: var(--fv-text); }
+body.vscode-dark .fv-btn-danger,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .fv-btn-danger { color: var(--fv-danger); }
+body.vscode-dark .fv-field :is(input, select, textarea),
+body.vscode-high-contrast:not(.vscode-high-contrast-light) .fv-field :is(input, select, textarea) {
+  color: var(--fv-text);
+  background: var(--fv-panel);
+}

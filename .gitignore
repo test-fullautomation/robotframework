@@ -38,3 +38,6 @@ node_modules
 # ProperDocs feature site
 /site/
 tools/plantuml.jar
+
+# The VS Code extension keeps its launch and build tasks
+!tools/vscode-robot-flow/.vscode
