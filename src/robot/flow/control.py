@@ -51,6 +51,10 @@ from robot.utils import secs_to_timestr
 
 
 CONTROL_SIGNAL = 'flow.control'
+# A stop is written under this name as well. The store keeps one value per
+# name, so a command given right after a stop would replace it before the
+# flow has read it; under its own name the stop stays.
+STOP_SIGNAL = 'flow.stop'
 STATE_SIGNAL = 'flow.state'
 PAUSE, RESUME, STOP = 'pause', 'resume', 'stop'
 COMMANDS = (PAUSE, RESUME, STOP)
@@ -267,18 +271,27 @@ class FlowControl:
                 pass
 
     def _read_command(self):
-        """The newest command for this process given since it started."""
+        """The newest command for this process given since it started.
+
+        A stop, once given, is the command: nothing written after it takes
+        it back.
+        """
+        for name in self._names(STOP_SIGNAL):
+            entry = self._store.get(name)
+            if entry and entry.get('time', 0) >= self._since:
+                return {'value': STOP, 'time': entry['time']}
         newest = None
-        names = [CONTROL_SIGNAL]
-        if self.rig:
-            names.append(f'{CONTROL_SIGNAL}.{self.rig}')
-        for name in names:
+        for name in self._names(CONTROL_SIGNAL):
             entry = self._store.get(name)
             if not entry or entry.get('time', 0) < self._since:
                 continue
             if newest is None or entry['time'] >= newest['time']:
                 newest = entry
         return newest
+
+    def _names(self, signal):
+        """The names a command for this process is written under."""
+        return [signal, f'{signal}.{self.rig}'] if self.rig else [signal]
 
     def apply(self, entry):
         """Act on a control entry ``{'value': command, 'time': seconds}`` once."""

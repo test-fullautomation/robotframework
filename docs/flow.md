@@ -427,7 +427,8 @@ The checkpoint is written, the test ends **UNKNOWN** with
 `Stopped by operator at iteration 38 of loop 'loop'; resumable from
 results/run42/plan.checkpoint.json.`, the remaining tests are not started and
 the teardown runs, so the bench is released. No recovery region catches a
-stop. UNKNOWN is the honest verdict: nothing failed and the plan did not
+stop, and a stop cannot be taken back: a `resume` or `pause` given after it
+does not cancel it. UNKNOWN is the honest verdict: nothing failed and the plan did not
 complete, and the [return code](unknown-status.md#return-code) keeps the two
 apart for whatever started the run.
 

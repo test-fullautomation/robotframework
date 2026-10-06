@@ -87,12 +87,16 @@ def _schema(output):
 
 
 def _control(store, action, rig=None):
-    from .control import CONTROL_SIGNAL, STATE_SIGNAL
+    from .control import CONTROL_SIGNAL, STATE_SIGNAL, STOP_SIGNAL
     from .signals import FlowSignals
 
     backend = FlowSignals(store=store)._store
     name = f'{CONTROL_SIGNAL}.{rig}' if rig else CONTROL_SIGNAL
     if action != 'status':
+        if action == 'stop':
+            # Under its own name too: a command given right after it would
+            # otherwise replace the stop before the flow has read it.
+            backend.set(f'{STOP_SIGNAL}.{rig}' if rig else STOP_SIGNAL, action)
         backend.set(name, action)
         print(f"{action} -> {'rig ' + rig if rig else 'all flows'} of '{store}'.")
         return 0
