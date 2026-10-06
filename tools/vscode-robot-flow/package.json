@@ -1,0 +1,366 @@
+{
+  "name": "robot-flow",
+  "displayName": "Robot Framework Grid & Flow",
+  "description": "The Manager GUI's Grid view of Robot Framework suites and resources, and its Diagram of RobotFramework AIO flow files, inside VS Code: read, click to find in the text, edit, run. Colours for Robot Framework files and Go to Definition for keywords in suites and flows.",
+  "version": "0.1.0",
+  "publisher": "robotframework-aio",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/test-fullautomation/robotframework.git",
+    "directory": "tools/vscode-robot-flow"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "robot framework",
+    "robotframework",
+    "flow",
+    "grid",
+    "diagram"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:robotframework",
+    "workspaceContains:**/*.flow.json",
+    "workspaceContains:**/testproject.json",
+    "onDebugResolve:robotflow",
+    "onDebugDynamicConfigurations:robotflow",
+    "onCommand:robotFlow.debug"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "robotframework",
+        "aliases": [
+          "Robot Framework",
+          "robotframework",
+          "robot"
+        ],
+        "extensions": [
+          ".robot",
+          ".resource"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "robotframework",
+        "scopeName": "source.robotframework",
+        "path": "./syntaxes/robotframework.tmLanguage.json"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "robotFlow.grid",
+        "displayName": "Robot Grid",
+        "selector": [
+          {
+            "filenamePattern": "*.robot"
+          },
+          {
+            "filenamePattern": "*.resource"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "robotFlow.diagram",
+        "displayName": "Flow Diagram",
+        "selector": [
+          {
+            "filenamePattern": "*.flow.json"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "robotFlow.openGrid",
+        "title": "Open Grid to the Side",
+        "category": "Robot Flow",
+        "icon": "$(table)"
+      },
+      {
+        "command": "robotFlow.openDiagram",
+        "title": "Open Flow Diagram to the Side",
+        "category": "Robot Flow",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "robotFlow.run",
+        "title": "Run",
+        "category": "Robot Flow",
+        "icon": "$(play)"
+      },
+      {
+        "command": "robotFlow.debug",
+        "title": "Debug",
+        "category": "Robot Flow",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "robotFlow.stop",
+        "title": "Stop the Run",
+        "category": "Robot Flow",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "robotFlow.runStep",
+        "title": "Run in Step Mode",
+        "category": "Robot Flow",
+        "icon": "$(debug-step-over)"
+      },
+      {
+        "command": "robotFlow.pause",
+        "title": "Pause the Flow",
+        "category": "Robot Flow",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "robotFlow.resume",
+        "title": "Resume the Flow (Step Mode: Next Step)",
+        "category": "Robot Flow",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "robotFlow.togglePause",
+        "title": "Pause or Resume the Flow",
+        "category": "Robot Flow"
+      },
+      {
+        "command": "robotFlow.continue",
+        "title": "Continue the Stopped Run from Its Checkpoint",
+        "category": "Robot Flow",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "robotFlow.openGroup",
+        "title": "Open Run Group Diagram…",
+        "category": "Robot Flow",
+        "icon": "$(type-hierarchy-sub)"
+      },
+      {
+        "command": "robotFlow.showRobot",
+        "title": "Show Which Robot Framework Is Used",
+        "category": "Robot Flow"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "robotFlow.run",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/ || activeCustomEditorId == robotFlow.diagram",
+          "group": "navigation@1"
+        },
+        {
+          "command": "robotFlow.debug",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/ || activeCustomEditorId == robotFlow.diagram",
+          "group": "navigation@2"
+        },
+        {
+          "command": "robotFlow.runStep",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "1_run@1"
+        },
+        {
+          "command": "robotFlow.continue",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "1_run@2"
+        },
+        {
+          "command": "robotFlow.openGrid",
+          "when": "resourceExtname == .robot || resourceExtname == .resource",
+          "group": "navigation"
+        },
+        {
+          "command": "robotFlow.openDiagram",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "robotFlow.run",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@8"
+        },
+        {
+          "command": "robotFlow.debug",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@8"
+        },
+        {
+          "command": "robotFlow.openGroup",
+          "when": "resourceFilename == testproject.json",
+          "group": "navigation@9"
+        },
+        {
+          "command": "robotFlow.openGrid",
+          "when": "resourceExtname == .robot || resourceExtname == .resource",
+          "group": "navigation@9"
+        },
+        {
+          "command": "robotFlow.openDiagram",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@9"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Robot Flow",
+      "properties": {
+        "robotFlow.python": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Python interpreter that has Robot Framework installed. Empty: the interpreter selected in the Python extension, else `python` on PATH."
+        },
+        "robotFlow.robotSource": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "A Robot Framework source tree to use instead of the installed one: its `src` folder (put first on `PYTHONPATH`). The Diagram of `*.flow.json` needs the RobotFramework AIO fork (`robot.flow`), the `src` folder of a checkout of this repository (e.g. `C:/work/robotframework/src`). `${workspaceFolder}` is expanded."
+        },
+        "robotFlow.pythonPath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "More folders for `PYTHONPATH` (libraries the suites import). `${workspaceFolder}` is expanded."
+        },
+        "robotFlow.timeoutSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 5,
+          "markdownDescription": "How long one read or edit of a file may take (Libdoc of large libraries can take a while)."
+        },
+        "robotFlow.resultsFolder": {
+          "type": "string",
+          "default": "results",
+          "markdownDescription": "Where runs write `output.xml`, `log.html` and `report.html`: one folder per run below this one. Relative to the test project's root (`testproject.json`), else the workspace folder."
+        },
+        "robotFlow.runArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "More Robot Framework options for runs started here, after the project's own `run.args`."
+        },
+        "robotFlow.refreshDelay": {
+          "type": "number",
+          "default": 400,
+          "minimum": 0,
+          "markdownDescription": "Milliseconds to wait after typing before the views read the text again."
+        }
+      }
+    },
+    "breakpoints": [
+      {
+        "language": "robotframework"
+      },
+      {
+        "language": "json"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "robotflow",
+        "label": "Robot Flow",
+        "languages": [
+          "robotframework",
+          "json"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "target"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "default": "${file}",
+                "description": "The suite, flow file or folder to run."
+              },
+              "variables": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "description": "Robot variables for the run (--variable name:value)."
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [],
+                "description": "More Robot Framework options, after the project's run.args and robotFlow.runArgs."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": false,
+                "description": "Stop before the first keyword or step."
+              },
+              "python": {
+                "type": "boolean",
+                "default": true,
+                "description": "Also debug Python: Step Into a keyword of your Python library stops in its function (needs the Python Debugger extension)."
+              },
+              "justMyCode": {
+                "type": "boolean",
+                "default": true,
+                "description": "Python: step only into your own code, not Robot Framework's libraries or installed packages."
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "robotflow",
+            "request": "launch",
+            "name": "Debug the open suite or flow",
+            "target": "${file}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Robot Flow: Debug a suite or flow",
+            "description": "Run with breakpoints, stepping and variables",
+            "body": {
+              "type": "robotflow",
+              "request": "launch",
+              "name": "Debug ${1:flow}",
+              "target": "^\"\\${file}\""
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "sync": "node scripts/sync-vendor.mjs",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test test/backend.test.mjs test/run.test.mjs test/define.test.mjs test/debug.test.mjs test/control.test.mjs",
+    "test:webview": "npm run compile && node test/webview/render.mjs",
+    "test:vscode": "npm run compile && node test/integration/run.mjs",
+    "package": "vsce package",
+    "test:grammar": "node test/grammar.run.mjs",
+    "grammar": "python scripts/build-grammar.py"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.0"
+  }
+}
