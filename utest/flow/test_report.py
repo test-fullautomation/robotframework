@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import tempfile
@@ -62,6 +63,7 @@ class TestReport(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(cls.tmp.cleanup)
         cls.flow = os.path.join(cls.tmp.name, 'plan.flow.json')
         with open(cls.flow, 'w', encoding='UTF-8') as file:
             json.dump(FLOW, file)
@@ -69,15 +71,11 @@ class TestReport(unittest.TestCase):
             file.write(LIBRARY)
         cls.out = os.path.join(cls.tmp.name, 'out')
         rc = run(cls.flow, parser='robot.flow', outputdir=cls.out, output='output.xml',
-                 log=None, report=None, stdout=open(os.devnull, 'w'),
+                 log=None, report=None, stdout=io.StringIO(),
                  variable=['FAIL_AT:2', 'MODE:slow'])
         cls.rc = rc
         cls.data = collect(os.path.join(cls.out, 'output.xml'))
         cls.stats = cls.data['flows'][0]['stats']
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmp.cleanup()
 
     def test_run_passed_and_one_flow_found(self):
         self.assertEqual(self.rc, 0)
