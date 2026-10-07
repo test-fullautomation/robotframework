@@ -108,6 +108,7 @@ robot --parser robot.flow endurance.flow.json            # run it; every robot o
 robot --parser robot.flow --dryrun endurance.flow.json   # check keywords and arguments without running them
 python -m robot.flow validate endurance.flow.json        # check the structure, naming the faulty node
 python -m robot.flow render   endurance.flow.json        # print the equivalent .robot text
+robot --parser robot.flow --flowreport flow.html endurance.flow.json   # run it and draw the plan with the results
 ```
 
 A dry run executes no keyword, but it does import the libraries: module-level code and
@@ -128,6 +129,9 @@ library constructors run, so keep bench access out of those.
   holds or ends a running flow between two steps, with loop deadlines, gate timeouts
   and watchdogs frozen meanwhile; a stopped or crashed flow leaves a checkpoint and the
   next run continues it (finished phases SKIP, the loop goes on with what is left).
+- **The flow report** — `--flowreport flow.html` draws the plan as it was written, with
+  what the run did on every node and edge (runs, outcomes, gate attempts, recovery paths,
+  where a stop happened), each box linked into `log.html`.
 - **Editor support** — a JSON Schema (`python -m robot.flow schema`, shipped as
   `robot/flow/flow.schema.json`) gives completion and error marking for flow files.
 - **A Python API** (experimental) — `robot.flow.api.Flow` builds the same file from `with`

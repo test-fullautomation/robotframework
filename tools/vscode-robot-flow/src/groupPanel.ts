@@ -137,6 +137,7 @@ export class GroupPanel implements vscode.Disposable {
       runTitle: `Run all ${this.group.members.length} members together (saves them first)`,
       live: !!live,
       hasLog: !!state && !!this.runs.artifact(this.key, 'log.html'),
+      hasFlowReport: !!state && !!this.runs.artifact(this.key, 'flow.html'),
     }) });
   }
 
@@ -165,7 +166,7 @@ export class GroupPanel implements vscode.Disposable {
         const [command, member] = msg.action.split(/:(.*)/s) as ['pause' | 'resume', string?];
         await this.runs.control(this.key, command, member || '');
       }
-      else if (msg.action === 'log' || msg.action === 'report') await this.runs.open(this.key, `${msg.action}.html`);
+      else if (msg.action === 'log' || msg.action === 'report' || msg.action === 'flow') await this.runs.open(this.key, `${msg.action}.html`);
       else if (msg.action === 'output') this.runs.output(this.key);
       else if (msg.action === 'option' && msg.name && msg.value !== undefined) {
         setOption(this.live, msg.name, msg.value);

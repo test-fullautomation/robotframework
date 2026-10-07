@@ -19,6 +19,7 @@
     python -m robot.flow render   <file.flow.json>
     python -m robot.flow schema   [--output flow.schema.json]
     python -m robot.flow control  <signal store> pause|resume|stop|status [--rig NAME]
+    python -m robot.flow report   <output.xml> [--output flow.html] [--log log.html]
 
 ``validate`` checks the file's shape and structure and prints the phases.
 ``render`` prints the equivalent ``.robot`` text of the suite that would run.
@@ -27,6 +28,9 @@
 (the file in ``ROBOT_FLOW_SIGNALS``), or one of them with ``--rig``; ``status``
 shows what they are doing. A stopped flow writes a checkpoint and continues
 when it is run again.
+``report`` writes the flow report of a run: the plan as drawn, with what the
+run did on each node, linked into ``log.html`` (``robot --flowreport`` writes
+it with the run).
 Running a flow is done with ``robot --parser robot.flow <file.flow.json>``.
 """
 
@@ -56,7 +60,12 @@ def main(argv=None):
     control.add_argument('action', choices=['pause', 'resume', 'stop', 'status'])
     control.add_argument('--rig', help='only the flow started with this FLOW_RIG / '
                                        'ROBOT_FLOW_RIG; default: all of them')
+    report = commands.add_parser('report', help='the flow report of a run', add_help=False)
+    report.add_argument('args', nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
+    if args.command == 'report':
+        from .report import report_cli
+        return report_cli(args.args)
     if args.command == 'schema':
         return _schema(args.output)
     if args.command == 'control':

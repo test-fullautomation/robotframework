@@ -51,6 +51,7 @@ class _BaseSettings:
                  'Log'              : ('log', 'log.html'),
                  'Report'           : ('report', 'report.html'),
                  'Timeline'         : ('timeline', None),  # cuongnht add thread
+                 'FlowReport'       : ('flowreport', None),  # cuongnht add flow
                  'XUnit'            : ('xunit', None),
                  'SplitLog'         : ('splitlog', False),
                  'TimestampOutputs' : ('timestampoutputs', False),
@@ -73,7 +74,8 @@ class _BaseSettings:
                  'PythonPath'       : ('pythonpath', []),
                  'StdOut'           : ('stdout', None),
                  'StdErr'           : ('stderr', None)}
-    _output_opts = ['Output', 'Log', 'Report', 'XUnit', 'DebugFile', 'Timeline']
+    _output_opts = ['Output', 'Log', 'Report', 'XUnit', 'DebugFile', 'Timeline',
+                    'FlowReport']
 
     def __init__(self, options=None, **extra_options):
         self.start_timestamp = format_time(time.time(), '', '-', '')
@@ -244,7 +246,7 @@ class _BaseSettings:
         name = self._opts[option]
         if not name:
             return None
-        if option in ('Log', 'Timeline') and self._output_disabled():
+        if option in ('Log', 'Timeline', 'FlowReport') and self._output_disabled():
             self[option] = None
             LOGGER.error(f'{option} file cannot be created if output.xml '
                          f'is disabled.')
@@ -266,7 +268,7 @@ class _BaseSettings:
             return extension
         if file_type in ['Output', 'XUnit']:
             return '.xml'
-        if file_type in ['Log', 'Report', 'Timeline']:
+        if file_type in ['Log', 'Report', 'Timeline', 'FlowReport']:
             return '.html'
         if file_type == 'DebugFile':
             return '.txt'
@@ -411,6 +413,11 @@ class _BaseSettings:
     def timeline(self):
         # cuongnht add thread
         return self['Timeline']
+
+    @property
+    def flow_report(self):
+        # cuongnht add flow
+        return self['FlowReport']
 
     @property
     def xunit(self):

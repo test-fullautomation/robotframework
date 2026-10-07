@@ -62,6 +62,8 @@ class DottedOutput:
             self._stderr.error(msg.message, msg.level)
 
     def output_file(self, name, path):
+        if name == 'FlowReport':
+            name = 'Flow report'  # cuongnht add flow
         self._stdout.write('%-8s %s\n' % (name+':', path))
 
 

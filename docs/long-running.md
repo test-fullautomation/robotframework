@@ -27,6 +27,7 @@
 | Stuck keyword or silent hang | [Watchdog](watchdog.md) in a `THREAD` block | supervised code calls `Feed Watchdog`; `on_timeout=` names the reaction keyword |
 | Log data lost on a crash | [Segmented output](segmented-output.md) | none — core output feature |
 | Unreadable two-day log | `--splitlog`, state-visit blocks, the [timeline](thread/merging-timeline.md#execution-timeline) | none |
+| A 600-cycle plan read as 600 iterations | the [flow report](flow.md#the-flow-report): the plan as drawn, with the counts on it | none |
 | Memory growth over days | bounded memory (below) | none — core fix |
 | "Bench not ready" reported as a product failure | [UNKNOWN status](unknown-status.md) and the return code | none |
 
@@ -38,7 +39,7 @@
 | StateMachine | `robot/libraries/StateMachine.py` | `Library    StateMachine` |
 | Watchdog | `robot/libraries/Watchdog.py` | `Library    Watchdog` + a `THREAD` block |
 | Segmented output | `robot/output/xmllogger.py`, `robot/output/segmentmerger.py` | `robot --segmentoutput 4h`; `python -m robot.output.segmentmerger` |
-| Flow files | `robot/flow/` | `robot --parser robot.flow`; `python -m robot.flow` |
+| Flow files | `robot/flow/` | `robot --parser robot.flow`; `robot --flowreport flow.html`; `python -m robot.flow` |
 
 ## Segmented output
 

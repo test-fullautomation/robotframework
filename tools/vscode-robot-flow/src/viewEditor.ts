@@ -244,6 +244,7 @@ class Session implements vscode.Disposable {
       canStep: this.kind.runnable(this.file) && /\.flow\.json$/i.test(this.file),
       live: live !== undefined,
       hasLog: !!state && !!this.runs.artifact(this.key, 'log.html'),
+      hasFlowReport: !!state && !!this.runs.artifact(this.key, 'flow.html'),
     }) });
   }
 
@@ -290,7 +291,7 @@ class Session implements vscode.Disposable {
       await this.runs.continueRun(this.key);
     } else if (action === 'pause' || action === 'resume') {
       await this.runs.control(this.key, action);
-    } else if (action === 'log' || action === 'report') {
+    } else if (action === 'log' || action === 'report' || action === 'flow') {
       await this.runs.open(this.key, `${action}.html`);
     } else if (action === 'output') {
       this.runs.output(this.key);

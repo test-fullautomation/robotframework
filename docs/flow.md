@@ -85,6 +85,7 @@ robot --parser robot.flow --variable RIG:RIG_A --outputdir out/rig_a flows/endur
 robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # check keywords and arguments without running them
 python -m robot.flow validate flows/endurance_cycle.flow.json           # shape and structure only
 python -m robot.flow render   flows/endurance_cycle.flow.json           # the equivalent .robot text
+robot --parser robot.flow --flowreport flow.html flows/endurance_cycle.flow.json   # run it and draw the plan with the results
 ```
 
 Every `robot` option applies — `--variable`, `--outputdir`, `--dryrun`,
@@ -291,6 +292,39 @@ Cycle
 The [return code](unknown-status.md#return-code) separates the two counts, so
 an orchestrator can tell "bench never became ready" from "product failed"
 without opening the log.
+
+## The flow report
+
+`log.html` shows a loop as its iterations, one after the other; a plan of
+four nodes that cycled 600 times is 600 blocks to scroll. The *flow report*
+shows the plan **as it was drawn** -- lanes for the phases, boxes for the
+nodes, the edges between them -- with what the run did written on it: how
+often each node ran and with which outcome, how often each edge was taken,
+how many attempts a gate needed, where a failed cycle went through the
+recovery, where a stopped run stopped and what a restart would do. Every box
+links into `log.html` at the keyword, so the log stays the record and the
+report is the way in.
+
+```bash
+robot --parser robot.flow --flowreport flow.html --outputdir out plan.flow.json
+rebot --flowreport flow.html --log log.html out/output.xml       # from an existing output
+python -m robot.flow report out/output.xml --output flow.html     # the same, standalone
+```
+
+The report is built from `output.xml` and the flow file the suite came from
+(its `source`; `--flow <file>` names it when the output was moved). The
+builder makes the suite again from the file and walks it next to the result,
+so each keyword in the log is attributed to its node of the plan. That
+attribution is positional: **the flow file must be the one the run used**.
+A changed file gives a report that cannot be trusted; a report of a run that
+spans a checkpoint restart is best read per output, or from the output that
+`rebot` merged.
+
+A node's record (select it) lists the runs with status and time, the slowest
+one, the first and the last failure with their errors, and the iterations of
+a loop as a strip of cycles that each open the log at that cycle. Sub-flows
+are drawn as a box containing their own plan; they start folded, except when
+something inside them failed, and open with their `+` or with *Expand all*.
 
 ## Two flows
 

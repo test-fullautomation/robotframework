@@ -25,7 +25,8 @@ and what you type in the text redraws the view, unsaved changes included.
   Explorer. The Diagram follows the run: the running step pulses, every step
   that ran shows its pass / fail count, *Motion* chooses how it follows
   (trail, hop, off). The toolbar shows the status and opens the Output, the
-  Log and the Report when the run is done.
+—— and, for a flow, the **Flow
+  report**: the plan as drawn, with what the run did on each node.
 - **Run groups** — the `groups` of a Manager GUI test project
   (`testproject.json`): the members' Diagrams side by side with the signals
   where one waits for another, and a Run that starts all members together on
@@ -69,7 +70,8 @@ or *Extensions → … → Install from VSIX…*. Build the `.vsix` with
   Explorer's context menu) runs the suite or flow; **Stop** ends it after the
   running keyword (a flow: at its next step, with a checkpoint; see *Pause,
   resume, stop and continue a flow*). Each run writes `output.xml`, `log.html` and `report.html`
-  to its own folder under `robotFlow.resultsFolder`.
+  (and `flow.html`, the flow report, with `robotFlow.flowReport`) to its own folder under
+  `robotFlow.resultsFolder`.
 - **Robot Flow: Open Run Group Diagram…** (or right-click a
   `testproject.json`) picks a group of the workspace's test projects.
 - A file inside a test project is read and run with the project's `run`

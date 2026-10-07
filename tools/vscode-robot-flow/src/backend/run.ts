@@ -1,7 +1,8 @@
 // Running a suite or a flow the way the Manager GUI does: python/robot_boot.py
 // (python -m robot that stops gracefully when its stop file appears), with
-// --parser robot.flow for flow files and flow_position.py as the listener
-// that writes where the run is (MM_FLOW_POSITION) for the live Diagram.
+// --parser robot.flow for flow files (and --flowreport flow.html when asked
+// for), and flow_position.py as the listener that writes where the run is
+// (MM_FLOW_POSITION) for the live Diagram.
 // No VS Code API here; test/ runs it with plain Node.
 import { ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -42,6 +43,8 @@ export interface RunRequest {
   dryrun?: boolean;
   /** Step mode (flows): the run pauses before every step of its test phases; Resume goes one on. */
   step?: boolean;
+  /** Flows: also write the fork's flow report (flow.html), the plan as drawn with the results on it. */
+  flowReport?: boolean;
   /** This process's name in the shared store (a group member): `--rig` reaches it alone. */
   rig?: string;
 }
@@ -83,6 +86,8 @@ export function planRun(req: RunRequest): RunPlan {
   const argv = [req.env.python, path.join(req.env.helpersDir, 'robot_boot.py'), '--outputdir', req.outDir,
                 '--consolecolors', 'off', '--consolemarkers', 'off', '--consolewidth', '100'];
   if (flows) argv.push('--parser', 'robot.flow');
+  // Opt-in: one more pass over output.xml at the end of the run.
+  if (flows && req.flowReport) argv.push('--flowreport', 'flow.html');
   for (const [name, value] of Object.entries(req.variables || {}).sort()) {
     if (!VARIABLE_RE.test(name)) throw new Error(`Invalid variable name ${JSON.stringify(name)}: use letters, digits and '_'.`);
     argv.push('--variable', `${name}:${value}`);
