@@ -164,6 +164,9 @@ Flow without a checkpoint has no bookkeeping keywords
     Length Should Be    ${tc.body[0].body[0].body}    1
 
 Flow report is written with the run and by rebot
+    [Documentation]    --flowreport draws the plan with the run's results and links it
+    ...    into the log; rebot writes the same report from output.xml. A stopped run
+    ...    shows where it stopped and what a restart would do (from its checkpoint).
     Remove File    ${CHECKPOINT}
     Remove File    ${FLOW REPORT}
     Run Tests    ${PARSER} --flowreport ${FLOW REPORT} --variable STOP_AT:3 --variable FLOW_CHECKPOINT:${CHECKPOINT}    flow/pause_stop.flow.json
@@ -189,6 +192,8 @@ Flow report is written with the run and by rebot
     [Teardown]    Run Keywords    Remove File    ${CHECKPOINT}    AND    Remove File    ${FLOW REPORT}
 
 Flow report needs a suite run from a flow file
+    [Documentation]    The report is built next to the suite rebuilt from the flow file;
+    ...    an output whose suite did not come from one is refused with an error.
     Run Tests    ${EMPTY}    misc/pass_and_fail.robot
     Copy Previous Outfile
     Run Rebot Without Processing Output    --flowreport ${FLOW REPORT}    ${OUTFILE COPY}
@@ -196,6 +201,8 @@ Flow report needs a suite run from a flow file
     File Should Not Exist    ${FLOW REPORT}
 
 Flow report is not created if output is disabled
+    [Documentation]    Like the log and the timeline, the flow report is generated from
+    ...    output.xml, so --output NONE disables it with an error.
     Run Tests Without Processing Output    ${PARSER} --output NONE --flowreport ${FLOW REPORT}    flow/no_checkpoint.flow.json
     Stderr Should Contain    [ ERROR ] FlowReport file cannot be created if output.xml is disabled.
     File Should Not Exist    ${FLOW REPORT}
