@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from robot import model, result, running
 
 
-ResultFile = Literal["OUTPUT", "REPORT", "LOG", "XUNIT", "DEBUG", "TIMELINE"]
+ResultFile = Literal["OUTPUT", "REPORT", "LOG", "XUNIT", "DEBUG", "TIMELINE", "FLOWREPORT"]
 
 
 class LoggerApi:
@@ -251,6 +251,13 @@ class LoggerApi:
         Calls :meth:`result_file` by default.
         """
         self.result_file("TIMELINE", path)
+
+    def flowreport_file(self, path: Path):
+        """Called when the flow report is closed (RobotFramework AIO extension).
+
+        Calls :meth:`result_file` by default.
+        """
+        self.result_file("FLOWREPORT", path)
 
     def result_file(self, kind: ResultFile, path: Path):
         """Called when any result file is closed by default.

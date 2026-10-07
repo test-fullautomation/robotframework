@@ -5,6 +5,7 @@ Resource          atest_resource.robot
 *** Variables ***
 ${PARSER}         --parser robot.flow
 ${CHECKPOINT}     %{TEMPDIR}${/}flow_atest.checkpoint.json
+${FLOW REPORT}    ${OUTDIR}${/}flow.html
 
 *** Test Cases ***
 Full example runs setup, cycles, recovery and teardown
@@ -161,6 +162,43 @@ Flow without a checkpoint has no bookkeeping keywords
     Should Be Equal    ${tc.body[0].type}    WHILE
     # Only the node itself in an iteration: no Flow Iteration before it.
     Length Should Be    ${tc.body[0].body[0].body}    1
+
+Flow report is written with the run and by rebot
+    Remove File    ${CHECKPOINT}
+    Remove File    ${FLOW REPORT}
+    Run Tests    ${PARSER} --flowreport ${FLOW REPORT} --variable STOP_AT:3 --variable FLOW_CHECKPOINT:${CHECKPOINT}    flow/pause_stop.flow.json
+    Check Test Case    Cycle    UNKNOWN
+    ...    GLOB:Stopped by operator at iteration 4 of loop 'cycles'; resumable from *flow_atest.checkpoint.json.
+    Stdout Should Contain    Flow report: ${FLOW REPORT}
+    ${html} =    Get File    ${FLOW REPORT}
+    Should Contain    ${html}    <title>Flow report: Pause Stop</title>
+    Should Contain    ${html}    Stopped by operator at iteration 4 of loop 'cycles'
+    # The loop node has its iterations and the edges of the plan counted.
+    Should Match Regexp    ${html}    "cycles": \{"runs": 1, "status": \{"UNKNOWN": 1\}.*"edges": \{"body": 4, "next": 3
+    # The run left a checkpoint: the report says what is left for the restart.
+    Should Contain    ${html}    "checkpoint": {"path":
+    Should Contain    ${html}    "matches": true
+    # rebot writes the same report from the output; the log link is relative.
+    Remove File    ${FLOW REPORT}
+    Copy Previous Outfile
+    Run Rebot    --flowreport ${FLOW REPORT} --log ${OUTDIR}${/}log.html    ${OUTFILE COPY}
+    Stdout Should Contain    Flow report: ${FLOW REPORT}
+    ${html} =    Get File    ${FLOW REPORT}
+    Should Contain    ${html}    <title>Flow report: Pause Stop</title>
+    Should Contain    ${html}    var LOG = "log.html"
+    [Teardown]    Run Keywords    Remove File    ${CHECKPOINT}    AND    Remove File    ${FLOW REPORT}
+
+Flow report needs a suite run from a flow file
+    Run Tests    ${EMPTY}    misc/pass_and_fail.robot
+    Copy Previous Outfile
+    Run Rebot Without Processing Output    --flowreport ${FLOW REPORT}    ${OUTFILE COPY}
+    Stderr Should Contain    [ ERROR ] No flow suite in
+    File Should Not Exist    ${FLOW REPORT}
+
+Flow report is not created if output is disabled
+    Run Tests Without Processing Output    ${PARSER} --output NONE --flowreport ${FLOW REPORT}    flow/no_checkpoint.flow.json
+    Stderr Should Contain    [ ERROR ] FlowReport file cannot be created if output.xml is disabled.
+    File Should Not Exist    ${FLOW REPORT}
 
 *** Keywords ***
 Parsing Should Fail

@@ -42,19 +42,23 @@ test('the plan: flow parser, live position and a clean console encoding for flow
   const out = path.join(os.tmpdir(), 'x');
   const flow = planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, variables: { FROM: '5' } });
   assert.ok(flow.argv.includes('--parser') && flow.argv.includes('robot.flow'));
+  assert.ok(!flow.argv.includes('--flowreport'), 'the flow report is opt-in');
+  const withReport = planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, flowReport: true });
+  assert.ok(withReport.argv.join(' ').includes('--flowreport flow.html'));
+  assert.ok(!planRun({ env: env(ROOT), target: path.join(ROOT, 'x.robot'), outDir: out, flowReport: true }).argv.includes('--flowreport'), 'only a flow has a flow report');
   assert.ok(flow.argv.join(' ').includes('--variable FROM:5'));
   assert.equal(flow.env.PYTHONIOENCODING, undefined, 'a codec suffix crashes Robot\'s console writer');
   assert.equal(flow.env.MM_FLOW_POSITION, path.join(out, 'flow_position.json'));
   assert.equal(flow.env.ROBOT_FLOW_SIGNALS, path.join(out, 'signals.json'));
   const suite = planRun({ env: env(ROOT), target: path.join(ROOT, 'x.robot'), outDir: out });
-  assert.ok(!suite.argv.includes('--parser') && !suite.env.MM_FLOW_POSITION);
+  assert.ok(!suite.argv.includes('--parser') && !suite.argv.includes('--flowreport') && !suite.env.MM_FLOW_POSITION);
   assert.throws(() => planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, variables: { 'a b': '1' } }), /Invalid variable/);
   delete process.env.PYTHONIOENCODING;
 });
 
 test('a flow run: passes, and its position is followed to the end', { skip }, async () => {
   const outDir = tmp();
-  const run = new RobotRun(planRun({ env: env(ROOT), target: COUNTDOWN, outDir }));
+  const run = new RobotRun(planRun({ env: env(ROOT), target: COUNTDOWN, outDir, flowReport: true }));
   const seen = [];
   run.on('position', (p) => seen.push(p));
   run.start();
@@ -65,6 +69,7 @@ test('a flow run: passes, and its position is followed to the end', { skip }, as
   assert.equal(last.done, true);
   assert.deepEqual(last.counts.tick, { pass: 3, fail: 0 });
   assert.ok(run.file('log.html') && run.file('output.xml'));
+  assert.ok(run.file('flow.html'), 'the flow report was written with the run');
   fs.rmSync(outDir, { recursive: true, force: true });
 });
 

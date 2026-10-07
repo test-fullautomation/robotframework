@@ -532,6 +532,11 @@ class Logger(AbstractLogger):
         for logger in self:
             logger.timeline_file(path)
 
+    def flowreport_file(self, path):
+        # cuongnht add flow
+        for logger in self:
+            logger.flowreport_file(path)
+
     def result_file(self, kind, path):
         kind_file = getattr(self, f"{kind.lower()}_file")
         kind_file(path)

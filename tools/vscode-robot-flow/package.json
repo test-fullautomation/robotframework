@@ -244,7 +244,12 @@
         "robotFlow.resultsFolder": {
           "type": "string",
           "default": "results",
-          "markdownDescription": "Where runs write `output.xml`, `log.html` and `report.html`: one folder per run below this one. Relative to the test project's root (`testproject.json`), else the workspace folder."
+          "markdownDescription": "Where runs write `output.xml`, `log.html` and `report.html` (and `flow.html` with `robotFlow.flowReport`): one folder per run below this one. Relative to the test project's root (`testproject.json`), else the workspace folder."
+        },
+        "robotFlow.flowReport": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Flow runs also write `flow.html`, the fork's flow report: the plan as drawn, with what the run did on each node (`--flowreport`). One more pass over `output.xml` at the end of the run."
         },
         "robotFlow.runArgs": {
           "type": "array",

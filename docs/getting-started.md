@@ -44,6 +44,7 @@ their own block.
 | Option | Purpose | Details |
 |--------|---------|---------|
 | `--timeline <file>` | Write an interactive per-thread execution timeline. | [Timeline](thread/merging-timeline.md#execution-timeline) |
+| `--flowreport <file>` | For a suite run from a flow file: draw the plan with the run's results on every node, linked into the log. | [The flow report](flow.md#the-flow-report) |
 | `--segmentoutput <time>` | Seal `output.xml` into well-formed segments every `<time>` (e.g. `30s`, `5min`). | [Segmented output](long-running.md#segmented-output) |
 | `--importfailure suite\|test` | Choose whether an import error makes the whole suite UNKNOWN (`suite`, default) or only the tests that use the failed import (`test`). | [UNKNOWN status](unknown-status.md#import-failures) |
 

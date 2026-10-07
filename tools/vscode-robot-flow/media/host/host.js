@@ -67,6 +67,7 @@ function showToolbar(t) {
       opt('zoom', 'fit', 'Fit', t.zoom) + opt('zoom', '0.75', '75%', t.zoom) + opt('zoom', 'natural', '100%', t.zoom)}</select></label>` +
       `<label class="tb-opt">Motion <select data-opt="motion">${
       opt('motion', 'tail', 'Trail', t.motion) + opt('motion', 'hop', 'Hop', t.motion) + opt('motion', 'off', 'Off', t.motion)}</select></label>` : '') +
+    (t.hasFlowReport ? '<button type="button" class="tb-btn" data-act="flow" title="Open flow.html in the browser: the plan as drawn, with what the run did on each node">Flow report</button>' : '') +
     (t.hasLog ? '<button type="button" class="tb-btn" data-act="log" title="Open log.html in the browser">Log</button>' +
                 '<button type="button" class="tb-btn" data-act="report" title="Open report.html in the browser">Report</button>' : '') +
     (t.status ? '<button type="button" class="tb-btn" data-act="output" title="The run\'s console output">Output</button>' : '');

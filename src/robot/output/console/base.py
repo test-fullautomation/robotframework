@@ -76,6 +76,8 @@ class BaseConsole:
         Called when result files are finished unless they are disabled.
         """
         kind = kind.title() if kind != "XUNIT" else "XUnit"
+        if kind == "Flowreport":
+            kind = "Flow report"  # cuongnht add flow
         label = f"{kind + ':':9}"
         if not label.endswith(" "):
             label += " "  # cuongnht add thread: 'Timeline:' is wider than the column.

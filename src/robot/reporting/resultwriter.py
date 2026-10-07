@@ -69,6 +69,8 @@ class ResultWriter:
             )
         if settings.timeline:  # cuongnht add thread
             self._write_timeline(settings.timeline, settings.log)
+        if settings.flow_report:  # cuongnht add flow
+            self._write_flow_report(settings.flow_report, settings.log)
         return results.return_code
 
     def _write_timeline(self, path, log_path):
@@ -86,6 +88,21 @@ class ResultWriter:
         from robot.timeline import generate_timeline
 
         self._write("Timeline", lambda p: generate_timeline(sources[0], p, link), path)
+
+    def _write_flow_report(self, path, log_path):
+        # cuongnht add flow: generated from output.xml next to the suite
+        # built again from the flow file; element ids must match the log.
+        sources = [str(s) for s in self._sources if not isinstance(s, Result)]
+        if len(sources) != 1:
+            LOGGER.error(
+                "Flow report cannot be created: it requires exactly one "
+                "output.xml source."
+            )
+            return
+        link = os.path.relpath(log_path, os.path.dirname(path)) if log_path else ""
+        from robot.flow.report import generate_report
+
+        self._write("FlowReport", lambda p: generate_report(sources[0], p, link), path)
 
     def _write_output(self, result, path, legacy_output=False):
         self._write("Output", result.save, path, legacy_output)

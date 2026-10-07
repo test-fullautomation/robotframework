@@ -119,7 +119,7 @@ export class RunManager implements vscode.Disposable {
     let plan;
     try {
       plan = planRun({
-        env, target: uri.fsPath, outDir, variables: extras.variables, step: extras.step,
+        env, target: uri.fsPath, outDir, variables: extras.variables, step: extras.step, flowReport: this.flowReport(uri),
         args: [...(extras.robotArgs || []), ...(project?.run.args || []), ...this.runArgs(uri), ...(extras.args || [])],
         extraEnv: { ...(project?.run.env || {}), ...(extras.env || {}) },
       });
@@ -168,7 +168,7 @@ export class RunManager implements vscode.Disposable {
       const env = await robotEnvFor(uri, this.extension.extensionPath);
       processes.set(m.id, new RobotRun(planRun({
         env, target: uri.fsPath, outDir: path.join(runDir, m.id), runDir, variables: m.variables, rig: m.id,
-        args: [...project.run.args, ...this.runArgs(uri)],
+        flowReport: this.flowReport(uri), args: [...project.run.args, ...this.runArgs(uri)],
         extraEnv: { ...project.run.env, ...group.env },
       })));
     }
@@ -256,6 +256,11 @@ export class RunManager implements vscode.Disposable {
     return vscode.workspace.getConfiguration('robotFlow', uri).get<string[]>('runArgs', []);
   }
 
+  /** Opt-in: a flow run also writes flow.html, the plan as drawn with the results on it. */
+  private flowReport(uri: vscode.Uri): boolean {
+    return vscode.workspace.getConfiguration('robotFlow', uri).get<boolean>('flowReport', false);
+  }
+
   private start(key: string, title: string, outDir: string, processes: Map<string, RobotRun>,
                 opts: { env: RobotEnv; debug: boolean; step: boolean; target: string | null;
                         variables: Record<string, string>; pausable: boolean }): RunState {
@@ -335,17 +340,22 @@ export class RunManager implements vscode.Disposable {
     this.changed.fire(key);
     if (a.state.debug) return;   // the debug session says how it ended
     const log = this.artifact(key, 'log.html');
+    // A flow run has the flow report: the plan as drawn with the results on it.
+    const files: Record<string, string> = {
+      ...(this.artifact(key, 'flow.html') ? { 'Open Flow Report': 'flow.html' } : {}),
+      ...(log ? { 'Open Log': 'log.html', 'Open Report': 'report.html' } : {}),
+    };
     const message = `${a.state.title}: ${a.state.status}` + (a.state.checkpoint ? ' · it can continue from where it stopped' : '');
     const show = a.state.status === 'passed' ? vscode.window.showInformationMessage
                                             : vscode.window.showWarningMessage;
-    void show(message, ...(a.state.checkpoint ? ['Continue'] : []), ...(log ? ['Open Log', 'Open Report'] : []), 'Show Output').then((pick) => {
+    void show(message, ...(a.state.checkpoint ? ['Continue'] : []), ...Object.keys(files), 'Show Output').then((pick) => {
       if (pick === 'Show Output') a.output.show();
       else if (pick === 'Continue') void this.continueRun(key);
-      else if (pick) void this.open(key, pick === 'Open Log' ? 'log.html' : 'report.html');
+      else if (pick && files[pick]) void this.open(key, files[pick]);
     });
   }
 
-  /** Open log.html / report.html in the browser. */
+  /** Open log.html / report.html / flow.html in the browser. */
   async open(key: string, name: string): Promise<void> {
     const f = this.artifact(key, name);
     if (!f || !fs.existsSync(f)) {

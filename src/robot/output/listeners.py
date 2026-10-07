@@ -299,6 +299,10 @@ class ListenerV3Facade(ListenerFacade):
             "timeline_file",
             lambda path: result_file("TIMELINE", path),
         )
+        self.flowreport_file = get(  # cuongnht add flow
+            "flowreport_file",
+            lambda path: result_file("FLOWREPORT", path),
+        )
         # Close
         self.close = get("close")
 
@@ -335,6 +339,7 @@ class ListenerV2Facade(ListenerFacade):
         self._xunit_file = get("xunit_file")
         self._debug_file = get("debug_file")
         self._timeline_file = get("timeline_file")  # cuongnht add thread
+        self._flowreport_file = get("flowreport_file")  # cuongnht add flow
         # Close
         self._close = get("close")
 
@@ -546,6 +551,10 @@ class ListenerV2Facade(ListenerFacade):
     def timeline_file(self, path: Path):
         # cuongnht add thread
         self._timeline_file(str(path))
+
+    def flowreport_file(self, path: Path):
+        # cuongnht add flow
+        self._flowreport_file(str(path))
 
     def _suite_attrs(self, data, result, end=False):
         attrs = dict(

@@ -212,6 +212,10 @@ Options
                           parallel lanes on a common time axis. Bars link to
                           the corresponding elements in the log file. Not
                           created unless this option is specified.
+    --flowreport file     HTML flow report: for suites run from flow files
+                          (--parser robot.flow), the plan as drawn with what
+                          the run did on each node, linked into the log file.
+                          Not created unless this option is specified.
  -b --debugfile file      Debug file written during execution. Not created
                           unless this option is specified.
  -T --timestampoutputs    When this option is used, timestamp in a format
@@ -527,10 +531,14 @@ class RobotFramework(Application):
             LOGGER.info(
                 f"Tests execution ended. Statistics:\n{result.suite.stat_message}"
             )
-            if settings.log or settings.report or settings.xunit or settings.timeline:
-                # cuongnht add thread: the timeline is generated from output.xml.
+            if (settings.log or settings.report or settings.xunit or settings.timeline
+                    or settings.flow_report):
+                # cuongnht add thread: the timeline and the flow report are
+                # generated from output.xml.
                 writer = ResultWriter(
-                    settings.output if settings.log or settings.timeline else result
+                    settings.output
+                    if settings.log or settings.timeline or settings.flow_report
+                    else result
                 )
                 writer.write_results(settings.get_rebot_settings())
         return result.return_code

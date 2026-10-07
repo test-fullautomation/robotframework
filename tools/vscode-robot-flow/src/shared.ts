@@ -43,7 +43,7 @@ export function statusText(state: RunState | null): string {
 }
 
 export function toolbar(state: RunState | null, opts: LiveOptions & { canRun: boolean; runTitle: string; live: boolean; hasLog: boolean;
-                                                                       canDebug?: boolean; canStep?: boolean }) {
+                                                                       hasFlowReport?: boolean; canDebug?: boolean; canStep?: boolean }) {
   const running = state?.status === 'running';
   const flow = running && state!.pausable ? describeFlow(state!.flow) : null;
   const group = !!state && (state.members.length > 1 || !state.members.includes('main'));
@@ -75,6 +75,8 @@ export function toolbar(state: RunState | null, opts: LiveOptions & { canRun: bo
     zoom: String(opts.zoom),
     motion: opts.motion,
     hasLog: opts.hasLog,
+    /** A flow run wrote flow.html: the plan as drawn with the results on it. */
+    hasFlowReport: !!opts.hasFlowReport,
   };
 }
 
