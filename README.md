@@ -117,7 +117,8 @@ library constructors run, so keep bench access out of those.
 - **Gates instead of guessed sleeps** — a `gate` polls a keyword until it passes; on timeout
   the message carries the last error and the time waited, and the verdict is `UNKNOWN` (the
   bench was not ready) unless the gate says `fail`.
-- **Loops bounded by construction** (`max_loops` and/or `max_seconds`, paced with `every`),
+- **Loops bounded by construction** (`max_loops` and/or `max_seconds`, paced with `every`;
+  a bound may be a `${variable}` sized per run with `--variable`),
   **recovery** that continues the loop or aborts with the original error, **decisions**, and
   setup/test/teardown **phases**.
 - **Sub-flows** — a region of the plan becomes a file of its own and is called as one step,

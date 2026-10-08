@@ -36,6 +36,7 @@ means the flow file must still be the one the run used.
 import json
 import os
 import re
+import re
 from datetime import datetime
 from html import escape
 from pathlib import Path
@@ -180,6 +181,7 @@ class _Stats:
         self.edges = {}             # edge label -> count
         self.iterations = []        # loops: [{status, id, elapsed}]
         self.attempts = []          # gates: attempts per run
+        self.limit = None           # loops: the iteration limit the run used
         self.roles = {}             # role -> count of items run
 
     def run(self, item, item_id):
@@ -210,6 +212,7 @@ class _Stats:
             'first_fail': self.first_fail, 'last_fail': self.last_fail, 'last': self.last,
             'last_error': self.last_error, 'edges': self.edges,
             'iterations': self.iterations, 'attempts': self.attempts, 'roles': self.roles,
+            'limit': self.limit,
         }
 
 
@@ -305,6 +308,8 @@ class _FlowRun:
                     stats.attempts.append(len(_items(item.body)))
             elif role == 'abort':
                 stats.edge('abort')
+            elif role == 'loop-start':
+                stats.limit = _assigned_limit(item)
         if built.name in self.keywords:
             self._walk(self.keywords[built.name].body, item.body, item_id)
 
@@ -421,6 +426,16 @@ class _FlowRun:
             if message.startswith('Stopped by') and '; resumable from ' in message:
                 return message.split('; resumable from ', 1)[1].rstrip('.')
         return None
+
+
+def _assigned_limit(item):
+    """The limit `Flow Loop` returned: logged as '${flow_limit_x} = 3'."""
+    for child in getattr(item, 'body', []) or []:
+        text = getattr(child, 'message', '') if getattr(child, 'type', None) == MESSAGE else ''
+        match = re.match(r'\$\{flow_limit_\w+\} = (\d+)$', text or '')
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def _stopped(test):
@@ -733,8 +748,10 @@ var LOG = "%LOG%";
       if (step.kind === 'loop') {
         var it = st ? st.iterations.length : 0, done = st ? (st.edges.next || 0) : 0;
         var bars = [];
-        if (step.max_loops) bars.push([Math.min(1, done / step.max_loops), done + ' / ' + step.max_loops + ' cycles']);
-        if (step.max_seconds) bars.push([st ? Math.min(1, st.elapsed / seconds(step.max_seconds)) : 0, secs(st ? st.elapsed : 0) + ' / ' + step.max_seconds]);
+        var limit = (st && st.limit) || (isFinite(+step.max_loops) ? +step.max_loops : null);
+        if (step.max_loops) bars.push([limit ? Math.min(1, done / limit) : 0, done + ' / ' + (limit || step.max_loops) + ' cycles']);
+        var bound = step.max_seconds ? seconds(step.max_seconds) : NaN;
+        if (step.max_seconds) bars.push([st && isFinite(bound) ? Math.min(1, st.elapsed / bound) : 0, secs(st ? st.elapsed : 0) + ' / ' + step.max_seconds]);
         if (!bars.length) bars.push([0, it + ' cycles']);
         bars.forEach(function (bar, i) {
           var by = y + 46 + i * 13;
@@ -759,7 +776,9 @@ var LOG = "%LOG%";
         var rx = bx + m.body.w + COL, f = e2.on_failure || 0;
         // Out of the body's side, up the gap between the columns and down into the recovery box from above.
         var gx = bx + m.body.w + COL / 2;
-        edge([[bx + m.body.w, by0 + 24], [gx, by0 + 24], [gx, by0 - 16], [rx + m.rec.w / 2, by0 - 16], [rx + m.rec.w / 2, by0]], f ? 'fail' : 'cold', 'on failure ×' + f, [gx + 6, by0 - 20]);
+        // It leaves from the first step of the body, which may be narrower than the body column.
+        var f0 = measure(step.body[0]), fx = bx + (m.body.w - f0.w) / 2 + f0.w, fy = by0 + (step.body[0].kind === 'decision' ? DH / 2 : 24);
+        edge([[fx, fy], [gx, fy], [gx, by0 - 16], [rx + m.rec.w / 2, by0 - 16], [rx + m.rec.w / 2, by0]], f ? 'fail' : 'cold', 'on failure ×' + f, [gx + 6, by0 - 20]);
         drawSeq(step.recovery, rx, by0, m.rec.w);
         var thenCount = step.then === 'abort' ? (e2.abort || 0) : (e2.continue || 0), rcx = rx + m.rec.w / 2;
         if (step.then === 'abort') {
@@ -800,7 +819,7 @@ var LOG = "%LOG%";
     if (!m) return 0;
     var n = parseFloat(m[1]), u = m[2].toLowerCase();
     var f = { ms: 0.001, millisecond: 0.001, milliseconds: 0.001, s: 1, sec: 1, second: 1, seconds: 1, m: 60, min: 60, minute: 60, minutes: 60, h: 3600, hour: 3600, hours: 3600, d: 86400, day: 86400, days: 86400 };
-    return n * (f[u] || 1);
+    return isFinite(n) ? n * (f[u] || 1) : NaN;
   }
 
   // ---- a flow: summary, lanes, detail
@@ -822,7 +841,8 @@ var LOG = "%LOG%";
     var loops = []; (function find(steps) { steps.forEach(function (st) { if (st.kind === 'loop') loops.push(st); ['body', 'recovery', 'yes', 'no', 'steps'].forEach(function (k) { if (st[k]) find(st[k]); }); }); })(flow.lanes.length ? [].concat.apply([], flow.plan.map(function (l) { return l.steps; })) : []);
     loops.forEach(function (loop) {
       var st = stats[loop.key]; if (!st) return;
-      fact((st.edges.next || 0) + (loop.max_loops ? ' of ' + loop.max_loops : ''), 'cycles of ' + loop.label + ' completed');
+      var lim = st.limit || (isFinite(+loop.max_loops) ? +loop.max_loops : loop.max_loops);
+      fact((st.edges.next || 0) + (lim ? ' of ' + lim : ''), 'cycles of ' + loop.label + ' completed');
       var failed = st.iterations.filter(function (i) { return i.status !== 'PASS'; }).length;
       if (failed) fact(String(failed), 'cycles of ' + loop.label + ' did not pass');
     });
@@ -950,7 +970,7 @@ var LOG = "%LOG%";
       }
       if (step && step.kind === 'loop') {
         row('Cycles', st.iterations.length + ' started, ' + (st.edges.next || 0) + ' completed');
-        if (step.max_loops) row('Limit', step.max_loops + ' cycles');
+        if (step.max_loops) row('Limit', st && st.limit && String(st.limit) !== String(step.max_loops) ? st.limit + ' cycles (' + step.max_loops + ')' : step.max_loops + ' cycles');
         if (step.max_seconds) row('Deadline', step.max_seconds);
         if (step.every) row('Every', step.every);
         if (st.edges.on_failure) row('Recovered', (st.edges.continue || 0) + ' of ' + st.edges.on_failure + ' failures');

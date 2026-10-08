@@ -23,6 +23,7 @@ reachable) is the job of :mod:`robot.flow.graph`.
 """
 
 import json
+import re
 from pathlib import Path
 
 from robot.errors import DataError
@@ -35,6 +36,10 @@ def is_string(item):
 
 
 FLOW_VERSION = 1
+
+# One '${variable}' as the whole value: a bound or a time sized per run.
+VARIABLE_PATTERN = r'^\s*\$\{[^{}$]+\}\s*$'
+VARIABLE_RE = re.compile(VARIABLE_PATTERN)
 
 START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW = (
     'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow'
@@ -326,11 +331,17 @@ def _validate_decision(node):
     node.condition = node.condition.strip()
 
 
+def is_variable(value):
+    """True for a value that is one ``${variable}`` reference, resolved when run."""
+    return is_string(value) and VARIABLE_RE.match(value.strip()) is not None
+
+
 def _validate_loop(node):
-    if node.max_loops is not None:
+    if node.max_loops is not None and not is_variable(node.max_loops):
         if isinstance(node.max_loops, bool) or not isinstance(node.max_loops, int) \
                 or node.max_loops < 1:
-            raise FlowError("'max_loops' must be a positive integer.", node.id)
+            raise FlowError("'max_loops' must be a positive integer or a "
+                            "'${variable}'.", node.id)
     node.max_seconds = _validate_time(node, 'max_seconds')
     node.every = _validate_time(node, 'every')
     if node.max_loops is None and node.max_seconds is None:
@@ -345,6 +356,8 @@ def _validate_time(node, attr, required=False, default=None):
             raise FlowError(f"'{attr}' is required.", node.id)
         return default
     value = _stringify(value)
+    if is_variable(value):
+        return value.strip()          # checked when the step runs
     try:
         seconds = timestr_to_secs(value)
     except ValueError:
@@ -403,7 +416,8 @@ def json_schema():
     """
     scalar = {'type': ['string', 'number', 'boolean', 'null']}
     time = {'type': ['string', 'number'],
-            'description': "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number."}
+            'description': "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number; "
+                           "or a '${variable}' holding one."}
     named = {'oneOf': [
         {'type': 'string', 'minLength': 1},
         {'type': 'array', 'minItems': 1,
@@ -464,8 +478,11 @@ def json_schema():
                                                  "e.g. \"$MODE == 'EMC'\"."}}),
         kind(LOOP, "Bounded repetition: 'body' in, 'next' back, 'done' out, optional "
                    "'on_failure'.",
-             extra={'max_loops': {'type': 'integer', 'minimum': 1,
-                                  'description': 'Fixed number; not a variable.'},
+             extra={'max_loops': {'anyOf': [{'type': 'integer', 'minimum': 1},
+                                            {'type': 'string', 'pattern': VARIABLE_PATTERN}],
+                                  'description': "Fixed number, or a '${variable}' "
+                                                 "holding one (set in 'variables' or "
+                                                 "with --variable)."},
                     'max_seconds': dict(time, description='Time limit of the loop.'),
                     'every': dict(time, description='Minimum time per round.')},
              anyOf=[{'required': ['max_loops']}, {'required': ['max_seconds']}]),

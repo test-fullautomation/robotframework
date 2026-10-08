@@ -80,6 +80,19 @@ Loop bounded only by a deadline ends with PASS
     Should Be Equal    ${tc.body[2].type}    WHILE
     Should Be True    3 <= len($tc.body[2].body) <= 8
 
+Loop bounds can be variables sized per run
+    [Documentation]    The file names the bound, the run sizes it: the default comes from
+    ...    the file's 'variables', --variable overrides it, and a value that is not a
+    ...    bound ends the loop's phase UNKNOWN (nothing was tested) when the loop starts.
+    Run Tests    ${PARSER}    flow/variable_bounds.flow.json
+    ${tc} =    Check Test Case    Variable Bounds    PASS
+    Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 2
+    Run Tests    ${PARSER} --variable CYCLES:3 --variable MAX_TIME:1h    flow/variable_bounds.flow.json
+    ${tc} =    Check Test Case    Variable Bounds    PASS
+    Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 3
+    Run Tests    ${PARSER} --variable CYCLES:many    flow/variable_bounds.flow.json
+    Check Test Case    Variable Bounds    UNKNOWN    'max_loops' of loop 'loop' must be a positive integer, got 'many'.
+
 Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS

@@ -11,7 +11,8 @@
 - Run a suite or flow from its view, the title bar or the Explorer; the
   Diagram follows the run live (running step, counts, trail); Stop; Output,
   Log and Report of each run, and the Flow report of a flow run
-  (`robotFlow.flowReport`, off by default).
+  (`robotFlow.flowReport`, off by default). *Run with Variables…* passes
+  `NAME=value` pairs as `--variable`.
 - Run groups of a test project (`testproject.json`): the members' Diagrams
   with their meeting points, run together on one signal store.
 - Files in a test project are read and run with the project's `run` settings.

@@ -208,7 +208,7 @@ from the module search path.
 | `gate` | `keyword`, `args`, `timeout`, `interval` (2s), `on_timeout`: unknown (default) or fail | 1 | Poll the keyword until it passes. On timeout the message carries the last error and the elapsed time. |
 | `sleep` | `duration` | 1 | `Sleep`. |
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |
-| `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. |
+| `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. A bound may be a `${variable}` (see below). |
 | `try` | — | `body`, `on_failure`, `done` | Failure routing without a loop. |
 | `flow` | `file`, `args` (an object: parameter → value) | 1 | Call another flow file — a sub-flow — as one step. |
 
@@ -240,6 +240,30 @@ plan calls it as one box:
   signals or suite variables.
 
 `python -m robot.flow validate` checks every sub-flow file it reaches.
+
+### Bounds from variables
+
+`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval` and a
+sleep's `duration` may be a single `${variable}` instead of a value. The
+default comes from the file's `variables`; a run overrides it on the command
+line, so the same plan runs as a one-hour smoke test and as the 48-hour
+endurance run:
+
+```json
+"variables": { "MAX_TIME": "48h", "CYCLES": 2000 },
+"nodes": [ { "id": "loop", "kind": "loop", "max_loops": "${CYCLES}", "max_seconds": "${MAX_TIME}" } ]
+```
+
+```bash
+robot --parser robot.flow --variable MAX_TIME:1h --variable CYCLES:50 plan.flow.json
+```
+
+The value is checked when the loop starts (a run with `CYCLES:many` ends
+there with an error); `--dryrun` cannot check it. The loop is still bounded
+by construction: the file names the bound, the run only sizes it. A
+checkpoint saves what is left of the sized bounds, so a restart continues
+with them. In the VS Code extension, *Run with Variables…* asks for the
+values.
 
 ### Rules
 

@@ -10,8 +10,9 @@ from robot.flow.report import collect, generate_report, render
 
 
 FLOW = {
-    'flow': {'name': 'Report Flow', 'version': 1, 'checkpoint': False},
+    'flow': {'name': 'Report Flow', 'version': 1},
     'imports': {'libraries': ['report_lib.py']},
+    'variables': {'CYCLES': 2},
     'nodes': [
         {'id': 'start', 'kind': 'start'},
         {'id': 'setup', 'kind': 'phase', 'role': 'setup'},
@@ -19,7 +20,7 @@ FLOW = {
         {'id': 'cycle', 'kind': 'phase', 'role': 'test', 'name': 'Cycle'},
         {'id': 'ready', 'kind': 'gate', 'keyword': 'Ready After', 'args': [2], 'timeout': '5s',
          'interval': '0.01s', 'label': 'Bench ready'},
-        {'id': 'loop', 'kind': 'loop', 'max_loops': 4, 'label': 'Cycles'},
+        {'id': 'loop', 'kind': 'loop', 'max_loops': '${CYCLES}', 'label': 'Cycles'},
         {'id': 'work', 'kind': 'keyword', 'keyword': 'Work', 'args': ['${FAIL_AT}'], 'label': 'Run cycle'},
         {'id': 'fix', 'kind': 'keyword', 'keyword': 'Note', 'args': ['recovered'], 'label': 'Recover'},
         {'id': 'which', 'kind': 'decision', 'condition': "$MODE == 'fast'", 'label': 'Fast mode?'},
@@ -72,7 +73,7 @@ class TestReport(unittest.TestCase):
         cls.out = os.path.join(cls.tmp.name, 'out')
         rc = run(cls.flow, parser='robot.flow', outputdir=cls.out, output='output.xml',
                  log=None, report=None, stdout=io.StringIO(),
-                 variable=['FAIL_AT:2', 'MODE:slow'])
+                 variable=['FAIL_AT:2', 'MODE:slow', 'CYCLES:4'])
         cls.rc = rc
         cls.data = collect(os.path.join(cls.out, 'output.xml'))
         cls.stats = cls.data['flows'][0]['stats']
@@ -97,13 +98,16 @@ class TestReport(unittest.TestCase):
     def test_loop_counts_and_edges(self):
         loop = self.stats['loop']
         self.assertEqual(loop['runs'], 1)
+        self.assertEqual(loop['limit'], 4, 'the limit the run used, not the file default')
+        self.assertEqual(self.data['flows'][0]['plan'][1]['steps'][1]['max_loops'], '${CYCLES}')
         self.assertEqual([i['status'] for i in loop['iterations']], ['PASS', 'PASS', 'PASS', 'PASS'])
         self.assertEqual(loop['edges'], {'body': 4, 'next': 4, 'done': 1, 'on_failure': 1, 'continue': 1})
         work = self.stats['work']
         self.assertEqual((work['runs'], work['status']), (4, {'PASS': 3, 'FAIL': 1}))
         self.assertEqual(work['last_error'], 'cycle 2 broke')
         self.assertEqual(work['first_fail'], work['last_fail'])
-        self.assertTrue(work['first_fail'].endswith('-k2-k1-k1'), work['first_fail'])
+        # Iteration 2: Flow Iteration, then the TRY branch holding the node.
+        self.assertTrue(work['first_fail'].endswith('-k2-k2-k1'), work['first_fail'])
         fix = self.stats['fix']
         self.assertEqual((fix['runs'], fix['status']), (1, {'PASS': 1}))
 

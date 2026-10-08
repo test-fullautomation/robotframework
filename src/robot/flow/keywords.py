@@ -29,7 +29,7 @@ and ``Flow Iteration`` are bookkeeping the builder adds for the checkpoint
 import os
 
 from robot.api import logger, SkipExecution
-from robot.errors import UnknownAssertionError
+from robot.errors import DataError, UnknownAssertionError
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.running.runkwregister import RUN_KW_REGISTER
@@ -131,8 +131,18 @@ def flow_loop(loop_id, max_loops=None, max_seconds=None, *variables):
     """
     builtin = BuiltIn()
     run = _current_run()
-    loops = _number(max_loops)
-    seconds = timestr_to_secs(max_seconds) if _given(max_seconds) else None
+    try:
+        loops = _number(max_loops)
+        if loops is not None and (loops < 1 or int(loops) != loops):
+            raise ValueError
+    except ValueError:
+        raise DataError(f"'max_loops' of loop '{loop_id}' must be a positive "
+                        f"integer, got {max_loops!r}.")
+    try:
+        seconds = timestr_to_secs(max_seconds) if _given(max_seconds) else None
+    except ValueError:
+        raise DataError(f"'max_seconds' of loop '{loop_id}' must be a valid time, "
+                        f"got {max_seconds!r}.")
     limit, deadline, restored, message = run.loop_started(
         loop_id, int(loops) if loops is not None else None, seconds
     )

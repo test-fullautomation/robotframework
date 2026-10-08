@@ -96,6 +96,20 @@ class TestSchema(unittest.TestCase):
         self._error(flow([START, {'id': 's', 'kind': 'sleep', 'duration': 'soon'}, END], []),
                     "Node 's': 'duration' must be a valid time string, got 'soon'")
 
+    def test_bounds_and_times_may_be_variables(self):
+        node = {'id': 'l', 'kind': 'loop', 'max_loops': '${CYCLES}',
+                'max_seconds': ' ${MAX_TIME} ', 'every': '${EVERY}'}
+        loop = load_flow(flow([START, node, END], [])).nodes['l']
+        self.assertEqual((loop.max_loops, loop.max_seconds, loop.every),
+                         ('${CYCLES}', '${MAX_TIME}', '${EVERY}'))
+        gate = {'id': 'g', 'kind': 'gate', 'keyword': 'Ready', 'timeout': '${T}'}
+        self.assertEqual(load_flow(flow([START, gate, END], [])).nodes['g'].timeout, '${T}')
+        for bad in ('${A}${B}', 'x${A}', '${}', '2 hours or ${MORE}'):
+            self._error(flow([START, dict(node, max_seconds=bad), END], []),
+                        "'max_seconds' must be a valid time string")
+        self._error(flow([START, dict(node, max_loops='3 ${X}'), END], []),
+                    "'max_loops' must be a positive integer or a '${variable}'")
+
     def test_loop_must_be_bounded(self):
         self._error(flow([START, {'id': 'l', 'kind': 'loop'}, END], []),
                     "unbounded loops are not allowed")
@@ -359,6 +373,19 @@ class TestBuilder(unittest.TestCase):
                          ['${flow_limit_my_loop}', '${flow_deadline_my_loop}'])
         self.assertEqual(loop.condition, 'robot.flow.control.clock() < $flow_deadline_my_loop')
         self.assertEqual((loop.limit, loop.on_limit), ('${flow_limit_my_loop}', 'pass'))
+
+    def test_variable_bounds_reach_the_loop(self):
+        data = copy.deepcopy(LOOP_FLOW)
+        data['nodes'][1].update(max_loops='${CYCLES}', max_seconds='${MAX_TIME}', every='${EVERY}')
+        _, start, loop = build(data).tests[0].body
+        self.assertEqual(list(start.args), ['loop', '${CYCLES}', '${MAX_TIME}'])
+        self.assertEqual(list(loop.body[-1].args), ['${EVERY}'])
+        # Without a checkpoint the loop is a plain WHILE: the bounds are resolved in it.
+        data['flow']['checkpoint'] = False
+        deadline, loop = build(data).tests[0].body
+        self.assertEqual(list(deadline.args),
+                         ['robot.flow.control.clock() + robot.utils.timestr_to_secs($MAX_TIME)'])
+        self.assertEqual((loop.limit, loop.on_limit), ('${CYCLES}', 'pass'))
 
     def test_loop_variables_are_passed_by_name(self):
         data = copy.deepcopy(LOOP_FLOW)

@@ -62,6 +62,24 @@ export interface RunPlan {
 
 const VARIABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** `NAME=value, OTHER=value` typed for a run (commas or line breaks between pairs). */
+export function parseVariables(text: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of text.split(/[,\n]/)) {
+    const pair = part.trim();
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    const name = (eq < 0 ? pair : pair.slice(0, eq)).trim();
+    if (eq < 0 || !VARIABLE_RE.test(name)) throw new Error(`Expected NAME=value, got ${JSON.stringify(pair)}.`);
+    out[name] = pair.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+export function formatVariables(variables: Record<string, string>): string {
+  return Object.entries(variables).map(([name, value]) => `${name}=${value}`).join(', ');
+}
+
 export function usesFlows(target: string): boolean {
   try {
     if (fs.statSync(target).isFile()) return target.toLowerCase().endsWith(FLOW_SUFFIX);
