@@ -129,6 +129,14 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
     vscode.commands.registerCommand('robotFlow.openGrid', openBeside(VIEWS.grid.viewType)),
     vscode.commands.registerCommand('robotFlow.openDiagram', openBeside(VIEWS.diagram.viewType)),
     vscode.commands.registerCommand('robotFlow.run', runTarget),
+    vscode.commands.registerCommand('robotFlow.runWithVariables', async (uri?: vscode.Uri) => {
+      const target = uri instanceof vscode.Uri ? uri : activeFile();
+      if (!target || !/\.(robot|flow\.json)$/i.test(target.fsPath)) {
+        void vscode.window.showInformationMessage('Open a .robot suite or a .flow.json file to run it.');
+        return null;
+      }
+      return runs.runFileWithVariables(target);
+    }),
     vscode.commands.registerCommand('robotFlow.stop', async (uri?: vscode.Uri) => {
       const target = uri instanceof vscode.Uri ? uri : activeFile();
       if (target) await runs.stop(fileKey(target.fsPath));

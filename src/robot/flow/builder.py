@@ -48,7 +48,7 @@ from robot.utils import timestr_to_secs
 
 from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
                     structure)
-from .schema import ABORT, PHASE, FlowError, load_flow
+from .schema import ABORT, PHASE, FlowError, is_variable, load_flow
 
 
 FLOW_LIBRARY = 'robot.flow.keywords'
@@ -290,7 +290,11 @@ class _Emitter:
         condition = 'True'
         if step.max_seconds:
             deadline = self._deadline_variable(step)
-            seconds = timestr_to_secs(step.max_seconds)
+            if is_variable(step.max_seconds):
+                # Resolved when the loop starts: $NAME is the variable's value.
+                seconds = f'robot.utils.timestr_to_secs(${step.max_seconds[2:-1]})'
+            else:
+                seconds = timestr_to_secs(step.max_seconds)
             self.origin(body.create_keyword(name='Evaluate', args=[f'{CLOCK} + {seconds}'],
                                             assign=[deadline]), step, 'deadline')
             condition = f'{CLOCK} < {deadline}'

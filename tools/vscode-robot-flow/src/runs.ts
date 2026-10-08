@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 import { ControlCommand, ControlState, activeProcesses, canPause, findCheckpoint, readControlState, sendControl } from './backend/control';
 import { RobotEnv } from './backend/helpers';
 import { Project, RunGroup, memberPath } from './backend/project';
-import { Position, RobotRun, RunStatus, planRun } from './backend/run';
+import { Position, RobotRun, RunStatus, formatVariables, parseVariables, planRun } from './backend/run';
 import { projectFor, resultsRoot, robotEnvFor } from './settings';
 
 /** How long a flow may take to reach its next step after Stop before the stop file follows (as in the GUI). */
@@ -131,6 +131,23 @@ export class RunManager implements vscode.Disposable {
       env, debug: !!extras.debug, step: !!extras.step, target: uri.fsPath,
       variables: extras.variables || {}, pausable: canPause(uri.fsPath),
     });
+  }
+
+  /** Run a file with variables typed by the user; the file's last ones are offered again. */
+  async runFileWithVariables(uri: vscode.Uri): Promise<RunState | null> {
+    const key = 'robotFlow.variables:' + fileKey(uri.fsPath);
+    const last = this.extension.workspaceState.get<Record<string, string>>(key, {});
+    const text = await vscode.window.showInputBox({
+      title: `Run ${path.basename(uri.fsPath)} with variables`,
+      prompt: 'NAME=value pairs separated by commas, passed as --variable (a flow\'s ${variable} bounds, for example).',
+      placeHolder: 'MAX_TIME=2h, CYCLES=50',
+      value: formatVariables(last),
+      validateInput: (v) => { try { parseVariables(v); return null; } catch (e) { return (e as Error).message; } },
+    });
+    if (text === undefined) return null;
+    const variables = parseVariables(text);
+    await this.extension.workspaceState.update(key, variables);
+    return this.runFile(uri, { variables });
   }
 
   /** A new run of a stopped flow that continues from its checkpoint (finished test phases are skipped). */

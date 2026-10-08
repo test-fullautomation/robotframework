@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { planRun, RobotRun } = require('../out/backend/run.js');
+const { planRun, RobotRun, parseVariables, formatVariables } = require('../out/backend/run.js');
 const { readProject, memberPath } = require('../out/backend/project.js');
 const { syncLinks, inspectGroup } = require('../out/backend/group.js');
 
@@ -54,6 +54,15 @@ test('the plan: flow parser, live position and a clean console encoding for flow
   assert.ok(!suite.argv.includes('--parser') && !suite.argv.includes('--flowreport') && !suite.env.MM_FLOW_POSITION);
   assert.throws(() => planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, variables: { 'a b': '1' } }), /Invalid variable/);
   delete process.env.PYTHONIOENCODING;
+});
+
+test('variables typed for a run: NAME=value pairs, checked', () => {
+  assert.deepEqual(parseVariables(' MAX_TIME=2h, CYCLES = 50 \n EMPTY= '), { MAX_TIME: '2h', CYCLES: '50', EMPTY: '' });
+  assert.deepEqual(parseVariables(''), {});
+  assert.deepEqual(parseVariables('A=b=c'), { A: 'b=c' });
+  assert.equal(formatVariables({ A: '1', B: 'x y' }), 'A=1, B=x y');
+  assert.throws(() => parseVariables('MAX TIME=2h'), /Expected NAME=value/);
+  assert.throws(() => parseVariables('justtext'), /Expected NAME=value/);
 });
 
 test('a flow run: passes, and its position is followed to the end', { skip }, async () => {

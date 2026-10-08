@@ -683,7 +683,7 @@
             "string",
             "number"
           ],
-          "description": "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number."
+          "description": "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number; or a '${variable}' holding one."
         }
       },
       "additionalProperties": false
@@ -762,9 +762,17 @@
           "description": "Text shown instead of the id."
         },
         "max_loops": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Fixed number; not a variable."
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^\\s*\\$\\{[^{}$]+\\}\\s*$"
+            }
+          ],
+          "description": "Fixed number, or a '${variable}' holding one (set in 'variables' or with --variable)."
         },
         "max_seconds": {
           "type": [

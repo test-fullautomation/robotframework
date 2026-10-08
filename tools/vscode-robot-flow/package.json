@@ -101,6 +101,12 @@
         "icon": "$(play)"
       },
       {
+        "command": "robotFlow.runWithVariables",
+        "title": "Run with Variables\u2026",
+        "category": "Robot Flow",
+        "icon": "$(play)"
+      },
+      {
         "command": "robotFlow.debug",
         "title": "Debug",
         "category": "Robot Flow",
@@ -166,6 +172,11 @@
           "group": "navigation@2"
         },
         {
+          "command": "robotFlow.runWithVariables",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/ || activeCustomEditorId == robotFlow.diagram",
+          "group": "1_run@0"
+        },
+        {
           "command": "robotFlow.runStep",
           "when": "resourceFilename =~ /\\.flow\\.json$/",
           "group": "1_run@1"
@@ -189,6 +200,11 @@
       "explorer/context": [
         {
           "command": "robotFlow.run",
+          "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@8"
+        },
+        {
+          "command": "robotFlow.runWithVariables",
           "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/",
           "group": "navigation@8"
         },
