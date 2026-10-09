@@ -281,6 +281,8 @@ class Session implements vscode.Disposable {
   private async onToolbar(action: string, name?: string, value?: string): Promise<void> {
     if (action === 'run') {
       await this.runs.runFile(this.document.uri);
+    } else if (action === 'runWith') {
+      await vscode.commands.executeCommand('robotFlow.runWithVariables', this.document.uri);
     } else if (action === 'debug') {
       await vscode.commands.executeCommand('robotFlow.debug', this.document.uri);
     } else if (action === 'stop') {
