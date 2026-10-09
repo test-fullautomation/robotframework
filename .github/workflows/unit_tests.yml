@@ -10,6 +10,13 @@ on:
       - 'src/**'
       - 'utest/**'
       - '!**/*.rst'
+  workflow_dispatch:
+    inputs:
+      pythons:
+        description: "Interpreters: 'quick' (the oldest and the newest) or 'all'"
+        type: choice
+        options: [ quick, all ]
+        default: quick
 
 
 jobs:
@@ -19,9 +26,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ 'ubuntu-latest', 'windows-latest' ]
-        # Python 3.7/3.8 are EOL and no longer installable on current
-        # runner images; the fork targets modern CPython (AIO ships 3.13).
-        python-version: [ '3.9', '3.10', '3.11', '3.12', '3.13' ]
+        # A push runs the oldest and the newest interpreters (the fork is not the
+        # upstream project: the whole support matrix on every push is what got
+        # Actions disabled on this fork). 'Run workflow' with pythons=all runs
+        # all of them.
+        python-version: ${{ fromJSON(inputs.pythons == 'all' && '["3.9", "3.10", "3.11", "3.12", "3.13"]' || '["3.9", "3.13"]') }}
 
     runs-on: ${{ matrix.os }}
 
