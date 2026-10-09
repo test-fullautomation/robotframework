@@ -89,6 +89,8 @@ negative tests, `Watchdog Should Have Fired`.
 | `Run Watchdog    name=DEFAULT` | The supervision loop; blocks until it fires or is stopped, so run it inside a `THREAD`. |
 | `Feed Watchdog    name=DEFAULT` | Signal progress; resets the stall timer. Call it from the supervised work. |
 | `Stop Watchdog    name=DEFAULT    timeout=10 s` | Stop gracefully and wait for the loop to end; fails if it does not end in time. |
+| `Pause Watchdog    name=DEFAULT` | Freeze the watchdog: no heartbeat, no stall, no deadline, and the paused time is not counted afterwards. A [paused flow](flow.md#pause-resume-stop-and-restart) does this for every watchdog. |
+| `Resume Watchdog    name=DEFAULT` | Let a paused watchdog continue where it was. |
 | `Get Watchdog Status    name=DEFAULT` | `CONFIGURED`, `RUNNING`, `STOPPED` or `FIRED`. |
 | `Watchdog Should Not Have Fired    name=DEFAULT` | Fail with the recorded reason if it fired. |
 | `Watchdog Should Have Fired    name=DEFAULT` | Fail unless it fired — for negative tests. |

@@ -147,6 +147,8 @@ class VerboseWriter:
             self._write_info()
 
     def output(self, name, path):
+        if name == 'FlowReport':
+            name = 'Flow report'  # cuongnht add flow
         self._stdout.write('%-8s %s\n' % (name+':', path))
 
 

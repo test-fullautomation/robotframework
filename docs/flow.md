@@ -70,7 +70,9 @@ See [Two flows](#two-flows) for the keywords and patterns.
   the offending node: branches that never re-join, a loop body that never
   returns, an unreachable box.
 - `robot --parser robot.flow --dryrun plan.flow.json` checks every keyword and
-  its arguments — including the keyword behind each gate.
+  its arguments — including the keyword behind each gate — without running
+  any of them. It does import the libraries, so module-level code and library
+  constructors run: keep bench access out of those.
 - `python -m robot.flow render plan.flow.json` prints the equivalent `.robot`
   text: what the reviewer reads is what runs.
 - Verdicts are honest: an assertion that fails is **FAIL**; a bench or a peer
@@ -80,9 +82,10 @@ See [Two flows](#two-flows) for the keywords and patterns.
 
 ```bash
 robot --parser robot.flow --variable RIG:RIG_A --outputdir out/rig_a flows/endurance_cycle.flow.json
-robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # validate without touching the bench
+robot --parser robot.flow --dryrun flows/endurance_cycle.flow.json      # check keywords and arguments without running them
 python -m robot.flow validate flows/endurance_cycle.flow.json           # shape and structure only
 python -m robot.flow render   flows/endurance_cycle.flow.json           # the equivalent .robot text
+robot --parser robot.flow --flowreport flow.html flows/endurance_cycle.flow.json   # run it and draw the plan with the results
 ```
 
 Every `robot` option applies — `--variable`, `--outputdir`, `--dryrun`,
@@ -205,7 +208,7 @@ from the module search path.
 | `gate` | `keyword`, `args`, `timeout`, `interval` (2s), `on_timeout`: unknown (default) or fail | 1 | Poll the keyword until it passes. On timeout the message carries the last error and the elapsed time. |
 | `sleep` | `duration` | 1 | `Sleep`. |
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |
-| `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. |
+| `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. A bound may be a `${variable}` (see below). |
 | `try` | — | `body`, `on_failure`, `done` | Failure routing without a loop. |
 | `flow` | `file`, `args` (an object: parameter → value) | 1 | Call another flow file — a sub-flow — as one step. |
 
@@ -237,6 +240,30 @@ plan calls it as one box:
   signals or suite variables.
 
 `python -m robot.flow validate` checks every sub-flow file it reaches.
+
+### Bounds from variables
+
+`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval` and a
+sleep's `duration` may be a single `${variable}` instead of a value. The
+default comes from the file's `variables`; a run overrides it on the command
+line, so the same plan runs as a one-hour smoke test and as the 48-hour
+endurance run:
+
+```json
+"variables": { "MAX_TIME": "48h", "CYCLES": 2000 },
+"nodes": [ { "id": "loop", "kind": "loop", "max_loops": "${CYCLES}", "max_seconds": "${MAX_TIME}" } ]
+```
+
+```bash
+robot --parser robot.flow --variable MAX_TIME:1h --variable CYCLES:50 plan.flow.json
+```
+
+The value is checked when the loop starts (a run with `CYCLES:many` ends
+there with an error); `--dryrun` cannot check it. The loop is still bounded
+by construction: the file names the bound, the run only sizes it. A
+checkpoint saves what is left of the sized bounds, so a restart continues
+with them. In the VS Code extension, *Run with Variables…* asks for the
+values.
 
 ### Rules
 
@@ -272,7 +299,8 @@ Cycle
 | test phase | a test case |
 | `gate` | `Flow Gate` from `robot.flow.keywords`, built on retrying the keyword |
 | `decision` | `IF` / `ELSE` |
-| `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline in the condition, so reaching either bound ends the loop with **PASS** |
+| `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline on the flow clock in the condition, so reaching either bound ends the loop with **PASS** |
+| checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds) and `Flow Iteration` first in its body. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
 | `on_failure` | `TRY` / `EXCEPT AS ${flow_error}`; `abort` adds `Fail ${flow_error}` after the recovery |
 
 ## Verdicts
@@ -288,6 +316,39 @@ Cycle
 The [return code](unknown-status.md#return-code) separates the two counts, so
 an orchestrator can tell "bench never became ready" from "product failed"
 without opening the log.
+
+## The flow report
+
+`log.html` shows a loop as its iterations, one after the other; a plan of
+four nodes that cycled 600 times is 600 blocks to scroll. The *flow report*
+shows the plan **as it was drawn** -- lanes for the phases, boxes for the
+nodes, the edges between them -- with what the run did written on it: how
+often each node ran and with which outcome, how often each edge was taken,
+how many attempts a gate needed, where a failed cycle went through the
+recovery, where a stopped run stopped and what a restart would do. Every box
+links into `log.html` at the keyword, so the log stays the record and the
+report is the way in.
+
+```bash
+robot --parser robot.flow --flowreport flow.html --outputdir out plan.flow.json
+rebot --flowreport flow.html --log log.html out/output.xml       # from an existing output
+python -m robot.flow report out/output.xml --output flow.html     # the same, standalone
+```
+
+The report is built from `output.xml` and the flow file the suite came from
+(its `source`; `--flow <file>` names it when the output was moved). The
+builder makes the suite again from the file and walks it next to the result,
+so each keyword in the log is attributed to its node of the plan. That
+attribution is positional: **the flow file must be the one the run used**.
+A changed file gives a report that cannot be trusted; a report of a run that
+spans a checkpoint restart is best read per output, or from the output that
+`rebot` merged.
+
+A node's record (select it) lists the runs with status and time, the slowest
+one, the first and the last failure with their errors, and the iterations of
+a loop as a strip of cycles that each open the log at that cycle. Sub-flows
+are drawn as a box containing their own plan; they start folded, except when
+something inside them failed, and open with their `+` or with *Expand all*.
 
 ## Two flows
 
@@ -363,3 +424,134 @@ The library is for coordination -- cycle numbers, acknowledgements, "ready".
 The bench's own values (a supply voltage, a DUT temperature) stay in the
 services that own them, and a flow waits on those with their own keywords.
 The runner itself still locks nothing: a flow stays restartable.
+
+## Pause, resume, stop and restart
+
+A long plan gets interrupted: a cable has to be swapped, the bench PC reboots,
+the run has to give the rig back on Friday and take it again on Monday. Two
+features cover this, and `stop` joins them.
+
+| | Pause / resume | Checkpoint / restart |
+|-|----------------|----------------------|
+| When | the flow is running and somebody says *hold* | the run ended without finishing: stopped, crashed, power lost |
+| Process | the same one keeps running | a new `robot` process, minutes or days later |
+| Unit | between two steps, between two polls of a gate | the loop iteration |
+| Bench | untouched; the flow waits | set up again by the setup phase, which runs again |
+| Verdict | not affected | finished phases show as SKIP, the rest as usual |
+
+### Pausing a running flow
+
+```bash
+python -m robot.flow control results/run42/signals.json pause
+python -m robot.flow control results/run42/signals.json resume
+python -m robot.flow control results/run42/signals.json status
+python -m robot.flow control results/run42/signals.json stop
+```
+
+The control channel is the signal store of the run (`ROBOT_FLOW_SIGNALS`), so
+nothing new has to be opened or installed, and every flow that shares the
+store pauses together: two rigs in lockstep stop at their next boundary and
+neither times out on the other. `--rig RIG_A` addresses one process, the one
+started with `--variable FLOW_RIG:RIG_A` (or `ROBOT_FLOW_RIG`). A flow started
+without `ROBOT_FLOW_SIGNALS` has no control channel. A command given before a
+process started is not for that process and is ignored by it.
+
+- **Where a flow pauses.** Between two steps, at the start of a loop iteration
+  and between two polls of a gate. A keyword that has started always
+  finishes: a pause asked for during a 20 second measurement takes effect
+  when the measurement returns. `THREAD` workers pause at their own next
+  keyword boundary.
+- **Paused time does not count.** Loop deadlines (`max_seconds`) and gate
+  timeouts are measured on the *flow clock*, which stands still while the
+  flow is paused: a 15 second gate held for an hour still has its 15 seconds.
+  Every [Watchdog](watchdog.md) is paused with the flow, so a deliberate hold
+  is not a stall. A fixed `sleep` node is the exception: it is a keyword, and
+  runs to its end.
+- **In the log.** `Flow paused by operator at iteration 37 of loop 'loop'.`
+  and `Flow resumed after 22 minutes 4 seconds.` appear where the flow stood.
+- **From a test.** `Flow Pause`, `Flow Resume` and `Flow Stop` are keywords of
+  `robot.flow.keywords`. A Watchdog's `on_timeout=Flow Pause` holds the bench
+  for a human instead of aborting the run.
+- **Step mode.** `--variable FLOW_STEP:yes` pauses before every node of the
+  test phases and waits for `resume` (or Enter, when the run has a console):
+  a way to walk a new plan through the bench one step at a time.
+
+### Stopping
+
+`stop` ends the run in an orderly way. The flow leaves at its next step
+boundary; an iteration that was already running is finished first when the
+stop arrives during its last step, and done again after the restart otherwise.
+The checkpoint is written, the test ends **UNKNOWN** with
+`Stopped by operator at iteration 38 of loop 'loop'; resumable from
+results/run42/plan.checkpoint.json.`, the remaining tests are not started and
+the teardown runs, so the bench is released. No recovery region catches a
+stop, and a stop cannot be taken back: a `resume` or `pause` given after it
+does not cancel it. UNKNOWN is the honest verdict: nothing failed and the plan did not
+complete, and the [return code](unknown-status.md#return-code) keeps the two
+apart for whatever started the run.
+
+### The checkpoint
+
+While a flow runs, a small JSON file records the test phases that finished,
+and for the loops directly in a test phase the number of completed
+iterations, what is left of `max_loops` and `max_seconds`, and the values of
+the variables the phase assigns:
+
+```json
+{
+  "flow": "plan.flow.json", "fingerprint": "sha1 of the flow file",
+  "position": { "phase": "Cycle", "loop": "loop", "iteration": 37 },
+  "remaining": { "max_loops": 963, "max_seconds": 21540.7 },
+  "variables": { "${n}": 37 },
+  "completed_phases": [ { "name": "Precheck", "status": "PASS", "finished": "2026-09-30 08:14:11" } ],
+  "saved": "2026-09-30 14:03:19"
+}
+```
+
+- **Where.** `<output directory>/<flow file name>.checkpoint.json`
+  (`plan.flow.json` gives `plan.checkpoint.json`). `"checkpoint": "path"` in
+  the `flow` section or `--variable FLOW_CHECKPOINT:path` names another file;
+  a relative path is taken from the output directory. A restart into a new
+  output directory therefore needs `FLOW_CHECKPOINT` pointing at the old file.
+- **When.** At the start and end of every test phase, at the start of a loop
+  iteration (at most once a second, so fast loops are not slowed down; a
+  crash can then cost up to a second of iterations), and on `stop`.
+  `"checkpoint_every": 100` or `--variable FLOW_CHECKPOINT_EVERY:100` writes
+  every hundredth iteration instead, `1` every iteration.
+- **Written whole.** The file is replaced atomically; a reader never sees half
+  of it.
+- **Kept or deleted.** A run that reaches its end deletes its checkpoint. A
+  stopped or crashed run leaves it.
+- **Not wanted.** `"checkpoint": false` in the `flow` section builds the flow
+  without it (and without the three bookkeeping keywords it adds).
+- Values that JSON cannot hold are left out with a warning; the run goes on.
+
+### Restarting
+
+```bash
+robot --parser robot.flow --variable FLOW_CHECKPOINT:results/run42/plan.checkpoint.json \
+      --outputdir results/run42b plan.flow.json
+```
+
+| `FLOW_RESUME` | Behaviour |
+|---------------|-----------|
+| `auto` (default) | continue from a checkpoint that belongs to this flow file; start from the beginning when there is none; warn and start from the beginning when it belongs to another version of the file |
+| `always` | continue, or end UNKNOWN when there is no matching checkpoint |
+| `never` | ignore a checkpoint and overwrite it |
+
+| Part of the plan | On restart |
+|------------------|------------|
+| setup phase | runs again: the state of the bench lives outside the flow, and the setup is how it is established |
+| test phases that finished | **SKIP** with `Completed with status PASS in the run that ended 2026-09-30 08:14:11 (see results/run42).` Visible, not run again. |
+| the interrupted test phase | the steps before its loop run again; the loop continues after the completed iterations with what is left of its bounds, and the saved variables are restored when the loop starts |
+| later phases, teardown | as usual |
+
+The unit of a restart is the loop iteration: the interrupted one is done
+again, so **iterations must be safe to repeat**. Only loops directly in a
+test phase are tracked. A loop inside a decision, a `try`, another loop or a
+sub-flow starts from its beginning, like any other step. A flow file that
+changed since the checkpoint does not match it any more (the fingerprint is
+that of the main file; sub-flow files are not part of it).
+
+Reading the two outputs together gives the verdict of the plan; `rebot` merges
+them into one report.

@@ -30,6 +30,7 @@ from robot.utils import (cut_assign_value, frange, get_error_message, get_timest
                          seq2str, split_from_equals, type_name, Matcher, timestr_to_secs, PriorityQueue)
 from robot.variables import is_dict_variable, evaluate_expression
 
+from . import pausepoint
 from .statusreporter import StatusReporter
 import threading
 
@@ -51,6 +52,10 @@ class BodyRunner:
             # keyword boundaries when their scope (test/suite) has ended.
             if self._run and self._context.thread_stop_requested():
                 raise ExecutionFailed('Thread stop requested.')
+            # cuongnht flow pause: a paused flow waits here, between two
+            # steps; a stopped one leaves here. No hook, no cost.
+            if self._run and pausepoint.hook:
+                pausepoint.hook(self._context, step)
             try:
                 step.run(self._context, self._run, self._templated)
             except ExecutionPassed as exception:

@@ -1,0 +1,21 @@
+{
+  "flow": { "name": "Laps", "version": 1 },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+    { "id": "test",     "kind": "phase", "role": "test", "name": "Forty Laps" },
+    { "id": "loop",     "kind": "loop",    "max_loops": 40 },
+    { "id": "lap",      "kind": "keyword", "keyword": "Sleep", "args": ["0.25s"] },
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "bye",      "kind": "keyword", "keyword": "Log", "args": ["teardown ran"] },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "test"], ["test", "loop"],
+    { "from": "loop", "to": "lap",      "label": "body" },
+    { "from": "lap",  "to": "loop",     "label": "next" },
+    { "from": "loop", "to": "teardown", "label": "done" },
+    ["teardown", "bye"], ["bye", "end"]
+  ]
+}
