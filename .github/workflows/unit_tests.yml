@@ -11,6 +11,13 @@ on:
       - 'src/**'
       - 'utest/**'
       - '!**/*.rst'
+  workflow_dispatch:
+    inputs:
+      pythons:
+        description: "Interpreters: 'quick' (the oldest, the newest, PyPy) or 'all'"
+        type: choice
+        options: [ quick, all ]
+        default: quick
 
 
 jobs:
@@ -20,7 +27,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [ 'ubuntu-latest', 'windows-latest' ]
-        python-version: [ '3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14', '3.15', 'pypy-3.11' ]
+        # A push runs the oldest and the newest interpreters (the fork is not the
+        # upstream project: the whole support matrix on every push is what got
+        # Actions disabled on this fork). 'Run workflow' with pythons=all runs
+        # all of them.
+        python-version: ${{ fromJSON(inputs.pythons == 'all' && '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14", "3.15", "pypy-3.11"]' || '["3.8", "3.13", "3.15", "pypy-3.11"]') }}
+        include:
+          # 3.8 cannot be installed on windows-latest any more: 3.9 is the oldest there.
+          - os: windows-latest
+            python-version: '3.9'
         exclude:
           - os: windows-latest
             python-version: 'pypy-3.11'
