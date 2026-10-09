@@ -27,9 +27,10 @@ and what you type in the text redraws the view, unsaved changes included.
   (trail, hop, off). The toolbar shows the status and opens the Output, the
   Log and the Report when the run is done — and, for a flow run with
   `robotFlow.flowReport` on, the **Flow report**: the plan as drawn, with what
-  the run did on each node. *Run with Variables…* (the title bar's menu, the
-  Explorer) asks for `NAME=value` pairs passed as `--variable`, the file's last
-  ones offered again: the way to size a flow's `${variable}` bounds per run.
+  the run did on each node. *Run with Variables…* (**▶ Run…** in the view's
+  toolbar, the title bar, the Explorer) asks for `NAME=value` pairs passed as
+  `--variable`, the file's last ones offered again: the way to size a flow's
+  `${variable}` bounds per run.
 - **Run groups** — the `groups` of a Manager GUI test project
   (`testproject.json`): the members' Diagrams side by side with the signals
   where one waits for another, and a Run that starts all members together on

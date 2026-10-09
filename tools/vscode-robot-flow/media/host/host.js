@@ -47,7 +47,8 @@ function showToolbar(t) {
     `<option value="${esc(value)}"${String(current) === String(value) ? ' selected' : ''}>${esc(label)}</option>`;
   el.hidden = false;
   el.innerHTML =
-    (t.canRun ? `<button type="button" class="tb-btn tb-run" data-act="run"${running ? ' disabled' : ''} title="${esc(t.runTitle || 'Run')}">▶ Run</button>` : '') +
+    (t.canRun ? `<button type="button" class="tb-btn tb-run" data-act="run"${running ? ' disabled' : ''} title="${esc(t.runTitle || 'Run')}">▶ Run</button>` +
+                `<button type="button" class="tb-btn" data-act="runWith"${running ? ' disabled' : ''} title="Run with variables: NAME=value pairs passed as --variable, e.g. the bounds of a loop">▶ Run…</button>` : '') +
     (t.canDebug ? `<button type="button" class="tb-btn" data-act="debug"${running ? ' disabled' : ''} title="Debug: stop at breakpoints (click a step's dot, or F9 in the text), step, see variables">⏵ Debug</button>` : '') +
     (t.canStep ? `<button type="button" class="tb-btn" data-act="step"${running ? ' disabled' : ''} title="Run in step mode: the flow pauses before every step of its test phases; Next step goes on">⏯ Step</button>` : '') +
     (t.canContinue ? '<button type="button" class="tb-btn tb-run" data-act="continue" title="A new run that continues from where this one stopped: finished test phases are skipped, the loop goes on with what is left">⟳ Continue</button>' : '') +

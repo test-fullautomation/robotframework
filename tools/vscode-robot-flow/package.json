@@ -104,7 +104,7 @@
         "command": "robotFlow.runWithVariables",
         "title": "Run with Variables\u2026",
         "category": "Robot Flow",
-        "icon": "$(play)"
+        "icon": "$(play-circle)"
       },
       {
         "command": "robotFlow.debug",
@@ -167,14 +167,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "robotFlow.debug",
+          "command": "robotFlow.runWithVariables",
           "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/ || activeCustomEditorId == robotFlow.diagram",
           "group": "navigation@2"
         },
         {
-          "command": "robotFlow.runWithVariables",
+          "command": "robotFlow.debug",
           "when": "resourceExtname == .robot || resourceFilename =~ /\\.flow\\.json$/ || activeCustomEditorId == robotFlow.diagram",
-          "group": "1_run@0"
+          "group": "navigation@3"
         },
         {
           "command": "robotFlow.runStep",
