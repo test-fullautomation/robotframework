@@ -92,7 +92,10 @@ class SuiteRunner(SuiteVisitor):
         ns = Namespace(self.variables, result, data.resource, self.settings.languages)
         ns.start_suite()
         ns.variables.set_from_variable_section(data.resource.variables)
-        EXECUTION_CONTEXTS.start_suite(result, ns, self.output, self.settings.dry_run)
+        EXECUTION_CONTEXTS.start_suite(
+            result, ns, self.output, self.settings.dry_run,
+            prune_results=self.settings.prune_results,
+        )
         self.context.set_suite_variables(result)
         if not self.suite_status.failed:
             import_errors = ns.handle_imports()

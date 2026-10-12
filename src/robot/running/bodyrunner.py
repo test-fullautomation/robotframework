@@ -286,6 +286,10 @@ class ForInRunner:
     def _run_one_round(self, data, result, assign, types, values, run=True):
         ctx = self._context
         iter_data = data.get_iteration()
+        if ctx.prune_results and len(result.body):
+            # cuongnht flat memory: the finished rounds are in the output file
+            # already; keeping their results until the test ends only costs memory.
+            result.body.clear()
         iter_result = result.body.create_iteration()
         variables = ctx.variables if run and not ctx.dry_run else {}
         if len(assign) == 1 and len(values) != 1:
@@ -529,6 +533,10 @@ class WhileRunner:
                     errors.extend(failed.get_errors())
                     if not failed.can_continue(ctx, self._templated):
                         break
+                if ctx.prune_results:
+                    # cuongnht flat memory: the finished iterations are in the
+                    # output file already; only the last one stays in the model.
+                    result.body.clear()
                 iter_result = result.body.create_iteration(start_time=datetime.now())
                 iter_data = data.get_iteration()
                 if not self._should_run(data.condition, ctx.variables):

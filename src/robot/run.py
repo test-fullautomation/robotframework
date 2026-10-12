@@ -331,6 +331,11 @@ Options
                           in test cases. Error codes are returned normally.
     --dryrun              Verifies test data and runs tests so that library
                           keywords are not executed.
+    --pruneresults        Drop the results of finished FOR and WHILE
+                          iterations from memory as soon as they are in the
+                          output file, so memory stays flat on long loops.
+                          Listeners then see only the last iteration of a
+                          finished loop. Always on for flow files.
  -X --exitonfailure       Stops test execution if any test fails.
     --exitonerror         Stops test execution if any error occurs when parsing
                           test data, importing libraries, and so on.

@@ -52,7 +52,9 @@ limitations.
 ## Bounded memory
 
 Execution memory stays flat regardless of run length. Robot Framework streams
-`output.xml` to disk and never keeps keyword results in memory, but four
+`output.xml` to disk, but it keeps the result objects of every finished loop
+iteration until the test ends (measured: 1.3 KB per `WHILE` round, 2 KB in a
+flow loop with its checkpoint marker -- 2 GB for a million cycles), and four
 accumulators used to grow without bound during very long runs. They are now
 bounded in the core:
 
@@ -62,6 +64,7 @@ bounded in the core:
 | `<errors>` section collection | first 10 000 kept in memory, overflow **spilled** to a sidecar file (`output_errors_spill.jsonl`) and folded back into the section at run end | nothing — the section stays complete |
 | Thread notification queues | drop-oldest at 10 000 per queue (FIFO and LIFO); a one-time WARN names the queue nobody consumes | only dead signals — a full queue already means a missing `Wait Thread Notification` |
 | Debug-file per-thread bookkeeping | released at thread end | nothing |
+| Results of finished `FOR` / `WHILE` iterations | dropped from the model once they are in the output file: always for flow files, with `--pruneresults` for suites | nothing from any file; a v3 listener looking at a finished loop's `body` at `end_test` sees only its last iteration |
 
 All limits are class attributes, tunable in one place
 (`Logger.message_cache_limit`, `OutputFile.max_errors`, `PriorityQueue.max_items`).

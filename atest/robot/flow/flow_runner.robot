@@ -93,6 +93,24 @@ Loop bounds can be variables sized per run
     Run Tests    ${PARSER} --variable CYCLES:many    flow/variable_bounds.flow.json
     Check Test Case    Variable Bounds    UNKNOWN    'max_loops' of loop 'loop' must be a positive integer, got 'many'.
 
+Finished loop iterations leave memory, the output keeps them
+    [Documentation]    A flow's loops run for hours: once an iteration is in output.xml its
+    ...    results are dropped from the model (only the last one stays). Suites keep
+    ...    everything unless --pruneresults says otherwise.
+    Run Tests    ${PARSER} --listener ${DATADIR}${/}flow${/}BodySizes.py --variable CYCLES:40    flow/variable_bounds.flow.json
+    Stdout Should Contain    BODY SIZE: WHILE in 'Variable Bounds' keeps 1 iteration(s)
+    ${tc} =    Check Test Case    Variable Bounds    PASS
+    Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 40
+    Run Tests    --listener ${DATADIR}${/}flow${/}BodySizes.py    flow/plain_loops.robot
+    Stdout Should Contain    BODY SIZE: WHILE in 'Plain Loops' keeps 31 iteration(s)
+    Stdout Should Contain    BODY SIZE: FOR in 'Plain Loops' keeps 30 iteration(s)
+    Run Tests    --pruneresults --listener ${DATADIR}${/}flow${/}BodySizes.py    flow/plain_loops.robot
+    Stdout Should Contain    BODY SIZE: WHILE in 'Plain Loops' keeps 1 iteration(s)
+    Stdout Should Contain    BODY SIZE: FOR in 'Plain Loops' keeps 1 iteration(s)
+    ${tc} =    Check Test Case    Plain Loops    PASS
+    Should Be True    len([i for i in $tc.body[0].body if i.type == 'ITERATION' and i.status == 'PASS']) == 30
+    Should Be True    len([i for i in $tc.body[1].body if i.type == 'ITERATION']) == 30
+
 Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS

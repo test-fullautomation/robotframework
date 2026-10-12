@@ -271,6 +271,11 @@ class _Listener:
 
     ROBOT_LISTENER_API_VERSION = 3
 
+    def start_suite(self, data, result):
+        # A flow's loops run for hours: finished iterations leave memory once
+        # they are in the output file (what --pruneresults does for suites).
+        EXECUTION_CONTEXTS.current.prune_results = True
+
     def end_test(self, data, result):
         run = _CONTROL.run
         if run is not None:

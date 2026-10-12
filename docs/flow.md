@@ -303,6 +303,11 @@ Cycle
 | checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds) and `Flow Iteration` first in its body. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
 | `on_failure` | `TRY` / `EXCEPT AS ${flow_error}`; `abort` adds `Fail ${flow_error}` after the recovery |
 
+A flow's loops keep memory flat: once an iteration is in `output.xml` its
+results leave the model (only the last one stays), so a million cycles cost
+the same memory as ten. Suites get the same with `--pruneresults`; see
+[Bounded memory](long-running.md#bounded-memory).
+
 ## Verdicts
 
 | What happened | Status |

@@ -85,8 +85,9 @@ class ExecutionContexts:
     def namespaces(self):
         return (context.namespace for context in self)
 
-    def start_suite(self, suite, namespace, output, dry_run=False):
-        ctx = _ExecutionContext(suite, namespace, output, dry_run, self._asynchronous)
+    def start_suite(self, suite, namespace, output, dry_run=False, prune_results=False):
+        ctx = _ExecutionContext(suite, namespace, output, dry_run, self._asynchronous,
+                                prune_results)
         self._contexts.append(ctx)
         return ctx
 
@@ -102,7 +103,8 @@ EXECUTION_CONTEXTS = ExecutionContexts()
 
 class _ExecutionContext:
 
-    def __init__(self, suite, namespace, output, dry_run=False, asynchronous=None):
+    def __init__(self, suite, namespace, output, dry_run=False, asynchronous=None,
+                 prune_results=False):
         self.suite = suite
         self.test = None
         self.timeouts = []
@@ -110,6 +112,9 @@ class _ExecutionContext:
         self.namespace = namespace
         self.output = output
         self.dry_run = dry_run
+        # cuongnht flat memory: finished FOR/WHILE iterations leave the result
+        # model once they are in the output file (--pruneresults; flow files).
+        self.prune_results = prune_results
         self.in_suite_teardown = False
         self.in_test_teardown = False
         self.in_keyword_teardown = 0
