@@ -117,6 +117,41 @@ class TestFileStore(_Base):
         assert_equal(store.get('a')['value'], 2)
         assert_true(not os.path.exists(store._lock_path))
 
+    def test_waiters_breaking_a_stale_lock_at_once_leave_one_holder(self):
+        # B sees the stale lock, A breaks it and takes a fresh one meanwhile,
+        # then B acts on its earlier look: the fresh lock must stay A's.
+        import threading
+        store_a, store_b = FileStore(self.path), FileStore(self.path)
+        store_a.set('a', 1)                 # the store and its folder exist
+        lock = store_a._lock_path
+        with open(lock, 'w', encoding='UTF-8'):
+            pass
+        old = time.time() - FileStore.STALE_LOCK_S - 1
+        os.utime(lock, (old, old))
+        holders, gate = [], threading.Event()
+
+        def take(name, store, pause=None):
+            deadline = time.time() + 5
+            while time.time() < deadline:
+                try:
+                    os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+                    holders.append(name)
+                    return
+                except FileExistsError:
+                    if pause:
+                        pause()
+                    store._break_stale_lock()
+                time.sleep(0.005)
+
+        waiter = threading.Thread(target=take, args=('B', store_b, lambda: gate.wait(2)))
+        waiter.start()
+        time.sleep(0.1)
+        take('A', store_a)
+        gate.set()
+        waiter.join(5)
+        assert_equal(holders, ['A'])
+        os.remove(lock)
+
     def test_processes_writing_at_once_lose_nothing(self):
         script = ('import sys\n'
                   'from robot.flow.signals import FileStore\n'

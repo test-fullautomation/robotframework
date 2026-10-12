@@ -416,9 +416,14 @@ export function maybeAlive(r: RunRecord, now = Date.now()): boolean {
   if (r.status === 'running' || r.status === 'stopping') return true;
   if (r.status !== 'incomplete' && r.status !== 'unknown') return false;
   const pids = Object.values(r.info?.pids || {});
-  if (pids.length) return pids.some(processAlive);
+  // A process id is reused once its process is gone: a run that died without
+  // its end written (the window closed, a reboot) is held by it for a while only.
+  if (pids.length && r.started !== null && now - r.started < PID_TRUST_MS) return pids.some(processAlive);
   return r.updated !== null && now - r.updated < ALIVE_MS;
 }
+
+/** How long a recorded process id is trusted to mean this run. */
+export const PID_TRUST_MS = 7 * 24 * 3600 * 1000;
 
 /**
  * Runs that ended more than `ageMs` ago. A run with no end written (a

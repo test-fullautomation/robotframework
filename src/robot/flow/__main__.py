@@ -65,21 +65,22 @@ def main(argv=None):
                                        'ROBOT_FLOW_RIG; default: all of them')
     control.add_argument('--json', action='store_true',
                          help="'status': print the store's entries as JSON")
+    # The server's options live with the server (robot.flow.server.main).
     server = commands.add_parser('server', help='the signal server for flows on several '
-                                                'machines (ROBOT_FLOW_SIGNALS=http://host:port/<run>)')
-    server.add_argument('--host', default='0.0.0.0', help='interface to listen on (default: all)')
-    server.add_argument('--port', type=int, default=8765,
-                        help='port (default: 8765; 0: any free one)')
-    server.add_argument('--file', help='keep the signals in this file across restarts')
+                                                'machines (ROBOT_FLOW_SIGNALS=http://host:port/<run>)',
+                                 add_help=False)
+    server.add_argument('args', nargs=argparse.REMAINDER)
     report = commands.add_parser('report', help='the flow report of a run', add_help=False)
     report.add_argument('args', nargs=argparse.REMAINDER)
-    args = parser.parse_args(argv)
+    arguments = sys.argv[1:] if argv is None else list(argv)
+    if arguments[:1] == ['server']:
+        # Its options begin with '--', which argparse would take for its own.
+        from .server import main as server_main
+        return server_main(arguments[1:])
+    args = parser.parse_args(arguments)
     if args.command == 'report':
         from .report import report_cli
         return report_cli(args.args)
-    if args.command == 'server':
-        from .server import serve
-        return serve(args.host, args.port, args.file)
     if args.command == 'schema':
         return _schema(args.output)
     if args.command == 'control':

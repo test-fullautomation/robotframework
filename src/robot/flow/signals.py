@@ -251,17 +251,40 @@ class FileStore(SignalStore):
         return Lock()
 
     def _break_stale_lock(self):
-        # Taken over by a rename, which only one of several waiters wins: a
-        # plain remove could take away the fresh lock another waiter had
-        # just created after the same check.
+        # Breaking a stale lock (its holder died) is done by one waiter at a
+        # time, under a guard file of its own: between one waiter's check
+        # and its removal another could have broken the lock and taken a
+        # fresh one, which the first would then remove. The guard holder
+        # checks again before it removes, and the lock path is never free
+        # before that removal, so no fresh lock can appear in between.
         try:
             if time.time() - os.path.getmtime(self._lock_path) <= self.STALE_LOCK_S:
                 return
-            stale = f'{self._lock_path}.{os.getpid()}.stale'
-            os.replace(self._lock_path, stale)
-            os.remove(stale)
+        except OSError:
+            return
+        guard = f'{self._lock_path}.break'
+        try:
+            os.close(os.open(guard, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        except FileExistsError:
+            # Another waiter is breaking it; unless that one died as well.
+            try:
+                if time.time() - os.path.getmtime(guard) > self.STALE_LOCK_S:
+                    os.remove(guard)
+            except OSError:
+                pass
+            return
+        except OSError:
+            return
+        try:
+            if time.time() - os.path.getmtime(self._lock_path) > self.STALE_LOCK_S:
+                os.remove(self._lock_path)
         except OSError:
             pass
+        finally:
+            try:
+                os.remove(guard)
+            except OSError:
+                pass
 
 
 class FlowSignals:

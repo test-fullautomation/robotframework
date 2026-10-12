@@ -198,7 +198,8 @@ class _Handler(BaseHTTPRequestHandler):
         if not token:
             return True
         given = self.headers.get('Authorization') or ''
-        if hmac.compare_digest(given.strip(), f'Bearer {token}'):
+        # Compared as bytes: the constant-time comparison takes ASCII text only.
+        if hmac.compare_digest(given.strip().encode('UTF-8'), f'Bearer {token}'.encode('UTF-8')):
             return True
         # The body, if any, is not read: the connection goes, so it cannot
         # be taken for the next request.
@@ -302,7 +303,8 @@ def main(argv=None):
 
 
 def _loopback(host):
-    return host in ('127.0.0.1', 'localhost', '::1', '')
+    # '' binds every interface, as 0.0.0.0 does.
+    return host in ('127.0.0.1', 'localhost', '::1')
 
 
 def serve(host=DEFAULT_HOST, port=8765, file=None, token=None, open_=False):

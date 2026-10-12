@@ -184,19 +184,23 @@ class FlowControl:
                     also_console=_on_main_thread())
         runners = self._pause_timeouts()
         started = time.time()
+        signalled = False
         while self._paused.is_set() and self._stop_reason is None:
             if _signal_received():
                 # Ctrl+C while paused: the run ends as a stop at the step
                 # boundary this wait returns to; a second signal would end
                 # the process without log or report.
-                logger.info('Signal received while paused: the flow leaves the pause.')
+                signalled = True
                 self.resume()
                 break
             time.sleep(self.SLICE_S)
         seconds = time.time() - started
         self._resume_timeouts(runners, seconds)
         waited = secs_to_timestr(round(seconds, 1))
-        if self._stop_reason is None:
+        if signalled:
+            logger.info(f'Flow left the pause on a signal after {waited}: the run ends.',
+                        also_console=_on_main_thread())
+        elif self._stop_reason is None:
             logger.info(f'Flow resumed after {waited}.', also_console=_on_main_thread())
         else:
             logger.info(f'Flow stopped while paused ({waited}).')
@@ -204,9 +208,9 @@ class FlowControl:
     def _pause_timeouts(self):
         """Keyword and test timeouts run on the wall clock: they are held
         while the flow is paused and given the pause back afterwards, so a
-        timed step paused for an hour has all of its timeout, as a gate has."""
-        if not _on_main_thread():
-            return []
+        timed step paused for an hour has all of its timeout, as a gate has.
+        The timeouts are the current thread's: a worker waiting here holds
+        its own."""
         context = EXECUTION_CONTEXTS.current
         if context is None:
             return []
@@ -324,6 +328,7 @@ class FlowControl:
         store = self._store
         waits = getattr(store, 'supports_wait', False)
         last = self._since_seq
+        last_stamp = (None, None)      # the newest entry's (seq, time) as last read
         while not self._poller_stop.is_set():
             if waits:
                 # The store tells when something changed (a long poll, a
@@ -339,16 +344,21 @@ class FlowControl:
             try:
                 entries = self._entries()
                 newest = max((_seq(entry) for entry in entries.values()), default=0)
-                if entries and newest < max(last, self._since_seq):
+                stamp = _newest_stamp(entries)
+                if entries and (newest < max(last, self._since_seq)
+                                or (newest == last_stamp[0] and stamp != last_stamp)):
                     # The store numbers its writes from the start again (the
                     # server restarted without its file, Redis was flushed):
                     # what it holds now is new to this process, whatever was
-                    # seen or applied before.
+                    # seen or applied before. Seen by the numbers going back,
+                    # or by the newest entry changing under the same number.
                     with self._lock:
                         self._since_seq = 0
                         self._seen = None
                         self._applied = set()
                     last = 0
+                if entries:
+                    last_stamp = stamp
                 self.apply(self._read_command(entries))
                 self._queue(self._read_requests(entries))
                 last = max(last, newest)
@@ -545,6 +555,16 @@ def _seq(entry):
         return int((entry or {}).get('seq') or 0)
     except (TypeError, ValueError, AttributeError):
         return 0
+
+
+def _newest_stamp(entries):
+    """The (seq, time) of the entry with the highest number: another entry
+    under the same number means the store started counting again."""
+    newest = None
+    for entry in entries.values():
+        if isinstance(entry, dict) and (newest is None or _seq(entry) > _seq(newest)):
+            newest = entry
+    return (_seq(newest), newest.get('time')) if newest is not None else (None, None)
 
 
 def _order(entry):

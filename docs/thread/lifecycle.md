@@ -146,6 +146,10 @@ always applied.
     the signal-based timeout of Linux and macOS reaches the main thread only.
     The test timeout belongs to the main thread; a worker starts without it.
     On an interpreter without CPython's C API a worker runs without timeouts.
+    A timer-based timeout interrupts Python code only, as on Windows: a
+    keyword blocked in C (`Sleep`, a lock, a socket read, `Wait Thread
+    Notification`) ends when that call returns, and the timeout is reported
+    then.
 
 ## Variable scoping
 

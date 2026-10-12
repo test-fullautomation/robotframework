@@ -522,13 +522,11 @@ class _ExecutionContext:
         ``(key, entry)``, or ``(None, None)``. Keywords address threads by
         their name; the registry by the key."""
         found = (None, None)
-        rank = lambda e: (not e.get("abandoned"), e["worker"].is_alive())
         for key, entry in dict(self.active_threads).items():
-            if entry["name"] != name:
-                continue
-            # A thread abandoned by its scope ranks last, a live one first;
-            # among equals the one registered later wins.
-            if found[1] is None or rank(entry) >= rank(found[1]):
+            if entry["name"] != name or entry.get("abandoned"):
+                continue        # an abandoned thread is past addressing: it was told to stop
+            # A live thread wins; among equals the one registered later.
+            if found[1] is None or entry["worker"].is_alive() >= found[1]["worker"].is_alive():
                 found = (key, entry)
         return found
 

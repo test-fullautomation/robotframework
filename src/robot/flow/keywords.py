@@ -647,7 +647,9 @@ class _Listener:
         run = _CONTROL.run
         if run is not None and str(data.source or '') == run.source:
             if _CONTROL.stop_requested and not run.stopped:
-                logger.info('Flow stop requested after the last step: the run completed.')
+                # Outside any keyword the log has no place for it: the console.
+                logger.info('Flow stop requested after the last step: the run completed.',
+                            also_console=True)
                 _CONTROL.clear_stop_request()
             run.finish()
             _CONTROL.publish('stopped' if run.stopped else 'finished')
