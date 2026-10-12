@@ -40,10 +40,12 @@ class XUnitFileWriter(ResultVisitor):
 
     def start_suite(self, suite: TestSuite):
         stats = suite.statistics  # Accessing property only once.
+        # cuongnht - add unknown state: an UNKNOWN test "could not be run" in
+        # xUnit terms, which is an error, so CI does not read the run as green.
         attrs = {
             "name": suite.name,
             "tests": str(stats.total),
-            "errors": "0",
+            "errors": str(stats.unknown),
             "failures": str(stats.failed),
             "skipped": str(stats.skipped),
             "time": format(suite.elapsed_time.total_seconds(), ".3f"),
@@ -75,6 +77,10 @@ class XUnitFileWriter(ResultVisitor):
         if test.failed:
             self._writer.element(
                 "failure", attrs={"message": test.message, "type": "AssertionError"}
+            )
+        if test.unknown:
+            self._writer.element(
+                "error", attrs={"message": test.message, "type": "UnknownAssertionError"}
             )
         if test.skipped:
             self._writer.element(

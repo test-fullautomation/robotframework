@@ -169,7 +169,12 @@ class JsonLogger:
         if self._on_worker_thread():
             return
         self._start(type=item.type)
-        self._end(name=item.name, daemon=item.daemon, **self._status(item))
+        # A placeholder, as in the XML output: the block has no status yet
+        # ("NOT SET" would break the log and rebot), and daemon=False must be
+        # written although it is false, or it reads as True again.
+        status = self._status(item)
+        status["status"] = "PASS"
+        self._end(name=item.name, daemon=UnlessNone(item.daemon), **status)
 
     def end_thread(self, item):
         pass

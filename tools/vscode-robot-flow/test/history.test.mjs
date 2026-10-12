@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { parseStamp, parseRobotTime, summarizeOutputText, summarizeOutput, sourceOfOutput, listCheckpoints, readRun, scanRuns, olderThan,
-        writeRunInfo, readRunInfo, readOutputDetail, formatDuration } = require('../out/backend/history.js');
+        maybeAlive, writeRunInfo, readRunInfo, readOutputDetail, formatDuration } = require('../out/backend/history.js');
 const { writeFlowReport } = require('../out/backend/report.js');
 const { planRun, RobotRun } = require('../out/backend/run.js');
 
@@ -166,12 +166,17 @@ test('a results root: runs newest first, groups by their members, checkpoints, t
     assert.equal(self.title, 'Hello Flow');
 
     // the age filter: by the end when known
-    // (every synthetic output ends 14:02:09; "died" has no end and counts by its start, 15:00)
+    // (every synthetic output ends 14:02:09; "died" has no end: it counts by the time its output was last written,
+    // and not at all while that is less than an hour ago, because a command-line run may still be writing it)
     const now = new Date(2026, 9, 12, 14, 3).getTime();
     assert.deepEqual(olderThan(runs, 24 * 3600 * 1000, now).map((r) => r.name).sort(),
                      ['20261011-125000-group-rendezvous', '20261011-131200-signals_smoke', '20261011-134000-laps',
                       '20261011-140200-05_parallel_ramp', 'cli-group-without-info', path.basename(root)].sort());
-    assert.equal(olderThan(runs, 0, new Date(2026, 9, 13).getTime()).length, runs.length, 'all of them two days later');
+    assert.ok(died.updated !== null && Date.now() - died.updated < 60000, 'written just now');
+    assert.equal(maybeAlive(died), true, 'no end, written just now: it may still run');
+    assert.ok(!olderThan(runs, 0).some((r) => r.name === died.name), 'never deleted while it may run');
+    assert.equal(olderThan(runs, 0, Date.now() + 2 * 3600 * 1000).some((r) => r.name === died.name), true, 'stale two hours later');
+    assert.equal(olderThan(runs, 0, Date.now() + 2 * 3600 * 1000).length, runs.length, 'all of them then');
 
     assert.equal(readRunInfo(path.join(root, 'junk')), null);
     assert.equal(summarizeOutput(path.join(root, 'nothing.xml')), null);

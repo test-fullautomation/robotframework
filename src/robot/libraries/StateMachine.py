@@ -797,10 +797,10 @@ class _Engine:
                     'variables': variables,
                     'machine': self._machine_fingerprint(),
                     'saved': time.strftime('%Y-%m-%d %H:%M:%S')}
-            tmp = checkpoint + '.tmp'
-            with open(tmp, 'w', encoding='UTF-8') as f:
-                json.dump(data, f, indent=2)
-            os.replace(tmp, checkpoint)   # atomic also on Windows
+            # Whole and on the disk (a temporary file of this process, fsync,
+            # rename), as the flow checkpoint is written.
+            from robot.flow.control import _write_json
+            _write_json(checkpoint, data)
             logger.debug(f"Checkpoint saved to '{checkpoint}'.")
         except Exception as err:
             # A failing checkpoint must never kill a running machine; it
@@ -824,9 +824,14 @@ class _Engine:
             self._visit_times = {}
             self._elapsed_offset = 0
             return initial
-        with open(checkpoint, encoding='UTF-8') as f:
-            data = json.load(f)
-        state = data['state']
+        try:
+            with open(checkpoint, encoding='UTF-8') as f:
+                data = json.load(f)
+            state = data['state']
+        except (OSError, ValueError, KeyError, TypeError) as err:
+            raise RuntimeError(f"Checkpoint file '{checkpoint}' cannot be read: "
+                               f"{err}. Remove it, or run with resume=False, "
+                               f"to start from the initial state.")
         if state not in self._states:
             raise RuntimeError(f"Checkpointed state '{state}' is not defined "
                                f"in the current machine.")

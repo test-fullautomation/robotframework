@@ -8,6 +8,7 @@ export function viewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, entr
   const nonce = crypto.randomBytes(16).toString('base64');
   const csp = [
     "default-src 'none'",
+    "base-uri 'none'",
     `img-src ${webview.cspSource} data:`,
     // the views add their styles with a <style> element (style.js)
     `style-src ${webview.cspSource} 'unsafe-inline'`,
@@ -20,7 +21,7 @@ export function viewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, entr
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
+<title>${title.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string)}</title>
 <link rel="stylesheet" href="${asUri('host', 'host.css')}">
 </head>
 <body>

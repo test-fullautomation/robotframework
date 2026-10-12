@@ -493,14 +493,17 @@ class TestBuilder(unittest.TestCase):
 
     def test_loop_with_recovery(self):
         test = build(LOOP_FLOW).tests[0]
-        phase, start, loop = test.body
+        phase, start, loop, end = test.body
         self.assertEqual((phase.name, list(phase.args)), ('Flow Phase', ['Test Flow']))
         self.assertEqual((start.name, list(start.args)), ('Flow Loop', ['loop', '3', 'NONE']))
         self.assertEqual(list(start.assign), ['${flow_limit_loop}', '${flow_deadline_loop}'])
         self.assertEqual(loop.type, BodyItem.WHILE)
-        # Bounded by iterations only: no clock in the condition, as in the plain shape.
+        # Bounded by iterations only: no clock in the condition, only the marker
+        # of a loop that ran to its end in an earlier run (no iteration then).
         self.assertEqual((loop.condition, loop.limit, loop.on_limit),
-                         ('True', '${flow_limit_loop}', 'pass'))
+                         ('$flow_deadline_loop != -1', '${flow_limit_loop}', 'pass'))
+        # The loop's end is recorded at once: a later stop does not replay it.
+        self.assertEqual((end.name, list(end.args)), ('Flow Loop End', ['loop']))
         try_, sleep = loop.body         # no marker keyword: the runner counts iterations
         self.assertEqual(try_.type, BodyItem.TRY_EXCEPT_ROOT)
         main, recovery = try_.body
@@ -524,7 +527,7 @@ class TestBuilder(unittest.TestCase):
                     [['start', 'my-loop'], {'from': 'my-loop', 'to': 'w', 'label': 'body'},
                      {'from': 'w', 'to': 'my-loop', 'label': 'next'},
                      {'from': 'my-loop', 'to': 'end', 'label': 'done'}])
-        _, start, loop = build(data).tests[0].body
+        _, start, loop, _ = build(data).tests[0].body
         self.assertEqual((start.name, list(start.args)), ('Flow Loop', ['my-loop', 'NONE', '2h']))
         self.assertEqual(list(start.assign),
                          ['${flow_limit_my_loop}', '${flow_deadline_my_loop}'])
@@ -534,7 +537,7 @@ class TestBuilder(unittest.TestCase):
     def test_variable_bounds_reach_the_loop(self):
         data = copy.deepcopy(LOOP_FLOW)
         data['nodes'][1].update(max_loops='${CYCLES}', max_seconds='${MAX_TIME}', every='${EVERY}')
-        _, start, loop = build(data).tests[0].body
+        _, start, loop, _ = build(data).tests[0].body
         self.assertEqual(list(start.args), ['loop', '${CYCLES}', '${MAX_TIME}'])
         self.assertEqual(list(loop.body[-1].args), ['${EVERY}'])
         # Without a checkpoint the loop is a plain WHILE: the bounds are resolved in it.
@@ -583,7 +586,7 @@ class TestBuilder(unittest.TestCase):
                      {'from': 'a_b', 'to': 'a-b', 'label': 'next'},
                      {'from': 'a-b', 'to': 'end', 'label': 'done'}])
         # The outer loop is checkpointed, the nested one is a plain loop.
-        _, outer_start, outer = build(data).tests[0].body
+        _, outer_start, outer, _ = build(data).tests[0].body
         inner_eval, inner = outer.body
         self.assertEqual(list(outer_start.assign),
                          ['${flow_limit_a_b}', '${flow_deadline_a_b}'])
@@ -714,7 +717,7 @@ Library    robot.flow.keywords
 Test Flow
     Flow Phase    Test Flow
     ${flow_limit_loop}    ${flow_deadline_loop}=    Flow Loop    loop    3    NONE
-    WHILE    True    limit=${flow_limit_loop}    on_limit=pass
+    WHILE    $flow_deadline_loop != -1    limit=${flow_limit_loop}    on_limit=pass
         TRY
             Work
         EXCEPT    AS    ${flow_error}
@@ -722,8 +725,18 @@ Test Flow
         END
         Sleep    1s
     END
+    Flow Loop End    loop
 '''
         self.assertEqual(text, expected)
+
+    def test_render_escapes_cells(self):
+        # What is rendered is what executes: an empty value, runs of spaces,
+        # a line break and a leading '#' would read as something else.
+        data = flow([START, kw('k', 'Log Many', '', 'four    spaces', '# not a comment', 'two\nlines'), END],
+                    [['start', 'k'], ['k', 'end']])
+        text = render_robot(build(data))
+        self.assertIn('Log Many    ${EMPTY}    four${SPACE * 4}spaces    \\# not a comment    two\\nlines',
+                      text)
 
 
 class FakeBuiltIn:

@@ -280,7 +280,7 @@ class SuiteRunner(SuiteVisitor):
         entries = [
             (name, entry)
             for name, entry in dict(threads).items()
-            if suite_scope_too or entry["daemon"]
+            if (suite_scope_too or entry["daemon"]) and not entry.get("abandoned")
         ]
         if not entries:
             return
@@ -302,7 +302,12 @@ class SuiteRunner(SuiteVisitor):
                         "WARN",
                     )
                 )
-            threads.pop(name, None)
+                # It stays listed, flagged: `Wait For Thread` and the "still
+                # running" note of later tests find it; the stop flag it
+                # reads is its own, so its next step boundary ends it.
+                entry["abandoned"] = True
+            else:
+                threads.pop(name, None)
 
     def _report_still_running_threads(self):
         # cuongnht thread scope: make suite-scoped threads from earlier tests

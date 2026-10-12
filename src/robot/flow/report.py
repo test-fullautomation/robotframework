@@ -527,7 +527,8 @@ def render(data, log='log.html'):
     title = ', '.join(flow['name'] for flow in data['flows'])
     return (TEMPLATE
             .replace('%TITLE%', escape(title))
-            .replace('%LOG%', escape(log or ''))
+            # A JS string, not HTML: a Windows path's backslashes stay as they are.
+            .replace('%LOG%', json.dumps(log or '').replace('</', '<\\/'))
             .replace('%DATA%', payload))
 
 
@@ -673,7 +674,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 <div class="page" id="page"></div>
 <script>
 var DATA = %DATA%;
-var LOG = "%LOG%";
+var LOG = %LOG%;
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
   var NW = 236, NH = 52, GAP = 30, PAD = 14, COL = 48, LANE_W = 190, LANE_PAD = 16, DH = 64;

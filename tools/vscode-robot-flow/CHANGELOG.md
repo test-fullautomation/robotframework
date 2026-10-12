@@ -22,6 +22,18 @@
   (`robotFlow.flowReport` is off by default) gets it from `output.xml` with
   the fork's `robot.flow report` when asked for, in the tree (*Flow report ·
   written on demand*) and on the Run page (*Write the flow report*).
+- Fixed after a review: the Run page's report frame is sandboxed (its own
+  origin, scripts only) and a link in a report opens only an HTML file of
+  the run's folder; a project's or `robotFlow.runArgs` `--outputdir` no
+  longer hides the run from the Runs view (the extension's options come
+  last); *Delete Old Runs* keeps a folder whose output is still being
+  written (a command-line run, another window's); two Run clicks during the
+  save no longer start two runs into one folder; a view edit made on text
+  that changed meanwhile is refused instead of overwriting the typing; a
+  comma inside a variable's value stays (`LIST=a,b`); the console text is
+  decoded across chunk boundaries; `testproject.json` is saved before a
+  group edit when it is open with changes; the vendored views carry a
+  NOTICE; the group title in a webview's title is escaped.
 - Completion in the text of flow files: the fork's JSON schema registered for
   `*.flow.json` (keys, kinds, enum values), node ids in edges, the labels the
   source node allows, keywords of the imports with their parameters (through

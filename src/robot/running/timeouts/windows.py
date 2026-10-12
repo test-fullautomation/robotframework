@@ -33,19 +33,34 @@ class WindowsRunner(Runner):
         super().__init__(timeout, timeout_error, data_error)
         self._runner_thread_id = current_thread().ident
         self._timeout_pending = False
+        self._timer = None
+        self._deadline = None
 
     def _run(self, runnable):
-        timer = Timer(self.timeout, self._timeout_exceeded)
-        timer.start()
+        self._timer = Timer(self.timeout, self._timeout_exceeded)
+        self._deadline = time.time() + self.timeout
+        self._timer.start()
         try:
             result = runnable()
         except TimeoutExceeded:
             self._timeout_pending = False
             raise
         finally:
-            timer.cancel()
+            self._timer.cancel()
         self._wait_for_pending_timeout()
         return result
+
+    def extend(self, seconds):
+        # The timer is replaced by one with what is left plus the extension.
+        super().extend(seconds)
+        timer = self._timer
+        if timer is None or self.exceeded:
+            return
+        timer.cancel()
+        left = max(0.0, self._deadline - time.time()) + seconds
+        self._deadline = time.time() + left
+        self._timer = Timer(left, self._timeout_exceeded)
+        self._timer.start()
 
     def _timeout_exceeded(self):
         self.exceeded = True

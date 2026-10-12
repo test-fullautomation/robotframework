@@ -87,6 +87,6 @@ class DottedConsole(BaseConsole):
             f"{'=' * self.width}\n"
             f"Run suite '{suite.name}' with {stats.total} {ts} in {elapsed}.\n\n"
         )
-        ed = "ED" if suite.status != "SKIP" else "PED"
-        self.highlight(suite.status, suite.status + ed)
+        words = {"SKIP": "SKIPPED", "UNKNOWN": "UNKNOWN"}
+        self.highlight(suite.status, words.get(suite.status, suite.status + "ED"))
         self.write(f"\n{stats.message}\n")

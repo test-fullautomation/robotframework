@@ -108,14 +108,14 @@ class TestReport(unittest.TestCase):
         self.assertEqual([(b['branch'], b['status'], b['error']) for b in ramp['branches']],
                          [('chamber', 'PASS', ''), ('psu', 'FAIL', 'cycle 5 broke')])
         self.assertEqual([b['name'] for b in ramp['branches']], ['flow.ramp.chamber', 'flow.ramp.psu'])
-        # Flow Phase, the gate, Flow Loop, the WHILE, the IF's two branches,
-        # 'done', then the region: its start, two threads and the join.
-        self.assertTrue(ramp['branches'][1]['id'].endswith('-k10'), ramp['branches'][1]['id'])
-        self.assertTrue(ramp['last'].endswith('-k11'), 'the join is the node')
+        # Flow Phase, the gate, Flow Loop, the WHILE, Flow Loop End, the IF's
+        # two branches, 'done', then the region: its start, two threads and the join.
+        self.assertTrue(ramp['branches'][1]['id'].endswith('-k11'), ramp['branches'][1]['id'])
+        self.assertTrue(ramp['last'].endswith('-k12'), 'the join is the node')
         # The nodes inside the branches have their own records, found through the threads.
         self.assertEqual((self.stats['chamber']['runs'], self.stats['chamber']['status']), (1, {'PASS': 1}))
         self.assertEqual(self.stats['psu']['status'], {'FAIL': 1})
-        self.assertTrue(self.stats['psu']['last'].endswith('-k10-k1-k1-k1'), self.stats['psu']['last'])
+        self.assertTrue(self.stats['psu']['last'].endswith('-k11-k1-k1-k1'), self.stats['psu']['last'])
         step = self.data['flows'][0]['plan'][1]['steps'][4]
         self.assertEqual((step['kind'], step['timeout'], step['stop_others']), ('parallel', '1 min', True))
         self.assertEqual([(b['id'], [s['id'] for s in b['steps']]) for b in step['branches']],

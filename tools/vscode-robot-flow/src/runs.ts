@@ -65,6 +65,14 @@ function stamp(name: string): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${safe}`;
 }
 
+/** A run folder of its own: the stamp has seconds, a second run in the same second gets a suffix. */
+function newRunDir(root: string, name: string): string {
+  const base = path.join(root, stamp(name));
+  let dir = base;
+  for (let i = 2; fs.existsSync(dir); i++) dir = `${base}-${i}`;
+  return dir;
+}
+
 interface Active {
   state: RunState;
   processes: Map<string, RobotRun>;
@@ -125,33 +133,41 @@ export class RunManager implements vscode.Disposable {
     return s === 'running' || s === 'stopping';
   }
 
+  /** Keys of runs being started: the save and the interpreter lookup take a while, a second Run meanwhile waits. */
+  private readonly starting = new Set<string>();
+
   /** Run a suite or flow file (saved first); `extras` from the debugger. */
   async runFile(uri: vscode.Uri, extras: RunExtras = {}): Promise<RunState | null> {
     const key = fileKey(uri.fsPath);
-    if (this.isRunning(key)) {
+    if (this.isRunning(key) || this.starting.has(key)) {
       void vscode.window.showInformationMessage(`${path.basename(uri.fsPath)} is running already.`);
       return this.state(key);
     }
-    const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === uri.fsPath);
-    if (doc?.isDirty) await doc.save();
-    const env = await robotEnvFor(uri, this.extension.extensionPath);
-    const project = projectFor(uri);
-    const outDir = path.join(resultsRoot(uri), stamp(path.basename(uri.fsPath)));
-    let plan;
+    this.starting.add(key);
     try {
-      plan = planRun({
-        env, target: uri.fsPath, outDir, variables: extras.variables, step: extras.step, flowReport: this.flowReport(uri),
-        args: [...(extras.robotArgs || []), ...(project?.run.args || []), ...this.runArgs(uri), ...(extras.args || [])],
-        extraEnv: { ...(project?.run.env || {}), ...(extras.env || {}) },
+      const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === uri.fsPath);
+      if (doc?.isDirty) await doc.save();
+      const env = await robotEnvFor(uri, this.extension.extensionPath);
+      const project = projectFor(uri);
+      const outDir = newRunDir(resultsRoot(uri), path.basename(uri.fsPath));
+      let plan;
+      try {
+        plan = planRun({
+          env, target: uri.fsPath, outDir, variables: extras.variables, step: extras.step, flowReport: this.flowReport(uri),
+          args: [...(extras.robotArgs || []), ...(project?.run.args || []), ...this.runArgs(uri), ...(extras.args || [])],
+          extraEnv: { ...(project?.run.env || {}), ...(extras.env || {}) },
+        });
+      } catch (e) {
+        void vscode.window.showErrorMessage((e as Error).message);
+        return null;
+      }
+      return this.start(key, path.basename(uri.fsPath), outDir, new Map([['main', new RobotRun(plan)]]), {
+        env, debug: !!extras.debug, step: !!extras.step, target: uri.fsPath,
+        variables: extras.variables || {}, pausable: canPause(uri.fsPath),
       });
-    } catch (e) {
-      void vscode.window.showErrorMessage((e as Error).message);
-      return null;
+    } finally {
+      this.starting.delete(key);
     }
-    return this.start(key, path.basename(uri.fsPath), outDir, new Map([['main', new RobotRun(plan)]]), {
-      env, debug: !!extras.debug, step: !!extras.step, target: uri.fsPath,
-      variables: extras.variables || {}, pausable: canPause(uri.fsPath),
-    });
   }
 
   /** Run a file with variables typed by the user; the file's last ones are offered again. */
@@ -190,30 +206,35 @@ export class RunManager implements vscode.Disposable {
   /** Run every member of a group together; they share one signal store in the group's folder. */
   async runGroup(project: Project, group: RunGroup): Promise<RunState | null> {
     const key = groupKey(project, group);
-    if (this.isRunning(key)) {
+    if (this.isRunning(key) || this.starting.has(key)) {
       void vscode.window.showInformationMessage(`${group.title} is running already.`);
       return this.state(key);
     }
-    for (const m of group.members) {
-      const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === memberPath(project, m));
-      if (doc?.isDirty) await doc.save();
+    this.starting.add(key);
+    try {
+      for (const m of group.members) {
+        const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath === memberPath(project, m));
+        if (doc?.isDirty) await doc.save();
+      }
+      const first = vscode.Uri.file(memberPath(project, group.members[0]));
+      const runDir = newRunDir(resultsRoot(first), 'group-' + group.id);
+      const processes = new Map<string, RobotRun>();
+      for (const m of group.members) {
+        const uri = vscode.Uri.file(memberPath(project, m));
+        const env = await robotEnvFor(uri, this.extension.extensionPath);
+        processes.set(m.id, new RobotRun(planRun({
+          env, target: uri.fsPath, outDir: path.join(runDir, m.id), runDir, variables: m.variables, rig: m.id,
+          flowReport: this.flowReport(uri), args: [...project.run.args, ...this.runArgs(uri)],
+          extraEnv: { ...project.run.env, ...group.env },
+        })));
+      }
+      return this.start(key, group.title, runDir, processes, {
+        env: await robotEnvFor(first, this.extension.extensionPath), debug: false, step: false, target: null,
+        variables: {}, pausable: group.members.every((m) => canPause(memberPath(project, m))),
+      });
+    } finally {
+      this.starting.delete(key);
     }
-    const first = vscode.Uri.file(memberPath(project, group.members[0]));
-    const runDir = path.join(resultsRoot(first), stamp('group-' + group.id));
-    const processes = new Map<string, RobotRun>();
-    for (const m of group.members) {
-      const uri = vscode.Uri.file(memberPath(project, m));
-      const env = await robotEnvFor(uri, this.extension.extensionPath);
-      processes.set(m.id, new RobotRun(planRun({
-        env, target: uri.fsPath, outDir: path.join(runDir, m.id), runDir, variables: m.variables, rig: m.id,
-        flowReport: this.flowReport(uri), args: [...project.run.args, ...this.runArgs(uri)],
-        extraEnv: { ...project.run.env, ...group.env },
-      })));
-    }
-    return this.start(key, group.title, runDir, processes, {
-      env: await robotEnvFor(first, this.extension.extensionPath), debug: false, step: false, target: null,
-      variables: {}, pausable: group.members.every((m) => canPause(memberPath(project, m))),
-    });
   }
 
   /** Pause or resume a running flow, or one member of a group run. */
@@ -349,6 +370,9 @@ export class RunManager implements vscode.Disposable {
                 opts: { env: RobotEnv; debug: boolean; step: boolean; target: string | null;
                         variables: Record<string, string>; pausable: boolean }): RunState {
     const old = this.runs.get(key);
+    if (old && (old.state.status === 'running' || old.state.status === 'stopping')) {
+      throw new Error(`${title} is running already.`);   // the callers check; never lose a running process
+    }
     if (old) this.clearTimers(old);
     const output = old?.output ?? vscode.window.createOutputChannel(`Robot: ${title}`);
     output.clear();

@@ -185,11 +185,30 @@ class FlowControl:
         started = time.time()
         while self._paused.is_set() and self._stop_reason is None:
             time.sleep(self.SLICE_S)
-        waited = secs_to_timestr(round(time.time() - started, 1))
+        seconds = time.time() - started
+        self._extend_timeouts(seconds)
+        waited = secs_to_timestr(round(seconds, 1))
         if self._stop_reason is None:
             logger.info(f'Flow resumed after {waited}.', also_console=_on_main_thread())
         else:
             logger.info(f'Flow stopped while paused ({waited}).')
+
+    def _extend_timeouts(self, seconds):
+        """Keyword and test timeouts run on the wall clock: the pause is
+        given back to them, so a timed step paused for an hour has all of
+        its timeout afterwards, as a gate has."""
+        if seconds <= 0 or not _on_main_thread():
+            return
+        context = EXECUTION_CONTEXTS.current
+        if context is None:
+            return
+        for timeout in getattr(context, 'timeouts', ()):
+            if getattr(timeout, 'start_time', -1) >= 0:
+                timeout.start_time += seconds
+        for runner in getattr(context, 'active_timeouts', ()):
+            extend = getattr(runner, 'extend', None)
+            if extend is not None:
+                extend(seconds)
 
     def _raise_stop(self, where):
         with self._lock:
@@ -303,9 +322,19 @@ class FlowControl:
                 break
             try:
                 entries = self._entries()
+                newest = max((_seq(entry) for entry in entries.values()), default=0)
+                if entries and newest < self._since_seq:
+                    # The store numbers its writes from the start again (the
+                    # server restarted without its file, Redis was flushed):
+                    # what it holds now is new to this process.
+                    with self._lock:
+                        self._since_seq = 0
+                        self._seen = None
+                        self._applied = set()
+                    last = 0
                 self.apply(self._read_command(entries))
                 self._queue(self._read_requests(entries))
-                last = max([last] + [_seq(entry) for entry in entries.values()])
+                last = max(last, newest)
             except Exception:       # a store that cannot be read must not end the watch
                 pass
 
@@ -362,7 +391,8 @@ class FlowControl:
             if stamp in self._applied:
                 continue
             if key.startswith(SET_SIGNAL + '.'):
-                target, _, name = key[len(SET_SIGNAL) + 1:].partition('.')
+                # The variable name holds no dot, a rig name may ('RIG.A').
+                target, _, name = key[len(SET_SIGNAL) + 1:].rpartition('.')
                 if name and target in ('*', self.rig or '*'):
                     found.append((stamp, _order(entry), (SET, name, entry.get('value'))))
             elif key in self._names(SNAPSHOT_SIGNAL):
@@ -473,7 +503,7 @@ class FlowControl:
 
 # Keywords the builder emits for bookkeeping; step mode does not stop at them
 # (a parallel region's node is its 'Flow Parallel Start').
-_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop', 'Flow Branch', 'Flow Join')
+_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop', 'Flow Loop End', 'Flow Branch', 'Flow Join')
 
 
 def _seq(entry):
@@ -525,8 +555,8 @@ def _iteration_hook(context, iteration):
     up to date.
     """
     run = CONTROL.run
-    if run is None or run.finished:
-        return
+    if run is None or run.finished or not _on_main_thread():
+        return          # a branch thread's loop is not checkpointed, nor written from there
     loop_id = run.loop_of(iteration.parent)
     if loop_id is None:
         return          # a loop the checkpoint does not track (nested, sub-flow)
@@ -684,6 +714,10 @@ class FlowRun:
             self._loops[loop_id] = {'offset': 0, 'count': 0, 'deadline': -1.0,
                                     'max_loops': max_loops}
             self.loop, self.iteration = loop_id, 0
+            # No WHILE of this loop iterates: the next one to iterate (a
+            # nested loop, a sub-flow's) is not this loop's and must not be
+            # claimed as it.
+            self._expect = False
             return 1, -1.0, {}, f"Loop '{loop_id}' ran to its end in the earlier run."
         if restored and restored.get('loop') == loop_id:
             done = int(restored.get('iteration') or 0)
@@ -710,6 +744,21 @@ class FlowRun:
                                 'max_loops': max_loops}
         self.loop, self.iteration = loop_id, done
         return limit, deadline, variables, message
+
+    def loop_ended(self, loop_id):
+        """The loop ran to its end (``Flow Loop End``, right after the WHILE).
+
+        Recorded at once: a stop or a crash later in the same phase would
+        otherwise replay the loop's last iteration, because the checkpoint
+        still named it as the loop in progress.
+        """
+        if self.loop != loop_id:
+            return
+        if loop_id not in self.done_loops:
+            self.done_loops.append(loop_id)
+        self.loop, self.iteration = None, 0
+        self._tracked, self._expect = None, False
+        self.write(force=True)
 
     def loop_of(self, while_data):
         """The id of the tracked loop that ``while_data`` (a WHILE) is, or None.
@@ -834,7 +883,10 @@ class FlowRun:
         stem = self.path[:-len('.checkpoint.json')] \
             if self.path.endswith('.checkpoint.json') else os.path.splitext(self.path)[0]
         path = f'{stem}.snapshot-{label}.json'
-        self._snapshot_variables()
+        # The variables are the ones taken at the iteration boundary, as in the
+        # checkpoint: a run from the snapshot replays the iteration it was
+        # taken in from its start. Read again here, mid-iteration, they would
+        # carry a counter already advanced into an iteration counted as not done.
         data = self.to_dict()
         data['snapshot'] = {'name': label, 'taken': _timestamp(),
                             'position': self.position_text(),

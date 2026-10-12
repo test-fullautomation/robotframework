@@ -659,7 +659,10 @@ recovery region, so the state at a failure is kept.
 
 A snapshot is not a core dump: the bench is not in it. A restart from it
 re-establishes the bench with the setup phase and continues the plan after
-the last completed iteration, as after a stop.
+the last completed iteration, as after a stop. The variables it holds are
+the ones at the start of the iteration it was taken in, like a checkpoint's,
+so the run from it replays that iteration from its start: a counter at 3
+when the snapshot is taken in the third iteration resumes with 3, not 4.
 
 ### Stopping
 

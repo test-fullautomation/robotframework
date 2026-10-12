@@ -4,9 +4,11 @@
 
 /**
  * A flow report (one self-contained HTML file) as the page's frame shows it
- * with `srcdoc`: the frame inherits the page's policy, so its script gets
- * the page's nonce, and a small script sends clicks on its links (into
- * log.html) to the page, which has the extension open them.
+ * with `srcdoc`. The frame is sandboxed (scripts only, its own origin: it
+ * cannot reach the page) but still inherits the page's policy, so its script
+ * gets the page's nonce. A small script added to it sends clicks on its links
+ * (into log.html) to the page, which has the extension open them, and says
+ * when it has loaded.
  */
 export function reportForFrame(html: string, n: string): string {
   const relay = `<script nonce="${n}">document.addEventListener('click', function (e) {
@@ -16,6 +18,9 @@ export function reportForFrame(html: string, n: string): string {
   if (!href || href.charAt(0) === '#') return;
   e.preventDefault();
   window.parent.postMessage({ type: 'frameLink', href: href }, '*');
+});
+window.addEventListener('load', function () {
+  window.parent.postMessage({ type: 'reportShown', length: document.body ? document.body.innerHTML.length : 0 }, '*');
 });</script>`;
   const withNonce = html.replace(/<script\b(?![^>]*\bnonce=)/gi, `<script nonce="${n}"`);
   return /<\/body>/i.test(withNonce) ? withNonce.replace(/<\/body>/i, relay + '</body>') : withNonce + relay;
@@ -124,18 +129,14 @@ export function runPageHtml(csp: string, n: string): string {
       section.dataset.key = key;
       section.hidden = d.group && m.id !== tab;
       section.innerHTML = '<h2 class="report-head">Flow report' + (m.reportKey ? ' <small><a data-open-report="' + esc(m.id) + '">open in the browser</a></small>' : '') + '</h2>'
-        + (m.reportKey ? '<iframe data-report="' + esc(m.id) + '" title="Flow report"></iframe>'
+        + (m.reportKey ? '<iframe data-report="' + esc(m.id) + '" sandbox="allow-scripts" title="Flow report"></iframe>'
           : m.canReport ? '<p><button data-flow-report="' + esc(m.id) + '">Write the flow report</button> <span class="note">from output.xml, with the fork\\'s robot.flow report</span></p>'
           : '<p class="note">' + (d.running ? 'Written when the run ends, or on demand afterwards.' : 'No flow report: the run has no output.xml.') + '</p>');
       const frame = section.querySelector('iframe');
       const html = m.reportHtml || lastHtml[m.id];
       if (frame && html) {
-        frame.addEventListener('load', () => {
-          let length = 0;
-          try { length = frame.contentDocument.body.innerHTML.length; } catch (e) { length = -1; }
-          post({ type: 'reportShown', member: m.id, key: m.reportKey, length });
-        });
-        frame.srcdoc = html;
+        frame.dataset.key = m.reportKey;
+        frame.srcdoc = html;   // the frame says when it has loaded (a sandboxed frame's document cannot be read from here)
       }
     });
     reports.querySelectorAll('section[data-member]').forEach((s) => { if (!keep.has(s.dataset.member)) s.remove(); });
@@ -188,15 +189,18 @@ export function runPageHtml(csp: string, n: string): string {
   });
   window.addEventListener('message', (e) => {
     if (!e.data) return;
-    if (e.data.type === 'data') {
+    // A report's frame may only say what it says below: the data comes from the extension alone.
+    const frame = [...document.querySelectorAll('iframe[data-report]')].find((f) => f.contentWindow === e.source);
+    if (e.data.type === 'data' && !frame) {
       // the extension's data; a report's HTML comes only when it changed
       data = e.data.data;
       data.members.forEach((m) => { if (m.reportHtml) lastHtml[m.id] = m.reportHtml; });
       render();
-    } else if (e.data.type === 'frameLink') {
+    } else if (e.data.type === 'frameLink' && frame) {
       // a link in a report's frame (log.html#id): the extension opens it
-      const frame = [...document.querySelectorAll('iframe[data-report]')].find((f) => f.contentWindow === e.source);
-      if (frame) post({ type: 'frameLink', member: frame.dataset.report, href: e.data.href });
+      post({ type: 'frameLink', member: frame.dataset.report, href: String(e.data.href || '') });
+    } else if (e.data.type === 'reportShown' && frame) {
+      post({ type: 'reportShown', member: frame.dataset.report, key: frame.dataset.key, length: Number(e.data.length) || 0 });
     }
   });
   post({ type: 'ready' });

@@ -128,7 +128,7 @@ def _bookkeeping():
         names = set()
         try:
             from robot.flow import builder
-            names.update(getattr(builder, n) for n in ("PHASE_KEYWORD", "LOOP_KEYWORD", "ITERATION_KEYWORD")
+            names.update(getattr(builder, n) for n in ("PHASE_KEYWORD", "LOOP_KEYWORD", "LOOP_END_KEYWORD", "ITERATION_KEYWORD")
                          if isinstance(getattr(builder, n, None), str))
         except ImportError:
             pass

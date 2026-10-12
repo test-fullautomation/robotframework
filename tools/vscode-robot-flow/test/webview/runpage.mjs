@@ -59,7 +59,7 @@ const CASES = [
       title: '01_hello.flow.json', status: 'passed', when: '11.10.2026, 09:46:16', duration: '0.6 s', target: null, variables: [], dir: 'D:\\demo\\flow\\results',
       live: null, running: false, pausable: false, paused: false, files: { log: true, report: true, output: false }, checkpoints: [], group: false,
       members: [member({ title: '01_hello.flow.json', status: 'passed', duration: '0.6 s', total: { pass: 1, fail: 0, skip: 0, unknown: 0 }, tests: tests([['Hello Flow', 'PASS', 0.53]]), canReport: false, reportKey: 'REPORT' })] },
-    expect: ['badge passed', 'Hello Flow', '<iframe', 'open in the browser'], shown: true },
+    expect: ['badge passed', 'Hello Flow', '<iframe', 'open in the browser'], shown: true, expectReport: true },
   { id: 'runpage-live', data: {
       title: 'climate_profile.flow.json', status: 'running', when: '11.10.2026, 14:02:00', duration: '12 min 4 s', target: 'D:\\bench\\flows\\climate_profile.flow.json', variables: [],
       dir: 'D:\\bench\\results\\20261011-140200-climate_profile', live: 'running · phase Soak, loop cycles iteration 7', running: true, pausable: true, paused: false,
@@ -101,21 +101,29 @@ for (const c of CASES.flatMap((x) => [x, { ...x, id: `${x.id}-dark`, dark: true 
   window.__sent = [];
   window.acquireVsCodeApi = () => ({ postMessage: (m) => window.__sent.push(m), getState() {}, setState() {} });
   window.addEventListener('error', (e) => { document.title = 'ERROR ' + e.message; });
+  // The sandboxed report frame loads in its own process, outside the page's
+  // virtual time: the page is marked done when the frame has reported, or
+  // after a while when no report is expected.
+  const done = () => {
+    const ready = window.__sent.some((m) => m.type === 'ready');
+    const shown = window.__sent.find((m) => m.type === 'reportShown');
+    if (!document.title.startsWith('ERROR')) document.title = 'DONE ' + (ready ? 'ready ' : 'no-ready ') + document.getElementById('page').innerHTML.length + ' report ' + (shown ? shown.length : 0);
+  };
+  window.addEventListener('message', (e) => { if (e.data && e.data.type === 'reportShown') setTimeout(done, 50); });
   window.addEventListener('load', () => {
     window.postMessage({ type: 'data', data: ${JSON.stringify(data).replace(/<\//g, '<\\/')} }, '*');
-    setTimeout(() => {
-      const ready = window.__sent.some((m) => m.type === 'ready');
-      const shown = window.__sent.find((m) => m.type === 'reportShown');
-      if (!document.title.startsWith('ERROR')) document.title = 'DONE ' + (ready ? 'ready ' : 'no-ready ') + document.getElementById('page').innerHTML.length + ' report ' + (shown ? shown.length : 0);
-    }, 1500);
+    setTimeout(done, ${c.expectReport ? 6000 : 1500});
   });
 </script>`);
   const file = path.join(OUT, `${c.id}.html`);
   fs.writeFileSync(file, html);
   const profile = fs.mkdtempSync(path.join(OUT, 'profile-'));
+  // Site isolation off: the sandboxed report frame then shares the page's
+  // process and its virtual time, so it has loaded when the DOM is dumped.
   const args = ['--headless=new', '--disable-gpu', '--allow-file-access-from-files', '--hide-scrollbars',
                 '--no-first-run', '--disable-sync', '--disable-extensions', `--user-data-dir=${profile}`,
-                '--window-size=1100,1300', '--virtual-time-budget=3000'];
+                '--disable-site-isolation-trials', '--disable-features=IsolateOrigins,site-per-process,IsolateSandboxedIframes',
+                '--window-size=1100,1300', '--virtual-time-budget=8000'];
   const quiet = { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] };
   const dom = execFileSync(EDGE, [...args, '--dump-dom', pathToFileURL(file).href], quiet);
   execFileSync(EDGE, [...args, `--screenshot=${path.join(OUT, `${c.id}.png`)}`, pathToFileURL(file).href], quiet);

@@ -69,13 +69,13 @@ class SuiteTeardownFailed(SuiteVisitor):
 
 
 class SuiteTeardownUnknown(SuiteTeardownFailed):
-    # cuongnht - add unknown state: an UNKNOWN suite teardown makes the tests
-    # UNKNOWN, not FAIL.
+    # cuongnht - add unknown state: an UNKNOWN suite teardown makes the passed
+    # tests UNKNOWN. A failed test keeps its verdict: a FAIL is never hidden.
     _normal_msg = "Parent suite teardown unknown:\n%s"
     _also_msg = "\n\nAlso parent suite teardown unknown:\n%s"
 
     def _suite_teardown_failed(self, test):
-        if not test.skipped:
+        if test.passed:
             test.status = test.UNKNOWN
         prefix = self._also_msg if test.message else self._normal_msg
         test.message += prefix % self.message

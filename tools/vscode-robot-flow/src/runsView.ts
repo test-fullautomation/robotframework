@@ -469,12 +469,16 @@ export class RunsProvider implements vscode.TreeDataProvider<Node>, vscode.Dispo
     return tests.map((test) => ({ type: 'test', test }));
   }
 
-  /** Delete the folders of finished runs older than `ageMs` (-1: every finished run). The number deleted. */
+  /**
+   * Delete the folders of finished runs older than `ageMs` (-1: every finished run). The number
+   * deleted. A run of this window that runs, and a folder with no end written whose output is
+   * still being written (a command-line run, another window's), are kept.
+   */
   deleteOlder(ageMs: number): number {
     let n = 0;
     for (const root of this.roots()) {
       const runs = this.runsOf(root).filter((o) => !o.state || !(o.state.status === 'running' || o.state.status === 'stopping')).map((o) => o.run);
-      const old = ageMs < 0 ? runs.filter((r) => r.status !== 'running' && r.status !== 'stopping') : olderThan(runs, ageMs);
+      const old = olderThan(runs, Math.max(0, ageMs));
       for (const r of old) {
         if (r.dir.toLowerCase() === root.toLowerCase()) continue;   // the root itself holds a command-line run: keep it
         try {
@@ -556,7 +560,7 @@ export function registerRunsView(context: vscode.ExtensionContext, runs: RunMana
       const pick = await vscode.window.showQuickPick(AGES.map((a) => ({ label: a.label, ms: a.ms })), { placeHolder: 'Delete the results of finished runs' });
       if (!pick) return;
       const confirm = await vscode.window.showWarningMessage(`${pick.label}: delete those run folders?`,
-                                                             { modal: true, detail: 'Running runs are kept. This cannot be undone.' }, 'Delete');
+                                                             { modal: true, detail: 'Runs still running, and folders whose output is still being written, are kept. This cannot be undone.' }, 'Delete');
       if (confirm !== 'Delete') return;
       const n = provider.deleteOlder(pick.ms);
       void vscode.window.showInformationMessage(n ? `${n} run folder${n === 1 ? '' : 's'} deleted.` : 'Nothing to delete.');

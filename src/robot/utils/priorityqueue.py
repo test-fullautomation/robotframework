@@ -1,4 +1,5 @@
 import heapq
+import itertools
 import queue
 
 
@@ -21,7 +22,9 @@ class PriorityQueue(queue.PriorityQueue, object):
 
    def __init__(self, queue_type="FIFO", callback=None):
       super(PriorityQueue, self).__init__()
-      self.counter = 0
+      # Counted atomically: threads put concurrently. The sequence number also
+      # orders entries of equal priority, so the payloads are never compared.
+      self._sequence = itertools.count(1)
       self.dropped = 0
       self._callback = callback
       self.factor = -1
@@ -45,15 +48,15 @@ class PriorityQueue(queue.PriorityQueue, object):
 
    def put(self, item, priority=None, skip_callback=False):
       # from robot.libraries.BuiltIn import BuiltIn
+      sequence = next(self._sequence)
       if priority is None:
-         self.counter += 1
-         priority = self.counter
+         priority = sequence
 
       while self.max_items and self.qsize() >= self.max_items:
          if not self._drop_oldest():
             break
          self.dropped += 1
-      super(PriorityQueue, self).put((self.factor * priority, item), block=True)
+      super(PriorityQueue, self).put((self.factor * priority, sequence, item), block=True)
       if not skip_callback:
          # BuiltIn().log_to_console(f"put item {item.name} into {id(self)}")
          self._trigger_callback("put", item)
@@ -76,5 +79,5 @@ class PriorityQueue(queue.PriorityQueue, object):
          return True
 
    def get(self, *args, **kwargs):
-      (priority, item) = super(PriorityQueue, self).get(*args, **kwargs)
+      (priority, _, item) = super(PriorityQueue, self).get(*args, **kwargs)
       return priority, item

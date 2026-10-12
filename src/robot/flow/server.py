@@ -38,6 +38,12 @@ An entry is ``{"value": ..., "time": epoch seconds, "seq": n}``; ``seq``
 counts every write to the server, so it orders the writes of all machines
 without comparing their clocks. With ``--file`` the server keeps its state
 in that file across restarts.
+
+The server listens on the loopback interface unless ``--host`` says
+otherwise, and with a token (``--token``, or ROBOT_FLOW_SIGNALS_TOKEN in the
+environment of the server and of every client) every request must carry
+``Authorization: Bearer <token>``: whoever can reach the server can pause,
+stop and change a run, so on a bench network the token is the fence.
 """
 
 import argparse
@@ -51,16 +57,28 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 
 MAX_WAIT_S = 30.0
+MAX_BODY_BYTES = 64 * 1024
+TOKEN_VARIABLE = 'ROBOT_FLOW_SIGNALS_TOKEN'
+DEFAULT_HOST = '127.0.0.1'
+
+
+def token_from_environment():
+    return os.environ.get(TOKEN_VARIABLE) or None
 
 
 class SignalServer:
-    """The state behind the HTTP interface; usable in-process by tests."""
+    """The state behind the HTTP interface; usable in-process by tests.
 
-    def __init__(self, host='0.0.0.0', port=8765, file=None):
+    ``token``: required of every request when given (``None``: the
+    environment's ROBOT_FLOW_SIGNALS_TOKEN, if set; ``''``: none).
+    """
+
+    def __init__(self, host=DEFAULT_HOST, port=8765, file=None, token=None):
         self._runs = {}             # run name -> {signal name -> entry}
         self._seq = 0
         self._cond = threading.Condition()
         self._file = os.path.abspath(file) if file else None
+        self.token = token_from_environment() if token is None else (token or None)
         self._load()
         handler = type('SignalHandler', (_Handler,), {'signals': self})
         self._server = ThreadingHTTPServer((host, port), handler)
@@ -151,12 +169,38 @@ class SignalServer:
         self._server.server_close()
 
 
+class _BadRequest(Exception):
+
+    def __init__(self, status, error):
+        super().__init__(error)
+        self.status, self.error = status, error
+
+
 class _Handler(BaseHTTPRequestHandler):
     signals = None          # the SignalServer, set on the subclass
     protocol_version = 'HTTP/1.1'
+    # A connection that sends nothing for longer than a long poll is dropped:
+    # the thread it holds is not kept for ever.
+    timeout = MAX_WAIT_S + 5
 
     def log_message(self, format, *args):
         pass                # quiet: a gate polls every two seconds
+
+    def handle(self):
+        try:
+            super().handle()
+        except (TimeoutError, OSError):
+            pass            # the client went away, or sat silent too long
+
+    def _authorized(self):
+        token = self.signals.token
+        if not token:
+            return True
+        given = self.headers.get('Authorization') or ''
+        if given.strip() == f'Bearer {token}':
+            return True
+        self._send(401, {'error': 'a token is required: Authorization: Bearer <token>'})
+        return False
 
     def _parts(self):
         parts = urlsplit(self.path)
@@ -173,7 +217,14 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _body(self):
-        length = int(self.headers.get('Content-Length') or 0)
+        try:
+            length = int(self.headers.get('Content-Length') or 0)
+        except ValueError:
+            raise _BadRequest(400, 'Content-Length must be an integer')
+        if length < 0:
+            raise _BadRequest(400, 'Content-Length must not be negative')
+        if length > MAX_BODY_BYTES:
+            raise _BadRequest(413, f'the body may hold at most {MAX_BODY_BYTES} bytes')
         raw = self.rfile.read(length) if length else b''
         try:
             return json.loads(raw.decode('UTF-8')) if raw else {}
@@ -181,6 +232,8 @@ class _Handler(BaseHTTPRequestHandler):
             return None
 
     def do_GET(self):
+        if not self._authorized():
+            return None
         segments, query = self._parts()
         if not segments:
             return self._send(200, self.signals.runs())
@@ -199,10 +252,16 @@ class _Handler(BaseHTTPRequestHandler):
         return self._send(200, entry)
 
     def do_PUT(self):
+        if not self._authorized():
+            return None
         segments, _ = self._parts()
         if len(segments) < 2:
             return self._send(400, {'error': 'PUT /<run>/<name>'})
-        body = self._body()
+        try:
+            body = self._body()
+        except _BadRequest as err:
+            self.close_connection = True    # the body was not read: nothing follows it
+            return self._send(err.status, {'error': err.error})
         if not isinstance(body, dict) or 'value' not in body:
             return self._send(400, {'error': 'the body must be {"value": ...}'})
         entry = self.signals.set(segments[0], '/'.join(segments[1:]), body['value'])
@@ -211,6 +270,8 @@ class _Handler(BaseHTTPRequestHandler):
     do_POST = do_PUT
 
     def do_DELETE(self):
+        if not self._authorized():
+            return None
         segments, _ = self._parts()
         if len(segments) != 1:
             return self._send(400, {'error': 'DELETE /<run>/'})
@@ -221,22 +282,28 @@ class _Handler(BaseHTTPRequestHandler):
 def main(argv=None):
     parser = argparse.ArgumentParser(prog='python -m robot.flow server',
                                      description='The signal server for flows on several machines.')
-    parser.add_argument('--host', default='0.0.0.0', help='interface to listen on (default: all)')
+    parser.add_argument('--host', default=DEFAULT_HOST,
+                        help=f'interface to listen on (default: {DEFAULT_HOST}, this machine '
+                             f'only; 0.0.0.0: every interface, then set a token)')
     parser.add_argument('--port', type=int, default=8765, help='port (default: 8765; 0: any free one)')
     parser.add_argument('--file', help='keep the signals in this file across restarts')
+    parser.add_argument('--token', help=f'the token every request must carry as '
+                                        f'"Authorization: Bearer <token>" (default: '
+                                        f'{TOKEN_VARIABLE} of the environment, if set)')
     args = parser.parse_args(argv)
-    return serve(args.host, args.port, args.file)
+    return serve(args.host, args.port, args.file, args.token)
 
 
-def serve(host='0.0.0.0', port=8765, file=None):
+def serve(host=DEFAULT_HOST, port=8765, file=None, token=None):
     """Run the server until Ctrl+C; the exit code of the command line."""
     try:
-        server = SignalServer(host, port, file)
+        server = SignalServer(host, port, file, token)
     except OSError as err:
         sys.stderr.write(f'Cannot listen on {host}:{port}: {err}\n')
         return 1
+    fence = 'a token is required' if server.token else 'no token: anyone who reaches it may control the runs'
     print(f'Signal server at {server.url}/<run>  (ROBOT_FLOW_SIGNALS={server.url}/<run> '
-          f'on every machine of the run; Ctrl+C stops it)', flush=True)
+          f'on every machine of the run; {fence}; Ctrl+C stops it)', flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

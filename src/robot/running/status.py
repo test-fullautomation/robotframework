@@ -31,6 +31,15 @@ class Failure:
         self.teardown_skipped = None
         self.unknown = None  # cuongnht - add unknown state
 
+    def record(self, unknown):
+        """Record the kind of a new failure: a FAIL verdict is never downgraded.
+
+        FAIL means an assertion was evaluated and did not hold; UNKNOWN means
+        no verdict could be reached. Once a verdict exists, a later UNKNOWN
+        (a teardown raising a plain exception, say) does not take it away.
+        """
+        self.unknown = bool(unknown) and self.unknown is not False
+
     def __bool__(self):
         return (
             self.setup is not None
@@ -111,7 +120,7 @@ class ExecutionStatus(ABC):
                 self.skipped = True
             else:
                 if hasattr(error, "unknown"):
-                    self.failure.unknown = error.unknown
+                    self.failure.record(error.unknown)
                 self.failure.setup = msg
                 self.exit.failure_occurred(
                     error.exit, suite_setup=isinstance(self, SuiteStatus)
@@ -129,7 +138,7 @@ class ExecutionStatus(ABC):
                 self.skipped = True
             else:
                 if hasattr(error, "unknown"):
-                    self.failure.unknown = error.unknown
+                    self.failure.record(error.unknown)
                 self.failure.teardown = msg
                 self.exit.failure_occurred(error.exit)
 
@@ -217,7 +226,7 @@ class TestStatus(ExecutionStatus):
             self.skipped = True
         else:
             if hasattr(error, "unknown"):
-                self.failure.unknown = error.unknown
+                self.failure.record(error.unknown)
             self.failure.test = message
             self.exit.failure_occurred(fatal)
 

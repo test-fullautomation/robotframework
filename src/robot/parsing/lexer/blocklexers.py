@@ -360,6 +360,7 @@ class GroupLexer(NestedBlockLexer):
             ForLexer,
             TryLexer,
             WhileLexer,
+            ThreadLexer,  # cuongnht add thread
             EndLexer,
             VarLexer,
             ReturnLexer,

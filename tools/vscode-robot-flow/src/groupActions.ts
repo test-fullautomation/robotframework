@@ -4,9 +4,20 @@
 // touches only the "groups" value of testproject.json.
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { GROUP_ID, MEMBER_ID, addMember, removeGroup, removeMember, renameGroup, setMemberVariables, targetOf } from './backend/groupedit';
+import { GROUP_ID, MEMBER_ID, addMember, projectFileOf, removeGroup, removeMember, renameGroup, setMemberVariables, targetOf } from './backend/groupedit';
 import { Project, RunGroup } from './backend/project';
 import { formatVariables, parseVariables } from './backend/run';
+
+/**
+ * The edits write testproject.json on disk. An editor open on it with unsaved
+ * changes would then be in conflict (and the edit would be made on stale text),
+ * so such an editor is saved first; a clean editor follows the file by itself.
+ */
+async function saveOpenProjectFile(project: Project): Promise<void> {
+  const file = projectFileOf(project).toLowerCase();
+  const doc = vscode.workspace.textDocuments.find((d) => d.uri.fsPath.toLowerCase() === file);
+  if (doc?.isDirty) await doc.save();
+}
 
 async function input(title: string, value: string, validate?: (v: string) => string | null, prompt?: string): Promise<string | undefined> {
   return vscode.window.showInputBox({ title, value, prompt, validateInput: validate ? (v) => validate(v.trim()) : undefined });
@@ -56,6 +67,7 @@ export async function addFlowToGroup(project: Project, file: string): Promise<{ 
   if (!memberId) return null;
   const variables = await variablesInput(`Variables of ${memberId}`, {});
   if (variables === undefined) return null;
+  await saveOpenProjectFile(project);
   const fresh = addMember(project, groupId, { id: memberId, target: targetOf(project, file), variables }, newGroup);
   return { project: fresh, groupId };
 }
@@ -76,6 +88,7 @@ export async function addMemberToGroup(project: Project, group: RunGroup): Promi
   if (!memberId) return null;
   const variables = await variablesInput(`Variables of ${memberId}`, {});
   if (variables === undefined) return null;
+  await saveOpenProjectFile(project);
   return addMember(project, group.id, { id: memberId, target: pick.label, variables });
 }
 
@@ -93,21 +106,25 @@ export async function editGroup(project: Project, group: RunGroup): Promise<{ pr
   if (pick.action === 'rename') {
     const title = await input('Title of the group', group.title);
     if (title === undefined) return null;
+    await saveOpenProjectFile(project);
     return { project: renameGroup(project, group.id, title.trim() || group.id), removed: false };
   }
   if (pick.action === 'variables') {
     const member = group.members.find((m) => m.id === pick.member)!;
     const variables = await variablesInput(`Variables of ${member.id}`, member.variables);
     if (variables === undefined) return null;
+    await saveOpenProjectFile(project);
     return { project: setMemberVariables(project, group.id, member.id, variables), removed: false };
   }
   if (pick.action === 'remove') {
     const ok = await vscode.window.showWarningMessage(`Remove ${pick.member} from ${group.title}?`, { modal: true }, 'Remove');
     if (ok !== 'Remove') return null;
+    await saveOpenProjectFile(project);
     const fresh = removeMember(project, group.id, pick.member!);
     return { project: fresh, removed: !fresh.groups.some((g) => g.id === group.id) };
   }
   const ok = await vscode.window.showWarningMessage(`Delete the run group ${group.title}? The flow files stay.`, { modal: true }, 'Delete');
   if (ok !== 'Delete') return null;
+  await saveOpenProjectFile(project);
   return { project: removeGroup(project, group.id), removed: true };
 }

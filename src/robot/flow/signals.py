@@ -251,9 +251,15 @@ class FileStore(SignalStore):
         return Lock()
 
     def _break_stale_lock(self):
+        # Taken over by a rename, which only one of several waiters wins: a
+        # plain remove could take away the fresh lock another waiter had
+        # just created after the same check.
         try:
-            if time.time() - os.path.getmtime(self._lock_path) > self.STALE_LOCK_S:
-                os.remove(self._lock_path)
+            if time.time() - os.path.getmtime(self._lock_path) <= self.STALE_LOCK_S:
+                return
+            stale = f'{self._lock_path}.{os.getpid()}.stale'
+            os.replace(self._lock_path, stale)
+            os.remove(stale)
         except OSError:
             pass
 

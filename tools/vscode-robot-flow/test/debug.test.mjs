@@ -5,6 +5,7 @@
 //
 //   ROBOT_FLOW_PYTHON, ROBOT_FLOW_SRC (the fork's src: flows need robot.flow)
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -307,8 +308,14 @@ class PythonClient {
   }
 }
 
+// In VS Code the Python Debugger extension's debugpy is used when the interpreter has none; here there is only the interpreter's.
+const noDebugpy = (() => {
+  if (skip) return skip;
+  try { execFileSync(PYTHON, ['-c', 'import debugpy'], { stdio: 'ignore' }); return false; } catch { return `debugpy is not importable by ${PYTHON}`; }
+})();
+
 test('Step Into a keyword of a Python library: stops in the function, back in Robot when it returns',
-     { skip, timeout: 240000 }, async (t) => {
+     { skip: noDebugpy, timeout: 240000 }, async (t) => {
   let python = null;
   const c = new Client({
     attachPython: async (port) => {

@@ -4229,30 +4229,46 @@ class _Misc(_BuiltInBase):
             raise AssertionError(f"Unable to release the rlock name '{rlock_name}'!!!")
         rlock_object.release()
 
-    def wait_for_thread(self, name: str, timeout: "timedelta | None" = None):
+    def wait_for_thread(
+        self,
+        name: str,
+        timeout: "timedelta | None" = None,
+        fail_on_error: bool = True,
+    ):
         """Waits until the `THREAD` block named `name` has finished.
 
         Args:
             name: Name of the thread.
             timeout: Maximum time to wait. Waits forever by default.
+            fail_on_error: Fail when the thread ended with a failure (its
+                keyword failed, so the thread only logged a warning). With
+                `False` the failure is only logged and the keyword passes.
 
-        Fails if the thread is still running after the timeout. Passing an
-        unknown or already finished thread name succeeds immediately. This
-        keyword is a RobotFramework AIO extension.
+        Fails if the thread is still running after the timeout, or, by
+        default, if it finished with a failure: that is how a test asserts
+        that a thread succeeded. Passing an unknown thread name, or one that
+        finished without a failure, succeeds immediately. This keyword is a
+        RobotFramework AIO extension.
         """
         # cuongnht thread scope
         entry = self._context.active_threads.get(name)
-        if entry is None:
+        if entry is not None:
+            secs = timeout.total_seconds() if timeout is not None else None
+            entry["worker"].join(secs)
+            if entry["worker"].is_alive():
+                raise AssertionError(
+                    f"Thread '{name}' did not finish in {secs_to_timestr(secs)}."
+                )
+            self._context.unregister_thread(name)
+        failure = self._context.thread_failures.get(name)
+        if failure and fail_on_error:
+            raise AssertionError(f"Thread '{name}' failed: {failure}")
+        if failure:
+            self.log(f"Thread '{name}' finished with a failure: {failure}")
+        elif entry is None:
             self.log(f"Thread '{name}' is not running.")
-            return
-        secs = timeout.total_seconds() if timeout is not None else None
-        entry["worker"].join(secs)
-        if entry["worker"].is_alive():
-            raise AssertionError(
-                f"Thread '{name}' did not finish in {secs_to_timestr(secs)}."
-            )
-        self._context.unregister_thread(name)
-        self.log(f"Thread '{name}' finished.")
+        else:
+            self.log(f"Thread '{name}' finished.")
 
     def stop_thread(self, name: str, timeout: timedelta = timedelta(seconds=10)):
         """Requests the `THREAD` block named `name` to stop and waits for it.

@@ -345,10 +345,13 @@ class Session implements vscode.Disposable {
     }
     const env = await this.env();
     const text = this.document.getText();
+    const version = this.document.version;
     const answer = await editView(env, this.kind.id, this.document.uri.fsPath, text, change);
     if (!answer.ok || typeof answer.text !== 'string') {
       return { ok: false, error: answer.error || 'The change could not be made.', ...(answer.missing ? { missing: answer.missing } : {}) };
     }
+    // The helper worked on the text as it was: typing meanwhile must not be replaced.
+    if (this.document.version !== version) return { ok: false, error: 'The text changed while the change was made: try again.' };
     if (answer.text === text) return { ...answer, text: undefined, ok: true };
     this.undo.push(text);
     const applied = await this.replaceText(answer.text);

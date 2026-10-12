@@ -49,8 +49,8 @@ from .control import CONTROL as _CONTROL
 
 
 __all__ = ['flow_gate', 'flow_retry', 'flow_parallel_start', 'flow_branch', 'flow_join',
-           'flow_phase', 'flow_loop', 'flow_pause', 'flow_resume', 'flow_stop',
-           'flow_snapshot']
+           'flow_phase', 'flow_loop', 'flow_loop_end', 'flow_pause', 'flow_resume',
+           'flow_stop', 'flow_snapshot']
 
 ROBOT_LIBRARY_VERSION = get_version()
 ROBOT_LIBRARY_SCOPE = 'GLOBAL'
@@ -492,6 +492,17 @@ def flow_loop(loop_id, max_loops=None, max_seconds=None, *variables):
     return ['NONE' if limit is None else str(limit), deadline]
 
 
+def flow_loop_end(loop_id):
+    """The loop ``loop_id`` ran to its end. Added by the flow builder after the WHILE.
+
+    The checkpoint records the loop as done at once, so that a stop or a
+    crash later in the phase does not replay its last iteration.
+    """
+    run = _CONTROL.run
+    if run is not None and not run.finished:
+        run.loop_ended(loop_id)
+
+
 # ------------------------------------------------------ pause, resume, stop
 
 def flow_snapshot(name=''):
@@ -560,6 +571,11 @@ def _current_run():
 
 
 def _start_run(builtin, source):
+    # A new flow in the same process (the API, a test runner) starts with
+    # the control state of its own: a stop given to the earlier flow, its
+    # step mode and its paused time belong to that flow.
+    if _CONTROL.run is not None:
+        _CONTROL.reset()
     value = builtin.get_variable_value
     outputdir = str(value('${OUTPUT DIR}') or '')
     path = value(CHECKPOINT_VARIABLE)
@@ -613,8 +629,22 @@ class _Listener:
 
     def end_test(self, data, result):
         run = _CONTROL.run
-        if run is not None:
-            run.phase_ended(result.name, result.status)
+        if run is None:
+            return
+        if result.message.startswith('Execution terminated by signal'):
+            # Ctrl+C, a CI cancel: the run ends as an orderly stop would, the
+            # phase not counted as done and the checkpoint kept to continue.
+            _CONTROL.stopped = True
+            run.stop()
+            _CONTROL.publish('stopped')
+            return
+        run.phase_ended(result.name, result.status)
+        if _CONTROL.stop_requested:
+            # `Flow Stop` as the phase's last step: no step boundary follows
+            # to leave at. The phase is done; the checkpoint is kept, and the
+            # next phase's first step is where the run stops.
+            run.stop()
+            _CONTROL.stopped = True
 
     def end_suite(self, data, result):
         run = _CONTROL.run

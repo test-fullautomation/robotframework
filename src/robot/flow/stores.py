@@ -27,6 +27,7 @@ system of your own goes in a class named by ``ROBOT_FLOW_SIGNALS_BACKEND``.
 """
 
 import json
+import os
 import threading
 import time
 from urllib.error import HTTPError, URLError
@@ -84,8 +85,12 @@ class HttpStore(SignalStore):
 
     def _request(self, method, url, payload=None, timeout=None):
         data = json.dumps(payload).encode('UTF-8') if payload is not None else None
-        request = Request(url, data=data, method=method,
-                          headers={'Content-Type': 'application/json'} if data else {})
+        headers = {'Content-Type': 'application/json'} if data else {}
+        # The server's token, from the same variable on every machine.
+        token = os.environ.get('ROBOT_FLOW_SIGNALS_TOKEN')
+        if token:
+            headers['Authorization'] = f'Bearer {token}'
+        request = Request(url, data=data, method=method, headers=headers)
         with urlopen(request, timeout=timeout or self.TIMEOUT_S) as response:
             return json.loads(response.read().decode('UTF-8'))
 

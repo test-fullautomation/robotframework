@@ -61,13 +61,19 @@ def merge_segments(output_path, part_paths=None, remove=True, logger=None):
     if not part_paths:
         return 0
     trees = []
+    merged_paths = []
+    skipped = []
     for path in [*part_paths, output_path]:
         root = _parse(path, logger)
-        if root is None and path == output_path:
-            logger.warn(f"Ignoring unrecoverable live output '{path}'.")
+        if root is None:
+            if path == output_path:
+                logger.warn(f"Ignoring unrecoverable live output '{path}'.")
+            else:
+                skipped.append(path)
             continue
-        if root is not None:
-            trees.append(root)
+        trees.append(root)
+        if path != output_path:
+            merged_paths.append(path)
     if not trees:
         logger.error("No parseable output segments found.")
         return 0
@@ -75,19 +81,37 @@ def merge_segments(output_path, part_paths=None, remove=True, logger=None):
     for root in trees[1:]:
         _merge_children(merged, root)
     ET.ElementTree(merged).write(output_path, encoding="UTF-8", xml_declaration=True)
-    logger.info(f"Merged {len(part_paths)} output segment(s) into {output_path}.")
+    logger.info(f"Merged {len(merged_paths)} output segment(s) into {output_path}.")
+    if skipped:
+        # Left on the disk: what they hold is not in the merged output.
+        logger.warn(
+            f"{len(skipped)} output segment(s) could not be read and were left "
+            f"out of {output_path}: {', '.join(skipped)}"
+        )
     if remove:
-        for path in part_paths:
+        for path in merged_paths:
             try:
                 os.remove(path)
             except OSError as err:
                 logger.warn(f"Removing merged segment '{path}' failed: {err}")
-    return len(part_paths)
+    return len(merged_paths)
 
 
 def _discover_parts(output_path):
     base, ext = os.path.splitext(output_path)
-    return sorted(glob.glob(f"{glob.escape(base)}_part_*{ext}"))
+    # By the number, not as text: part_1000 comes after part_999.
+    paths = glob.glob(f"{glob.escape(base)}_part_*{ext}")
+    return sorted(paths, key=lambda p: (_part_number(p, base, ext), p))
+
+
+def _part_number(path, base, ext):
+    tail = path[len(base) + len("_part_"):]
+    if ext:
+        tail = tail[: -len(ext)]
+    try:
+        return int(tail)
+    except ValueError:
+        return float("inf")
 
 
 def _parse(path, logger):

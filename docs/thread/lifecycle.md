@@ -93,8 +93,11 @@ Stop Thread        SUITEWORKER    timeout=10 s    # request a stop and wait; fai
 Wait For Thread    SUITEWORKER    timeout=1 min   # join without stopping; fail if still running
 ```
 
-`Wait For Thread` followed by an assertion is the way to make a thread's result
-part of the test verdict.
+`Wait For Thread` is the way to make a thread's result part of the test
+verdict: a thread whose keyword failed only logs a warning while it runs (its
+`THREAD` block shows FAIL in the log), and `Wait For Thread` on it fails with
+that message. `fail_on_error=False` only logs it, for a thread whose failure
+the test judges itself afterwards.
 
 !!! warning "Timeouts inside a worker"
     On Linux and macOS keyword and test timeouts rely on signals, which only

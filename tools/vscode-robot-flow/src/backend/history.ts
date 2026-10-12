@@ -72,6 +72,8 @@ export interface RunRecord {
   status: HistoryStatus;
   /** When it started (ms): run.json, the output, or the folder's stamp. */
   started: number | null;
+  /** When its output.xml (else the folder) was last written (ms): a run with no end still writing it is alive. */
+  updated: number | null;
   elapsed: number | null;
   total: Counts | null;
   info: RunInfo | null;
@@ -267,6 +269,15 @@ export function listCheckpoints(dir: string): Checkpoint[] {
   return out;
 }
 
+function mtimeOf(file: string | null): number | null {
+  if (!file) return null;
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 function fileIn(dir: string, name: string): string | null {
   const f = path.join(dir, name);
   return fs.existsSync(f) ? f : null;
@@ -303,12 +314,14 @@ export function readRun(dir: string, name = path.basename(dir), member = false):
   const title = member ? name : info?.title || (stamp?.name ? stamp.name : summary?.suite || name);
   const record: RunRecord = {
     dir, name, title, kind, status: 'unknown', started: info?.started ?? summary?.start ?? stamp?.time ?? null,
+    updated: mtimeOf(output) ?? mtimeOf(dir),
     elapsed: summary?.elapsed ?? (info?.ended && info.started ? (info.ended - info.started) / 1000 : null),
     total: summary?.total ?? null, info, target, members,
     files: { log: fileIn(dir, 'log.html'), report: fileIn(dir, 'report.html'), flow: fileIn(dir, 'flow.html'), output },
     checkpoints,
   };
   if (members.length) {
+    record.updated = members.reduce<number | null>((acc, m) => m.updated === null ? acc : Math.max(acc ?? 0, m.updated), record.updated);
     record.total = members.reduce<Counts | null>((acc, m) => m.total ? {
       pass: (acc?.pass || 0) + m.total.pass, fail: (acc?.fail || 0) + m.total.fail,
       skip: (acc?.skip || 0) + m.total.skip, unknown: (acc?.unknown || 0) + m.total.unknown } : acc, null);
@@ -361,11 +374,26 @@ export function scanRuns(root: string, limit = LIST_LIMIT): RunRecord[] {
   return out.sort((a, b) => (b.started || 0) - (a.started || 0));
 }
 
-/** Runs that ended more than `ageMs` ago (an unfinished one with no end counts by its start). */
+/** A run with no end written counts as still alive while its output was written less than this long ago. */
+export const ALIVE_MS = 3600 * 1000;
+
+/** A run of this folder may still be running: no end was written, and the output is recent. */
+export function maybeAlive(r: RunRecord, now = Date.now()): boolean {
+  if (r.status === 'running' || r.status === 'stopping') return true;
+  if (r.status !== 'incomplete' && r.status !== 'unknown') return false;
+  return r.updated !== null && now - r.updated < ALIVE_MS;
+}
+
+/**
+ * Runs that ended more than `ageMs` ago. A run with no end written (a
+ * command-line run, or one of another window) counts by the time its
+ * output was last written, and not at all while that is recent.
+ */
 export function olderThan(runs: RunRecord[], ageMs: number, now = Date.now()): RunRecord[] {
   return runs.filter((r) => {
-    if (r.status === 'running' || r.status === 'stopping') return false;
-    const ended = r.info?.ended ?? (r.started !== null && r.elapsed !== null ? r.started + r.elapsed * 1000 : r.started);
+    if (maybeAlive(r, now)) return false;
+    const ended = r.info?.ended ?? (r.status === 'incomplete' || r.status === 'unknown' ? r.updated
+      : r.started !== null && r.elapsed !== null ? r.started + r.elapsed * 1000 : r.started);
     return ended !== null && now - ended > ageMs;
   });
 }

@@ -80,6 +80,10 @@ class Runner:
     def _run(self, runnable: "Callable[[], object]") -> object:
         raise NotImplementedError
 
+    def extend(self, seconds: float):
+        """Give the running timeout ``seconds`` more: the time a flow spent paused."""
+        self.timeout += seconds
+
     def pause(self):
         self.paused += 1
 

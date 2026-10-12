@@ -1,0 +1,8 @@
+The files in this folder (flow-view/, robot-grid/) and python/flow_debug.py,
+python/flow_edit.py, python/flow_inspect.py, python/robot_grid.py are copies
+of the Manager GUI's shared views and helpers from
+https://github.com/test-fullautomation/python-microservice-base
+(the commit is recorded in SOURCE.json; scripts/sync-vendor.mjs refreshes them).
+
+They are Copyright Robert Bosch GmbH and licensed under the Apache License,
+Version 2.0, the same license as this extension: see ../../LICENSE.

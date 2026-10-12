@@ -37,13 +37,30 @@ The distinction is between *the product is wrong* and *we could not tell*:
 | A keyword or variable was not found, an import failed, a `DataError` or an unexpected exception was raised, the system under test crashed | **UNKNOWN** |
 | The test was skipped | **SKIP** |
 
-Internally: `AssertionError` maps to FAIL, while `DataError`,
-`UnknownAssertionError`, `AttributeError` and other unexpected exceptions map to
-UNKNOWN. One exception is kept from earlier versions: an invalid `TRY/EXCEPT`
-structure (for example a missing `END`) marks the `TRY` branch UNKNOWN but
-fails the test. The point is diagnostic honesty — a broken environment or a missing
-keyword should not be counted as a product defect, because doing so buries real
-regressions in noise on a long endurance run.
+Internally, the exact rule is: `UnknownAssertionError` and its subclasses
+(`DataError`, `VariableError`, `KeywordError`: missing keywords and variables,
+failed imports), a bare `Exception` (`raise Exception("...")`, not a subclass)
+and `AttributeError` map to UNKNOWN. Everything else, `AssertionError` and
+`RuntimeError`, `ValueError`, `KeyError` and your own exception classes among
+them, maps to FAIL, as it always did. One exception is kept from earlier
+versions: an invalid `TRY/EXCEPT` structure (for example a missing `END`)
+marks the `TRY` branch UNKNOWN but fails the test. The point is diagnostic
+honesty — a broken environment or a missing keyword should not be counted as a
+product defect, because doing so buries real regressions in noise on a long
+endurance run.
+
+When a test has both kinds of failure, **FAIL wins**: a verdict, once reached,
+is never downgraded. A failed assertion followed by a teardown that raises a
+bare exception ends FAIL (the teardown's message is appended as usual), and so
+does a failed assertion among several continuable failures. A suite teardown
+that ends UNKNOWN marks the suite's *passed* tests UNKNOWN; its failed tests
+keep their FAIL.
+
+Two more cases give UNKNOWN because no verdict was reached: with
+`--exitonfailure`, the tests that are not run after the first failure end
+UNKNOWN (not FAIL as upstream), and with `--importfailure suite` (the default,
+see below) every test of a suite with a broken import ends UNKNOWN without
+running.
 
 !!! note "Calculator example"
     Testing `3 + 2`:
@@ -53,9 +70,16 @@ regressions in noise on a long endurance run.
     - crash, exception, or no result shown → **UNKNOWN** (there is nothing to judge)
 
 UNKNOWN appears everywhere a status appears: the console summary
-(`… , N unknown`), `log.html`, `report.html`, the statistics in `output.xml`
-(an `unknown` attribute on each `stat`), and the return code. Messages logged
-at the UNKNOWN level are also written to the console, like errors. The legacy
+(`… , N unknown`, shown when the count is not zero), `log.html`,
+`report.html`, the statistics in `output.xml` (an `unknown` attribute on each
+`stat`), the return code, the xUnit file (`--xunit`: an UNKNOWN test is an
+`<error>` and counted in the `errors` attribute, so a CI consumer never reads
+such a run as green) and the reruns: `--rerunfailed` and `--rerunfailedsuites`
+select the UNKNOWN tests and suites along with the failed ones, because a test
+without a verdict is exactly what a rerun is for. The framework's own
+UNKNOWN-level messages (the note it logs when a keyword fails that way) go to
+the log, not to the console: a failure caught by `Run Keyword And Ignore
+Error` or `TRY` would otherwise be printed although it was handled. The legacy
 output format (`--legacyoutput`) has no UNKNOWN statistics attribute.
 
 ## Import failures

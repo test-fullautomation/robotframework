@@ -6,6 +6,7 @@
 // frame (it is one self-contained HTML file). A group run has one tab per
 // member. The page follows the run: it is redrawn when the folder or the
 // run's state changes.
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
@@ -61,7 +62,7 @@ interface PageData {
 const DETAIL_EVERY_MS = 10000;
 
 function nonce(): string {
-  return Array.from({ length: 24 }, () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]).join('');
+  return crypto.randomBytes(16).toString('base64');
 }
 
 export class RunPage implements vscode.Disposable {
@@ -233,15 +234,19 @@ export class RunPage implements vscode.Disposable {
         this.errors.push(String(m.what || 'error'));
         return;
       case 'frameLink': {
-        // "log.html#s1-t1-k2" in a report: the file next to that report, in the browser
+        // "log.html#s1-t1-k2" in a report: an HTML file next to that report, in the browser. Nothing
+        // else: the report is a results file, and a link in it must not reach outside the run's folder.
         const member = run.kind === 'group' ? run.members.find((x) => x.name === m.member) : run;
         const href = String(m.href || '');
-        if (!member || !href || /^[a-z]+:/i.test(href)) {
-          if (/^https?:/i.test(href)) void vscode.env.openExternal(vscode.Uri.parse(href));
+        if (!member || !href) return;
+        if (/^https?:\/\//i.test(href)) {
+          void vscode.env.openExternal(vscode.Uri.parse(href));
           return;
         }
         const [file, fragment] = href.split('#');
-        const target = path.resolve(member.dir, file || 'log.html');
+        const name = file || 'log.html';
+        if (name !== path.basename(name) || !/^[\w.-]+\.html$/i.test(name)) return;
+        const target = path.join(member.dir, name);
         if (fs.existsSync(target)) void vscode.env.openExternal(vscode.Uri.file(target).with({ fragment: fragment || '' }));
         return;
       }
@@ -255,9 +260,7 @@ export class RunPage implements vscode.Disposable {
         if (m.what === 'report' && run.files.report) return void vscode.env.openExternal(vscode.Uri.file(run.files.report));
         if (m.what === 'folder') return void vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(run.dir));
         if (m.what === 'target' && run.target) return void vscode.commands.executeCommand('vscode.open', vscode.Uri.file(run.target));
-        if (m.what === 'file' && m.file) return void vscode.commands.executeCommand('vscode.open', vscode.Uri.file(m.file));
         if (m.what === 'output' && key) return this.runs.output(key);
-        if (m.what === 'external' && m.file) return void vscode.env.openExternal(vscode.Uri.file(m.file));
         return;
       case 'continue': {
         const c = run.checkpoints.find((x) => x.file === m.file);

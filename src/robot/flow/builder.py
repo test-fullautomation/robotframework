@@ -69,6 +69,7 @@ LIMIT_VARIABLE = '${flow_limit_%s}'
 THREAD_VARIABLE = '${flow_thread_%s}'
 PHASE_KEYWORD = 'Flow Phase'
 LOOP_KEYWORD = 'Flow Loop'
+LOOP_END_KEYWORD = 'Flow Loop End'
 PARALLEL_KEYWORD = 'Flow Parallel Start'
 BRANCH_KEYWORD = 'Flow Branch'
 JOIN_KEYWORD = 'Flow Join'
@@ -196,15 +197,20 @@ class _Emitter:
         args += ['\\' + name for name in names]
         start = body.create_keyword(name=LOOP_KEYWORD, args=args, assign=[limit, deadline])
         self.origin(start, step, 'loop-start')
-        # Only a loop with a time bound reads the clock each round; the
-        # iteration limit alone bounds the others, as in the plain shape.
-        condition = f'{CLOCK} < ${deadline[2:-1]}' if step.max_seconds else 'True'
+        # Only a loop with a time bound reads the clock each round. The others
+        # test the deadline marker: `Flow Loop` returns -1 for a loop that ran
+        # to its end in an earlier run, and no iteration may run then.
+        condition = (f'{CLOCK} < ${deadline[2:-1]}' if step.max_seconds
+                     else f'${deadline[2:-1]} != -1')
         while_ = body.create_while(condition=condition, limit=limit, on_limit='pass')
         self.origin(while_, step)
         self._guarded(while_.body, step, 'guard')
         if step.every:
             self.origin(while_.body.create_keyword(name='Sleep', args=[step.every]),
                         step, 'every')
+        # The loop ran to its end: recorded at once (see FlowRun.loop_ended).
+        end = body.create_keyword(name=LOOP_END_KEYWORD, args=[_literal(step.id)])
+        self.origin(end, step, 'loop-end')
 
     def _keyword(self, body, step):
         if step.retry is None and step.timeout is None:
