@@ -126,9 +126,11 @@ library constructors run, so keep bench access out of those.
   setup/test/teardown **phases**.
 - **Sub-flows** — a region of the plan becomes a file of its own and is called as one step,
   with parameters.
-- **Two flows as two processes** — with the `robot.flow.signals` library two flows meet and
-  run in lockstep through a small signal file of the run; a missing peer ends `UNKNOWN`
-  instead of hanging or failing falsely.
+- **Two flows as two processes, or two machines** — with the `robot.flow.signals` library
+  two flows meet and run in lockstep through the signal store of the run: a small JSON
+  file on one PC, or for a distributed bench `python -m robot.flow server` (nothing to
+  install), a Redis server or an MQTT broker, or a store class of your own; a missing
+  peer ends `UNKNOWN` instead of hanging or failing falsely.
 - **Pause, stop, set, snapshot and restart** — `python -m robot.flow control <store> pause | resume | stop | set NAME=value | snapshot [name]`
   holds or ends a running flow between two steps, with loop deadlines, gate timeouts
   and watchdogs frozen meanwhile; a stopped or crashed flow leaves a checkpoint and the

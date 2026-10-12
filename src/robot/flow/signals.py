@@ -28,21 +28,30 @@ This is for *coordination* -- cycle numbers, acknowledgements, "I am
 ready" -- not for the bench's own values, which stay in the services that
 own them.
 
-Where the signals live:
+Where the signals live -- the *store* of the run, named by the
+``ROBOT_FLOW_SIGNALS`` environment variable, which whoever starts the group
+sets for every member (a fresh store per run means two runs can never read
+each other's signals):
 
-- By default, a JSON file shared by the processes of the run: its path comes
-  from the ``ROBOT_FLOW_SIGNALS`` environment variable, which whoever starts
-  the group sets to a file of that run (a fresh file per run means two runs
-  can never read each other's signals). Without it, a file in the temporary
-  directory, shared by every run on the machine that does not set one.
+- a **path**: a JSON file shared by the processes of the run on one machine
+  (the default; unset, a file in the temporary directory shared by every run
+  on the machine that sets none);
+- ``http://host:port/<run>``: the signal server of ``python -m robot.flow
+  server`` on any machine of the bench, for flows on several machines, with
+  nothing to install;
+- ``redis://host:port/0?ns=<run>`` or ``mqtt://host:port/<run>``: a Redis
+  server or an MQTT broker already on the bench (the ``redis`` and
+  ``paho-mqtt`` packages are imported when such a store is used);
 - ``ROBOT_FLOW_SIGNALS_BACKEND`` names a class (``package.module.Class`` or
-  ``package.module:Class``) to use instead, for processes on different
-  machines: it is created with the ``ROBOT_FLOW_SIGNALS`` value as its only
-  argument (none when that is empty) and needs two methods, ``get(name)``
-  returning ``{'value': ..., 'time': epoch seconds}`` or ``None``, and
-  ``set(name, value)``.
-- ``Library  robot.flow.signals.FlowSignals  store=path  backend=Class``
+  ``package.module:Class``) for any other system: a :class:`SignalStore`
+  subclass created with the ``ROBOT_FLOW_SIGNALS`` value as its only argument
+  (none when that is empty). ``utest/flow/test_signals.py`` has the contract
+  such a class must meet.
+- ``Library  robot.flow.signals.FlowSignals  store=...  backend=Class``
   chooses them in the flow or suite instead of the environment.
+
+The same store is the run's control channel (pause, resume, stop, set,
+snapshot, status): see :mod:`robot.flow.control`.
 
 Values are numbers when they look like numbers (``Set Signal  cycle  3``
 stores ``3``), strings otherwise; ``Signal Should Be`` compares numbers as
@@ -66,15 +75,101 @@ STORE_VARIABLE = 'ROBOT_FLOW_SIGNALS'
 BACKEND_VARIABLE = 'ROBOT_FLOW_SIGNALS_BACKEND'
 DEFAULT_STORE = os.path.join(tempfile.gettempdir(), 'robot_flow_signals.json')
 _OPERATORS = ('==', '!=', '<', '<=', '>', '>=')
+# URL schemes with a shipped store; anything else is a path or a custom class.
+_SCHEMES = {'http': 'robot.flow.stores:HttpStore', 'https': 'robot.flow.stores:HttpStore',
+            'redis': 'robot.flow.stores:RedisStore', 'rediss': 'robot.flow.stores:RedisStore',
+            'mqtt': 'robot.flow.stores:MqttStore', 'mqtts': 'robot.flow.stores:MqttStore'}
 
 
-class FileStore:
+class SignalStore:
+    """Where the signals of a run live. Subclass it for another system.
+
+    A store keeps *the last value of each name*: it is shared state, not a
+    message stream, so a process that joins late reads what was set before
+    it came. An entry is a dict ``{'value': ..., 'time': epoch seconds,
+    'seq': int}``; ``seq`` is assigned by the store and strictly increases
+    over every write to it by every process, which is what the control
+    channel uses to tell "given since this process started" without trusting
+    the clocks of two machines. :meth:`entry` builds one.
+
+    Required: :meth:`get`, :meth:`set`, :meth:`read`. Optional:
+    :meth:`wait` with ``supports_wait = True`` when the system can block
+    until something changes (a long poll, a subscription), and
+    :meth:`close`. ``where`` is the store's description for the log.
+    """
+
+    supports_wait = False
+    where = ''
+
+    def get(self, name):
+        """The entry of ``name``, or ``None``."""
+        raise NotImplementedError
+
+    def set(self, name, value):
+        """Store ``value`` (a JSON-safe scalar or dict) under ``name``."""
+        raise NotImplementedError
+
+    def read(self):
+        """Every entry, as a dict name -> entry."""
+        raise NotImplementedError
+
+    def last_seq(self):
+        """The newest sequence number in the store (0 when it is empty)."""
+        return max((_seq(entry) for entry in self.read().values()), default=0)
+
+    def wait(self, seq, timeout):
+        """Return when an entry newer than ``seq`` exists, or after ``timeout``
+        seconds. The default only sleeps; a store that can do better says
+        ``supports_wait = True``."""
+        time.sleep(timeout)
+
+    def close(self):
+        pass
+
+    @staticmethod
+    def entry(value, seq):
+        return {'value': value, 'time': time.time(), 'seq': int(seq), 'pid': os.getpid()}
+
+
+def _seq(entry):
+    try:
+        return int((entry or {}).get('seq') or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+class MemoryStore(SignalStore):
+    """Signals in this process only: the reference store, for tests and for
+    a run whose members are threads. ``name`` tells stores apart."""
+
+    _stores = {}
+    _lock = threading.Lock()
+
+    def __init__(self, name='default'):
+        with self._lock:
+            self._data, self._seq = self._stores.setdefault(name, ({}, [0]))
+        self.where = f'memory:{name}'
+
+    def get(self, name):
+        return self._data.get(name)
+
+    def set(self, name, value):
+        with self._lock:
+            self._seq[0] += 1
+            self._data[name] = self.entry(value, self._seq[0])
+
+    def read(self):
+        return dict(self._data)
+
+
+class FileStore(SignalStore):
     """Signals in a JSON file, safe for several processes and threads.
 
     A write takes a lock file next to the store (created exclusively, so one
     writer at a time; one older than ``STALE_LOCK_S`` is left over from a
     killed process and is taken over), reads, updates and replaces the file
-    whole. A reader never sees half a file.
+    whole. A reader never sees half a file. The sequence number is one more
+    than the newest in the file, under the lock.
     """
 
     STALE_LOCK_S = 10.0
@@ -82,6 +177,7 @@ class FileStore:
 
     def __init__(self, path):
         self.path = os.path.abspath(path)
+        self.where = self.path
         self._lock_path = self.path + '.lock'
         self._thread_lock = threading.Lock()
 
@@ -91,8 +187,12 @@ class FileStore:
     def set(self, name, value):
         with self._thread_lock, self._locked():
             data = self._read()
-            data[name] = {'value': value, 'time': time.time(), 'pid': os.getpid()}
+            seq = max((_seq(entry) for entry in data.values()), default=0) + 1
+            data[name] = self.entry(value, seq)
             self._replace(data)
+
+    def read(self):
+        return self._read()
 
     def _read(self):
         for attempt in range(50):
@@ -170,15 +270,8 @@ class FlowSignals:
     ROBOT_LIBRARY_VERSION = _get_version()
 
     def __init__(self, store=None, backend=None):
-        store = store if store is not None else os.environ.get(STORE_VARIABLE, '')
-        backend = backend or os.environ.get(BACKEND_VARIABLE, '')
-        if backend:
-            cls = _import_class(backend)
-            self._store = cls(store) if store else cls()
-            self._where = f'{backend}({store!r})' if store else backend
-        else:
-            self._store = FileStore(store or DEFAULT_STORE)
-            self._where = self._store.path
+        self._store = open_store(store, backend)
+        self._where = self._store.where
 
     def set_signal(self, name, value):
         """Set signal ``name`` to ``value``, for the other flows of the run.
@@ -243,6 +336,62 @@ def _number(value):
 
 def _is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def open_store(store=None, backend=None):
+    """The :class:`SignalStore` for ``store``: a path, a URL with a known
+    scheme, or whatever the class ``backend`` (``package.module:Class``; the
+    ``ROBOT_FLOW_SIGNALS_BACKEND`` environment variable when not given)
+    takes. Both default to the environment; no store at all is the file in
+    the temporary directory."""
+    store = store if store is not None else os.environ.get(STORE_VARIABLE, '')
+    store = str(store).strip()
+    backend = backend or os.environ.get(BACKEND_VARIABLE, '')
+    if backend:
+        cls = _import_class(backend)
+        instance = cls(store) if store else cls()
+        return _adapted(instance, f'{backend}({store!r})' if store else backend)
+    scheme = _scheme(store)
+    if scheme in _SCHEMES:
+        return _import_class(_SCHEMES[scheme])(store)
+    if scheme == 'file':
+        from urllib.request import url2pathname
+        store = url2pathname(store[len('file:'):].lstrip('/') if os.name == 'nt'
+                             else store[len('file:'):])
+    elif scheme:
+        raise ValueError(f"Signal store '{store}': no store for '{scheme}://'. Use a "
+                         f"path, http://, redis:// or mqtt://, or name a class in "
+                         f"{BACKEND_VARIABLE}.")
+    return FileStore(store or DEFAULT_STORE)
+
+
+def _scheme(store):
+    head, sep, _ = store.partition('://')
+    # 'C:\\path' has no '://'; a one-letter scheme would be a drive anyway.
+    return head.lower() if sep and len(head) > 1 and head.isalpha() else ''
+
+
+def _adapted(instance, where):
+    """A custom class with only ``get`` and ``set`` (the first contract) still
+    works for signals; the control channel needs ``read`` for its requests."""
+    if not getattr(instance, 'where', ''):
+        try:
+            instance.where = where
+        except AttributeError:
+            pass
+    if not hasattr(instance, 'read'):
+        legacy = getattr(instance, '_read', None)
+        try:
+            instance.read = legacy if legacy else (lambda: {})
+        except AttributeError:
+            pass
+    for name in ('last_seq', 'wait', 'close'):
+        if not hasattr(instance, name):
+            try:
+                setattr(instance, name, getattr(SignalStore, name).__get__(instance))
+            except AttributeError:
+                pass
+    return instance
 
 
 def _import_class(name):

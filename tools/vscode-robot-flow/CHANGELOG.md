@@ -15,7 +15,10 @@
   `NAME=value` pairs as `--variable`. *Set…* and *Snapshot* act on a running
   flow through its signal store.
 - Run groups of a test project (`testproject.json`): the members' Diagrams
-  with their meeting points, run together on one signal store. *Add to Run
+  with their meeting points, run together on one signal store. A project
+  whose `run.env` names a store URL (`ROBOT_FLOW_SIGNALS=http://hub:8765/run`,
+  the fork's signal server for members on several machines) is followed
+  through `python -m robot.flow control <store> status --json`. *Add to Run
   Group…* on a flow file and the panel's *Member…* / *Group…* edit the
   groups (only the `groups` value of the file changes); a JSON schema for
   `testproject.json`.

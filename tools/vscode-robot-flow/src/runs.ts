@@ -7,7 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { ControlCommand, ControlState, activeProcesses, canPause, findCheckpoint, readControlState, sendControl } from './backend/control';
+import { ControlCommand, ControlState, activeProcesses, canPause, findCheckpoint, readControlStateFrom, sendControl } from './backend/control';
 import { RobotEnv } from './backend/helpers';
 import { Project, RunGroup, memberPath } from './backend/project';
 import { Position, RobotRun, RunStatus, formatVariables, parseVariables, planRun } from './backend/run';
@@ -291,7 +291,7 @@ export class RunManager implements vscode.Disposable {
       return;
     }
     // Not under the debugger: a run it holds at a breakpoint would never reach the next step.
-    if (a.state.pausable && !a.state.debug && a.store && activeProcesses(readControlState(a.store)).length) {
+    if (a.state.pausable && !a.state.debug && a.store && activeProcesses(await readControlStateFrom(a.env, a.store)).length) {
       const res = await sendControl(a.env, a.store, 'stop');
       if (res.ok && this.isRunning(key)) {
         a.output.appendLine('[stop: at the next step, with a checkpoint to continue from]');
@@ -364,11 +364,20 @@ export class RunManager implements vscode.Disposable {
     return state;
   }
 
+  private reading = new Set<string>();
+
   /** What the flows say now, from their store; the views hear of a change. */
-  private readFlow(key: string): void {
+  private async readFlow(key: string): Promise<void> {
     const a = this.runs.get(key);
-    if (!a || !a.store || !this.isRunning(key)) return;
-    const flow = readControlState(a.store);
+    if (!a || !a.store || !this.isRunning(key) || this.reading.has(key)) return;
+    this.reading.add(key);
+    let flow: ControlState | null;
+    try {
+      flow = await readControlStateFrom(a.env, a.store);    // a URL store asks the CLI
+    } finally {
+      this.reading.delete(key);
+    }
+    if (!this.runs.has(key)) return;
     const shape = (f: ControlState | null) => JSON.stringify([
       Object.entries(f?.processes || {}).map(([n, p]) => [n, p.state, p.phase, p.loop, p.iteration]), f?.command?.value]);
     if (shape(flow) === shape(a.state.flow)) return;

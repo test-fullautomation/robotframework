@@ -63,16 +63,27 @@ def main(argv=None):
                          help="'set': NAME=value pairs; 'snapshot': its name (optional)")
     control.add_argument('--rig', help='only the flow started with this FLOW_RIG / '
                                        'ROBOT_FLOW_RIG; default: all of them')
+    control.add_argument('--json', action='store_true',
+                         help="'status': print the store's entries as JSON")
+    server = commands.add_parser('server', help='the signal server for flows on several '
+                                                'machines (ROBOT_FLOW_SIGNALS=http://host:port/<run>)')
+    server.add_argument('--host', default='0.0.0.0', help='interface to listen on (default: all)')
+    server.add_argument('--port', type=int, default=8765,
+                        help='port (default: 8765; 0: any free one)')
+    server.add_argument('--file', help='keep the signals in this file across restarts')
     report = commands.add_parser('report', help='the flow report of a run', add_help=False)
     report.add_argument('args', nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     if args.command == 'report':
         from .report import report_cli
         return report_cli(args.args)
+    if args.command == 'server':
+        from .server import serve
+        return serve(args.host, args.port, args.file)
     if args.command == 'schema':
         return _schema(args.output)
     if args.command == 'control':
-        return _control(args.store, args.action, args.rig, args.args)
+        return _control(args.store, args.action, args.rig, args.args, args.json)
     try:
         if args.command == 'validate':
             _validate(args.file)
@@ -98,12 +109,16 @@ def _schema(output):
     return 0
 
 
-def _control(store, action, rig=None, args=()):
+def _control(store, action, rig=None, args=(), as_json=False):
     from .control import (CONTROL_SIGNAL, SET_SIGNAL, SNAPSHOT_SIGNAL, STATE_SIGNAL,
                           STOP_SIGNAL, VARIABLE_NAME)
-    from .signals import FlowSignals
+    from .signals import open_store
 
-    backend = FlowSignals(store=store)._store
+    try:
+        backend = open_store(store)
+    except (ValueError, ImportError, RuntimeError, OSError) as err:
+        sys.stderr.write(f'{err}\n')
+        return 1
     target = 'rig ' + rig if rig else 'all flows'
     if action == 'set':
         pairs = [arg.partition('=') for arg in args]
@@ -131,7 +146,14 @@ def _control(store, action, rig=None, args=()):
         backend.set(name, action)
         print(f"{action} -> {target} of '{store}'.")
         return 0
-    entries = backend._read() if hasattr(backend, '_read') else {}
+    try:
+        entries = backend.read() or {}
+    except Exception as err:
+        sys.stderr.write(f"Cannot read '{store}': {err}\n")
+        return 1
+    if as_json:
+        print(json.dumps(entries))
+        return 0
     commands = {key: entry for key, entry in entries.items()
                 if key == CONTROL_SIGNAL or key.startswith(CONTROL_SIGNAL + '.')}
     states = {key: entry for key, entry in entries.items()

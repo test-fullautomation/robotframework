@@ -68,7 +68,12 @@ export function sendControl(env: RobotEnv, store: string, command: ControlComman
   });
 }
 
-/** The flows' own state, read from the store; null when no flow has used it yet. */
+/** A store that is not a file: the signal server (http://), Redis, MQTT, a custom class's URL. */
+export function isUrlStore(store: string): boolean {
+  return /^[a-z][a-z0-9+.-]+:\/\//i.test(store) && !/^file:/i.test(store);
+}
+
+/** The flows' own state, read from the store file; null when no flow has used it yet. */
 export function readControlState(store: string, now = Date.now()): ControlState | null {
   let entries: unknown;
   try {
@@ -76,6 +81,36 @@ export function readControlState(store: string, now = Date.now()): ControlState 
   } catch {
     return null;   // not there yet, or being replaced
   }
+  return stateFromEntries(entries, now);
+}
+
+/** The same for any store: a file is read directly, a URL through `control <store> status --json`. */
+export function readControlStateFrom(env: RobotEnv, store: string, now = Date.now()): Promise<ControlState | null> {
+  if (!isUrlStore(store)) return Promise.resolve(readControlState(store, now));
+  return new Promise((resolve) => {
+    let child;
+    try {
+      const childEnv: NodeJS.ProcessEnv = { ...process.env, PYTHONPATH: pythonPathFor(env), PYTHONUTF8: '1' };
+      delete childEnv.PYTHONIOENCODING;
+      child = spawn(env.python, ['-m', 'robot.flow', 'control', store, 'status', '--json'], { cwd: env.cwd, env: childEnv, windowsHide: true });
+    } catch {
+      resolve(null);
+      return;
+    }
+    const out: Buffer[] = [];
+    let done = false;
+    const finish = (s: ControlState | null) => { if (!done) { done = true; clearTimeout(timer); resolve(s); } };
+    const timer = setTimeout(() => { child.kill(); finish(null); }, 15000);
+    child.stdout.on('data', (d: Buffer) => out.push(d));
+    child.on('error', () => finish(null));
+    child.on('close', (code: number | null) => {
+      if (code !== 0) { finish(null); return; }
+      try { finish(stateFromEntries(JSON.parse(Buffer.concat(out).toString('utf8')), now)); } catch { finish(null); }
+    });
+  });
+}
+
+function stateFromEntries(entries: unknown, now: number): ControlState | null {
   if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return null;
   const processes: Record<string, FlowProcess> = {};
   let command: ControlState['command'] = null;

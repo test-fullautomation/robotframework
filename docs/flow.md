@@ -446,21 +446,58 @@ If the peer dies, the gate times out and the verdict is UNKNOWN, not FAIL.
 Never retract a flag the peer may not have read yet — mark the end with a new
 signal (`${RIG}.done`) instead.
 
-Where they live:
+Where they live: the *store* of the run, named by **`ROBOT_FLOW_SIGNALS`**,
+which whoever starts the group sets for every member. A store keeps the
+last value of each name with the time it was set and a sequence number, so
+a flow that joins late reads what was set before it came. Whatever the
+store, it is also the run's control channel (pause, resume, stop, set,
+snapshot, status), and the same `python -m robot.flow control <store> ...`
+works on it.
 
-- **`ROBOT_FLOW_SIGNALS`** -- a JSON file the processes of the run share
-  (created on first write; writes are locked, readers never see half a file;
-  a lock left behind by a killed process is taken over after 10 seconds).
-  Whoever starts the group sets it to a file *of that run*, so two runs can
-  never read each other's signals, for example `results/<run>/signals.json`.
-  Unset, it is `robot_flow_signals.json` in the
-  temporary directory, shared by every run on the machine that sets none.
-- **`ROBOT_FLOW_SIGNALS_BACKEND`** -- a class (`package.module.Class` or `package.module:Class`) for
-  flows on different machines: created with the `ROBOT_FLOW_SIGNALS` value,
-  it needs `get(name)` (returning `{"value": ..., "time": ...}` or `None`)
-  and `set(name, value)`.
+| `ROBOT_FLOW_SIGNALS` | the store |
+|---|---|
+| a path, e.g. `results/<run>/signals.json` | **a JSON file** the processes of the run share on one machine (the default; created on first write; writes are locked, readers never see half a file; a lock left behind by a killed process is taken over after 10 seconds). Unset: `robot_flow_signals.json` in the temporary directory, shared by every run on the machine that sets none. |
+| `http://<host>:8765/<run>` | **the signal server**: `python -m robot.flow server` on any machine of the bench; see below. |
+| `redis://<host>:6379/0?ns=<run>` | a **Redis** server already on the bench (`pip install redis`). The run's signals are one hash, the sequence numbers one counter. |
+| `mqtt://[user:pw@]<host>:1883/<run>` | an **MQTT broker** (`pip install paho-mqtt`): each signal is the retained message of `<run>/<name>`. The broker assigns no sequence numbers, so the publishers' clocks order the writes: keep the machines on NTP. |
+
+A fresh store per run (a new file, a new `<run>` name) means two runs can
+never read each other's signals.
+
+- **`ROBOT_FLOW_SIGNALS_BACKEND`** -- any other system (a bus the bench
+  already has, a database): a class (`package.module:Class`) created with
+  the `ROBOT_FLOW_SIGNALS` value. Subclass `robot.flow.signals.SignalStore`,
+  implement `get`, `set` and `read`, and prove it with the store contract
+  test; [Signal stores](signal-stores.md#a-store-of-your-own) shows a worked
+  class.
 - In a flow or suite, `Library    robot.flow.signals.FlowSignals    store=...    backend=...`
   sets both there.
+
+### Flows on several machines
+
+A distributed system is tested by flows on several machines meeting through
+one store. Nothing has to be installed for it: start the signal server on
+any machine of the bench and point every member at it, with its rig name.
+
+```bash
+# on bench PC "hub"
+python -m robot.flow server --port 8765            # --file signals.json keeps the state across restarts
+
+# on every machine of the run, with the run's own name in the URL
+export ROBOT_FLOW_SIGNALS=http://hub:8765/run42
+robot --parser robot.flow --variable FLOW_RIG:RIG_A plan_a.flow.json     # on PC A
+robot --parser robot.flow --variable FLOW_RIG:RIG_B plan_b.flow.json     # on PC B
+
+# from anywhere
+python -m robot.flow control http://hub:8765/run42 status
+python -m robot.flow control http://hub:8765/run42 pause --rig RIG_B
+```
+
+The server orders every write with one sequence number, so a command given
+before a member started is not for it however the clocks of the two
+machines differ. [Signal stores](signal-stores.md) has the server's HTTP
+interface, Redis, MQTT and RabbitMQ (through its MQTT plugin), and how to
+write and prove a store of your own.
 
 The library is for coordination -- cycle numbers, acknowledgements, "ready".
 The bench's own values (a supply voltage, a DUT temperature) stay in the

@@ -126,6 +126,27 @@ class TestRequestsFromTheStore(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.tmp.name, 'run1', 'requests.checkpoint.json')))
 
 
+class TestRequestsThroughTheServer(TestRequestsFromTheStore):
+    """The same run with the signal server as the store: the flow's own
+    requests, the poller and the restart all go over HTTP."""
+
+    def setUp(self):
+        super().setUp()
+        from robot.flow.server import SignalServer
+        self.server = SignalServer('127.0.0.1', 0)
+        self.server.start()
+        self.addCleanup(self.server.shutdown)
+        self.store = f'{self.server.url}/requests-{id(self)}'
+        os.environ['ROBOT_FLOW_SIGNALS'] = self.store
+
+    def test_the_flow_published_its_state_to_the_server(self):
+        rc, suite = self._run('run1')
+        self.assertEqual(rc, 0)
+        states = {k: v for k, v in self.server.read(f'requests-{id(self)}').items() if k.startswith('flow.state.')}
+        self.assertEqual(len(states), 1)
+        self.assertEqual(list(states.values())[0]['value']['state'], 'finished')
+
+
 class FakeStore:
 
     def __init__(self):

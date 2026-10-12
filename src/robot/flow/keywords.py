@@ -410,12 +410,11 @@ def _follow_store():
     store = os.environ.get('ROBOT_FLOW_SIGNALS')
     if not store:
         return
-    current = getattr(_CONTROL._store, 'path', None)
-    if _CONTROL._poller is not None and current == os.path.abspath(store):
+    if _CONTROL._poller is not None and _CONTROL._store_url == store:
         return
-    from .signals import FlowSignals as _FlowSignals
+    from .signals import open_store as _open_store
     _CONTROL.stop_polling()
-    _CONTROL.start_polling(_FlowSignals(store=store)._store)
+    _CONTROL.start_polling(_open_store(store), url=store)
 
 
 # The body runner's pause point, and the control channel of the run: the

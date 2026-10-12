@@ -81,11 +81,15 @@ class FlowControl:
         self._paused_total = 0.0
         self._stop_reason = None
         self._store = None
+        self._store_url = None  # what the store was opened from, to tell a rebind
         self._poller = None
         self._poller_stop = threading.Event()
+        # Commands are for this process when written after it started: by the
+        # store's sequence number, or by time for a store that has none.
         self._since = time.time()
+        self._since_seq = 0
         self._seen = None
-        self._applied = set()   # (store key, time) of requests taken over
+        self._applied = set()   # (store key, seq or time) of requests taken over
         self._pending = []      # set / snapshot requests for the flow's thread
         self._console = None
         self.rig = os.environ.get('ROBOT_FLOW_RIG', '')
@@ -254,12 +258,21 @@ class FlowControl:
 
     # ------------------------------------------------- the control channel
 
-    def start_polling(self, store):
-        """Follow the control signal of ``store`` (``get(name)``, ``set(name, value)``)."""
+    def start_polling(self, store, url=None):
+        """Follow the control signal of ``store`` (a :class:`~robot.flow.signals.SignalStore`)."""
         with self._lock:
             if self._poller is not None:
                 return
             self._store = store
+            self._store_url = url
+            try:
+                self._since_seq = int(store.last_seq())
+            except Exception:
+                self._since_seq = 0
+            # What was seen and applied belongs to the store it came from:
+            # another store numbers its writes from the start again.
+            self._seen = None
+            self._applied = set()
             self._poller_stop.clear()
             self._poller = threading.Thread(target=self._poll, name='FlowControl',
                                             daemon=True)
@@ -273,53 +286,91 @@ class FlowControl:
             poller.join(self.POLL_S * 4)
 
     def _poll(self):
-        while not self._poller_stop.wait(self.POLL_S):
+        store = self._store
+        waits = getattr(store, 'supports_wait', False)
+        last = self._since_seq
+        while not self._poller_stop.is_set():
+            if waits:
+                # The store tells when something changed (a long poll, a
+                # subscription): a command reaches the flow at once.
+                try:
+                    store.wait(last, self.POLL_S)
+                except Exception:
+                    time.sleep(self.POLL_S)
+                if self._poller_stop.is_set():
+                    break
+            elif self._poller_stop.wait(self.POLL_S):
+                break
             try:
-                self.apply(self._read_command())
-                self._queue(self._read_requests())
+                entries = self._entries()
+                self.apply(self._read_command(entries))
+                self._queue(self._read_requests(entries))
+                last = max([last] + [_seq(entry) for entry in entries.values()])
             except Exception:       # a store that cannot be read must not end the watch
                 pass
 
-    def _read_command(self):
+    def _entries(self):
+        """Every entry of the store; a store of the first contract (get/set
+        only) is read name by name for the commands."""
+        read = getattr(self._store, 'read', None) or getattr(self._store, '_read', None)
+        entries = read() if read else None
+        if entries:
+            return dict(entries)
+        entries = {}
+        for signal in (STOP_SIGNAL, CONTROL_SIGNAL, SNAPSHOT_SIGNAL):
+            for name in self._names(signal):
+                entry = self._store.get(name)
+                if entry:
+                    entries[name] = entry
+        return entries
+
+    def _newer(self, entry):
+        """Written after this process started: by sequence number, else by time."""
+        if not isinstance(entry, dict):
+            return False
+        seq = _seq(entry)
+        if seq:
+            return seq > self._since_seq
+        return entry.get('time', 0) >= self._since
+
+    def _read_command(self, entries):
         """The newest command for this process given since it started.
 
         A stop, once given, is the command: nothing written after it takes
         it back.
         """
         for name in self._names(STOP_SIGNAL):
-            entry = self._store.get(name)
-            if entry and entry.get('time', 0) >= self._since:
-                return {'value': STOP, 'time': entry['time']}
+            entry = entries.get(name)
+            if self._newer(entry):
+                return {'value': STOP, 'time': entry.get('time'), 'seq': _seq(entry)}
         newest = None
         for name in self._names(CONTROL_SIGNAL):
-            entry = self._store.get(name)
-            if not entry or entry.get('time', 0) < self._since:
+            entry = entries.get(name)
+            if not self._newer(entry):
                 continue
-            if newest is None or entry['time'] >= newest['time']:
+            if newest is None or _order(entry) >= _order(newest):
                 newest = entry
         return newest
 
-    def _read_requests(self):
+    def _read_requests(self, entries):
         """Set and snapshot requests for this process since it started, each once."""
-        read = getattr(self._store, '_read', None)
-        entries = read() if read else {}
         found = []
-        for key, entry in (entries or {}).items():
-            if not isinstance(entry, dict) or entry.get('time', 0) < self._since:
+        for key, entry in entries.items():
+            if not self._newer(entry):
                 continue
-            stamp = (key, entry.get('time'))
+            stamp = (key, _seq(entry) or entry.get('time'))
             if stamp in self._applied:
                 continue
             if key.startswith(SET_SIGNAL + '.'):
                 target, _, name = key[len(SET_SIGNAL) + 1:].partition('.')
                 if name and target in ('*', self.rig or '*'):
-                    found.append((stamp, (SET, name, entry.get('value'))))
+                    found.append((stamp, _order(entry), (SET, name, entry.get('value'))))
             elif key in self._names(SNAPSHOT_SIGNAL):
-                found.append((stamp, (SNAPSHOT, str(entry.get('value') or ''))))
-        found.sort(key=lambda item: item[0][1] or 0)
-        for stamp, request in found:
+                found.append((stamp, _order(entry), (SNAPSHOT, str(entry.get('value') or ''))))
+        found.sort(key=lambda item: item[1])
+        for stamp, _, request in found:
             self._applied.add(stamp)
-        return [request for _, request in found]
+        return [request for _, _, request in found]
 
     def _queue(self, requests):
         if requests:
@@ -371,7 +422,7 @@ class FlowControl:
         """Act on a control entry ``{'value': command, 'time': seconds}`` once."""
         if not entry:
             return
-        key = (entry.get('value'), entry.get('time'))
+        key = (entry.get('value'), _seq(entry) or entry.get('time'))
         if key == self._seen:
             return
         self._seen = key
@@ -413,6 +464,8 @@ class FlowControl:
             self._applied = set()
             self._pending = []
             self._store = None
+            self._store_url = None
+            self._since_seq = 0
             self.step_mode = False
             self.stopped = False
             self.run = None
@@ -420,6 +473,18 @@ class FlowControl:
 
 # Keywords the builder emits for bookkeeping; step mode does not stop at them.
 _INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop')
+
+
+def _seq(entry):
+    try:
+        return int((entry or {}).get('seq') or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+def _order(entry):
+    """Writes in the order they happened: by sequence number, then by time."""
+    return (_seq(entry), entry.get('time') or 0)
 
 CONTROL = FlowControl()
 

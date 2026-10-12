@@ -14,7 +14,8 @@ existing suites run unchanged; everything below is opt-in.
 <p class="pain-line">"My test plan is a flowchart, but I maintain it as .robot by hand."</p>
 ### [Flow files](flow.md)
 Run the flowchart itself. Gates, bounded loops and recovery are built in — and
-two flows in two processes can meet and move in lockstep.
+two flows in two processes, or on two machines, can meet and move in lockstep
+through a [signal store](signal-stores.md).
 </div>
 
 <div class="card" markdown>
