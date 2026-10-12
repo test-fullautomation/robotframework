@@ -204,7 +204,7 @@ from the module search path.
 |------|------------|-----------|---------|
 | `start` / `end` | — | 1 / 0 | Exactly one start; at least one end. |
 | `phase` | `role`: setup, test, teardown; `name` for tests | 1 | Setup → suite setup, each test phase → one test case, teardown → suite teardown. Without phases the whole flow is one test named after the flow. |
-| `keyword` | `keyword`, `args`, `assign` | 1 | Call a keyword; `${var}` substitution applies. `assign` (`"${VERSION}"`) stores the return value for a later decision. |
+| `keyword` | `keyword`, `args`, `assign`, optional `retry`, `timeout` | 1 | Call a keyword; `${var}` substitution applies. `assign` (`"${VERSION}"`) stores the return value for a later decision. `retry` runs it again when it fails, `timeout` limits each attempt (see [Retry and timeout per step](#retry-and-timeout-per-step)). |
 | `gate` | `keyword`, `args`, `timeout`, `interval` (2s), `on_timeout`: unknown (default) or fail | 1 | Poll the keyword until it passes. On timeout the message carries the last error and the elapsed time. |
 | `sleep` | `duration` | 1 | `Sleep`. |
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |
@@ -241,9 +241,43 @@ plan calls it as one box:
 
 `python -m robot.flow validate` checks every sub-flow file it reaches.
 
+### Retry and timeout per step
+
+A gate waits for the bench; a `keyword` node that *acts* on it sometimes needs
+a second chance too -- a reading that is noise once in a while, a command the
+device drops under load. The policy is declared on the node, not coded into
+the keyword:
+
+```json
+{ "id": "read", "kind": "keyword", "keyword": "Read Sensor", "args": ["ch1"], "assign": "${LEVEL}",
+  "retry": { "max_attempts": 5, "interval": "2s", "backoff": 2, "on_exhausted": "unknown" },
+  "timeout": "30s" }
+```
+
+| attribute | meaning |
+|-----------|---------|
+| `retry.max_attempts` | How many times the keyword may run (a number alone, `"retry": 3`, is this). |
+| `retry.interval` | The wait before the next attempt; default `1s`. Paused time does not count. |
+| `retry.backoff` | The factor the wait grows by after each attempt; default 1. With `2s` and `2`: 2 s, 4 s, 8 s ... |
+| `retry.on_exhausted` | The verdict when the last attempt fails too: `fail` (default, the keyword's own failure) or `unknown` (the bench did not cooperate; nothing was tested). |
+| `timeout` | A keyword timeout on each attempt: an attempt that exceeds it is interrupted and counts as failed -- retried under a `retry` policy, otherwise the step fails. |
+
+In the log the node is one `Flow Retry` step whose children are the attempts,
+with a message per failed attempt saying when the next one comes and why
+this one failed;
+the flow report shows the number of attempts on the box, like a gate's. The
+step's error names the attempts and carries the last error
+(`'Read Sensor' failed after 5 attempts. Last error: ...`). With one attempt
+the keyword's own failure is kept as it is; a timed-out step fails with
+`'Read Sensor' timed out after 30 seconds`, an ordinary failure the node's
+`on_failure` recovery can route. A skip, a test timeout, a syntax error or an
+exit-on-failure is never retried. `max_attempts`, `interval` and `timeout` may
+be `${variables}`, sized per run like loop bounds.
+
 ### Bounds from variables
 
-`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval` and a
+`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval`, a
+keyword's `timeout` and `retry` values, and a
 sleep's `duration` may be a single `${variable}` instead of a value. The
 default comes from the file's `variables`; a run overrides it on the command
 line, so the same plan runs as a one-hour smoke test and as the 48-hour
@@ -298,6 +332,7 @@ Cycle
 | setup / teardown phase | generated user keywords `Flow Setup` / `Flow Teardown` as suite setup and teardown — they may hold loops and branches |
 | test phase | a test case |
 | `gate` | `Flow Gate` from `robot.flow.keywords`, built on retrying the keyword |
+| `keyword` with `retry` or `timeout` | `Flow Retry` from `robot.flow.keywords`: the attempts are its children, each under Robot's keyword timeout when the node has one; a node without a policy is the plain keyword call |
 | `decision` | `IF` / `ELSE` |
 | `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline on the flow clock in the condition, so reaching either bound ends the loop with **PASS** |
 | checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds) and `Flow Iteration` first in its body. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
@@ -314,6 +349,8 @@ the same memory as ten. Suites get the same with `--pruneresults`; see
 |---------------|--------|
 | A keyword asserted and failed | FAIL |
 | A gate timed out | **UNKNOWN** — the bench or a peer was not ready; nothing was tested. `on_timeout: fail` per gate when a silent peer *is* the product failing |
+| A keyword failed on every attempt of its `retry` | FAIL with the last error and the number of attempts; `on_exhausted: unknown` per node when giving up means the bench did not cooperate |
+| A keyword attempt exceeded the node's `timeout` | The attempt is interrupted and counts as failed: retried under a `retry` policy, else FAIL (`timed out after ...`) |
 | A setup gate timed out | UNKNOWN for every test (`Setup unknown:`); teardown still runs |
 | A keyword in the flow does not exist or has wrong arguments | UNKNOWN, and `--dryrun` reports it per node — including the keyword behind a gate |
 | A loop reached `max_loops` or `max_seconds` | PASS — reaching the bound is the plan |
@@ -329,7 +366,7 @@ four nodes that cycled 600 times is 600 blocks to scroll. The *flow report*
 shows the plan **as it was drawn** -- lanes for the phases, boxes for the
 nodes, the edges between them -- with what the run did written on it: how
 often each node ran and with which outcome, how often each edge was taken,
-how many attempts a gate needed, where a failed cycle went through the
+how many attempts a gate or a retried keyword needed, where a failed cycle went through the
 recovery, where a stopped run stopped and what a restart would do. Every box
 links into `log.html` at the keyword, so the log stays the record and the
 report is the way in.

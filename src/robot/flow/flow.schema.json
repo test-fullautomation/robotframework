@@ -550,6 +550,72 @@
             }
           ],
           "description": "Variable(s) for the return value, e.g. '${VERSION}'."
+        },
+        "retry": {
+          "oneOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\s*\\$\\{[^{}$]+\\}\\s*$"
+                }
+              ],
+              "description": "How many times the keyword may run, or a '${variable}' holding the number."
+            },
+            {
+              "type": "object",
+              "required": [
+                "max_attempts"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "max_attempts": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\s*\\$\\{[^{}$]+\\}\\s*$"
+                    }
+                  ],
+                  "description": "How many times the keyword may run, or a '${variable}' holding the number."
+                },
+                "interval": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "description": "Wait before the next attempt; default 1s."
+                },
+                "backoff": {
+                  "type": "number",
+                  "minimum": 1,
+                  "description": "Factor the wait grows by after each attempt; default 1 (a constant wait)."
+                },
+                "on_exhausted": {
+                  "enum": [
+                    "fail",
+                    "unknown"
+                  ],
+                  "description": "Verdict when the last attempt fails too: 'fail' (the default: the keyword's own failure) or 'unknown' (the bench did not cooperate)."
+                }
+              }
+            }
+          ],
+          "description": "Run the keyword again when it fails: a number of attempts, or a policy object."
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Time limit of one attempt; an attempt that exceeds it fails (and is retried under a retry policy)."
         }
       },
       "additionalProperties": false

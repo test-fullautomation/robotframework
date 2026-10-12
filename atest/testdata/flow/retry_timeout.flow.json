@@ -1,0 +1,38 @@
+{
+  "flow": { "name": "Retry Timeout", "checkpoint": false },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "variables": { "TRIES": 3 },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "retried", "kind": "phase", "role": "test", "name": "Passes After Retries" },
+    { "id": "k1", "kind": "keyword", "keyword": "Flaky Reading", "args": ["3"], "assign": "${READ}",
+                                     "retry": { "max_attempts": "${TRIES}", "interval": "0.05s", "backoff": 2 } },
+    { "id": "k1b", "kind": "keyword", "keyword": "Log", "args": ["Reading ${READ}"] },
+    { "id": "fail", "kind": "phase", "role": "test", "name": "Exhausted Is Fail" },
+    { "id": "k2", "kind": "keyword", "keyword": "Break Something", "args": ["Still broken."],
+                                     "retry": { "max_attempts": 2, "interval": "0.01s" } },
+    { "id": "unknown", "kind": "phase", "role": "test", "name": "Exhausted Is Unknown" },
+    { "id": "k3", "kind": "keyword", "keyword": "Break Something", "args": ["No reply."],
+                                     "retry": { "max_attempts": 2, "interval": "0.01s", "on_exhausted": "unknown" } },
+    { "id": "slow", "kind": "phase", "role": "test", "name": "Timed Out Attempt Is Retried" },
+    { "id": "k4", "kind": "keyword", "keyword": "Slow Then Fast", "args": ["2s"],
+                                     "timeout": "0.3s", "retry": { "max_attempts": 2, "interval": "0.01s" } },
+    { "id": "limit", "kind": "phase", "role": "test", "name": "Timeout Alone Fails The Step" },
+    { "id": "k5", "kind": "keyword", "keyword": "Take Time", "args": ["2s"], "timeout": "0.3s" },
+    { "id": "routed", "kind": "phase", "role": "test", "name": "Timeout Is Routed To The Recovery" },
+    { "id": "guard", "kind": "try" },
+    { "id": "k6", "kind": "keyword", "keyword": "Take Time", "args": ["2s"], "timeout": "0.3s" },
+    { "id": "k7", "kind": "keyword", "keyword": "Recover DUT", "args": ["RIG_T"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "retried"], ["retried", "k1"], ["k1", "k1b"], ["k1b", "fail"], ["fail", "k2"],
+    ["k2", "unknown"], ["unknown", "k3"], ["k3", "slow"], ["slow", "k4"], ["k4", "limit"],
+    ["limit", "k5"], ["k5", "routed"], ["routed", "guard"],
+    { "from": "guard", "to": "k6", "label": "body" },
+    { "from": "k6", "to": "guard", "label": "next" },
+    { "from": "guard", "to": "k7", "label": "on_failure" },
+    { "from": "k7", "to": "guard", "label": "continue" },
+    { "from": "guard", "to": "end", "label": "done" }
+  ]
+}

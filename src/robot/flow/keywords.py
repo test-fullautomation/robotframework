@@ -20,7 +20,8 @@ It deliberately contains only what the runner itself needs; waits that know
 about a bench (signals, services, devices) belong to application libraries
 and are referenced from the flow by name.
 
-``Flow Gate`` is the wait of a ``gate`` node. ``Flow Phase``, ``Flow Loop``
+``Flow Gate`` is the wait of a ``gate`` node; ``Flow Retry`` runs a ``keyword``
+node that has a ``retry`` policy or a ``timeout``. ``Flow Phase``, ``Flow Loop``
 and ``Flow Iteration`` are bookkeeping the builder adds for the checkpoint
 (see :mod:`robot.flow.control`). ``Flow Pause``, ``Flow Resume`` and
 ``Flow Stop`` let a test or a supervisor hold or end the flow it runs in.
@@ -29,10 +30,11 @@ and ``Flow Iteration`` are bookkeeping the builder adds for the checkpoint
 import os
 
 from robot.api import logger, SkipExecution
-from robot.errors import DataError, UnknownAssertionError
+from robot.errors import DataError, ExecutionFailed, UnknownAssertionError
 from robot.libraries.BuiltIn import BuiltIn
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.running.runkwregister import RUN_KW_REGISTER
+from robot.running.timeouts import KeywordTimeout
 from robot.utils import is_truthy, secs_to_timestr, timestr_to_secs
 from robot.version import get_version
 
@@ -40,7 +42,7 @@ from . import control as _control
 from .control import CONTROL as _CONTROL
 
 
-__all__ = ['flow_gate', 'flow_phase', 'flow_loop', 'flow_iteration',
+__all__ = ['flow_gate', 'flow_retry', 'flow_phase', 'flow_loop', 'flow_iteration',
            'flow_pause', 'flow_resume', 'flow_stop', 'flow_snapshot']
 
 ROBOT_LIBRARY_VERSION = get_version()
@@ -103,6 +105,104 @@ def flow_gate(timeout, interval, on_timeout, name, *args):
 # and keeps the keyword name and its arguments unresolved until they are run.
 RUN_KW_REGISTER.register_run_keyword('robot.flow.keywords', 'flow_gate', 3,
                                      deprecation_warning=False, dry_run=True)
+
+
+def flow_retry(max_attempts, interval, backoff, on_exhausted, timeout, name, *args):
+    """Runs the keyword ``name`` under a retry policy and a time limit per attempt.
+
+    The keyword is run up to ``max_attempts`` times until it passes, waiting
+    ``interval`` between attempts; the wait grows by the factor ``backoff``
+    each time (``1``: a constant wait). ``timeout`` (``NONE`` for none) is a
+    Robot keyword timeout on each attempt: an attempt that exceeds it is
+    interrupted and counts as failed. The flow clock is used for the waits,
+    so a paused flow does not spend them.
+
+    When the last attempt fails too, the step fails with the last error and
+    the number of attempts; ``on_exhausted`` decides its status: ``fail``
+    (the keyword's own verdict) or ``unknown`` (the bench did not cooperate,
+    nothing was tested). With a single attempt and no time limit exceeded,
+    the keyword's own failure is raised unchanged.
+
+    A failure that must not be retried -- a test timeout, a syntax error,
+    an exit-on-failure, a skip -- is raised at once.
+
+    Returns the passing attempt's return value. The builder generates calls
+    of this keyword for ``keyword`` nodes with ``retry`` or ``timeout``.
+    """
+    attempts = _positive_int('max_attempts', max_attempts, name)
+    try:
+        wait = timestr_to_secs(interval)
+        factor = float(backoff)
+        limit = timestr_to_secs(timeout) if _given(timeout) else None
+    except ValueError as err:
+        raise DataError(f"Retry policy of '{name}' is invalid: {err}")
+    if on_exhausted not in ('unknown', 'fail'):
+        raise DataError(f"'on_exhausted' must be 'unknown' or 'fail', got "
+                        f"'{on_exhausted}'.")
+    builtin = BuiltIn()
+    context = EXECUTION_CONTEXTS.current
+    for attempt in range(1, attempts + 1):
+        result, error, timed_out = _attempt(builtin, context, limit, name, args)
+        if error is None:
+            if attempt > 1:
+                logger.info(f"'{name}' passed on attempt {attempt} of {attempts}.")
+            return result
+        if attempt < attempts:
+            logger.info(f"Attempt {attempt} of {attempts} of '{name}' "
+                        f"{'timed out' if timed_out else 'failed'}, next attempt in "
+                        f"{secs_to_timestr(wait)}: {error}")
+            _CONTROL.sleep(wait)
+            wait *= factor
+            continue
+        if attempts == 1 and not timed_out:
+            raise error
+        what = (f"timed out after {secs_to_timestr(limit)}" if timed_out and attempts == 1
+                else f"failed after {attempts} attempts")
+        message = f"'{name}' {what}. Last error: {error}"
+        if on_exhausted == 'fail':
+            raise AssertionError(message)
+        raise UnknownAssertionError(message)
+
+
+RUN_KW_REGISTER.register_run_keyword('robot.flow.keywords', 'flow_retry', 5,
+                                     deprecation_warning=False, dry_run=True)
+
+def _attempt(builtin, context, limit, name, args):
+    """One attempt of ``name``: ``(return value, None, False)`` when it passed,
+    else ``(None, failure, whether it was this attempt's own time limit)``."""
+    if limit is None:
+        timeout = None
+        run = lambda: builtin.run_keyword(name, *args)
+    else:
+        # The same keyword timeout a user keyword's [Timeout] sets: the
+        # keyword runner applies it to the attempt and interrupts it.
+        timeout = KeywordTimeout(limit)
+
+        def run():
+            with context.keyword_timeout(timeout):
+                return builtin.run_keyword(name, *args)
+    occurred = context.timeout_occurred
+    try:
+        return run(), None, False
+    except ExecutionFailed as err:
+        if err.keyword_timeout and timeout is not None and timeout.timed_out():
+            # Our own limit, not an enclosing one: the attempt is over and the
+            # flow goes on, so a teardown must not see a timeout that was handled.
+            context.timeout_occurred = occurred
+            return None, err, True
+        if err.dont_continue or err.skip:
+            raise
+        return None, err, False
+
+
+def _positive_int(attr, value, name):
+    try:
+        number = _number(value)
+        if number is None or number < 1 or int(number) != number:
+            raise ValueError
+    except ValueError:
+        raise DataError(f"'{attr}' of '{name}' must be a positive integer, got {value!r}.")
+    return int(number)
 
 
 # ------------------------------------------------------------- bookkeeping
@@ -307,6 +407,8 @@ class _Listener:
         if run is not None and str(data.source or '') == run.source:
             run.finish()
             _CONTROL.publish('stopped' if run.stopped else 'finished')
+            # Nothing is left to control; the next run binds the poller again.
+            _CONTROL.stop_polling()
 
 
 ROBOT_LIBRARY_LISTENER = _Listener()
@@ -322,7 +424,7 @@ def _follow_store():
     if not store:
         return
     current = getattr(_CONTROL._store, 'path', None)
-    if _CONTROL._store is not None and current == os.path.abspath(store):
+    if _CONTROL._poller is not None and current == os.path.abspath(store):
         return
     from .signals import FlowSignals as _FlowSignals
     _CONTROL.stop_polling()

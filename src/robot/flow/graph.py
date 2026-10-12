@@ -52,6 +52,8 @@ class KeywordStep(Step):
         self.keyword = node.keyword
         self.args = node.args
         self.assign = node.assign
+        self.retry = node.retry         # policy dict, or None
+        self.timeout = node.timeout     # time limit of one attempt, or None
 
 
 class GateStep(KeywordStep):

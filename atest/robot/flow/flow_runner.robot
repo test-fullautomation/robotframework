@@ -93,6 +93,30 @@ Loop bounds can be variables sized per run
     Run Tests    ${PARSER} --variable CYCLES:many    flow/variable_bounds.flow.json
     Check Test Case    Variable Bounds    UNKNOWN    'max_loops' of loop 'loop' must be a positive integer, got 'many'.
 
+Keyword nodes retry under a policy and time out per attempt
+    [Documentation]    'retry' runs a keyword node again when it fails (attempts, interval,
+    ...    backoff, the verdict when the last attempt fails too); 'timeout' is a keyword
+    ...    timeout on each attempt. The attempts are the Flow Retry call's children in the
+    ...    log; a timeout of the step itself is a plain failure the recovery can route.
+    Run Tests    ${PARSER}    flow/retry_timeout.flow.json
+    ${tc} =    Check Test Case    Passes After Retries    PASS
+    ${call} =    Set Variable    ${tc.body[0]}
+    Should Be Equal    ${call.name}    Flow Retry
+    Should Be True    [k.status for k in $call.body if k.type == 'KEYWORD'] == ['FAIL', 'FAIL', 'PASS']
+    Check Log Message    ${call.messages[0]}    Attempt 1 of 3 of 'Flaky Reading' failed, next attempt in 50 milliseconds: Reading 1 is noise.
+    Check Log Message    ${call.messages[1]}    Attempt 2 of 3 of 'Flaky Reading' failed, next attempt in 100 milliseconds: Reading 2 is noise.
+    Check Log Message    ${call.messages[2]}    'Flaky Reading' passed on attempt 3 of 3.
+    Check Log Message    ${tc.body[1].messages[0]}    Reading 3
+    Check Test Case    Exhausted Is Fail    FAIL    'Break Something' failed after 2 attempts. Last error: Still broken.
+    Check Test Case    Exhausted Is Unknown    UNKNOWN    'Break Something' failed after 2 attempts. Last error: No reply.
+    ${tc} =    Check Test Case    Timed Out Attempt Is Retried    PASS
+    Should Be True    [k.status for k in $tc.body[0].body if k.type == 'KEYWORD'] == ['FAIL', 'PASS']
+    Check Log Message    ${tc.body[0].messages[0]}    Attempt 1 of 2 of 'Slow Then Fast' timed out, next attempt in 10 milliseconds: Keyword timeout 300 milliseconds exceeded.
+    Check Test Case    Timeout Alone Fails The Step    FAIL    'Take Time' timed out after 300 milliseconds. Last error: Keyword timeout 300 milliseconds exceeded.
+    ${tc} =    Check Test Case    Timeout Is Routed To The Recovery    PASS
+    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for RIG_T.
+    Should Be Equal    ${SUITE.status}    UNKNOWN
+
 Finished loop iterations leave memory, the output keeps them
     [Documentation]    A flow's loops run for hours: once an iteration is in output.xml its
     ...    results are dropped from the model (only the last one stays). Suites keep
@@ -114,6 +138,9 @@ Finished loop iterations leave memory, the output keeps them
 Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS
+    Run Tests    ${PARSER} --dryrun    flow/retry_timeout.flow.json
+    Check Test Case    Passes After Retries    PASS
+    Should Be Equal    ${SUITE.status}    PASS
     Run Tests    ${PARSER} --dryrun    flow/invalid_keyword.flow.json
     Check Test Case    Invalid Keyword    UNKNOWN
     ...    Several failures occurred:\n\n1) No keyword with name 'No Such Keyword' found.\n\n2) Keyword 'FlowStubs.Signal Should Be' expected 3 arguments, got 1.

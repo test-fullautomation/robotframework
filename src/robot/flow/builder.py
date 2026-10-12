@@ -20,7 +20,8 @@ Mapping:
 - setup phase     -> suite setup calling the generated user keyword ``Flow Setup``
 - test phase      -> one test case
 - teardown phase  -> suite teardown calling ``Flow Teardown``
-- keyword         -> keyword call
+- keyword         -> keyword call; with a ``retry`` policy or a ``timeout``
+                     wrapped in ``Flow Retry`` from ``robot.flow.keywords``
 - gate            -> ``Flow Gate`` from ``robot.flow.keywords``
 - sleep           -> ``Sleep``
 - decision        -> ``IF`` / ``ELSE``
@@ -53,6 +54,7 @@ from .schema import ABORT, PHASE, FlowError, is_variable, load_flow
 
 FLOW_LIBRARY = 'robot.flow.keywords'
 GATE_KEYWORD = 'Flow Gate'
+RETRY_KEYWORD = 'Flow Retry'
 SETUP_KEYWORD = 'Flow Setup'
 TEARDOWN_KEYWORD = 'Flow Teardown'
 ERROR_VARIABLE = '${flow_error}'
@@ -188,8 +190,18 @@ class _Emitter:
                         step, 'every')
 
     def _keyword(self, body, step):
-        self.origin(body.create_keyword(name=step.keyword, args=step.args,
-                                        assign=step.assign), step)
+        if step.retry is None and step.timeout is None:
+            self.origin(body.create_keyword(name=step.keyword, args=step.args,
+                                            assign=step.assign), step)
+            return
+        # Under a policy the node is one 'Flow Retry' call; its attempts show
+        # as the call's children in the log, like a gate's.
+        policy = step.retry or {'max_attempts': 1, 'interval': '0s', 'backoff': 1,
+                                'on_exhausted': 'fail'}
+        args = [str(policy['max_attempts']), policy['interval'], str(policy['backoff']),
+                policy['on_exhausted'], step.timeout or 'NONE', step.keyword, *step.args]
+        self.origin(body.create_keyword(name=RETRY_KEYWORD, args=args, assign=step.assign),
+                    step)
 
     def _gate(self, body, step):
         args = [step.timeout, step.interval, step.on_timeout, step.keyword, *step.args]

@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import unittest
 
@@ -115,6 +116,38 @@ class TestSchema(unittest.TestCase):
                     "unbounded loops are not allowed")
         self._error(flow([START, {'id': 'l', 'kind': 'loop', 'max_loops': 0}, END], []),
                     "'max_loops' must be a positive integer")
+
+    def test_retry_policy_shapes(self):
+        def node(retry=None, timeout=None):
+            item = kw('k', 'Read')
+            if retry is not None:
+                item['retry'] = retry
+            if timeout is not None:
+                item['timeout'] = timeout
+            return load_flow(flow([START, item, END], [])).nodes['k']
+
+        self.assertEqual((node().retry, node().timeout), (None, None))
+        self.assertEqual(node(retry=3).retry, {'max_attempts': 3, 'interval': '1s',
+                                               'backoff': 1, 'on_exhausted': 'fail'})
+        full = node(retry={'max_attempts': '${TRIES}', 'interval': '${WAIT}', 'backoff': 2.5,
+                           'on_exhausted': 'unknown'}, timeout='30s')
+        self.assertEqual(full.retry, {'max_attempts': '${TRIES}', 'interval': '${WAIT}',
+                                      'backoff': 2.5, 'on_exhausted': 'unknown'})
+        self.assertEqual(full.timeout, '30s')
+        self.assertEqual(node(timeout='${LIMIT}').timeout, '${LIMIT}')
+        for bad, expected in [
+                ({'interval': '1s'}, "'retry' needs 'max_attempts'"),
+                (0, "'retry.max_attempts' must be a positive integer"),
+                ('many', "'retry.max_attempts' must be a positive integer"),
+                ({'max_attempts': 2, 'backoff': 0.5}, "'retry.backoff' must be a number of at least 1"),
+                ({'max_attempts': 2, 'interval': 'soon'}, "'retry.interval' must be a valid time"),
+                ({'max_attempts': 2, 'on_exhausted': 'skip'}, "'retry.on_exhausted' must be 'fail' or 'unknown'"),
+                ({'max_attempts': 2, 'attempts': 3}, "'retry' has unknown key(s) attempts")]:
+            with self.subTest(bad):
+                self._error(flow([START, dict(kw('k', 'Read'), retry=bad), END], []),
+                            "Node 'k': " + expected)
+        self._error(flow([START, dict(kw('k', 'Read'), timeout='soon'), END], []),
+                    "Node 'k': 'timeout' must be a valid time string")
 
     def test_negative_duration(self):
         gate = {'id': 'g', 'kind': 'gate', 'keyword': 'K', 'timeout': '-5s'}
@@ -435,6 +468,23 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(outer.condition, 'robot.flow.control.clock() < $flow_deadline_a_b')
         self.assertEqual(inner.condition, 'robot.flow.control.clock() < ${flow_deadline_a_b_2}')
 
+    def test_retry_and_timeout_wrap_the_keyword(self):
+        def call(**policy):
+            node = dict(kw('k', 'Read Level', 'ch1'), assign='${LEVEL}', **policy)
+            return build(flow([START, node, END], [['start', 'k'], ['k', 'end']])).tests[0].body[1]
+
+        plain = call()
+        self.assertEqual((plain.name, list(plain.args)), ('Read Level', ['ch1']))
+        retried = call(retry={'max_attempts': 5, 'interval': '2s', 'backoff': 2,
+                              'on_exhausted': 'unknown'})
+        self.assertEqual(retried.name, 'Flow Retry')
+        self.assertEqual(list(retried.args), ['5', '2s', '2', 'unknown', 'NONE', 'Read Level', 'ch1'])
+        self.assertEqual(list(retried.assign), ['${LEVEL}'])
+        limited = call(timeout='30s')
+        self.assertEqual(list(limited.args), ['1', '0s', '1', 'fail', '30s', 'Read Level', 'ch1'])
+        both = call(retry='${TRIES}', timeout='${LIMIT}')
+        self.assertEqual(list(both.args), ['${TRIES}', '1s', '1', 'fail', '${LIMIT}', 'Read Level', 'ch1'])
+
     def test_gate_with_assign(self):
         gate = {'id': 'g', 'kind': 'gate', 'keyword': 'Read Level', 'timeout': '1s',
                 'assign': '${LEVEL}'}
@@ -538,6 +588,94 @@ class TestFlowGate(unittest.TestCase):
     def test_invalid_on_timeout(self):
         with self.assertRaises(ValueError):
             keywords.flow_gate('1s', '1s', 'skip', 'K')
+
+
+class FakeContext:
+    timeout_occurred = False
+
+    @contextlib.contextmanager
+    def keyword_timeout(self, timeout):
+        timeout.start()         # as the real context does when it adds one
+        yield
+
+
+class RetryBuiltIn:
+    """``run_keyword`` scripted per attempt: a value to return, or an exception to raise."""
+    results = []
+    calls = []
+
+    def run_keyword(self, name, *args):
+        self.calls.append((name, args))
+        outcome = self.results.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def failed(message, **flags):
+    from robot.errors import ExecutionFailed
+    return ExecutionFailed(message, **flags)
+
+
+class TestFlowRetry(unittest.TestCase):
+
+    def setUp(self):
+        self._builtin, self._contexts = keywords.BuiltIn, keywords.EXECUTION_CONTEXTS
+        keywords.BuiltIn = RetryBuiltIn
+        keywords.EXECUTION_CONTEXTS = type('Contexts', (), {'current': FakeContext()})
+        RetryBuiltIn.calls = []
+        self.sleeps = []
+        keywords._CONTROL.sleep = self.sleeps.append
+
+    def tearDown(self):
+        keywords.BuiltIn, keywords.EXECUTION_CONTEXTS = self._builtin, self._contexts
+        del keywords._CONTROL.sleep
+
+    def retry(self, attempts='3', interval='1s', backoff='1', on_exhausted='fail', timeout='NONE'):
+        return keywords.flow_retry(attempts, interval, backoff, on_exhausted, timeout, 'K', 'a')
+
+    def test_passes_after_failures_with_backoff(self):
+        RetryBuiltIn.results = [failed('no'), failed('still no'), 42]
+        self.assertEqual(self.retry(attempts='5', interval='2s', backoff='2'), 42)
+        self.assertEqual(RetryBuiltIn.calls, [('K', ('a',))] * 3)
+        self.assertEqual(self.sleeps, [2.0, 4.0])
+
+    def test_exhausted_is_fail_or_unknown_with_the_last_error(self):
+        RetryBuiltIn.results = [failed('1'), failed('2'), failed('3')]
+        with self.assertRaises(AssertionError) as cm:
+            self.retry()
+        self.assertEqual(str(cm.exception), "'K' failed after 3 attempts. Last error: 3")
+        self.assertEqual(self.sleeps, [1.0, 1.0])
+        RetryBuiltIn.results = [failed('x'), failed('y')]
+        with self.assertRaises(keywords.UnknownAssertionError) as cm:
+            self.retry(attempts='2', on_exhausted='unknown')
+        self.assertEqual(str(cm.exception), "'K' failed after 2 attempts. Last error: y")
+
+    def test_single_attempt_raises_the_keywords_own_failure(self):
+        error = failed('as it was')
+        RetryBuiltIn.results = [error]
+        with self.assertRaises(keywords.ExecutionFailed) as cm:
+            self.retry(attempts='1')
+        self.assertIs(cm.exception, error)
+
+    def test_failures_that_must_not_be_retried(self):
+        for flags in ({'skip': True}, {'test_timeout': True}, {'syntax': True}, {'exit': True}):
+            RetryBuiltIn.results = [failed('stop', **flags), 'never']
+            with self.subTest(flags), self.assertRaises(keywords.ExecutionFailed):
+                self.retry()
+            self.assertEqual(RetryBuiltIn.results, ['never'])
+        # An enclosing keyword timeout is not this step's own: no retry either.
+        RetryBuiltIn.results = [failed('outer', keyword_timeout=True), 'never']
+        with self.assertRaises(keywords.ExecutionFailed):
+            self.retry(timeout='1h')
+
+    def test_invalid_policy_is_a_data_error(self):
+        RetryBuiltIn.results = []
+        for kwargs in ({'attempts': 'many'}, {'attempts': '0'}, {'interval': 'soon'},
+                       {'backoff': 'x'}, {'on_exhausted': 'skip'}, {'timeout': 'later'}):
+            with self.subTest(kwargs), self.assertRaises(DataError):
+                self.retry(**kwargs)
+        self.assertEqual(RetryBuiltIn.calls, [])
 
 
 if __name__ == '__main__':

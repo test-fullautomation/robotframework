@@ -46,7 +46,7 @@ from robot.api import ExecutionResult
 from robot.errors import DataError
 
 from . import build_flow_suite
-from .builder import FLOW_LIBRARY, GATE_KEYWORD
+from .builder import FLOW_LIBRARY, GATE_KEYWORD, RETRY_KEYWORD
 from .control import checkpoint_name, fingerprint, read_checkpoint
 from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
                     structure)
@@ -306,7 +306,7 @@ class _FlowRun:
             stats.roles[role] = stats.roles.get(role, 0) + 1
             if role == 'node':
                 stats.run(item, item_id)
-                if built.name == GATE_KEYWORD:
+                if built.name in (GATE_KEYWORD, RETRY_KEYWORD):
                     stats.attempts.append(len(_items(item.body)))
             elif role == 'abort':
                 stats.edge('abort')
@@ -375,6 +375,10 @@ class _FlowRun:
                              timeout=step.timeout, interval=step.interval, on_timeout=step.on_timeout)
             elif isinstance(step, KeywordStep):
                 entry.update(kind='keyword', detail=' '.join([step.keyword] + list(step.args)))
+                if step.retry is not None:
+                    entry['retry'] = dict(step.retry)
+                if step.timeout is not None:
+                    entry['timeout'] = step.timeout
             elif isinstance(step, SleepStep):
                 entry.update(kind='sleep', detail=step.duration)
             elif isinstance(step, FlowStep):
@@ -580,6 +584,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 .chip.idle rect { fill: var(--idle-soft); } .chip.idle text { fill: var(--muted); }
 .chip.unknown rect { fill: var(--unknown-soft); } .chip.unknown text { fill: var(--unknown); }
 .chip.skip rect { fill: var(--skip-soft); } .chip.skip text { fill: var(--skip); }
+.chip.tries rect { fill: var(--idle-soft); } .chip.tries text { fill: var(--fg); }
 .track { fill: var(--idle-soft); } .fill-a { fill: var(--accent); }
 .toggle { cursor: pointer; outline: none; }
 .toggle rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
@@ -836,7 +841,10 @@ var LOG = "%LOG%";
     var g4 = group(step, x, y, w, NH, 'box');
     el('text', { 'class': 'kind', x: x + 12, y: y + 17 }, g4, step.kind.toUpperCase());
     el('text', { 'class': 'label', x: x + 12, y: y + 36 }, g4, truncate(step.label, 28));
-    chips(g4, st, x + w - 8, y + 8);
+    var right4 = chips(g4, st, x + w - 8, y + 8);
+    // A gate or a retried keyword that needed more than one attempt says so on the box.
+    var tries = st && st.attempts.length ? Math.max.apply(null, st.attempts) : 0;
+    if (tries > 1) chip(g4, 'tries', tries + ' tries', right4, y + 8);
   }
   function seconds(text) {
     var m = /^\s*([\d.]+)\s*([a-z]*)/i.exec(String(text));
@@ -1004,6 +1012,14 @@ var LOG = "%LOG%";
       if (step && step.kind === 'decision') row('Branches', 'yes ' + (st.edges.yes || 0) + ', no ' + (st.edges.no || 0));
     }
     if (step && step.kind === 'gate') { row('Timeout', step.timeout + ', poll every ' + step.interval); row('On timeout', step.on_timeout); }
+    if (step && step.kind === 'keyword') {
+      if (step.retry) {
+        var r = step.retry;
+        row('Retry', 'up to ' + r.max_attempts + ' attempts, ' + r.interval + ' apart' + (r.backoff > 1 ? ', growing ×' + r.backoff : ''));
+        row('On exhaustion', r.on_exhausted);
+      }
+      if (step.timeout) row('Timeout', step.timeout + ' per attempt');
+    }
     if (kv.children.length) body.appendChild(kv);
     if (st && st.last_error) { body.appendChild(h('span', 'eyebrow', 'Last error')); body.appendChild(h('div', 'err', st.last_error)); }
     if (st && st.iterations.length) {

@@ -16,7 +16,7 @@ SIGNALS = {
     'bench.mode': [3],
     'bench.never': [0],
 }
-COUNTS = {'cycle': 0, 'recovery': 0, 'iteration': 0, 'hold': 0}
+COUNTS = {'cycle': 0, 'recovery': 0, 'iteration': 0, 'hold': 0, 'flaky': 0, 'slow': 0}
 OPERATORS = {
     '==': lambda a, b: a == b,
     '!=': lambda a, b: a != b,
@@ -63,6 +63,29 @@ def release_bench():
 
 def break_something(message='Broken on purpose.'):
     raise AssertionError(message)
+
+
+def flaky_reading(passes_on):
+    """Fails until it is read for the ``passes_on``th time; returns the count."""
+    COUNTS['flaky'] += 1
+    if COUNTS['flaky'] < int(passes_on):
+        raise AssertionError(f"Reading {COUNTS['flaky']} is noise.")
+    return COUNTS['flaky']
+
+
+def take_time(seconds):
+    """Runs for ``seconds``: a step that is too slow for its timeout."""
+    import time
+    time.sleep(float(seconds[:-1]) if str(seconds).endswith('s') else float(seconds))
+    logger.info(f'Took {seconds}.')
+
+
+def slow_then_fast(seconds):
+    """The first call takes ``seconds``, later calls return at once."""
+    COUNTS['slow'] += 1
+    if COUNTS['slow'] == 1:
+        take_time(seconds)
+    logger.info(f"Call {COUNTS['slow']} done.")
 
 
 def count_iteration():

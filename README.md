@@ -117,6 +117,9 @@ library constructors run, so keep bench access out of those.
 - **Gates instead of guessed sleeps** — a `gate` polls a keyword until it passes; on timeout
   the message carries the last error and the time waited, and the verdict is `UNKNOWN` (the
   bench was not ready) unless the gate says `fail`.
+- **Retry and timeout per step** — a `keyword` node declares `retry` (attempts, interval,
+  backoff, the verdict on exhaustion) and `timeout` (per attempt) instead of coding them
+  into the keyword; the attempts are in the log and on the flow report.
 - **Loops bounded by construction** (`max_loops` and/or `max_seconds`, paced with `every`;
   a bound may be a `${variable}` sized per run with `--variable`),
   **recovery** that continues the loop or aborts with the original error, **decisions**, and

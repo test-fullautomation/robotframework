@@ -17,6 +17,8 @@ FLOW = {
         {'id': 'start', 'kind': 'start'},
         {'id': 'setup', 'kind': 'phase', 'role': 'setup'},
         {'id': 'power', 'kind': 'keyword', 'keyword': 'Note', 'args': ['power on'], 'label': 'Power on'},
+        {'id': 'sense', 'kind': 'keyword', 'keyword': 'Flaky', 'args': [3], 'label': 'Read sensor',
+         'retry': {'max_attempts': 5, 'interval': '0.01s', 'backoff': 2}, 'timeout': '5s'},
         {'id': 'cycle', 'kind': 'phase', 'role': 'test', 'name': 'Cycle'},
         {'id': 'ready', 'kind': 'gate', 'keyword': 'Ready After', 'args': [2], 'timeout': '5s',
          'interval': '0.01s', 'label': 'Bench ready'},
@@ -32,7 +34,7 @@ FLOW = {
         {'id': 'end', 'kind': 'end'},
     ],
     'edges': [
-        ['start', 'setup'], ['setup', 'power'], ['power', 'cycle'], ['cycle', 'ready'], ['ready', 'loop'],
+        ['start', 'setup'], ['setup', 'power'], ['power', 'sense'], ['sense', 'cycle'], ['cycle', 'ready'], ['ready', 'loop'],
         {'from': 'loop', 'to': 'work', 'label': 'body'}, {'from': 'work', 'to': 'loop', 'label': 'next'},
         {'from': 'loop', 'to': 'fix', 'label': 'on_failure'}, {'from': 'fix', 'to': 'loop', 'label': 'continue'},
         {'from': 'loop', 'to': 'which', 'label': 'done'},
@@ -42,10 +44,16 @@ FLOW = {
 }
 
 LIBRARY = '''
-COUNT = {'ready': 0, 'work': 0}
+COUNT = {'ready': 0, 'work': 0, 'flaky': 0}
 
 def note(text):
     print(text)
+
+def flaky(passes_on):
+    COUNT['flaky'] += 1
+    if COUNT['flaky'] < int(passes_on):
+        raise AssertionError('reading %d is noise' % COUNT['flaky'])
+    return COUNT['flaky']
 
 def ready_after(attempts):
     COUNT['ready'] += 1
@@ -94,6 +102,15 @@ class TestReport(unittest.TestCase):
     def test_gate_attempts(self):
         gate = self.stats['ready']
         self.assertEqual((gate['runs'], gate['status'], gate['attempts']), (1, {'PASS': 1}, [2]))
+
+    def test_retried_keyword_attempts_and_policy(self):
+        sense = self.stats['sense']
+        self.assertEqual((sense['runs'], sense['status'], sense['attempts']), (1, {'PASS': 1}, [3]))
+        step = self.data['flows'][0]['plan'][0]['steps'][1]
+        self.assertEqual(step['kind'], 'keyword')
+        self.assertEqual(step['retry'], {'max_attempts': 5, 'interval': '0.01s', 'backoff': 2,
+                                         'on_exhausted': 'fail'})
+        self.assertEqual(step['timeout'], '5s')
 
     def test_loop_counts_and_edges(self):
         loop = self.stats['loop']
