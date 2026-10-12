@@ -12,7 +12,8 @@
   Diagram follows the run live (running step, counts, trail); Stop; Output,
   Log and Report of each run, and the Flow report of a flow run
   (`robotFlow.flowReport`, off by default). *Run with Variables…* passes
-  `NAME=value` pairs as `--variable`.
+  `NAME=value` pairs as `--variable`. *Set…* and *Snapshot* act on a running
+  flow through its signal store.
 - Run groups of a test project (`testproject.json`): the members' Diagrams
   with their meeting points, run together on one signal store.
 - Files in a test project are read and run with the project's `run` settings.

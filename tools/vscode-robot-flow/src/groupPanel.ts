@@ -166,6 +166,8 @@ export class GroupPanel implements vscode.Disposable {
         const [command, member] = msg.action.split(/:(.*)/s) as ['pause' | 'resume', string?];
         await this.runs.control(this.key, command, member || '');
       }
+      else if (msg.action === 'set') await this.runs.setVariables(this.key);
+      else if (msg.action === 'snapshot') await this.runs.snapshot(this.key);
       else if (msg.action === 'log' || msg.action === 'report' || msg.action === 'flow') await this.runs.open(this.key, `${msg.action}.html`);
       else if (msg.action === 'output') this.runs.output(this.key);
       else if (msg.action === 'option' && msg.name && msg.value !== undefined) {

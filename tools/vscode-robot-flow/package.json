@@ -142,6 +142,18 @@
         "category": "Robot Flow"
       },
       {
+        "command": "robotFlow.setVariables",
+        "title": "Set Variables in the Running Flow\u2026",
+        "category": "Robot Flow",
+        "icon": "$(symbol-variable)"
+      },
+      {
+        "command": "robotFlow.snapshot",
+        "title": "Snapshot the Running Flow\u2026",
+        "category": "Robot Flow",
+        "icon": "$(save)"
+      },
+      {
         "command": "robotFlow.continue",
         "title": "Continue the Stopped Run from Its Checkpoint",
         "category": "Robot Flow",

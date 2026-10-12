@@ -126,7 +126,7 @@ library constructors run, so keep bench access out of those.
 - **Two flows as two processes** — with the `robot.flow.signals` library two flows meet and
   run in lockstep through a small signal file of the run; a missing peer ends `UNKNOWN`
   instead of hanging or failing falsely.
-- **Pause, stop and restart** — `python -m robot.flow control <store> pause | resume | stop`
+- **Pause, stop, set, snapshot and restart** — `python -m robot.flow control <store> pause | resume | stop | set NAME=value | snapshot [name]`
   holds or ends a running flow between two steps, with loop deadlines, gate timeouts
   and watchdogs frozen meanwhile; a stopped or crashed flow leaves a checkpoint and the
   next run continues it (finished phases SKIP, the loop goes on with what is left).

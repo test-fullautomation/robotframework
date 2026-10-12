@@ -56,8 +56,13 @@ CONTROL_SIGNAL = 'flow.control'
 # flow has read it; under its own name the stop stays.
 STOP_SIGNAL = 'flow.stop'
 STATE_SIGNAL = 'flow.state'
-PAUSE, RESUME, STOP = 'pause', 'resume', 'stop'
-COMMANDS = (PAUSE, RESUME, STOP)
+# Requests with a payload, each under its own name so none replaces another:
+# 'flow.set.<rig or *>.<NAME>' holds a value, 'flow.snapshot[.<rig>]' a name.
+SET_SIGNAL = 'flow.set'
+SNAPSHOT_SIGNAL = 'flow.snapshot'
+PAUSE, RESUME, STOP, SET, SNAPSHOT = 'pause', 'resume', 'stop', 'set', 'snapshot'
+COMMANDS = (PAUSE, RESUME, STOP, SET, SNAPSHOT)
+VARIABLE_NAME = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 RESUME_MODES = ('auto', 'always', 'never')
 CHECKPOINT_VERSION = 1
 
@@ -80,6 +85,8 @@ class FlowControl:
         self._poller_stop = threading.Event()
         self._since = time.time()
         self._seen = None
+        self._applied = set()   # (store key, time) of requests taken over
+        self._pending = []      # set / snapshot requests for the flow's thread
         self._console = None
         self.rig = os.environ.get('ROBOT_FLOW_RIG', '')
         self.step_mode = False
@@ -150,6 +157,8 @@ class FlowControl:
         """
         if self._paused.is_set():
             self._wait(where)
+        if self._pending:
+            self._apply_pending()
         if self._stop_reason is not None and _on_main_thread() \
                 and not (context is not None and context.in_teardown):
             self._raise_stop(where)
@@ -267,6 +276,7 @@ class FlowControl:
         while not self._poller_stop.wait(self.POLL_S):
             try:
                 self.apply(self._read_command())
+                self._queue(self._read_requests())
             except Exception:       # a store that cannot be read must not end the watch
                 pass
 
@@ -288,6 +298,70 @@ class FlowControl:
             if newest is None or entry['time'] >= newest['time']:
                 newest = entry
         return newest
+
+    def _read_requests(self):
+        """Set and snapshot requests for this process since it started, each once."""
+        read = getattr(self._store, '_read', None)
+        entries = read() if read else {}
+        found = []
+        for key, entry in (entries or {}).items():
+            if not isinstance(entry, dict) or entry.get('time', 0) < self._since:
+                continue
+            stamp = (key, entry.get('time'))
+            if stamp in self._applied:
+                continue
+            if key.startswith(SET_SIGNAL + '.'):
+                target, _, name = key[len(SET_SIGNAL) + 1:].partition('.')
+                if name and target in ('*', self.rig or '*'):
+                    found.append((stamp, (SET, name, entry.get('value'))))
+            elif key in self._names(SNAPSHOT_SIGNAL):
+                found.append((stamp, (SNAPSHOT, str(entry.get('value') or ''))))
+        found.sort(key=lambda item: item[0][1] or 0)
+        for stamp, request in found:
+            self._applied.add(stamp)
+        return [request for _, request in found]
+
+    def _queue(self, requests):
+        if requests:
+            with self._lock:
+                self._pending.extend(requests)
+
+    def request(self, kind, *args):
+        """Queue a set / snapshot request from inside the process (keywords, tests)."""
+        self._queue([(kind, *args)])
+
+    def _apply_pending(self):
+        """Apply queued requests on the flow's own thread, between two steps."""
+        if not _on_main_thread():
+            return
+        with self._lock:
+            pending, self._pending = self._pending, []
+        for request in pending:
+            try:
+                if request[0] == SET:
+                    self._set_variable(request[1], request[2])
+                else:
+                    self._take_snapshot(request[1])
+            except Exception as err:
+                logger.warn(f'Flow {request[0]} request failed: {err}')
+
+    def _set_variable(self, name, value):
+        from robot.libraries.BuiltIn import BuiltIn
+        if not VARIABLE_NAME.match(str(name)):
+            raise DataError(f"'{name}' is not a variable name.")
+        value = '' if value is None else str(value)
+        BuiltIn().set_suite_variable(f'${{{name}}}', value)
+        logger.info(f"Variable ${{{name}}} set to '{value}' by operator (suite scope).",
+                    also_console=True)
+
+    def _take_snapshot(self, name):
+        run = self.run
+        if run is None:
+            raise DataError('no flow is running')
+        path = run.snapshot(name)
+        logger.info(f"Snapshot '{os.path.basename(path)}' written {self._position()}: "
+                    f"continue from it with FLOW_CHECKPOINT:{path}", also_console=True)
+        return path
 
     def _names(self, signal):
         """The names a command for this process is written under."""
@@ -336,6 +410,8 @@ class FlowControl:
             self._stop_reason = None
             self._since = time.time()
             self._seen = None
+            self._applied = set()
+            self._pending = []
             self._store = None
             self.step_mode = False
             self.stopped = False
@@ -367,7 +443,7 @@ def _hook(context, step):
     """Called by the body runner before every step."""
     control = CONTROL
     if not (control.step_mode or control._paused.is_set()
-            or control._stop_reason is not None) or context.dry_run:
+            or control._stop_reason is not None or control._pending) or context.dry_run:
         return
     if control.step_mode:
         control.step(context, step)
@@ -426,6 +502,7 @@ class FlowRun:
         self._phase_restored = None # the same, while its phase is being continued
         self._loops = {}            # loop id -> state
         self._written = 0.0
+        self.snapshots = []         # [{'name', 'path', 'taken', 'position'}]
 
     # --------------------------------------------------------------- restart
 
@@ -442,6 +519,14 @@ class FlowRun:
         if mode == 'never':
             return False
         data, problem = read_checkpoint(self.path)
+        if data is not None and data.get('snapshot'):
+            # Continuing from a snapshot: it stays as it is; the run writes its
+            # own checkpoint next to it.
+            taken = data['snapshot']
+            logger.info(f"Continuing from snapshot '{taken.get('name')}' taken "
+                        f"{taken.get('taken')} {taken.get('position') or ''}.".replace(' .', '.'),
+                        also_console=True)
+            self.path = re.sub(r'\.snapshot-[^\\/]*\.json$', '.checkpoint.json', self.path)
         if data is not None and data.get('fingerprint') != self.fingerprint:
             data, problem = None, (f"Checkpoint '{self.path}' belongs to another "
                                    f"version of the flow file '{data.get('flow')}'")
@@ -630,30 +715,50 @@ class FlowRun:
         it, and a power loss right after the write does not lose it."""
         if self.finished:
             return False
-        directory = os.path.dirname(self.path)
-        temp = f'{self.path}.{os.getpid()}.tmp'
         try:
-            if directory:
-                os.makedirs(directory, exist_ok=True)
-            with open(temp, 'w', encoding='UTF-8') as file:
-                json.dump(self.to_dict(), file, indent=1)
-                file.flush()
-                os.fsync(file.fileno())
-            for attempt in range(50):
-                try:
-                    os.replace(temp, self.path)
-                    break
-                except PermissionError:     # being read on Windows
-                    time.sleep(0.01)
-            else:
-                os.remove(temp)
-                raise OSError('the file stays locked')
-            _fsync_directory(directory or '.')
+            _write_json(self.path, self.to_dict())
         except OSError as err:
             logger.warn(f"Writing flow checkpoint '{self.path}' failed: {err}")
             return False
         self._written = time.time()
         return True
+
+    def snapshot(self, name=''):
+        """Write the state as a named file next to the checkpoint and keep it.
+
+        The file is a checkpoint (a run continues from it with
+        ``FLOW_CHECKPOINT``) plus a ``snapshot`` section: when and where it was
+        taken and the JSON-safe variables in scope, for inspection.
+        """
+        label = re.sub(r'[^\w.-]+', '_', str(name or '')).strip('_') \
+            or time.strftime('%Y%m%d-%H%M%S')
+        stem = self.path[:-len('.checkpoint.json')] \
+            if self.path.endswith('.checkpoint.json') else os.path.splitext(self.path)[0]
+        path = f'{stem}.snapshot-{label}.json'
+        self._snapshot_variables()
+        data = self.to_dict()
+        data['snapshot'] = {'name': label, 'taken': _timestamp(),
+                            'position': self.position_text(),
+                            'phase': self.phase, 'loop': self.loop, 'iteration': self.iteration,
+                            'scope': self._scope_variables()}
+        _write_json(path, data)
+        self.snapshots.append({'name': label, 'path': path, 'taken': data['snapshot']['taken'],
+                               'position': self.position_text()})
+        return path
+
+    def _scope_variables(self):
+        """The JSON-safe variables in scope, for inspection (not restored)."""
+        try:
+            from robot.libraries.BuiltIn import BuiltIn
+            variables = BuiltIn().get_variables()
+        except Exception:
+            return {}
+        scope = {}
+        for name, value in variables.items():
+            if name in _AUTOMATIC_VARIABLES or name.startswith('${flow_') or not json_safe(value):
+                continue
+            scope[name] = value
+        return scope
 
     def position_text(self):
         if self.loop:
@@ -661,6 +766,38 @@ class FlowRun:
         if self.phase:
             return f"in phase '{self.phase}'"
         return ''
+
+
+_AUTOMATIC_VARIABLES = frozenset(
+    '${/} ${:} ${\\n} ${SPACE} ${EMPTY} ${True} ${False} ${None} ${null} ${TEMPDIR} ${EXECDIR} '
+    '${CURDIR} ${OUTPUT_DIR} ${OUTPUT_FILE} ${LOG_FILE} ${REPORT_FILE} ${DEBUG_FILE} ${LOG_LEVEL} '
+    '${PREV_TEST_NAME} ${PREV_TEST_STATUS} ${PREV_TEST_MESSAGE} ${SUITE_NAME} ${SUITE_SOURCE} '
+    '${SUITE_DOCUMENTATION} ${TEST_NAME} ${TEST_DOCUMENTATION} ${OPTIONS} &{SUITE_METADATA} '
+    '@{TEST_TAGS} ${KEYWORD_STATUS} ${KEYWORD_MESSAGE} ${TEST_STATUS} ${TEST_MESSAGE} '
+    '${SUITE_STATUS} ${SUITE_MESSAGE}'.split()
+)
+
+
+def _write_json(path, data):
+    """Write ``data`` whole and to the disk: a temporary file, fsync, rename."""
+    directory = os.path.dirname(path)
+    temp = f'{path}.{os.getpid()}.tmp'
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(temp, 'w', encoding='UTF-8') as file:
+        json.dump(data, file, indent=1)
+        file.flush()
+        os.fsync(file.fileno())
+    for attempt in range(50):
+        try:
+            os.replace(temp, path)
+            break
+        except PermissionError:     # being read on Windows
+            time.sleep(0.01)
+    else:
+        os.remove(temp)
+        raise OSError('the file stays locked')
+    _fsync_directory(directory or '.')
 
 
 def _fsync_directory(directory):

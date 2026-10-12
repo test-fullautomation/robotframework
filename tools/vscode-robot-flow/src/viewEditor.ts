@@ -293,6 +293,10 @@ class Session implements vscode.Disposable {
       await this.runs.continueRun(this.key);
     } else if (action === 'pause' || action === 'resume') {
       await this.runs.control(this.key, action);
+    } else if (action === 'set') {
+      await this.runs.setVariables(this.key);
+    } else if (action === 'snapshot') {
+      await this.runs.snapshot(this.key);
     } else if (action === 'log' || action === 'report' || action === 'flow') {
       await this.runs.open(this.key, `${action}.html`);
     } else if (action === 'output') {

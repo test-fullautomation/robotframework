@@ -14,7 +14,7 @@ import * as path from 'node:path';
 import { Answer, RobotEnv, pythonPathFor } from './helpers';
 import { FLOW_SUFFIX } from './run';
 
-export type ControlCommand = 'pause' | 'resume' | 'stop';
+export type ControlCommand = 'pause' | 'resume' | 'stop' | 'snapshot' | 'set';
 
 /** What one flow process says about itself. */
 export interface FlowProcess {
@@ -39,10 +39,10 @@ export function canPause(target: string): boolean {
   return target.toLowerCase().endsWith(FLOW_SUFFIX);
 }
 
-/** Send pause / resume / stop to every flow of the store, or to one rig. */
-export function sendControl(env: RobotEnv, store: string, command: ControlCommand, rig = ''): Promise<Answer> {
+/** Send pause / resume / stop / snapshot [name] / set NAME=value... to every flow of the store, or to one rig. */
+export function sendControl(env: RobotEnv, store: string, command: ControlCommand, rig = '', extra: string[] = []): Promise<Answer> {
   return new Promise((resolve) => {
-    const args = ['-m', 'robot.flow', 'control', store, command, ...(rig ? ['--rig', rig] : [])];
+    const args = ['-m', 'robot.flow', 'control', store, command, ...extra, ...(rig ? ['--rig', rig] : [])];
     let child;
     try {
       const childEnv: NodeJS.ProcessEnv = { ...process.env, PYTHONPATH: pythonPathFor(env), PYTHONUTF8: '1' };

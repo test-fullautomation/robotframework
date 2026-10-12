@@ -155,6 +155,14 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
       const state = runOf(uri);
       return flowCommand(uri, state && describeFlow(state.flow)?.paused ? 'resume' : 'pause');
     }),
+    vscode.commands.registerCommand('robotFlow.setVariables', (uri?: vscode.Uri) => {
+      const state = runOf(uri);
+      return state ? runs.setVariables(state.key) : vscode.window.showInformationMessage('No flow of the active file is running.');
+    }),
+    vscode.commands.registerCommand('robotFlow.snapshot', (uri?: vscode.Uri) => {
+      const state = runOf(uri);
+      return state ? runs.snapshot(state.key) : vscode.window.showInformationMessage('No flow of the active file is running.');
+    }),
     vscode.commands.registerCommand('robotFlow.continue', async (uri?: vscode.Uri) => {
       const target = uri instanceof vscode.Uri ? uri : activeFile();
       if (!target) return null;

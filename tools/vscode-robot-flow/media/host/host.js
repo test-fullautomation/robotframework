@@ -55,6 +55,8 @@ function showToolbar(t) {
     (t.pausable ? (t.flowPaused
       ? `<button type="button" class="tb-btn tb-run" data-act="resume" title="${t.step ? 'Run the next step, then pause again' : 'Go on from where the flow paused'}">${t.step ? '⏭ Next step' : '▶ Resume'}</button>`
       : '<button type="button" class="tb-btn" data-act="pause" title="Pause at the next step: loop deadlines and gate timeouts wait too">⏸ Pause</button>') : '') +
+    (t.pausable ? '<button type="button" class="tb-btn" data-act="set" title="Set variables in the running flow (NAME=value), applied at its next step">Set\u2026</button>' +
+                  '<button type="button" class="tb-btn" data-act="snapshot" title="Write a named snapshot of the flow state next to its checkpoint, to continue from later">Snapshot</button>' : '') +
     (running ? `<button type="button" class="tb-btn" data-act="stop" title="${t.status === 'stopping'
       ? 'Stopping: again stops through the stop file, a third time ends it at once'
       : t.flowStop ? 'Stop at the next step: the teardown runs and a checkpoint is written to continue from'

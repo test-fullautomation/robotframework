@@ -33,6 +33,7 @@ means the flow file must still be the one the run used.
     python -m robot.flow report results/output.xml [--output flow.html]
 """
 
+import glob
 import json
 import os
 import re
@@ -260,6 +261,7 @@ class _FlowRun:
             'plan': self._plan(flow),
             'stats': {key: stats.to_dict() for key, stats in self.stats.items()},
             'checkpoint': self._checkpoint(),
+            'snapshots': self._snapshots(),
         }
 
     # ----------------------------------------------------------- matching
@@ -402,7 +404,7 @@ class _FlowRun:
 
     # --------------------------------------------------------- checkpoint
 
-    def _checkpoint(self):
+    def _checkpoint_path(self):
         path = self.checkpoint or self._checkpoint_from_stop()
         if not path:
             stem = os.path.basename(self.source)
@@ -410,6 +412,27 @@ class _FlowRun:
                 if stem.lower().endswith(extension):
                     stem = stem[:-len(extension)]
             path = os.path.join(os.path.dirname(os.path.abspath(self.output)), checkpoint_name(stem))
+        return path
+
+    def _snapshots(self):
+        """The snapshots next to the checkpoint: `<stem>.snapshot-<name>.json`."""
+        path = self._checkpoint_path()
+        stem = path[:-len('.checkpoint.json')] if path.endswith('.checkpoint.json') else os.path.splitext(path)[0]
+        found = []
+        for candidate in sorted(glob.glob(glob.escape(stem) + '.snapshot-*.json')):
+            data, _ = read_checkpoint(candidate)
+            taken = (data or {}).get('snapshot')
+            if not taken:
+                continue
+            found.append({'name': taken.get('name'), 'taken': taken.get('taken'),
+                          'position': taken.get('position'), 'phase': taken.get('phase'),
+                          'loop': taken.get('loop'), 'iteration': taken.get('iteration'),
+                          'path': os.path.abspath(candidate),
+                          'matches': data.get('fingerprint') == fingerprint(self.source)})
+        return found
+
+    def _checkpoint(self):
+        path = self._checkpoint_path()
         data, _ = read_checkpoint(path)
         if not data:
             return None
@@ -565,6 +588,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 .tools { display: flex; gap: 6px; }
 .btn { font: 500 12px system-ui, sans-serif; color: var(--accent); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; cursor: pointer; }
 .btn:hover { border-color: var(--accent); }
+.snaps { margin: 4px 0 0 18px; padding: 0; font-size: 13px; } .snaps li { margin: 4px 0; } .snaps .hint { overflow-wrap: anywhere; }
 .join { fill: var(--muted); } .join.cold { fill: var(--idle); } .join.rec { fill: var(--skip); }
 .detail { position: sticky; top: 12px; }
 .detail .body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -847,6 +871,7 @@ var LOG = "%LOG%";
       if (failed) fact(String(failed), 'cycles of ' + loop.label + ' did not pass');
     });
     fact(secs(s.elapsed), 'run time');
+    if (flow.snapshots && flow.snapshots.length) fact(String(flow.snapshots.length), 'snapshot' + (flow.snapshots.length > 1 ? 's' : '') + ' taken, kept next to the checkpoint');
     fact(s.tests.passed + ' · ' + s.tests.failed + ' · ' + s.tests.unknown, 'phases passed · failed · unknown');
     if (flow.checkpoint && flow.checkpoint.matches) {
       var r = flow.checkpoint.remaining || {};
@@ -999,6 +1024,21 @@ var LOG = "%LOG%";
       if (st.max_id && st.runs > 1) jump('Slowest run', st.max_id);
       jump(st.runs > 1 ? 'Last run' : 'In the log', st.last);
       if (any) { body.appendChild(h('span', 'eyebrow', 'Open in log.html')); body.appendChild(jumps); }
+    }
+    var snaps = (flowData.snapshots || []).filter(function (s) { return step && step.kind === 'loop' && s.loop === step.id; });
+    if (snaps.length) {
+      body.appendChild(h('span', 'eyebrow', 'Snapshots taken here'));
+      var list = h('ul', 'snaps');
+      snaps.forEach(function (s) {
+        var li = h('li'), it = st && st.iterations ? st.iterations[s.iteration] : null;
+        li.appendChild(h('span', 'mono', s.name));
+        li.appendChild(document.createTextNode(' \u00b7 ' + s.taken + ' \u00b7 cycle ' + (s.iteration + 1) + ' '));
+        var link = it ? logLink(it.id) : null;
+        if (link) { var a = h('a', null, 'in the log'); a.href = link; li.appendChild(a); }
+        li.appendChild(h('div', 'hint', 'continue from it: --variable FLOW_CHECKPOINT:' + s.path + (s.matches ? '' : ' (another version of the flow file)')));
+        list.appendChild(li);
+      });
+      body.appendChild(list);
     }
     if (flowData.checkpoint && step && step.kind === 'loop' && flowData.checkpoint.position && flowData.checkpoint.position.loop === step.id) {
       var r = flowData.checkpoint.remaining || {};

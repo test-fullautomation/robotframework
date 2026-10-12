@@ -19,6 +19,7 @@
     python -m robot.flow render   <file.flow.json>
     python -m robot.flow schema   [--output flow.schema.json]
     python -m robot.flow control  <signal store> pause|resume|stop|status [--rig NAME]
+    python -m robot.flow control  <signal store> set NAME=value ... | snapshot [name] [--rig NAME]
     python -m robot.flow report   <output.xml> [--output flow.html] [--log log.html]
 
 ``validate`` checks the file's shape and structure and prints the phases.
@@ -57,7 +58,9 @@ def main(argv=None):
     schema.add_argument('--output', '-o', help='write it to this file instead')
     control = commands.add_parser('control', help='pause, resume or stop running flows')
     control.add_argument('store', help="the run's signal store (ROBOT_FLOW_SIGNALS)")
-    control.add_argument('action', choices=['pause', 'resume', 'stop', 'status'])
+    control.add_argument('action', choices=['pause', 'resume', 'stop', 'status', 'set', 'snapshot'])
+    control.add_argument('args', nargs='*',
+                         help="'set': NAME=value pairs; 'snapshot': its name (optional)")
     control.add_argument('--rig', help='only the flow started with this FLOW_RIG / '
                                        'ROBOT_FLOW_RIG; default: all of them')
     report = commands.add_parser('report', help='the flow report of a run', add_help=False)
@@ -69,7 +72,7 @@ def main(argv=None):
     if args.command == 'schema':
         return _schema(args.output)
     if args.command == 'control':
-        return _control(args.store, args.action, args.rig)
+        return _control(args.store, args.action, args.rig, args.args)
     try:
         if args.command == 'validate':
             _validate(args.file)
@@ -95,11 +98,30 @@ def _schema(output):
     return 0
 
 
-def _control(store, action, rig=None):
-    from .control import CONTROL_SIGNAL, STATE_SIGNAL, STOP_SIGNAL
+def _control(store, action, rig=None, args=()):
+    from .control import (CONTROL_SIGNAL, SET_SIGNAL, SNAPSHOT_SIGNAL, STATE_SIGNAL,
+                          STOP_SIGNAL, VARIABLE_NAME)
     from .signals import FlowSignals
 
     backend = FlowSignals(store=store)._store
+    target = 'rig ' + rig if rig else 'all flows'
+    if action == 'set':
+        pairs = [arg.partition('=') for arg in args]
+        bad = [arg for arg, (name, eq, _) in zip(args, pairs)
+               if not eq or not VARIABLE_NAME.match(name.strip())]
+        if not pairs or bad:
+            print(f"'set' takes NAME=value pairs; got: {' '.join(bad or ['nothing'])}")
+            return 1
+        for name, _, value in pairs:
+            backend.set(f'{SET_SIGNAL}.{rig or "*"}.{name.strip()}', value)
+            print(f"set ${{{name.strip()}}} = '{value}' -> {target} of '{store}' (applied at the next step).")
+        return 0
+    if action == 'snapshot':
+        label = ' '.join(args)
+        backend.set(f'{SNAPSHOT_SIGNAL}.{rig}' if rig else SNAPSHOT_SIGNAL, label)
+        print(f"snapshot{' ' + repr(label) if label else ''} -> {target} of '{store}' "
+              f"(written at the next step, next to the checkpoint).")
+        return 0
     name = f'{CONTROL_SIGNAL}.{rig}' if rig else CONTROL_SIGNAL
     if action != 'status':
         if action == 'stop':
@@ -107,7 +129,7 @@ def _control(store, action, rig=None):
             # otherwise replace the stop before the flow has read it.
             backend.set(f'{STOP_SIGNAL}.{rig}' if rig else STOP_SIGNAL, action)
         backend.set(name, action)
-        print(f"{action} -> {'rig ' + rig if rig else 'all flows'} of '{store}'.")
+        print(f"{action} -> {target} of '{store}'.")
         return 0
     entries = backend._read() if hasattr(backend, '_read') else {}
     commands = {key: entry for key, entry in entries.items()

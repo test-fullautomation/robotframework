@@ -172,6 +172,16 @@ RobotFramework AIO fork with flow control (`robotFlow.robotSource`).
   run from that checkpoint: finished test phases are skipped and the
   interrupted loop goes on with what is left of it and with its saved
   variables. The setup phase runs again.
+- **Set…** (the toolbar, or *Robot Flow: Set Variables in the Running
+  Flow…*) sends `NAME=value` pairs to the running flow; it applies them at
+  its next step as suite variables and logs it. A loop's bounds are read when
+  the loop starts, so they change for the next loop, not the running one.
+- **Snapshot** (the toolbar, or *Robot Flow: Snapshot the Running Flow…*)
+  writes a named `<flow>.snapshot-<name>.json` next to the checkpoint at the
+  flow's next step. It is kept after the run; *Continue* from it with
+  `FLOW_CHECKPOINT` (*Run with Variables…* on top of it replays with changed
+  values: the values you give win over the saved ones). The flow report
+  lists the snapshots of a run at their loop.
 - **Step** (the toolbar, or *Robot Flow: Run in Step Mode*) runs the flow in
   step mode: it pauses before every step of its test phases, and **Next step**
   runs one more. The setup phase is not stepped.

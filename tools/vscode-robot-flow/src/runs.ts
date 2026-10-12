@@ -215,6 +215,52 @@ export class RunManager implements vscode.Disposable {
     return true;
   }
 
+  /** Set variables in the running flow(s): NAME=value pairs, applied at the next step (suite scope). */
+  async setVariables(key: string, member = ''): Promise<boolean> {
+    const a = this.runs.get(key);
+    if (!a || a.state.status !== 'running' || !a.state.pausable || !a.store) {
+      void vscode.window.showInformationMessage('Only a running flow can take a variable: it is applied at its next step.');
+      return false;
+    }
+    const text = await vscode.window.showInputBox({
+      title: `Set variables in ${a.state.title}`,
+      prompt: 'NAME=value pairs separated by commas; applied at the flow\'s next step, suite scope. A loop\'s bounds are read when the loop starts.',
+      placeHolder: 'VOLTS=14.2, MODE=EMC',
+      validateInput: (v) => { try { return Object.keys(parseVariables(v)).length ? null : 'Give at least one NAME=value.'; } catch (e) { return (e as Error).message; } },
+    });
+    if (!text) return false;
+    const pairs = Object.entries(parseVariables(text)).map(([n, v]) => `${n}=${v}`);
+    const res = await sendControl(a.env, a.store, 'set', member, pairs);
+    if (!res.ok) {
+      void vscode.window.showWarningMessage(`The variables were not sent: ${res.error}`);
+      return false;
+    }
+    a.output.appendLine(`[set ${pairs.join(' ')}${member ? ' ' + member : ''}: applied at the next step]`);
+    return true;
+  }
+
+  /** Write a named snapshot of the running flow's state next to its checkpoint. */
+  async snapshot(key: string, member = ''): Promise<boolean> {
+    const a = this.runs.get(key);
+    if (!a || a.state.status !== 'running' || !a.state.pausable || !a.store) {
+      void vscode.window.showInformationMessage('Only a running flow can take a snapshot.');
+      return false;
+    }
+    const name = await vscode.window.showInputBox({
+      title: `Snapshot of ${a.state.title}`,
+      prompt: 'A name for the snapshot (optional: the time is used). Written at the flow\'s next step next to its checkpoint; a new run can continue from it.',
+      placeHolder: 'before the swap',
+    });
+    if (name === undefined) return false;
+    const res = await sendControl(a.env, a.store, 'snapshot', member, name ? [name] : []);
+    if (!res.ok) {
+      void vscode.window.showWarningMessage(`The snapshot was not requested: ${res.error}`);
+      return false;
+    }
+    a.output.appendLine(`[snapshot${name ? ' ' + JSON.stringify(name) : ''}: written at the next step]`);
+    return true;
+  }
+
   /** One process of a run ('main' for a file run). */
   process(key: string, id = 'main'): RobotRun | null {
     return this.runs.get(key)?.processes.get(id) ?? null;

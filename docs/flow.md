@@ -481,6 +481,44 @@ process started is not for that process and is ignored by it.
   test phases and waits for `resume` (or Enter, when the run has a console):
   a way to walk a new plan through the bench one step at a time.
 
+### Changing a running flow: `set` and `snapshot`
+
+```bash
+python -m robot.flow control results/run42/signals.json set VOLTS=14.2 MODE=EMC
+python -m robot.flow control results/run42/signals.json snapshot before the swap
+```
+
+`set` gives a running flow new values: at its next step boundary the flow
+sets them as suite variables and logs `Variable ${VOLTS} set to '14.2' by
+operator (suite scope).` on the console too. Keyword arguments and decision
+conditions use the new value from then on. A loop's `max_loops` /
+`max_seconds` are read when the loop starts, so a set changes the next loop,
+not the one running. `--rig` addresses one process, as for `pause`.
+
+`snapshot` writes the flow's state as `<flow>.snapshot-<name>.json` next to
+the checkpoint, at the next step boundary, and the flow goes on. The file is
+a checkpoint plus a `snapshot` section (when and where it was taken, and the
+JSON-safe variables in scope, for inspection), it is **kept** when the run
+ends, and a new run continues from it like from a checkpoint:
+
+```bash
+robot --parser robot.flow --variable FLOW_CHECKPOINT:results/run42/plan.snapshot-before_the_swap.json \
+      --variable VOLTS:13.5 --outputdir results/run42-replay plan.flow.json
+```
+
+A value given with `--variable` wins over the one the snapshot (or any
+checkpoint) saved for the same name, and the log says `Kept from the command
+line instead of the checkpoint: ${VOLTS}.` -- that is how a bad cycle is
+replayed with a changed value. The run writes its own `plan.checkpoint.json`
+next to the snapshot; the snapshot stays as it was. The flow report lists
+the snapshots of a run at their loop, linked into the log. From inside a
+plan, the keyword `Flow Snapshot    name` does the same, for example in a
+recovery region, so the state at a failure is kept.
+
+A snapshot is not a core dump: the bench is not in it. A restart from it
+re-establishes the bench with the setup phase and continues the plan after
+the last completed iteration, as after a stop.
+
 ### Stopping
 
 `stop` ends the run in an orderly way. The flow leaves at its next step

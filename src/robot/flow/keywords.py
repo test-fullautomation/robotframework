@@ -41,7 +41,7 @@ from .control import CONTROL as _CONTROL
 
 
 __all__ = ['flow_gate', 'flow_phase', 'flow_loop', 'flow_iteration',
-           'flow_pause', 'flow_resume', 'flow_stop']
+           'flow_pause', 'flow_resume', 'flow_stop', 'flow_snapshot']
 
 ROBOT_LIBRARY_VERSION = get_version()
 ROBOT_LIBRARY_SCOPE = 'GLOBAL'
@@ -148,12 +148,19 @@ def flow_loop(loop_id, max_loops=None, max_seconds=None, *variables):
     )
     run.variable_names = [name for name in variables if name]
     run.read_variable = builtin.get_variable_value
+    scopes = EXECUTION_CONTEXTS.current.namespace.variables
+    kept = [name for name in restored if scopes.given_on_command_line(name)]
     for name, value in restored.items():
-        builtin.set_test_variable(name, value)
+        if name not in kept:
+            builtin.set_test_variable(name, value)
     if message:
         logger.info(message, also_console=True)
         if restored:
-            logger.info(f"Restored variables: {', '.join(sorted(restored))}.")
+            logger.info(f"Restored variables: {', '.join(sorted(set(restored) - set(kept)))}."
+                        if set(restored) - set(kept) else 'No variables restored.')
+        if kept:
+            logger.info(f"Kept from the command line instead of the checkpoint: "
+                        f"{', '.join(sorted(kept))}.")
     return ['NONE' if limit is None else str(limit), deadline]
 
 
@@ -172,6 +179,19 @@ def flow_iteration(loop_id):
 
 
 # ------------------------------------------------------ pause, resume, stop
+
+def flow_snapshot(name=''):
+    """Writes a named snapshot of the flow's state next to its checkpoint.
+
+    The file is kept after the run and a new run continues from it with
+    ``FLOW_CHECKPOINT``. The operator does the same from outside with
+    ``python -m robot.flow control <store> snapshot [name]``.
+    """
+    path = _current_run().snapshot(name)
+    logger.info(f"Snapshot '{os.path.basename(path)}' written; continue from it with "
+                f"FLOW_CHECKPOINT:{path}", also_console=True)
+    return path
+
 
 def flow_pause(reason='keyword'):
     """Pauses the flow at its next step boundary.
@@ -243,6 +263,7 @@ def _start_run(builtin, source):
     run = _control.FlowRun(source, str(value('${SUITE NAME}')), path, outputdir,
                            int(every) if every else None)
     _CONTROL.run = run
+    _follow_store()
     mode = str(value(RESUME_VARIABLE) or 'auto').strip().lower()
     if run.load(mode):
         done = ', '.join(phase['name'] for phase in run.completed) or 'none'
@@ -291,9 +312,24 @@ class _Listener:
 ROBOT_LIBRARY_LISTENER = _Listener()
 
 
+def _follow_store():
+    """Poll the signal store named by ROBOT_FLOW_SIGNALS, (re)bound per run.
+
+    A process that runs several flows in a row (the API, tests) may name a
+    different store for each; the poller follows the one of the current run.
+    """
+    store = os.environ.get('ROBOT_FLOW_SIGNALS')
+    if not store:
+        return
+    current = getattr(_CONTROL._store, 'path', None)
+    if _CONTROL._store is not None and current == os.path.abspath(store):
+        return
+    from .signals import FlowSignals as _FlowSignals
+    _CONTROL.stop_polling()
+    _CONTROL.start_polling(_FlowSignals(store=store)._store)
+
+
 # The body runner's pause point, and the control channel of the run: the
 # signal store the flows of a run group already share.
 _control.install()
-if os.environ.get('ROBOT_FLOW_SIGNALS'):
-    from .signals import FlowSignals as _FlowSignals
-    _CONTROL.start_polling(_FlowSignals()._store)
+_follow_store()

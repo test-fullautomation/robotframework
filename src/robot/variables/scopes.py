@@ -162,6 +162,11 @@ class VariableScopes:
             else:
                 scope.set_from_file(variables, overwrite=overwrite)
 
+    def given_on_command_line(self, name):
+        """Whether ``name`` (any ``${x}`` spelling) was given with ``--variable``."""
+        # cuongnht add flow
+        return _normalize_name(name) in getattr(self._global, 'cli_variable_names', ())
+
     def set_from_variable_section(self, variables, overwrite=False):
         for scope in self._scopes_until_suite:
             scope.set_from_variable_section(variables, overwrite)
@@ -221,6 +226,11 @@ class VariableScopes:
         return self.current.as_dict(decoration=decoration)
 
 
+def _normalize_name(name):
+    # cuongnht add flow: '${My Var}', 'my_var' and 'MYVAR' are the same name.
+    return name.strip().strip('${}@&%').replace(' ', '').replace('_', '').lower()
+
+
 class GlobalVariables(Variables):
     _import_by_path_ends = (".py", "/", os.sep, ".yaml", ".yml", ".json")
 
@@ -239,6 +249,8 @@ class GlobalVariables(Variables):
                 msg, details = get_error_details()
                 LOGGER.error(msg)
                 LOGGER.info(details)
+        # cuongnht add flow: a restarted flow does not restore a variable given here.
+        self.cli_variable_names = set()
         for varstr in settings.variables:
             match = re.fullmatch("([^:]+): ([^:]+):(.*)", varstr)
             if match:
@@ -249,6 +261,7 @@ class GlobalVariables(Variables):
             else:
                 name, value = varstr, ""
             self[f"${{{name}}}"] = value
+            self.cli_variable_names.add(_normalize_name(name))
 
     def _convert_cli_variable(self, name, typ, value):
         from robot.api.types import Secret
