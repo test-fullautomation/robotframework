@@ -47,6 +47,8 @@ from robot.errors import DataError
 
 from . import build_flow_suite
 from .builder import FLOW_LIBRARY, GATE_KEYWORD, RETRY_KEYWORD
+
+LEGACY_ITERATION_KEYWORD = 'Flow Iteration'
 from .control import checkpoint_name, fingerprint, read_checkpoint
 from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
                     structure)
@@ -283,7 +285,10 @@ class _FlowRun:
 
     def _walk(self, built_body, result_body, parent_id):
         built_items = list(built_body)
-        result_items = _numbered(parent_id, result_body)
+        # Outputs of earlier versions have a 'Flow Iteration' marker first in
+        # every iteration; it takes its log number but is not a step of the plan.
+        result_items = [entry for entry in _numbered(parent_id, result_body)
+                        if getattr(entry[0], 'name', None) != LEGACY_ITERATION_KEYWORD]
         for built, (item, item_id, branches) in zip(built_items, result_items):
             origin = self._origin(built)
             btype = getattr(built, 'type', None)

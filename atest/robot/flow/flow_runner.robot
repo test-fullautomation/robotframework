@@ -14,19 +14,19 @@ Full example runs setup, cycles, recovery and teardown
     Should Be Equal    ${SUITE.setup.name}    Flow Setup
     Should Be Equal    ${SUITE.teardown.name}    Flow Teardown
     Check Log Message    ${SUITE.setup.body[1].messages[0]}    Power on for RIG_A.
-    # Flow Phase, Flow Loop, then the loop; Flow Iteration leads every iteration.
+    # Flow Phase, Flow Loop, then the loop; an iteration holds the node's TRY only.
     ${loop} =    Set Variable    ${SUITE.tests[0].body[2]}
     Should Be Equal    ${loop.type}    WHILE
     # Three iterations, then the INFO message about reaching the limit.
     ${iterations} =    Evaluate    [item for item in $loop.body if item.type == 'ITERATION']
     Length Should Be    ${iterations}    3
     # Iteration 1 passes: the EXCEPT branch is not run.
-    Should Be Equal    ${loop.body[0].body[1].body[1].status}    NOT RUN
+    Should Be Equal    ${loop.body[0].body[0].body[1].status}    NOT RUN
     # Iteration 2 fails on purpose and runs the recovery, then the loop continues.
-    ${recovery} =    Set Variable    ${loop.body[1].body[1].body[1]}
+    ${recovery} =    Set Variable    ${loop.body[1].body[0].body[1]}
     Should Be Equal    ${recovery.type}    EXCEPT
     Check Log Message    ${recovery.body[0].messages[0]}    Recovery 1 for RIG_A.
-    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
+    Check Log Message    ${loop.body[2].body[0].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
     Check Log Message    ${SUITE.teardown.body[0].messages[0]}    Bench released.
 
 Signals between flows: set, wait at a gate, read back
@@ -87,9 +87,16 @@ Loop bounds can be variables sized per run
     Run Tests    ${PARSER}    flow/variable_bounds.flow.json
     ${tc} =    Check Test Case    Variable Bounds    PASS
     Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 2
-    Run Tests    ${PARSER} --variable CYCLES:3 --variable MAX_TIME:1h    flow/variable_bounds.flow.json
+    Run Tests    ${PARSER} --variable CYCLES:3 --variable MAX_TIME:1h --variable FLOW_CHECKPOINT_EVERY:2    flow/variable_bounds.flow.json
     ${tc} =    Check Test Case    Variable Bounds    PASS
     Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 3
+    # No marker keyword in the iterations: the runner counts them, and an
+    # iteration that writes the checkpoint (every second one here) says so.
+    ${loop} =    Set Variable    ${tc.body[2]}
+    Should Be True    [i.type for i in $loop.body[0].body] == ['MESSAGE', 'KEYWORD', 'KEYWORD']
+    Should Be True    [m.message for m in $loop.body[0].body if m.type == 'MESSAGE'] == ["Iteration 1 of loop 'loop'; checkpoint written."]
+    Should Be True    [i.type for i in $loop.body[1].body] == ['KEYWORD', 'KEYWORD']
+    Should Be True    [m.message for m in $loop.body[2].body if m.type == 'MESSAGE'] == ["Iteration 3 of loop 'loop'; checkpoint written."]
     Run Tests    ${PARSER} --variable CYCLES:many    flow/variable_bounds.flow.json
     Check Test Case    Variable Bounds    UNKNOWN    'max_loops' of loop 'loop' must be a positive integer, got 'many'.
 
@@ -202,8 +209,8 @@ Stop leaves a checkpoint and the next run continues from it
     ${loop} =    Set Variable    ${tc.body[3]}
     # Three iterations were left; the message about the limit follows them.
     Should Be True    len([item for item in $loop.body if item.type == 'ITERATION']) == 3
-    Check Log Message    ${loop.body[0].body[1].body[0].body[0].messages[0]}    Work 4.
-    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Work 6.
+    Check Log Message    ${loop.body[0].body[0].body[0].body[0].messages[0]}    Work 4.
+    Check Log Message    ${loop.body[2].body[0].body[0].body[0].messages[0]}    Work 6.
     Check Test Case    Report    PASS
     Should Be Equal    ${SUITE.status}    PASS
     File Should Not Exist    ${CHECKPOINT}

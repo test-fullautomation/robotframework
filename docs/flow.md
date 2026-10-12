@@ -335,7 +335,7 @@ Cycle
 | `keyword` with `retry` or `timeout` | `Flow Retry` from `robot.flow.keywords`: the attempts are its children, each under Robot's keyword timeout when the node has one; a node without a policy is the plain keyword call |
 | `decision` | `IF` / `ELSE` |
 | `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline on the flow clock in the condition, so reaching either bound ends the loop with **PASS** |
-| checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds) and `Flow Iteration` first in its body. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
+| checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds). The iterations are counted by the runner itself as each one starts, without a keyword in the log. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
 | `on_failure` | `TRY` / `EXCEPT AS ${flow_error}`; `abort` adds `Fail ${flow_error}` after the recovery |
 
 A flow's loops keep memory flat: once an iteration is in `output.xml` its
@@ -597,7 +597,10 @@ the variables the phase assigns:
   iteration (at most once a second, so fast loops are not slowed down; a
   crash can then cost up to a second of iterations), and on `stop`.
   `"checkpoint_every": 100` or `--variable FLOW_CHECKPOINT_EVERY:100` writes
-  every hundredth iteration instead, `1` every iteration.
+  every hundredth iteration instead, `1` every iteration. Each write leaves a
+  line in the iteration (`Iteration 1200 of loop 'loop'; checkpoint
+  written.`), so the log shows the progress at that pace and nothing more:
+  counting an iteration costs no keyword call.
 - **Written whole, and to the disk.** The file is written to a temporary name,
   flushed to the disk (`fsync`) and renamed into place: a reader never sees
   half of it, and a power loss right after a write does not lose it.

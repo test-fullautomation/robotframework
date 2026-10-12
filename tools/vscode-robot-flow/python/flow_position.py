@@ -123,7 +123,7 @@ _BOOKKEEPING = []
 
 def _bookkeeping():
     """Names of the keywords the fork adds for its checkpoint (``Flow Phase``,
-    ``Flow Loop``, ``Flow Iteration``); none with an older fork."""
+    ``Flow Loop``; older forks also ``Flow Iteration``); none with an older fork."""
     if not _BOOKKEEPING:
         names = set()
         try:

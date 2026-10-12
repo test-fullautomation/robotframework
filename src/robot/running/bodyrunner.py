@@ -547,6 +547,10 @@ class WhileRunner:
     def _run_iteration(self, data, result, run=True):
         runner = BodyRunner(self._context, run, self._templated)
         with StatusReporter(data, result, self._context, run):
+            # cuongnht flow checkpoint: the flow runner counts the iteration
+            # here, before its first step. No hook, no cost.
+            if run and pausepoint.iteration_hook:
+                pausepoint.iteration_hook(self._context, data)
             runner.run(data, result)
 
     def _should_run(self, condition, variables):

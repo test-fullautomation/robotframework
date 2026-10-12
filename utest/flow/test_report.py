@@ -123,8 +123,8 @@ class TestReport(unittest.TestCase):
         self.assertEqual((work['runs'], work['status']), (4, {'PASS': 3, 'FAIL': 1}))
         self.assertEqual(work['last_error'], 'cycle 2 broke')
         self.assertEqual(work['first_fail'], work['last_fail'])
-        # Iteration 2: Flow Iteration, then the TRY branch holding the node.
-        self.assertTrue(work['first_fail'].endswith('-k2-k2-k1'), work['first_fail'])
+        # Iteration 2, first item the TRY, its first branch holding the node.
+        self.assertTrue(work['first_fail'].endswith('-k2-k1-k1'), work['first_fail'])
         fix = self.stats['fix']
         self.assertEqual((fix['runs'], fix['status']), (1, {'PASS': 1}))
 

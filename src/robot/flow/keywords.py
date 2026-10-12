@@ -21,9 +21,10 @@ about a bench (signals, services, devices) belong to application libraries
 and are referenced from the flow by name.
 
 ``Flow Gate`` is the wait of a ``gate`` node; ``Flow Retry`` runs a ``keyword``
-node that has a ``retry`` policy or a ``timeout``. ``Flow Phase``, ``Flow Loop``
-and ``Flow Iteration`` are bookkeeping the builder adds for the checkpoint
-(see :mod:`robot.flow.control`). ``Flow Pause``, ``Flow Resume`` and
+node that has a ``retry`` policy or a ``timeout``. ``Flow Phase`` and
+``Flow Loop`` are bookkeeping the builder adds for the checkpoint (see
+:mod:`robot.flow.control`; the iterations are counted by the WHILE runner's
+hook, without a keyword). ``Flow Pause``, ``Flow Resume`` and
 ``Flow Stop`` let a test or a supervisor hold or end the flow it runs in.
 """
 
@@ -42,7 +43,7 @@ from . import control as _control
 from .control import CONTROL as _CONTROL
 
 
-__all__ = ['flow_gate', 'flow_retry', 'flow_phase', 'flow_loop', 'flow_iteration',
+__all__ = ['flow_gate', 'flow_retry', 'flow_phase', 'flow_loop',
            'flow_pause', 'flow_resume', 'flow_stop', 'flow_snapshot']
 
 ROBOT_LIBRARY_VERSION = get_version()
@@ -262,20 +263,6 @@ def flow_loop(loop_id, max_loops=None, max_seconds=None, *variables):
             logger.info(f"Kept from the command line instead of the checkpoint: "
                         f"{', '.join(sorted(kept))}.")
     return ['NONE' if limit is None else str(limit), deadline]
-
-
-def flow_iteration(loop_id):
-    """Marks the start of an iteration of ``loop_id``. Added by the flow builder.
-
-    The iterations before this one are complete: the checkpoint is updated
-    (at most once a second, or every ``checkpoint_every`` iterations).
-    """
-    run = _CONTROL.run
-    if run is not None:
-        run.iteration_started(loop_id)
-    # A stop asked for during the previous iteration takes effect here, with
-    # that iteration counted as done.
-    _CONTROL.pause_point(EXECUTION_CONTEXTS.current)
 
 
 # ------------------------------------------------------ pause, resume, stop

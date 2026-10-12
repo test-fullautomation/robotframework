@@ -419,8 +419,7 @@ class FlowControl:
 
 
 # Keywords the builder emits for bookkeeping; step mode does not stop at them.
-ITERATION_KEYWORD = 'Flow Iteration'
-_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop', ITERATION_KEYWORD)
+_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop')
 
 CONTROL = FlowControl()
 
@@ -447,18 +446,32 @@ def _hook(context, step):
         return
     if control.step_mode:
         control.step(context, step)
-    if control._stop_reason is not None and getattr(step, 'name', None) == ITERATION_KEYWORD:
-        # Let the iteration be counted first: `Flow Iteration` stops the flow
-        # itself, so an iteration that ran to its end is not done again.
-        if control._paused.is_set():
-            control._wait(None)
-        return
     control.pause_point(context)
 
 
+def _iteration_hook(context, iteration):
+    """Called by the WHILE runner when an iteration starts, before its first step.
+
+    Counts the iteration when the WHILE is a checkpointed flow loop: the
+    iterations before it are complete, the checkpoint may be due. A stop asked
+    for during the previous iteration takes effect here, with that iteration
+    counted as done; a pause is held here too, so the position in the log is
+    up to date.
+    """
+    run = CONTROL.run
+    if run is None or run.finished:
+        return
+    loop_id = run.loop_of(iteration.parent)
+    if loop_id is None:
+        return          # a loop the checkpoint does not track (nested, sub-flow)
+    run.iteration_started(loop_id)
+    CONTROL.pause_point(context)
+
+
 def install():
-    """Register the pause point with the body runner."""
+    """Register the pause point and the iteration hook with the body runner."""
     pausepoint.hook = _hook
+    pausepoint.iteration_hook = _iteration_hook
 
 
 # ---------------------------------------------------------------- checkpoint
@@ -501,6 +514,8 @@ class FlowRun:
         self._restored = None       # position saved by an earlier run
         self._phase_restored = None # the same, while its phase is being continued
         self._loops = {}            # loop id -> state
+        self._tracked = None        # the WHILE data of `loop`, bound at its first iteration
+        self._expect = False        # `Flow Loop` ran: the next WHILE to iterate is `loop`
         self._written = 0.0
         self.snapshots = []         # [{'name', 'path', 'taken', 'position'}]
 
@@ -560,6 +575,7 @@ class FlowRun:
         self.variables = {}
         self.variable_names = []
         self._loops = {}
+        self._tracked, self._expect = None, False
         restored = self._restored
         if restored and restored.get('phase') != name:
             restored = None
@@ -596,6 +612,7 @@ class FlowRun:
         seconds = max_seconds
         variables = {}
         message = None
+        self._tracked, self._expect = None, True
         if loop_id in self.done_loops:
             self.done_loops.remove(loop_id)
             self._loops[loop_id] = {'offset': 0, 'count': 0, 'deadline': -1.0,
@@ -628,6 +645,20 @@ class FlowRun:
         self.loop, self.iteration = loop_id, done
         return limit, deadline, variables, message
 
+    def loop_of(self, while_data):
+        """The id of the tracked loop that ``while_data`` (a WHILE) is, or None.
+
+        ``Flow Loop`` runs right before its WHILE, so the first WHILE to
+        iterate after it is the loop's; it is remembered by identity, and a
+        WHILE nested in its body is not it.
+        """
+        if while_data is self._tracked:
+            return self.loop
+        if self._expect and self.loop:
+            self._tracked, self._expect = while_data, False
+            return self.loop
+        return None
+
     def iteration_started(self, loop_id):
         """An iteration of ``loop_id`` starts: the ones before it are complete."""
         state = self._loops.get(loop_id)
@@ -643,8 +674,10 @@ class FlowRun:
             due = self.iteration % self.every == 0
         else:
             due = time.time() - self._written >= self.MIN_INTERVAL_S
-        if due:
-            self.write(force=True)
+        if due and self.write(force=True):
+            # The log shows the progress at the pace of the checkpoint.
+            logger.info(f"Iteration {self.iteration + 1} of loop '{loop_id}'; "
+                        f"checkpoint written.")
 
     def _snapshot_variables(self):
         read = self.read_variable

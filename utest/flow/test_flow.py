@@ -374,10 +374,10 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual((start.name, list(start.args)), ('Flow Loop', ['loop', '3', 'NONE']))
         self.assertEqual(list(start.assign), ['${flow_limit_loop}', '${flow_deadline_loop}'])
         self.assertEqual(loop.type, BodyItem.WHILE)
+        # Bounded by iterations only: no clock in the condition, as in the plain shape.
         self.assertEqual((loop.condition, loop.limit, loop.on_limit),
-                         ('robot.flow.control.clock() < $flow_deadline_loop', '${flow_limit_loop}', 'pass'))
-        iteration, try_, sleep = loop.body
-        self.assertEqual((iteration.name, list(iteration.args)), ('Flow Iteration', ['loop']))
+                         ('True', '${flow_limit_loop}', 'pass'))
+        try_, sleep = loop.body         # no marker keyword: the runner counts iterations
         self.assertEqual(try_.type, BodyItem.TRY_EXCEPT_ROOT)
         main, recovery = try_.body
         self.assertEqual(main.type, BodyItem.TRY)
@@ -390,7 +390,7 @@ class TestBuilder(unittest.TestCase):
     def test_abort_reraises(self):
         data = copy.deepcopy(LOOP_FLOW)
         data['edges'][4] = {'from': 'recover', 'to': 'end', 'label': 'abort'}
-        recovery = build(data).tests[0].body[2].body[1].body[1]
+        recovery = build(data).tests[0].body[2].body[0].body[1]
         self.assertEqual([(k.name, list(k.args)) for k in recovery.body],
                          [('Recover', []), ('Fail', ['${flow_error}'])])
 
@@ -460,7 +460,7 @@ class TestBuilder(unittest.TestCase):
                      {'from': 'a-b', 'to': 'end', 'label': 'done'}])
         # The outer loop is checkpointed, the nested one is a plain loop.
         _, outer_start, outer = build(data).tests[0].body
-        _, inner_eval, inner = outer.body
+        inner_eval, inner = outer.body
         self.assertEqual(list(outer_start.assign),
                          ['${flow_limit_a_b}', '${flow_deadline_a_b}'])
         self.assertEqual(list(inner_eval.assign), ['${flow_deadline_a_b_2}'])
@@ -534,8 +534,7 @@ Library    robot.flow.keywords
 Test Flow
     Flow Phase    Test Flow
     ${flow_limit_loop}    ${flow_deadline_loop}=    Flow Loop    loop    3    NONE
-    WHILE    robot.flow.control.clock() < $flow_deadline_loop    limit=${flow_limit_loop}    on_limit=pass
-        Flow Iteration    loop
+    WHILE    True    limit=${flow_limit_loop}    on_limit=pass
         TRY
             Work
         EXCEPT    AS    ${flow_error}

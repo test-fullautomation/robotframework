@@ -30,8 +30,9 @@ Mapping:
 - checkpoint      -> ``Flow Phase`` first in every test, and for the loops
                      directly in a test phase ``Flow Loop`` before the
                      ``WHILE`` (it returns the bounds, or what an earlier
-                     run left of them) and ``Flow Iteration`` first in its
-                     body; not emitted with ``"checkpoint": false``
+                     run left of them); the iterations themselves are
+                     counted by the WHILE runner's iteration hook, nothing
+                     is emitted for them; not emitted with ``"checkpoint": false``
 - on_failure      -> ``TRY`` / ``EXCEPT AS ${flow_error}``; ``abort`` re-raises
                      with ``Fail`` after the recovery ran
 - flow (sub-flow) -> a call of the generated user keyword ``Flow: <sub-flow name>``;
@@ -62,7 +63,6 @@ DEADLINE_VARIABLE = '${flow_deadline_%s}'
 LIMIT_VARIABLE = '${flow_limit_%s}'
 PHASE_KEYWORD = 'Flow Phase'
 LOOP_KEYWORD = 'Flow Loop'
-ITERATION_KEYWORD = 'Flow Iteration'
 # The flow clock stands still while the flow is paused, so a hold does not
 # use up a loop's time.
 CLOCK = 'robot.flow.control.clock()'
@@ -76,8 +76,8 @@ def build_suite(flow, source=None, origins=None):
     key, role)`` for every item built from a node: the key is the node id
     (``<sub-flow name>::<id>`` inside a sub-flow) and the role says what the
     item is for the node (``node`` for the item that is the node, else
-    ``phase``, ``loop-start``, ``iteration``, ``every``, ``deadline``,
-    ``guard`` or ``abort``). The flow report maps a run back to the plan
+    ``phase``, ``loop-start``, ``every``, ``deadline``, ``guard`` or
+    ``abort``). The flow report maps a run back to the plan
     with it.
     """
     data = flow.data
@@ -179,11 +179,11 @@ class _Emitter:
         args += ['\\' + name for name in names]
         start = body.create_keyword(name=LOOP_KEYWORD, args=args, assign=[limit, deadline])
         self.origin(start, step, 'loop-start')
-        while_ = body.create_while(condition=f'{CLOCK} < ${deadline[2:-1]}',
-                                   limit=limit, on_limit='pass')
+        # Only a loop with a time bound reads the clock each round; the
+        # iteration limit alone bounds the others, as in the plain shape.
+        condition = f'{CLOCK} < ${deadline[2:-1]}' if step.max_seconds else 'True'
+        while_ = body.create_while(condition=condition, limit=limit, on_limit='pass')
         self.origin(while_, step)
-        mark = while_.body.create_keyword(name=ITERATION_KEYWORD, args=[_literal(step.id)])
-        self.origin(mark, step, 'iteration')
         self._guarded(while_.body, step, 'guard')
         if step.every:
             self.origin(while_.body.create_keyword(name='Sleep', args=[step.every]),
