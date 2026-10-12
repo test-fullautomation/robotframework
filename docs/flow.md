@@ -523,8 +523,9 @@ the variables the phase assigns:
   crash can then cost up to a second of iterations), and on `stop`.
   `"checkpoint_every": 100` or `--variable FLOW_CHECKPOINT_EVERY:100` writes
   every hundredth iteration instead, `1` every iteration.
-- **Written whole.** The file is replaced atomically; a reader never sees half
-  of it.
+- **Written whole, and to the disk.** The file is written to a temporary name,
+  flushed to the disk (`fsync`) and renamed into place: a reader never sees
+  half of it, and a power loss right after a write does not lose it.
 - **Kept or deleted.** A run that reaches its end deletes its checkpoint. A
   stopped or crashed run leaves it.
 - **Not wanted.** `"checkpoint": false` in the `flow` section builds the flow
@@ -560,3 +561,24 @@ that of the main file; sub-flow files are not part of it).
 
 Reading the two outputs together gives the verdict of the plan; `rebot` merges
 them into one report.
+
+### After a crash
+
+A killed process, a bench PC that rebooted, a power cut: nothing orderly
+happened, so there is no `Stopped by operator` message and no teardown. What
+is left is the checkpoint, which is as recent as the last iteration boundary
+(or at most one second old; `checkpoint_every: 1` makes it exact), and the
+output file, cut wherever the process died. The restart is the same command
+as after a stop and behaves the same: the setup phase runs again, finished
+phases SKIP, the loop continues after its last *completed* iteration, so the
+interrupted one is done again.
+
+A cut `output.xml` cannot be read by `rebot`. For endurance runs, run with
+`--segmentoutput 1h` (or shorter): every sealed segment is a complete output
+of its hour and `python -m robot.output.segmentmerger` joins them, so the
+log of the crashed run is lost only for the last, unsealed interval. See
+[Segmented output](segmented-output.md).
+
+This path is tested: the unit test `utest/flow/test_crash_recovery.py` kills a
+running flow without warning and checks that the continued run covers the
+plan exactly once, except the interrupted iteration.

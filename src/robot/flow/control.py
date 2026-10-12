@@ -626,7 +626,8 @@ class FlowRun:
         }
 
     def write(self, force=False):
-        """Write the file whole: a reader never sees half of it."""
+        """Write the file whole and to the disk: a reader never sees half of
+        it, and a power loss right after the write does not lose it."""
         if self.finished:
             return False
         directory = os.path.dirname(self.path)
@@ -636,6 +637,8 @@ class FlowRun:
                 os.makedirs(directory, exist_ok=True)
             with open(temp, 'w', encoding='UTF-8') as file:
                 json.dump(self.to_dict(), file, indent=1)
+                file.flush()
+                os.fsync(file.fileno())
             for attempt in range(50):
                 try:
                     os.replace(temp, self.path)
@@ -645,6 +648,7 @@ class FlowRun:
             else:
                 os.remove(temp)
                 raise OSError('the file stays locked')
+            _fsync_directory(directory or '.')
         except OSError as err:
             logger.warn(f"Writing flow checkpoint '{self.path}' failed: {err}")
             return False
@@ -657,6 +661,22 @@ class FlowRun:
         if self.phase:
             return f"in phase '{self.phase}'"
         return ''
+
+
+def _fsync_directory(directory):
+    """Make the rename durable too (POSIX; directories cannot be opened on Windows)."""
+    if os.name == 'nt':
+        return
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def read_checkpoint(path):
