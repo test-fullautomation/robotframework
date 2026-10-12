@@ -31,6 +31,16 @@ and what you type in the text redraws the view, unsaved changes included.
   toolbar, the title bar, the Explorer) asks for `NAME=value` pairs passed as
   `--variable`, the file's last ones offered again: the way to size a flow's
   `${variable}` bounds per run.
+- **Robot Runs** (a view in the Explorer) — what ran, what runs now, and
+  what each run left behind: one row per results folder with its status,
+  time and duration; a running run with where it is and Pause / Resume /
+  Stop inline; under a run its phases or tests with their verdicts, the Log,
+  Report and Flow report, its checkpoint and snapshots with *Continue from
+  here*, the Output and the folder. Read from the results folders, so it
+  survives a restart and lists command-line runs too. A click opens the
+  **Run page** in the editor area: the phases as a table with time bars and
+  the failure messages in full, the buttons, and for a flow run the **flow
+  report** itself on the page, written on demand when the run has none.
 - **Run groups** — the `groups` of a Manager GUI test project
   (`testproject.json`): the members' Diagrams side by side with the signals
   where one waits for another, and a Run that starts all members together on
@@ -92,6 +102,37 @@ or *Extensions → … → Install from VSIX…*. Build the `.vsix` with
   resume, stop and continue a flow*). Each run writes `output.xml`, `log.html` and `report.html`
   (and `flow.html`, the flow report, with `robotFlow.flowReport`) to its own folder under
   `robotFlow.resultsFolder`.
+- **Robot Runs**, a view at the bottom of the Explorer, lists the runs of
+  the results folders (`robotFlow.resultsFolder` of each workspace folder
+  and of each test project, plus the folders of runs started here): running
+  ones first, then newest first, each with its status icon, the time of day
+  (and the date when not today), the duration, and `1 of 4 failed` when
+  something did. Click a run for its **Run page**, a tab in the editor
+  area: the header (status, start, duration, variables, the target and the
+  folder as links), the buttons (Log, Report, Output, *Continue from* each
+  checkpoint and snapshot; Pause / Resume, Stop and Snapshot while it runs),
+  the phases or tests as a table with a time bar per row and the failure
+  messages in full, and for a flow run the **flow report** on the page
+  itself, the plan as drawn with what the run did on each node. When the
+  run wrote none (`robotFlow.flowReport` is off by default), *Write the flow
+  report* makes it from `output.xml` with the fork's `robot.flow report`,
+  a second or two. A group run has one tab per member. The page follows a
+  running run. Expand a run in the tree for its **Phases** (a flow) or
+  **Tests** (a suite) with their verdicts, elapsed times and failure
+  messages; the **Log**, **Report** and **Flow report** (opened in the
+  browser; a flow run without one gets *Flow report · written on demand*,
+  a click writes and opens it); its
+  **checkpoint** and **snapshots**, each with ↻ *Continue from here*, which
+  starts a new run of the flow from that file with the original run's
+  variables; the **Output** of a run of this window; and **Open folder**. A
+  running run shows where it is (phase, loop, iteration, or the step) with
+  Pause / Resume and Stop inline, and *Snapshot…* in its menu. A group run
+  lists its members. The folders are read as they are, so runs made from
+  the command line into the same folder appear too (their phases come from
+  `output.xml`; the time and name from the folder or the output). Right-click
+  a finished run to delete its results; 🗑 in the view's title deletes the
+  finished runs older than a day, a week or a month, or all of them. The
+  list follows the folders (a watcher) and the runs of this window.
 - **Robot Flow: Open Run Group Diagram…** (or right-click a
   `testproject.json`) picks a group of the workspace's test projects.
 - **Add to Run Group…** (a flow file's title-bar menu or Explorer context)

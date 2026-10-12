@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { ControlCommand, ControlState, activeProcesses, canPause, findCheckpoint, readControlStateFrom, sendControl } from './backend/control';
 import { RobotEnv } from './backend/helpers';
+import { readRunInfo, writeRunInfo } from './backend/history';
 import { Project, RunGroup, memberPath } from './backend/project';
 import { Position, RobotRun, RunStatus, formatVariables, parseVariables, planRun } from './backend/run';
 import { projectFor, resultsRoot, robotEnvFor } from './settings';
@@ -97,6 +98,26 @@ export class RunManager implements vscode.Disposable {
 
   state(key: string): RunState | null {
     return this.runs.get(key)?.state ?? null;
+  }
+
+  /** Every run of this window, running or done. */
+  all(): RunState[] {
+    return [...this.runs.values()].map((a) => a.state);
+  }
+
+  /** The run whose output folder this is (a group member's folder counts for its group). */
+  stateOfDir(dir: string): RunState | null {
+    const wanted = path.resolve(dir).toLowerCase();
+    for (const a of this.runs.values()) {
+      const out = path.resolve(a.state.outDir).toLowerCase();
+      if (out === wanted || (a.state.members.length > 1 && path.dirname(wanted) === out)) return a.state;
+    }
+    return null;
+  }
+
+  /** A new run of a flow from a checkpoint or snapshot file, with the variables given (the original run's). */
+  continueFrom(target: string, checkpoint: string, variables: Record<string, string> = {}): Promise<RunState | null> {
+    return this.runFile(vscode.Uri.file(target), { variables: { ...variables, FLOW_CHECKPOINT: checkpoint } });
   }
 
   isRunning(key: string): boolean {
@@ -340,10 +361,19 @@ export class RunManager implements vscode.Disposable {
     };
     const store = [...processes.values()][0]?.plan.signalsFile ?? null;
     state.pausable = opts.pausable && !!store;
+    const group = processes.size > 1 || !processes.has('main');
     const active: Active = { state, processes, output, env: opts.env, store, variables: opts.variables };
     this.runs.set(key, active);
+    // run.json: what the Runs view lists the folder by, also after a restart.
+    try {
+      writeRunInfo(outDir, {
+        title, target: opts.target, kind: group ? 'group' : opts.pausable ? 'flow' : 'suite',
+        members: group ? state.members : undefined, variables: opts.variables, started: state.started, status: 'running',
+      });
+    } catch (e) {
+      output.appendLine(`(run.json was not written: ${(e as Error).message})`);
+    }
     if (state.pausable) active.watch = setInterval(() => this.readFlow(key), 1000);
-    const group = processes.size > 1 || !processes.has('main');
     for (const [id, run] of processes) {
       output.appendLine(`> ${run.plan.argv.join(' ')}`);
       run.on('output', (text: string) => {
@@ -409,6 +439,13 @@ export class RunManager implements vscode.Disposable {
     a.state.paused = null;
     const codes = all.map((p) => p.exitCode).join(', ');
     a.output.appendLine(`\n${a.state.title}: ${a.state.status} (exit ${codes})`);
+    const info = readRunInfo(a.state.outDir);
+    if (info) {
+      try {
+        writeRunInfo(a.state.outDir, { ...info, status: a.state.status, ended: a.state.ended,
+          exitCodes: Object.fromEntries([...a.processes].map(([id, p]) => [id, p.exitCode])) });
+      } catch { /* the folder is gone: nothing to list */ }
+    }
     this.changed.fire(key);
     if (a.state.debug) return;   // the debug session says how it ended
     const log = this.artifact(key, 'log.html');

@@ -2,6 +2,26 @@
 
 ## 0.1.0 — not released
 
+- *Robot Runs*, a view in the Explorer: the runs of the results folders,
+  running ones first with where they are and Pause / Resume / Stop inline,
+  then newest first with status, time, duration and the failed count. A run
+  expands to its phases or tests (streamed from `output.xml` by
+  `run_summary.py`, no Robot needed), Log / Report / Flow report, its
+  checkpoint and snapshots with *Continue from here* (a new run from that
+  file with the original run's variables), the Output and the folder. Read
+  from disk, so it survives a restart and lists command-line runs; runs
+  started here write a `run.json` next to their output. Delete a run, or
+  the finished runs older than a day, a week or a month.
+- The *Run page*: a click on a run opens it as a tab in the editor area,
+  with the header, the buttons (Log, Report, Output, Continue from each
+  checkpoint and snapshot; Pause / Resume, Stop and Snapshot while it runs),
+  the phases or tests as a table with time bars and the failure messages in
+  full, one tab per member of a group, and for a flow run the flow report
+  on the page itself. The page follows a running run.
+- The flow report on demand: a flow run that wrote none
+  (`robotFlow.flowReport` is off by default) gets it from `output.xml` with
+  the fork's `robot.flow report` when asked for, in the tree (*Flow report ·
+  written on demand*) and on the Run page (*Write the flow report*).
 - Completion in the text of flow files: the fork's JSON schema registered for
   `*.flow.json` (keys, kinds, enum values), node ids in edges, the labels the
   source node allows, keywords of the imports with their parameters (through

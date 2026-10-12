@@ -195,6 +195,36 @@ async function pauseAFlow(api) {
     assert.ok(stopped.checkpoint, 'a checkpoint to continue from');
     console.log(`ok flow control: stopped with ${path.basename(stopped.checkpoint)}`);
 
+    // The Runs view lists the folder from disk: status, the checkpoint, the target.
+    const listed = api.history().find((r) => r.dir.toLowerCase() === stopped.outDir.toLowerCase());
+    assert.ok(listed, 'the Runs view lists the stopped run');
+    assert.equal(listed.status, 'stopped');
+    assert.equal(listed.kind, 'flow');
+    assert.equal(listed.target.toLowerCase(), laps.toLowerCase());
+    assert.deepEqual(listed.checkpoints.map((c) => c.kind), ['checkpoint']);
+    assert.ok(listed.files.log && listed.files.output, 'its log and output');
+    console.log(`ok runs view: ${listed.title} listed as ${listed.status} with its checkpoint`);
+
+    // The Run page opens as a tab; the flow report is written on demand (robotFlow.flowReport is off).
+    assert.equal(api.openRun(listed.dir), true, 'the Run page opened');
+    const pageTab = await until('the Run page tab', () => vscode.window.tabGroups.all.flatMap((g) => g.tabs)
+      .find((t) => t.input instanceof vscode.TabInputWebview && t.label === `Run: ${listed.title}`), 15000);
+    assert.ok(pageTab);
+    assert.equal(api.openRun(path.join(listed.dir, 'no-such-run')), false, 'no page for a folder that is not a run');
+    assert.equal(listed.files.flow, null, 'no flow report written with the run');
+    const flowReport = await api.flowReport(listed.dir);
+    assert.ok(flowReport && require('node:fs').existsSync(flowReport), 'the flow report was written');
+    assert.equal(api.history().find((r) => r.dir.toLowerCase() === stopped.outDir.toLowerCase()).files.flow, flowReport, 'and is listed now');
+    // ... and the page shows it in its frame (the frame's document has content: the report's script ran)
+    const shown = await until('the report in the page\'s frame', () => {
+      const p = api.runPage(listed.dir);
+      if (p && p.errors.length) throw new Error(`the Run page reported: ${p.errors.join(' / ')}`);
+      const frame = p && p.reportShown[listed.name];   // a single run's member is named after its folder
+      return frame && frame.length > 1000 && frame;
+    }, 30000);
+    assert.ok(shown.key.startsWith(flowReport), 'the frame shows that file');
+    console.log(`ok runs view: the Run page opened, the flow report was written on demand and shown (${shown.length} chars in the frame)`);
+
     const again = await vscode.commands.executeCommand('robotFlow.continue', vscode.Uri.file(laps));
     assert.ok(again && again.started > stopped.started, 'a new run');
     const end = await until('the continued run ended', () => {
@@ -203,6 +233,20 @@ async function pauseAFlow(api) {
     }, 90000);
     assert.equal(end.status, 'passed');
     console.log('ok flow control: continued from the checkpoint and passed');
+
+    // Continue from the view's checkpoint item, as its inline button does: the stopped run's folder is still there.
+    const fromView = await vscode.commands.executeCommand('robotFlow.runs.continueFrom', { type: 'checkpoint', run: listed, checkpoint: listed.checkpoints[0] });
+    assert.ok(fromView && fromView.started > end.started, 'a new run from the view');
+    const viewEnd = await until('the run continued from the view ended', () => {
+      const s = api.runState(laps);
+      return s && s.started === fromView.started && ['passed', 'failed', 'error', 'stopped'].includes(s.status) && s;
+    }, 90000);
+    assert.equal(viewEnd.status, 'passed');
+    const listedAgain = api.history().find((r) => r.dir.toLowerCase() === viewEnd.outDir.toLowerCase());
+    assert.ok(listedAgain && listedAgain.status === 'passed', 'the continued run is listed as passed');
+    assert.equal(listedAgain.info.variables.FLOW_CHECKPOINT, listed.checkpoints[0].file, 'run.json keeps the variables');
+    assert.ok(api.history().filter((r) => path.dirname(r.dir).toLowerCase() === results.toLowerCase()).length >= 3, 'all three runs listed');
+    console.log('ok runs view: continued from the checkpoint item and listed as passed');
   } finally {
     require('node:fs').rmSync(results, { recursive: true, force: true });
   }

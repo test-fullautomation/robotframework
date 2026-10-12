@@ -11,7 +11,10 @@ import { registerDefinitions } from './definitions';
 import { diagramUnavailable, probeRobot } from './backend/robot';
 import { addFlowToGroup } from './groupActions';
 import { GroupPanel } from './groupPanel';
+import { RunRecord } from './backend/history';
 import { RunManager, RunState, fileKey, groupKey } from './runs';
+import { RunPage } from './runPage';
+import { registerRunsView } from './runsView';
 import { forgetInterpreters, projectFor, robotEnvFor } from './settings';
 import { VIEWS, ViewEditorProvider, forgetRobots } from './viewEditor';
 
@@ -32,6 +35,14 @@ export interface RobotFlowApi {
   control(file: string, command: 'pause' | 'resume' | 'stop'): Promise<boolean>;
   openGroup(projectFile: string, groupId: string): boolean;
   runGroup(projectFile: string, groupId: string): Promise<RunState | null>;
+  /** What the Runs view lists: the runs of every results root, as read from disk. */
+  history(): RunRecord[];
+  /** Open the Run page of a run folder (as a click in the Runs view does); false when there is no such run. */
+  openRun(dir: string): boolean;
+  /** The flow report of a run folder, written now when the run has none; null when it cannot be. */
+  flowReport(dir: string): Promise<string | null>;
+  /** The open Run page of a folder: its last data and what its report frames show; null when none is open. */
+  runPage(dir: string): { data: RunPage['data']; reportShown: RunPage['reportShown']; errors: string[] } | null;
 }
 
 /** The file of the active editor: a text editor or one of our custom editors. */
@@ -75,6 +86,7 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
   registerDefinitions(context);
   registerCompletion(context);
   registerDebugger(context, runs);
+  const history = registerRunsView(context, runs);
   const providers = Object.values(VIEWS).map((kind) => {
     const provider = new ViewEditorProvider(kind, context, log, runs);
     context.subscriptions.push(vscode.window.registerCustomEditorProvider(kind.viewType, provider, {
@@ -268,6 +280,16 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
     runGroup: async (projectFile, id) => {
       const found = findGroup(projectFile, id);
       return found ? runs.runGroup(found.project, found.group) : null;
+    },
+    history: () => history.list(),
+    openRun: (dir) => !!RunPage.show(context, history, runs, dir),
+    runPage: (dir) => {
+      const page = RunPage.get(dir);
+      return page ? { data: page.data, reportShown: page.reportShown, errors: page.errors } : null;
+    },
+    flowReport: async (dir) => {
+      const found = history.lookup(dir);
+      return found ? history.flowReportOf(found.run) : null;
     },
   };
 }
