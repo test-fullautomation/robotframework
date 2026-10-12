@@ -26,6 +26,11 @@ Mapping:
 - decision        -> ``IF`` / ``ELSE``
 - loop            -> ``WHILE`` (``limit=max_loops on_limit=pass``, a deadline
                      condition for ``max_seconds``, ``Sleep every`` last)
+- checkpoint      -> ``Flow Phase`` first in every test, and for the loops
+                     directly in a test phase ``Flow Loop`` before the
+                     ``WHILE`` (it returns the bounds, or what an earlier
+                     run left of them) and ``Flow Iteration`` first in its
+                     body; not emitted with ``"checkpoint": false``
 - on_failure      -> ``TRY`` / ``EXCEPT AS ${flow_error}``; ``abort`` re-raises
                      with ``Fail`` after the recovery ran
 - flow (sub-flow) -> a call of the generated user keyword ``Flow: <sub-flow name>``;
@@ -43,7 +48,7 @@ from robot.utils import timestr_to_secs
 
 from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
                     structure)
-from .schema import ABORT, PHASE, FlowError, load_flow
+from .schema import ABORT, PHASE, FlowError, is_variable, load_flow
 
 
 FLOW_LIBRARY = 'robot.flow.keywords'
@@ -52,11 +57,27 @@ SETUP_KEYWORD = 'Flow Setup'
 TEARDOWN_KEYWORD = 'Flow Teardown'
 ERROR_VARIABLE = '${flow_error}'
 DEADLINE_VARIABLE = '${flow_deadline_%s}'
+LIMIT_VARIABLE = '${flow_limit_%s}'
+PHASE_KEYWORD = 'Flow Phase'
+LOOP_KEYWORD = 'Flow Loop'
+ITERATION_KEYWORD = 'Flow Iteration'
+# The flow clock stands still while the flow is paused, so a hold does not
+# use up a loop's time.
+CLOCK = 'robot.flow.control.clock()'
 SUBFLOW_KEYWORD = 'Flow: %s'
 
 
-def build_suite(flow, source=None):
-    """Return a runnable suite for ``flow``. ``source`` is the flow file path."""
+def build_suite(flow, source=None, origins=None):
+    """Return a runnable suite for ``flow``. ``source`` is the flow file path.
+
+    ``origins``, when a dict is given, is filled with ``id(item) -> (node
+    key, role)`` for every item built from a node: the key is the node id
+    (``<sub-flow name>::<id>`` inside a sub-flow) and the role says what the
+    item is for the node (``node`` for the item that is the node, else
+    ``phase``, ``loop-start``, ``iteration``, ``every``, ``deadline``,
+    ``guard`` or ``abort``). The flow report maps a run back to the plan
+    with it.
+    """
     data = flow.data
     suite = TestSuite(name=data.name, source=source)
     resource = suite.resource
@@ -71,13 +92,25 @@ def build_suite(flow, source=None):
         resource.imports.variables(name, args)
     for name, value in data.variables.items():
         resource.variables.create(name='${%s}' % name, value=[value])
-    emitter = _Emitter(resource, source)
+    tracked = data.checkpoint is not False
+    if isinstance(data.checkpoint, str):
+        resource.variables.create(name='${FLOW_CHECKPOINT}', value=[data.checkpoint])
+    if tracked and data.checkpoint_every:
+        resource.variables.create(name='${FLOW_CHECKPOINT_EVERY}',
+                                  value=[str(data.checkpoint_every)])
+    emitter = _Emitter(resource, source, origins)
     if flow.setup:
         emitter.user_keyword(resource, SETUP_KEYWORD, flow.setup.steps)
         suite.setup.config(name=SETUP_KEYWORD)
     for phase in flow.tests:
         test = suite.tests.create(name=phase.name)
-        emitter.emit(test.body, phase.steps)
+        if tracked:
+            marker = test.body.create_keyword(name=PHASE_KEYWORD,
+                                              args=[_literal(phase.name)])
+            emitter.origin(marker, phase, 'phase')
+            emitter.emit_phase(test.body, phase.steps)
+        else:
+            emitter.emit(test.body, phase.steps)
     if flow.teardown:
         emitter.user_keyword(resource, TEARDOWN_KEYWORD, flow.teardown.steps)
         suite.teardown.config(name=TEARDOWN_KEYWORD)
@@ -88,13 +121,28 @@ class _Emitter:
     """Emits steps into bodies. One instance per built suite, so that the
     variable names it invents are unique within that suite."""
 
-    def __init__(self, resource=None, source=None):
+    def __init__(self, resource=None, source=None, origins=None):
         self._deadlines = {}     # loop node id -> deadline variable name
         self._resource = resource
+        self.origins = origins   # id(item) -> (node key, role), or None
         # Sub-flow files resolve relative to the file that calls them.
         self._dirs = [Path(source).resolve().parent if source else Path.cwd()]
         self._calling = []       # sub-flow files being built, to reject cycles
         self._subflows = {}      # resolved sub-flow path -> (keyword name, parameters)
+
+    def origin(self, item, step, role='node'):
+        """Record that ``item`` was built for ``step`` (a step or a phase)."""
+        if self.origins is None:
+            return item
+        key = step.id if getattr(step, 'id', None) else f'phase:{step.name}'
+        if self._calling:
+            # Inside a sub-flow the ids are the sub-flow file's own; its
+            # name is unique in the suite, so '<name>::<id>' tells them apart.
+            name = self._subflows.get(self._calling[-1], ('',))[0]
+            name = name[len(SUBFLOW_KEYWORD % ''):] if name.startswith(SUBFLOW_KEYWORD % '') else name
+            key = f'{name}::{key}'
+        self.origins[id(item)] = (key, role)
+        return item
 
     def user_keyword(self, resource, name, steps):
         keyword = resource.keywords.create(name=name)
@@ -108,15 +156,48 @@ class _Emitter:
         for step in steps:
             self._emitters[type(step)](self, body, step)
 
+    def emit_phase(self, body, steps):
+        """Emit the steps of a test phase; its top-level loops are checkpointed."""
+        if not steps:
+            body.create_keyword(name='No Operation')
+            return
+        names = _assigned(steps)
+        for step in steps:
+            if isinstance(step, Loop):
+                self._tracked_loop(body, step, names)
+            else:
+                self._emitters[type(step)](self, body, step)
+
+    def _tracked_loop(self, body, step, names):
+        name = self._deadline_name(step)
+        limit, deadline = LIMIT_VARIABLE % name, DEADLINE_VARIABLE % name
+        args = [_literal(step.id), str(step.max_loops or 'NONE'),
+                step.max_seconds or 'NONE']
+        # Names, not values: the keyword reads them when a checkpoint is due.
+        args += ['\\' + name for name in names]
+        start = body.create_keyword(name=LOOP_KEYWORD, args=args, assign=[limit, deadline])
+        self.origin(start, step, 'loop-start')
+        while_ = body.create_while(condition=f'{CLOCK} < ${deadline[2:-1]}',
+                                   limit=limit, on_limit='pass')
+        self.origin(while_, step)
+        mark = while_.body.create_keyword(name=ITERATION_KEYWORD, args=[_literal(step.id)])
+        self.origin(mark, step, 'iteration')
+        self._guarded(while_.body, step, 'guard')
+        if step.every:
+            self.origin(while_.body.create_keyword(name='Sleep', args=[step.every]),
+                        step, 'every')
+
     def _keyword(self, body, step):
-        body.create_keyword(name=step.keyword, args=step.args, assign=step.assign)
+        self.origin(body.create_keyword(name=step.keyword, args=step.args,
+                                        assign=step.assign), step)
 
     def _gate(self, body, step):
         args = [step.timeout, step.interval, step.on_timeout, step.keyword, *step.args]
-        body.create_keyword(name=GATE_KEYWORD, args=args, assign=step.assign)
+        self.origin(body.create_keyword(name=GATE_KEYWORD, args=args, assign=step.assign),
+                    step)
 
     def _sleep(self, body, step):
-        body.create_keyword(name='Sleep', args=[step.duration])
+        self.origin(body.create_keyword(name='Sleep', args=[step.duration]), step)
 
     def _flow(self, body, step):
         name, parameters = self._subflow(step)
@@ -126,7 +207,7 @@ class _Emitter:
             raise FlowError(f"Sub-flow '{step.file}' has no parameter(s) "
                             f"{', '.join(unknown)}; its parameters are: {known}.", step.id)
         args = [f'{arg}={value}' for arg, value in step.args.items()]
-        body.create_keyword(name=name, args=args)
+        self.origin(body.create_keyword(name=name, args=args), step)
 
     def _subflow(self, step):
         """The keyword built from ``step.file``, building it on first use."""
@@ -199,7 +280,7 @@ class _Emitter:
             add('VARIABLES', imports.variables, name, args)
 
     def _decision(self, body, step):
-        if_ = body.create_if()
+        if_ = self.origin(body.create_if(), step)
         yes = if_.body.create_branch(BodyItem.IF, condition=step.condition)
         self.emit(yes.body, step.yes)
         no = if_.body.create_branch(BodyItem.ELSE)
@@ -209,21 +290,30 @@ class _Emitter:
         condition = 'True'
         if step.max_seconds:
             deadline = self._deadline_variable(step)
-            seconds = timestr_to_secs(step.max_seconds)
-            body.create_keyword(name='Evaluate', args=[f'time.time() + {seconds}'],
-                                assign=[deadline])
-            condition = f'time.time() < {deadline}'
+            if is_variable(step.max_seconds):
+                # Resolved when the loop starts: $NAME is the variable's value.
+                seconds = f'robot.utils.timestr_to_secs(${step.max_seconds[2:-1]})'
+            else:
+                seconds = timestr_to_secs(step.max_seconds)
+            self.origin(body.create_keyword(name='Evaluate', args=[f'{CLOCK} + {seconds}'],
+                                            assign=[deadline]), step, 'deadline')
+            condition = f'{CLOCK} < {deadline}'
         if step.max_loops:
             limit, on_limit = str(step.max_loops), 'pass'
         else:
             # Only a deadline bounds the loop; lift Robot's default iteration limit.
             limit, on_limit = 'NONE', None
         while_ = body.create_while(condition=condition, limit=limit, on_limit=on_limit)
-        self._guarded(while_.body, step)
+        self.origin(while_, step)
+        self._guarded(while_.body, step, 'guard')
         if step.every:
-            while_.body.create_keyword(name='Sleep', args=[step.every])
+            self.origin(while_.body.create_keyword(name='Sleep', args=[step.every]),
+                        step, 'every')
 
     def _deadline_variable(self, step):
+        return DEADLINE_VARIABLE % self._deadline_name(step)
+
+    def _deadline_name(self, step):
         """A variable name derived from the loop id, unique within the suite.
 
         Sanitising ids can make different ids equal (``a-b`` and ``a_b``);
@@ -236,22 +326,23 @@ class _Emitter:
             number += 1
             name = f'{base}_{number}'
         self._deadlines[step.id] = name
-        return DEADLINE_VARIABLE % name
+        return name
 
     def _try(self, body, step):
-        self._guarded(body, step)
+        self._guarded(body, step, 'node')
 
-    def _guarded(self, body, step):
+    def _guarded(self, body, step, role):
         if step.recovery is None:
             self.emit(body, step.body)
             return
-        try_ = body.create_try()
+        try_ = self.origin(body.create_try(), step, role)
         main = try_.body.create_branch(BodyItem.TRY)
         self.emit(main.body, step.body)
         recovery = try_.body.create_branch(BodyItem.EXCEPT, variable=ERROR_VARIABLE)
         self.emit(recovery.body, step.recovery)
         if step.then == ABORT:
-            recovery.body.create_keyword(name='Fail', args=[ERROR_VARIABLE])
+            self.origin(recovery.body.create_keyword(name='Fail', args=[ERROR_VARIABLE]),
+                        step, 'abort')
 
     _emitters = {
         KeywordStep: _keyword,
@@ -262,6 +353,28 @@ class _Emitter:
         Loop: _loop,
         Try: _try,
     }
+
+
+def _literal(text):
+    """``text`` as a keyword argument that is taken as it is written."""
+    return text.replace('\\', '\\\\').replace('=', '\\=').replace('${', '\\${')
+
+
+def _assigned(steps):
+    """The variables the steps assign, in order, for the checkpoint."""
+    names = []
+
+    def collect(items):
+        for step in items or ():
+            for name in getattr(step, 'assign', None) or ():
+                name = name.rstrip('= ')
+                if name.startswith('${') and name not in names:
+                    names.append(name)
+            for attr in ('body', 'recovery', 'yes', 'no'):
+                collect(getattr(step, attr, None))
+
+    collect(steps)
+    return names
 
 
 def _is_path(name):

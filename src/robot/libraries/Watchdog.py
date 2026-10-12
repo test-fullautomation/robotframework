@@ -17,6 +17,7 @@ import time
 
 from robot.api import logger
 from robot.libraries.BuiltIn import BuiltIn
+from robot.running import pausepoint
 from robot.utils import timestr_to_secs, secs_to_timestr
 from robot.version import get_version
 
@@ -70,6 +71,16 @@ class Watchdog:
 
     def __init__(self):
         self._watchdogs = {}
+        # A paused flow pauses its watchdogs: a deliberate hold is not a stall.
+        pausepoint.add_listener(self)
+
+    def on_pause(self):
+        for wd in list(self._watchdogs.values()):
+            wd.pause()
+
+    def on_resume(self, seconds=None):
+        for wd in list(self._watchdogs.values()):
+            wd.resume()
 
     # ------------------------------------------------------------------
     # Configuration
@@ -127,6 +138,8 @@ class Watchdog:
         wd.start()
         logger.info(f"Watchdog '{name}' started.", also_console=True)
         while not wd.stop.wait(self._POLL):
+            if wd.paused_at is not None:
+                continue
             now = time.monotonic()
             if wd.heartbeat and now >= wd.next_heartbeat:
                 self._heartbeat(wd, now)
@@ -191,6 +204,23 @@ class Watchdog:
                                      f"{timeout}.")
             time.sleep(self._POLL / 2)
 
+    def pause_watchdog(self, name='DEFAULT'):
+        """Freezes the watchdog: no heartbeat, no stall, no deadline while paused.
+
+        The time spent paused is not counted afterwards either. A flow that
+        is paused (``Flow Pause``, ``python -m robot.flow control ... pause``)
+        does this for every watchdog automatically.
+        """
+        self._get(name).pause()
+        logger.info(f"Watchdog '{name}' paused.")
+
+    def resume_watchdog(self, name='DEFAULT'):
+        """Lets a paused watchdog continue where it was."""
+        seconds = self._get(name).resume()
+        if seconds is not None:
+            logger.info(f"Watchdog '{name}' resumed after "
+                        f"{secs_to_timestr(round(seconds, 1))}.")
+
     def get_watchdog_status(self, name='DEFAULT'):
         """Returns ``CONFIGURED``, ``RUNNING``, ``STOPPED`` or ``FIRED``."""
         return self._get(name).state
@@ -239,12 +269,32 @@ class _Watchdog:
         self.started = None
         self.last_feed = None
         self.next_heartbeat = None
+        self.paused_at = None
+        self._lock = threading.Lock()
 
     def start(self):
         self.started = self.last_feed = time.monotonic()
         if self.heartbeat:
             self.next_heartbeat = self.started + self.heartbeat
         self.state = 'RUNNING'
+
+    def pause(self):
+        with self._lock:
+            if self.paused_at is None and self.state == 'RUNNING':
+                self.paused_at = time.monotonic()
+
+    def resume(self):
+        """Shift every clock by the paused time. Returns it, or None."""
+        with self._lock:
+            if self.paused_at is None:
+                return None
+            seconds = time.monotonic() - self.paused_at
+            self.started += seconds
+            self.last_feed += seconds
+            if self.next_heartbeat is not None:
+                self.next_heartbeat += seconds
+            self.paused_at = None
+            return seconds
 
     def feed(self):
         self.last_feed = time.monotonic()

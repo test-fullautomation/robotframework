@@ -49,11 +49,15 @@ from .schema import FLOW_VERSION, FlowError, load_flow
 EXTENSION = 'flow.json'
 
 
-def build_flow_suite(source):
-    """Build a runnable suite from the flow file at ``source``."""
+def build_flow_suite(source, origins=None):
+    """Build a runnable suite from the flow file at ``source``.
+
+    ``origins``, when a dict is given, records which node each built item
+    comes from (see :func:`robot.flow.builder.build_suite`).
+    """
     path = Path(source)
     flow = structure(load_flow(path))
-    return build_suite(flow, source=path)
+    return build_suite(flow, source=path, origins=origins)
 
 
 class FlowParser:

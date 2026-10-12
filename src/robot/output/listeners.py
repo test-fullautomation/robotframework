@@ -27,7 +27,8 @@ class Listeners:
     _method_names = ('start_suite', 'end_suite', 'start_test', 'end_test',
                      'start_keyword', 'end_keyword', 'log_message', 'message',
                      'output_file', 'report_file', 'log_file', 'debug_file',
-                     'xunit_file', 'timeline_file', 'library_import', 'resource_import',
+                     'xunit_file', 'timeline_file', 'flowreport_file',  # cuongnht add flow
+                     'library_import', 'resource_import',
                      'variables_import', 'close')
 
     def __init__(self, listeners, log_level='INFO'):

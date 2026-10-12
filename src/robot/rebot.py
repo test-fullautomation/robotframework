@@ -140,6 +140,11 @@ Options
                           the corresponding elements in the log file. Requires
                           exactly one input XML. Not created unless this
                           option is specified.
+    --flowreport file     HTML flow report: for suites run from flow files
+                          (--parser robot.flow), the plan as drawn with what
+                          the run did on each node, linked into the log file.
+                          Requires exactly one input XML. Not created
+                          unless this option is specified.
  -x --xunit file          xUnit compatible result file. Not created unless this
                           option is specified.
  -T --timestampoutputs    When this option is used, timestamp in a format

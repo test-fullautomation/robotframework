@@ -6,9 +6,16 @@ the core of *RobotFramework AIO* and extends the upstream framework where large,
 test systems need more than the standard feature set:
 
 - **native parallel execution** inside test cases (the `THREAD` keyword with complete result
-  reporting), and
+  reporting),
 - **very long, condition-driven test runs** (hours to days) that survive crashes, bound their
-  memory and stay debuggable.
+  memory and stay debuggable,
+- **test plans that run as they are drawn** (flow files: a flowchart of gates, bounded loops
+  and recovery, executed directly), and
+- **honest verdicts** (the `UNKNOWN` status separates "the product is wrong" from "nothing
+  could be judged").
+
+The feature guide with diagrams and examples is in [`docs/`](docs/index.md) and published at
+<https://test-fullautomation.github.io/robotframework/>.
 
 Everything from standard Robot Framework 6.1 — syntax, standard libraries, listener and
 library APIs, output formats — is preserved; existing test suites run unchanged
@@ -66,6 +73,75 @@ Parallel Measurement
 - **Bounded memory** — the framework's internal message collections are capped or spilled to
   disk, so execution memory stays flat over days-long runs.
 
+### Flow files: the test plan is the test
+
+A bench run is a plan — wait for the chamber, loop the cycle tests for eight hours, recover
+when a cycle fails, release the bench. A *flow file* writes that flowchart down as nodes and
+edges, and Robot Framework runs it directly: the suite is built in memory at run time, so
+there is no `.robot` file to keep in step with the drawing.
+
+```json
+{
+  "flow": { "name": "Endurance Cycle", "version": 1 },
+  "imports": { "libraries": ["bench.py"] },
+  "nodes": [
+    { "id": "start",   "kind": "start" },
+    { "id": "ready",   "kind": "gate",    "keyword": "Chamber Should Be Ready", "timeout": "30 min" },
+    { "id": "loop",    "kind": "loop",    "max_loops": 1000, "max_seconds": "8h", "every": "10s" },
+    { "id": "cycle",   "kind": "keyword", "keyword": "Run Cycle Tests" },
+    { "id": "recover", "kind": "keyword", "keyword": "Recover DUT" },
+    { "id": "end",     "kind": "end" }
+  ],
+  "edges": [
+    ["start", "ready"], ["ready", "loop"],
+    { "from": "loop",    "to": "cycle",   "label": "body" },
+    { "from": "cycle",   "to": "loop",    "label": "next" },
+    { "from": "loop",    "to": "recover", "label": "on_failure" },
+    { "from": "recover", "to": "loop",    "label": "continue" },
+    { "from": "loop",    "to": "end",     "label": "done" }
+  ]
+}
+```
+
+```
+robot --parser robot.flow endurance.flow.json            # run it; every robot option applies
+robot --parser robot.flow --dryrun endurance.flow.json   # check keywords and arguments without running them
+python -m robot.flow validate endurance.flow.json        # check the structure, naming the faulty node
+python -m robot.flow render   endurance.flow.json        # print the equivalent .robot text
+robot --parser robot.flow --flowreport flow.html endurance.flow.json   # run it and draw the plan with the results
+```
+
+A dry run executes no keyword, but it does import the libraries: module-level code and
+library constructors run, so keep bench access out of those.
+
+- **Gates instead of guessed sleeps** — a `gate` polls a keyword until it passes; on timeout
+  the message carries the last error and the time waited, and the verdict is `UNKNOWN` (the
+  bench was not ready) unless the gate says `fail`.
+- **Loops bounded by construction** (`max_loops` and/or `max_seconds`, paced with `every`;
+  a bound may be a `${variable}` sized per run with `--variable`),
+  **recovery** that continues the loop or aborts with the original error, **decisions**, and
+  setup/test/teardown **phases**.
+- **Sub-flows** — a region of the plan becomes a file of its own and is called as one step,
+  with parameters.
+- **Two flows as two processes** — with the `robot.flow.signals` library two flows meet and
+  run in lockstep through a small signal file of the run; a missing peer ends `UNKNOWN`
+  instead of hanging or failing falsely.
+- **Pause, stop and restart** — `python -m robot.flow control <store> pause | resume | stop`
+  holds or ends a running flow between two steps, with loop deadlines, gate timeouts
+  and watchdogs frozen meanwhile; a stopped or crashed flow leaves a checkpoint and the
+  next run continues it (finished phases SKIP, the loop goes on with what is left).
+- **The flow report** — `--flowreport flow.html` draws the plan as it was written, with
+  what the run did on every node and edge (runs, outcomes, gate attempts, recovery paths,
+  where a stop happened), each box linked into `log.html`.
+- **Editor support** — a JSON Schema (`python -m robot.flow schema`, shipped as
+  `robot/flow/flow.schema.json`) gives completion and error marking for flow files.
+- **A Python API** (experimental) — `robot.flow.api.Flow` builds the same file from `with`
+  blocks.
+
+A flow is a *workflow* (nodes are things the test does, edges mean "then"); the StateMachine
+library above is the other model (nodes are what the system is, edges mean "when"). The
+validator rejects a flow that is a state machine in disguise.
+
 ### The UNKNOWN test status
 
 Standard Robot Framework knows only PASS, FAIL and SKIP — which forces two very different
@@ -91,6 +167,14 @@ UNKNOWN is assigned automatically for broken test data (missing keywords, invali
 syntax problems) and for unexpected generic exceptions escaping from libraries; ordinary
 assertion failures (`Should Be Equal` etc.) remain FAIL. Test libraries can also raise
 `robot.errors.UnknownAssertionError` deliberately to state "no verdict".
+
+- **Import errors** make tests UNKNOWN, not FAIL: `--importfailure suite` (the default) marks
+  the whole suite, `--importfailure test` only the tests that use the failed import.
+- **The return code carries both counts**, so CI can tell a broken bench from a regression
+  without opening the log: `rc = (min(unknown, 14) << 4) | min(failed, 15)` — decode with
+  `failed = rc & 0x0F` and `unknown = (rc >> 4) & 0x0F`. `0` means no test failed and none
+  is unknown; skipped tests are not counted, so a run in which every test was skipped also
+  returns `0`.
 
 ### Further extensions
 
@@ -143,22 +227,28 @@ pip install .
 ```
 
 For detailed instructions, including installing Python, see [INSTALL.rst](INSTALL.rst).
-Python 3.6 or newer is required.
+Python 3.6 or newer is required; the unit and acceptance tests run on Python 3.9 to 3.13.
 
 > **Note:** installing the upstream `robotframework` package from PyPI gives you the standard
 > framework *without* the extensions described above.
 
 ## Documentation
 
+- **Feature guide** — one page per feature, with the problem it solves, diagrams and
+  examples: <https://test-fullautomation.github.io/robotframework/>. The sources are in
+  [`docs/`](docs/index.md); preview them locally with `python -m properdocs serve`.
 - Library documentation for the new standard libraries:
-  `python -m robot.libdoc StateMachine StateMachine.html` and
-  `python -m robot.libdoc Watchdog Watchdog.html`
-- Command line help for the new options (`--timeline`, `--segmentoutput`, …):
-  `python -m robot --help`
+  `python -m robot.libdoc StateMachine StateMachine.html`,
+  `python -m robot.libdoc Watchdog Watchdog.html` and
+  `python -m robot.libdoc robot.flow.signals FlowSignals.html`
+- Command line help for the new options (`--timeline`, `--segmentoutput`,
+  `--importfailure`, …): `python -m robot --help`; for flow files:
+  `python -m robot.flow --help`
 - The *RobotFramework AIO Reference* (built from the separate `robotframework-documentation`
   project) contains dedicated chapters on threading and state machines.
 - Acceptance tests under `atest/robot/` double as executable examples, e.g.
-  `atest/robot/standard_libraries/statemachine/`.
+  `atest/robot/standard_libraries/statemachine/` and `atest/robot/flow/` (flow files in
+  `atest/testdata/flow/`).
 
 ## Upstream project and license
 

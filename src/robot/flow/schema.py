@@ -23,6 +23,7 @@ reachable) is the job of :mod:`robot.flow.graph`.
 """
 
 import json
+import re
 from pathlib import Path
 
 from robot.errors import DataError
@@ -30,6 +31,10 @@ from robot.utils import is_string, timestr_to_secs
 
 
 FLOW_VERSION = 1
+
+# One '${variable}' as the whole value: a bound or a time sized per run.
+VARIABLE_PATTERN = r'^\s*\$\{[^{}$]+\}\s*$'
+VARIABLE_RE = re.compile(VARIABLE_PATTERN)
 
 START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW = (
     'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow'
@@ -101,8 +106,11 @@ class FlowData:
     """The validated content of a flow file."""
 
     def __init__(self, name, version, libraries, resources, variable_files,
-                 variables, nodes, edges):
+                 variables, nodes, edges, checkpoint=None, checkpoint_every=None):
         self.name = name
+        # None: the default file; a string: that file; False: no checkpoint.
+        self.checkpoint = checkpoint
+        self.checkpoint_every = checkpoint_every
         self.version = version
         self.libraries = libraries          # list of (name, args)
         self.resources = resources          # list of paths
@@ -131,13 +139,13 @@ def load_flow(source):
 def validate(data):
     if not isinstance(data, dict):
         raise FlowError('Flow file must contain a JSON object at the top level.')
-    name, version = _validate_flow_section(data.get('flow'))
+    name, version, checkpoint, every = _validate_flow_section(data.get('flow'))
     libraries, resources, variable_files = _validate_imports(data.get('imports', {}))
     variables = _validate_variables(data.get('variables', {}))
     nodes = _validate_nodes(data.get('nodes'))
     edges = _validate_edges(data.get('edges'), nodes)
     return FlowData(name, version, libraries, resources, variable_files,
-                    variables, nodes, edges)
+                    variables, nodes, edges, checkpoint, every)
 
 
 def _validate_flow_section(flow):
@@ -148,7 +156,18 @@ def _validate_flow_section(flow):
     if version != FLOW_VERSION:
         raise FlowError(f"Unsupported flow version {version!r}; "
                         f"this Robot Framework supports version {FLOW_VERSION}.")
-    return flow['name'].strip(), version
+    checkpoint = flow.get('checkpoint')
+    if checkpoint is True:
+        checkpoint = None
+    if checkpoint not in (None, False) \
+            and not (is_string(checkpoint) and checkpoint.strip()):
+        raise FlowError("'flow.checkpoint' must be a file path, or false for a "
+                        "flow without a checkpoint.")
+    every = flow.get('checkpoint_every')
+    if every is not None and (isinstance(every, bool) or not isinstance(every, int)
+                              or every < 1):
+        raise FlowError("'flow.checkpoint_every' must be a positive integer.")
+    return flow['name'].strip(), version, checkpoint, every
 
 
 def _validate_imports(imports):
@@ -307,11 +326,17 @@ def _validate_decision(node):
     node.condition = node.condition.strip()
 
 
+def is_variable(value):
+    """True for a value that is one ``${variable}`` reference, resolved when run."""
+    return is_string(value) and VARIABLE_RE.match(value.strip()) is not None
+
+
 def _validate_loop(node):
-    if node.max_loops is not None:
+    if node.max_loops is not None and not is_variable(node.max_loops):
         if isinstance(node.max_loops, bool) or not isinstance(node.max_loops, int) \
                 or node.max_loops < 1:
-            raise FlowError("'max_loops' must be a positive integer.", node.id)
+            raise FlowError("'max_loops' must be a positive integer or a "
+                            "'${variable}'.", node.id)
     node.max_seconds = _validate_time(node, 'max_seconds')
     node.every = _validate_time(node, 'every')
     if node.max_loops is None and node.max_seconds is None:
@@ -326,6 +351,8 @@ def _validate_time(node, attr, required=False, default=None):
             raise FlowError(f"'{attr}' is required.", node.id)
         return default
     value = _stringify(value)
+    if is_variable(value):
+        return value.strip()          # checked when the step runs
     try:
         seconds = timestr_to_secs(value)
     except ValueError:
@@ -384,7 +411,8 @@ def json_schema():
     """
     scalar = {'type': ['string', 'number', 'boolean', 'null']}
     time = {'type': ['string', 'number'],
-            'description': "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number."}
+            'description': "A time: '10s', '1 min 30 s', '1:30', '2h' or seconds as a number; "
+                           "or a '${variable}' holding one."}
     named = {'oneOf': [
         {'type': 'string', 'minLength': 1},
         {'type': 'array', 'minItems': 1,
@@ -445,8 +473,11 @@ def json_schema():
                                                  "e.g. \"$MODE == 'EMC'\"."}}),
         kind(LOOP, "Bounded repetition: 'body' in, 'next' back, 'done' out, optional "
                    "'on_failure'.",
-             extra={'max_loops': {'type': 'integer', 'minimum': 1,
-                                  'description': 'Fixed number; not a variable.'},
+             extra={'max_loops': {'anyOf': [{'type': 'integer', 'minimum': 1},
+                                            {'type': 'string', 'pattern': VARIABLE_PATTERN}],
+                                  'description': "Fixed number, or a '${variable}' "
+                                                 "holding one (set in 'variables' or "
+                                                 "with --variable)."},
                     'max_seconds': dict(time, description='Time limit of the loop.'),
                     'every': dict(time, description='Minimum time per round.')},
              anyOf=[{'required': ['max_loops']}, {'required': ['max_seconds']}]),
@@ -486,8 +517,20 @@ def json_schema():
         'properties': {
             '$schema': {'type': 'string'},
             'flow': {'type': 'object', 'required': ['name'], 'additionalProperties': False,
-                     'properties': {'name': {'type': 'string', 'pattern': r'\S'},
-                                    'version': {'const': FLOW_VERSION}}},
+                     'properties': {
+                         'name': {'type': 'string', 'pattern': r'\S'},
+                         'version': {'const': FLOW_VERSION},
+                         'checkpoint': {
+                             'type': ['string', 'boolean'],
+                             'description': 'File that records how far the flow got, '
+                                            'so a stopped or crashed run can continue. '
+                                            'Default: <flow file name>.checkpoint.json '
+                                            'in the output directory; false for none.'},
+                         'checkpoint_every': {
+                             'type': 'integer', 'minimum': 1,
+                             'description': 'Write the checkpoint every this many loop '
+                                            'iterations instead of at most once a '
+                                            'second.'}}},
             'imports': {'type': 'object', 'additionalProperties': False,
                         'properties': {
                             'libraries': {'type': 'array', 'items': named,

@@ -83,7 +83,8 @@ green to CI:
 rc = (min(unknown, 14) << 4) | min(failed, 15)
 ```
 
-- `0` means everything passed (no failures, no unknowns).
+- `0` means no test failed and none is unknown. Skipped tests are not counted,
+  so a run in which every test was skipped also returns `0`.
 - Decode with `failed = rc & 0x0F` and `unknown = (rc >> 4) & 0x0F`.
 - The maximum is `239`, so the reserved Robot Framework codes `251`–`255` are
   never touched, and the value stays within the 8-bit range POSIX shells use.

@@ -1,0 +1,16 @@
+{
+  "flow": { "name": "Plain", "version": 1, "checkpoint": false },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "loop",  "kind": "loop", "max_loops": 2 },
+    { "id": "tick",  "kind": "keyword", "keyword": "Count Iteration" },
+    { "id": "end",   "kind": "end" }
+  ],
+  "edges": [
+    ["start", "loop"],
+    { "from": "loop", "to": "tick", "label": "body" },
+    { "from": "tick", "to": "loop", "label": "next" },
+    { "from": "loop", "to": "end",  "label": "done" }
+  ]
+}

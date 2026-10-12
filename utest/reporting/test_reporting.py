@@ -129,6 +129,7 @@ class StubSettings:
     output = None
     xunit = None
     timeline = None  # cuongnht add thread
+    flow_report = None  # cuongnht add flow
     status_rc = True
     suite_config = {}
     statistics_config = {}

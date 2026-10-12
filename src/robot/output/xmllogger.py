@@ -43,37 +43,66 @@ class _SegmentingWriter:
         self._stack = []    # [(tag, attrs dict), ...], root first
         self.segment_paths = []
         self.last_rotation = time.monotonic()
+        # A worker that is still running after its file was finalized
+        # (abandoned thread, end of execution) keeps logging. What it writes
+        # from then on is dropped instead of failing in the worker with
+        # "I/O operation on closed file". The lock makes closing by the main
+        # thread and writing by the owner exclude each other.
+        self.closed = False
+        self._lock = threading.RLock()
 
     def start(self, name, attrs=None, newline=True):
-        self._stack.append((name, dict(attrs or {})))
-        self._writer.start(name, attrs, newline)
+        with self._lock:
+            if self.closed:
+                return
+            self._stack.append((name, dict(attrs or {})))
+            self._writer.start(name, attrs, newline)
 
     def end(self, name, newline=True):
-        if self._stack and self._stack[-1][0] == name:
-            self._stack.pop()
-        self._writer.end(name, newline)
+        with self._lock:
+            if self.closed:
+                return
+            if self._stack and self._stack[-1][0] == name:
+                self._stack.pop()
+            self._writer.end(name, newline)
 
     def element(self, name, content=None, attrs=None, escape=True, newline=True):
-        self._writer.element(name, content, attrs, escape, newline)
+        with self._lock:
+            if self.closed:
+                return
+            self._writer.element(name, content, attrs, escape, newline)
 
     def content(self, content=None, escape=True, newline=False):
-        self._writer.content(content, escape, newline)
+        with self._lock:
+            if self.closed:
+                return
+            self._writer.content(content, escape, newline)
 
     def close(self):
-        self._writer.close()
+        with self._lock:
+            if not self.closed:
+                self.closed = True
+                self._writer.close()
 
     def rotate(self, sealed_path):
-        """Seals the current file into ``sealed_path`` and starts a new one."""
-        for name, _ in reversed(self._stack):
-            self._writer.end(name)
-        self._writer.close()
-        os.replace(self.path, sealed_path)
-        self._writer = XmlWriter(self.path, write_empty=False, usage='output')
-        for index, (name, attrs) in enumerate(self._stack):
-            attrs = dict(attrs)
-            if index > 0:    # roots of segments correspond by position
-                attrs['continued'] = 'true'
-            self._writer.start(name, attrs)
+        """Seals the current file into ``sealed_path`` and starts a new one.
+
+        Returns False when the file is closed and nothing was sealed.
+        """
+        with self._lock:
+            if self.closed:
+                return False
+            for name, _ in reversed(self._stack):
+                self._writer.end(name)
+            self._writer.close()
+            os.replace(self.path, sealed_path)
+            self._writer = XmlWriter(self.path, write_empty=False, usage='output')
+            for index, (name, attrs) in enumerate(self._stack):
+                attrs = dict(attrs)
+                if index > 0:    # roots of segments correspond by position
+                    attrs['continued'] = 'true'
+                self._writer.start(name, attrs)
+            return True
 
     def maybe_rotate(self, interval):
         """Rotates when ``interval`` seconds have passed since the last one.
@@ -84,15 +113,16 @@ class _SegmentingWriter:
             return
         base, ext = os.path.splitext(self.path)
         sealed = f'{base}_part_{len(self.segment_paths) + 1:03d}{ext}'
-        self.rotate(sealed)
-        self.segment_paths.append(sealed)
+        if self.rotate(sealed):
+            self.segment_paths.append(sealed)
         self.last_rotation = time.monotonic()
 
     def finalize(self):
         """Closes all still open elements and the file itself."""
-        while self._stack:
-            self.end(self._stack[-1][0])
-        self.close()
+        with self._lock:
+            while self._stack and not self.closed:
+                self.end(self._stack[-1][0])
+            self.close()
 
 
 class XmlLogger(ResultVisitor):
@@ -140,6 +170,7 @@ class XmlLogger(ResultVisitor):
         # something visible is logged inside them. Keyed by thread name
         # because each thread streams to its own writer.
         self._pending_log_kws = {}
+        self._closed = False
 
     def get_level_from_kw_args(self, args=None):
         # args expected to be a 'kw.args' tuple; returns the explicit literal
@@ -160,6 +191,10 @@ class XmlLogger(ResultVisitor):
             return NullMarkupWriter()
         thread_name = threading.current_thread().name
         if thread_name not in XmlLogger.thread_writer_dict:
+            if self._closed:
+                # Execution has ended and the thread files are merged: a
+                # worker that still runs has nowhere to write.
+                return NullMarkupWriter()
             filename, file_extension = os.path.splitext(self.path)
             thread_path = filename + '_' + thread_name + file_extension
             XmlLogger.thread_output_files[thread_name] = thread_path
@@ -210,6 +245,7 @@ class XmlLogger(ResultVisitor):
         # cuongnht add thread: threads (typically daemons) that are still
         # running when execution ends leave their writers open. Finalize the
         # files here so they are well-formed XML and can be merged/parsed.
+        self._closed = True
         for name in list(XmlLogger.thread_writer_dict):
             if name == 'MainThread':
                 continue
