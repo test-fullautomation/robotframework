@@ -1,0 +1,11 @@
+{
+  "flow": { "name": "Hello Flow", "version": 1 },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "hello", "kind": "keyword", "keyword": "Log", "args": ["Hello from a flow file"] },
+    { "id": "pause", "kind": "sleep",   "duration": "0.5s" },
+    { "id": "bye",   "kind": "keyword", "keyword": "Log", "args": ["...and that was the whole test plan"] },
+    { "id": "end",   "kind": "end" }
+  ],
+  "edges": [ ["start", "hello"], ["hello", "pause"], ["pause", "bye"], ["bye", "end"] ]
+}

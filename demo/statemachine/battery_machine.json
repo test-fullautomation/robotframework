@@ -1,0 +1,16 @@
+{
+  "states": {
+    "INIT":        {"enter": "Setup DUT", "timeout": "30 s"},
+    "CHARGING":    {"enter": "Start Charging",    "during": "Charge Step",    "on_error": "FAULT"},
+    "DISCHARGING": {"enter": "Start Discharging", "during": "Discharge Step", "exit": "Complete Cycle", "on_error": "FAULT"},
+    "FAULT":       {"enter": "Collect Diagnostics", "final": true},
+    "DONE":        {"final": true}
+  },
+  "transitions": [
+    "INIT -> CHARGING when $DUT_READY",
+    "CHARGING -> DONE when $CYCLES >= 3",
+    "CHARGING -> DISCHARGING when $SOC >= 80",
+    {"source": "DISCHARGING", "target": "CHARGING", "condition": "$SOC <= 20"}
+  ],
+  "checkpoint_variables": ["${SOC}", "${CYCLES}"]
+}

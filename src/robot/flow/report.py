@@ -291,7 +291,8 @@ class _FlowRun:
         # Outputs of earlier versions have a 'Flow Iteration' marker first in
         # every iteration; it takes its log number but is not a step of the plan.
         result_items = [entry for entry in _numbered(parent_id, result_body)
-                        if getattr(entry[0], 'name', None) != LEGACY_ITERATION_KEYWORD]
+                        if not (entry[0].type == 'KEYWORD'
+                                and entry[0].name == LEGACY_ITERATION_KEYWORD)]
         for built, (item, item_id, branches) in zip(built_items, result_items):
             origin = self._origin(built)
             btype = getattr(built, 'type', None)

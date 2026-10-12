@@ -1,0 +1,38 @@
+{
+  "flow": { "name": "Flash Campaign", "version": 1 },
+  "imports": { "libraries": ["bench_keywords.py"] },
+  "variables": { "IMAGE": "fw-2.1" },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+
+    { "id": "setup",    "kind": "phase", "role": "setup" },
+    { "id": "alive",    "kind": "keyword", "keyword": "Power On Ecu" },
+
+    { "id": "test",     "kind": "phase", "role": "test", "name": "Flash And Verify" },
+    { "id": "gate",     "kind": "gate",    "keyword": "Ecu Should Be Alive", "timeout": "5s", "interval": "0.5s" },
+    { "id": "version",  "kind": "keyword", "keyword": "Read Ecu Version", "assign": "${CURRENT}" },
+    { "id": "current",  "kind": "decision", "condition": "$CURRENT == $IMAGE" },
+    { "id": "skip",     "kind": "keyword", "keyword": "Log", "args": ["${IMAGE} is already flashed, nothing to do"] },
+    { "id": "try",      "kind": "try" },
+    { "id": "flash",    "kind": "keyword", "keyword": "Flash Image", "args": ["${IMAGE}"] },
+    { "id": "verify",   "kind": "keyword", "keyword": "Verify Via Uds", "args": ["${IMAGE}"] },
+    { "id": "restore",  "kind": "keyword", "keyword": "Restore Golden Image" },
+    { "id": "done",     "kind": "keyword", "keyword": "Log", "args": ["campaign finished with ${IMAGE}"] },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "alive"], ["alive", "test"], ["test", "gate"],
+    ["gate", "version"], ["version", "current"],
+    { "from": "current", "to": "skip",    "label": "yes" },
+    { "from": "current", "to": "try",     "label": "no" },
+    { "from": "try",     "to": "flash",   "label": "body" },
+    ["flash", "verify"],
+    { "from": "verify",  "to": "try",     "label": "next" },
+    { "from": "try",     "to": "restore", "label": "on_failure" },
+    { "from": "restore", "to": "end",     "label": "abort" },
+    { "from": "try",     "to": "done",    "label": "done" },
+    ["skip", "done"], ["done", "end"]
+  ]
+}

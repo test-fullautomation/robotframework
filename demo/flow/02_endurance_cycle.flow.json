@@ -1,0 +1,35 @@
+{
+  "flow": { "name": "Endurance Cycle", "version": 1 },
+  "imports": { "libraries": ["bench_keywords.py"] },
+  "variables": { "RIG": "RIG_A" },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+
+    { "id": "setup",    "kind": "phase", "role": "setup" },
+    { "id": "reset",    "kind": "keyword", "keyword": "Reset Bench" },
+    { "id": "chamber",  "kind": "keyword", "keyword": "Start Chamber", "args": ["2s"] },
+    { "id": "settled",  "kind": "gate",    "keyword": "Chamber Should Be Ready", "timeout": "10s", "interval": "0.5s" },
+    { "id": "power",    "kind": "keyword", "keyword": "Power On DUT", "args": ["${RIG}"] },
+
+    { "id": "cycle",    "kind": "phase", "role": "test", "name": "Cycle" },
+    { "id": "loop",     "kind": "loop",    "max_loops": 5, "max_seconds": "1min", "every": "0.5s" },
+    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}"] },
+    { "id": "recover",  "kind": "keyword", "keyword": "Recover DUT", "args": ["${RIG}"] },
+
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "release",  "kind": "keyword", "keyword": "Release Bench" },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "reset"], ["reset", "chamber"], ["chamber", "settled"],
+    ["settled", "power"], ["power", "cycle"], ["cycle", "loop"],
+    { "from": "loop",    "to": "run",      "label": "body" },
+    { "from": "run",     "to": "loop",     "label": "next" },
+    { "from": "loop",    "to": "recover",  "label": "on_failure" },
+    { "from": "recover", "to": "loop",     "label": "continue" },
+    { "from": "loop",    "to": "teardown", "label": "done" },
+    ["teardown", "release"], ["release", "end"]
+  ]
+}

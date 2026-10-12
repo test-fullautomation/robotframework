@@ -9,6 +9,7 @@ venv*
 MANIFEST
 atest/results
 utest/jasmine-results
+demo/*/results
 .idea
 .vscode
 .*project

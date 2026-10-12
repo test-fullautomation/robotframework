@@ -1,0 +1,36 @@
+{
+  "flow": { "name": "Rendezvous", "version": 1 },
+  "imports": { "libraries": ["bench_keywords.py", "robot.flow.signals"] },
+  "variables": { "RIG": "RIG_A", "PEER": "RIG_B" },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+
+    { "id": "setup",    "kind": "phase", "role": "setup" },
+    { "id": "announce", "kind": "keyword", "keyword": "Set Signal", "args": ["${RIG}.ready", 1] },
+
+    { "id": "test",     "kind": "phase", "role": "test", "name": "Meet The Peer" },
+    { "id": "meet",     "kind": "gate",    "keyword": "Signal Should Be", "args": ["${PEER}.ready", "==", 1],
+                                            "timeout": "15s", "interval": "0.5s" },
+    { "id": "both",     "kind": "keyword", "keyword": "Log", "args": ["${RIG}: peer ${PEER} is ready, starting the lockstep cycles"] },
+    { "id": "loop",     "kind": "loop",    "max_loops": 3, "every": "0.3s" },
+    { "id": "run",      "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}", 99], "assign": "${n}" },
+    { "id": "tell",     "kind": "keyword", "keyword": "Set Signal", "args": ["${RIG}.cycle", "${n}"] },
+    { "id": "sync",     "kind": "gate",    "keyword": "Signal Should Be", "args": ["${PEER}.cycle", ">=", "${n}"],
+                                            "timeout": "15s", "interval": "0.2s" },
+
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "leave",    "kind": "keyword", "keyword": "Set Signal", "args": ["${RIG}.done", 1] },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "announce"], ["announce", "test"], ["test", "meet"],
+    ["meet", "both"], ["both", "loop"],
+    { "from": "loop", "to": "run",      "label": "body" },
+    ["run", "tell"], ["tell", "sync"],
+    { "from": "sync", "to": "loop",     "label": "next" },
+    { "from": "loop", "to": "teardown", "label": "done" },
+    ["teardown", "leave"], ["leave", "end"]
+  ]
+}

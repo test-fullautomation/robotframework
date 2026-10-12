@@ -74,5 +74,6 @@ robot --timeline timeline.html my_suite.robot
 ```
 
 Then read [Getting started](getting-started.md), or open one of the runnable
-demos next to the repository: `demo/flow/`, `demo/statemachine/`,
-`demo/longrun/`.
+demos in the repository's `demo/` folder: `demo/flow/`, `demo/statemachine/`,
+`demo/longrun/`. Each has a `run.py` that finds the checkout's `src/` by
+itself and a README with its learning path.
