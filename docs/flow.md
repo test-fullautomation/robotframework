@@ -211,6 +211,7 @@ from the module search path.
 | `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. A bound may be a `${variable}` (see below). |
 | `try` | — | `body`, `on_failure`, `done` | Failure routing without a loop. |
 | `flow` | `file`, `args` (an object: parameter → value) | 1 | Call another flow file — a sub-flow — as one step. |
+| `parallel` | `timeout`, `stop_others` (true) | `branch` (two or more), `done`, optional `on_failure` | Run the branches at the same time and join them before going on. Each branch ends with an edge labelled `join` back to the node (see [Parallel regions](#parallel-regions)). |
 
 A recovery region ends with `continue` back to its loop or try node, or with
 `abort` to the node after it (or an end node); `abort` re-raises the failure
@@ -274,10 +275,72 @@ the keyword's own failure is kept as it is; a timed-out step fails with
 exit-on-failure is never retried. `max_attempts`, `interval` and `timeout` may
 be `${variables}`, sized per run like loop bounds.
 
+### Parallel regions
+
+"Ramp the chamber while the PSU sweeps, then measure": two things happen at
+the same time, and the plan goes on when both are done. A `parallel` node
+draws that as one box with a branch per thing:
+
+```json
+{ "id": "ramp", "kind": "parallel", "label": "Ramp and sweep", "timeout": "10 min" },
+{ "id": "chamber", "kind": "keyword", "keyword": "Set Chamber", "args": [-40] },
+{ "id": "cold",    "kind": "gate",    "keyword": "Chamber At",  "args": [-40], "timeout": "5 min" },
+{ "id": "psu",     "kind": "keyword", "keyword": "Sweep PSU",   "args": [8, 16, 0.5] },
+{ "id": "measure", "kind": "keyword", "keyword": "Measure" }
+```
+
+```json
+{ "from": "ramp", "to": "chamber", "label": "branch" }, ["chamber", "cold"], { "from": "cold", "to": "ramp", "label": "join" },
+{ "from": "ramp", "to": "psu",     "label": "branch" },                      { "from": "psu",  "to": "ramp", "label": "join" },
+{ "from": "ramp", "to": "measure", "label": "done" }
+```
+
+- **Edges.** `branch` is the one label a node may carry several times: one
+  per branch, to its first node. A branch is an ordinary sequence --
+  keywords, gates, sleeps, decisions, loops, try regions, sub-flows -- and
+  its last node returns to the parallel node with `join`. `done` leaves the
+  region (or `next` / `continue` / `abort` when the region is the last node
+  of an enclosing body), and `on_failure` is a recovery region as for a loop
+  or try. A node belongs to one branch, a branch holds no phase, and a
+  region cannot be inside a branch of another (nor inside a sub-flow called
+  from one): the validator says so, naming the node.
+- **`timeout`** bounds the whole region on the flow clock: every branch must
+  have joined by then. **`stop_others`** (default `true`) stops the other
+  branches at their next step when one fails; `false` lets them run to their
+  end and reports everything.
+- **Each branch runs on a copy of the variables** as they were when the
+  region started, like a `THREAD` body: an `assign` inside a branch is the
+  branch's own. Data the plan needs after the join goes through
+  [signals](#two-flows) (`Set Signal` in the branch, `Get Signal` after) --
+  the same mechanism two flows use, now inside one process.
+- **A region is one step of its enclosing body**, not a restart unit: inside
+  a checkpointed loop the iteration is the unit, so an interrupted region runs
+  again as a whole with its iteration.
+- Node policies apply inside branches (`retry`, `timeout`, gates), with the
+  `THREAD` caveat that on Linux and macOS keyword timeouts do not work in
+  worker threads.
+
+What runs: `Flow Parallel Start` names the branches' threads
+(`flow.<region>.<branch>`, numbered from the region's second run on, so a
+region in a loop keeps every iteration's logs), a `THREAD` block per branch
+runs `Flow Branch` on a generated user keyword holding the branch's steps,
+and `Flow Join` waits for them in slices on the flow clock. In `log.html`
+each branch is one thread block, and the timeline shows them side by side.
+
+| What happened in the region | The join |
+|---|---|
+| every branch passed | PASS, `Region 'ramp': 2 branches joined after 3 minutes 10 seconds.` in the log |
+| a branch failed | FAIL with the branch's error: `Branch 'psu' of 'ramp' failed: PSU current 3.2 A, expected < 3 A.`; the others are stopped at their next step (`stop_others`), the log says which |
+| a gate timed out inside a branch | that branch is UNKNOWN, and so is the join: `Branch 'chamber' of 'ramp' is unknown: Gate ...` -- the worst status wins, UNKNOWN over FAIL, one line per branch |
+| the region's `timeout` passed | FAIL naming the branches still running, which are stopped; a branch that does not reach a step boundary within 10 seconds is abandoned and the message says so |
+| the flow is paused | the join and the branches wait at their next step; the region's timeout does not advance |
+| the flow is stopped | the branches are stopped first, then the flow ends as usual |
+| `on_failure` | the recovery sees the join's failure, like a `try` node's; `continue` goes on with `done`, `abort` re-raises after the recovery |
+
 ### Bounds from variables
 
 `max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval`, a
-keyword's `timeout` and `retry` values, and a
+keyword's `timeout` and `retry` values, a parallel region's `timeout`, and a
 sleep's `duration` may be a single `${variable}` instead of a value. The
 default comes from the file's `variables`; a run overrides it on the command
 line, so the same plan runs as a one-hour smoke test and as the 48-hour
@@ -303,10 +366,11 @@ values.
 
 The validator rejects, naming the node, anything that is not a structured
 workflow: a second way out of an action node, decision branches that do not
-re-join, a loop body that does not return with `next`, an edge into a loop
-body from outside, an unbounded loop, an unreachable node. These are exactly
-the conditions under which the graph compiles losslessly to `IF`, `WHILE` and
-`TRY`.
+re-join, a loop body that does not return with `next`, a branch of a parallel
+region that does not return with `join`, an edge into a loop body from
+outside, an unbounded loop, a region inside a branch of another, an
+unreachable node. These are exactly the conditions under which the graph
+compiles losslessly to `IF`, `WHILE`, `TRY` and `THREAD`.
 
 ## What runs
 
@@ -337,6 +401,7 @@ Cycle
 | `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline on the flow clock in the condition, so reaching either bound ends the loop with **PASS** |
 | checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds). The iterations are counted by the runner itself as each one starts, without a keyword in the log. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
 | `on_failure` | `TRY` / `EXCEPT AS ${flow_error}`; `abort` adds `Fail ${flow_error}` after the recovery |
+| `parallel` | `Flow Parallel Start` (returns the threads' names), one `THREAD` block per branch running `Flow Branch` on the generated user keyword `Flow Branch: <region>/<branch>` that holds the branch's steps, then `Flow Join`; with `on_failure` the region is inside the `TRY` |
 
 A flow's loops keep memory flat: once an iteration is in `output.xml` its
 results leave the model (only the last one stays), so a million cycles cost
@@ -351,6 +416,9 @@ the same memory as ten. Suites get the same with `--pruneresults`; see
 | A gate timed out | **UNKNOWN** — the bench or a peer was not ready; nothing was tested. `on_timeout: fail` per gate when a silent peer *is* the product failing |
 | A keyword failed on every attempt of its `retry` | FAIL with the last error and the number of attempts; `on_exhausted: unknown` per node when giving up means the bench did not cooperate |
 | A keyword attempt exceeded the node's `timeout` | The attempt is interrupted and counts as failed: retried under a `retry` policy, else FAIL (`timed out after ...`) |
+| A branch of a parallel region failed | FAIL of the join, naming the branch and its error; the other branches are stopped at their next step (`stop_others`) |
+| A gate timed out inside a branch | UNKNOWN for that branch and for the join: the worst status of the branches wins (UNKNOWN over FAIL) |
+| A parallel region did not join within its `timeout` | FAIL naming the branches still running |
 | A setup gate timed out | UNKNOWN for every test (`Setup unknown:`); teardown still runs |
 | A keyword in the flow does not exist or has wrong arguments | UNKNOWN, and `--dryrun` reports it per node — including the keyword behind a gate |
 | A loop reached `max_loops` or `max_seconds` | PASS — reaching the bound is the plan |
@@ -669,8 +737,10 @@ robot --parser robot.flow --variable FLOW_CHECKPOINT:results/run42/plan.checkpoi
 
 The unit of a restart is the loop iteration: the interrupted one is done
 again, so **iterations must be safe to repeat**. Only loops directly in a
-test phase are tracked. A loop inside a decision, a `try`, another loop or a
-sub-flow starts from its beginning, like any other step. A flow file that
+test phase are tracked. A loop inside a decision, a `try`, another loop, a
+sub-flow or a branch of a parallel region starts from its beginning, like any
+other step; a parallel region itself is one step of its iteration and runs
+again as a whole. A flow file that
 changed since the checkpoint does not match it any more (the fingerprint is
 that of the main file; sub-flow files are not part of it).
 

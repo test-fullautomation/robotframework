@@ -29,6 +29,9 @@ FLOW = {
         {'id': 'fast', 'kind': 'keyword', 'keyword': 'Note', 'args': ['fast']},
         {'id': 'slow', 'kind': 'keyword', 'keyword': 'Note', 'args': ['slow']},
         {'id': 'done', 'kind': 'keyword', 'keyword': 'Note', 'args': ['joined']},
+        {'id': 'ramp', 'kind': 'parallel', 'label': 'Ramp and sweep', 'timeout': '1 min'},
+        {'id': 'chamber', 'kind': 'keyword', 'keyword': 'Note', 'args': ['chamber']},
+        {'id': 'psu', 'kind': 'keyword', 'keyword': 'Work', 'args': ['${PSU_FAIL}'], 'label': 'Sweep PSU'},
         {'id': 'teardown', 'kind': 'phase', 'role': 'teardown'},
         {'id': 'release', 'kind': 'keyword', 'keyword': 'Note', 'args': ['released']},
         {'id': 'end', 'kind': 'end'},
@@ -39,7 +42,10 @@ FLOW = {
         {'from': 'loop', 'to': 'fix', 'label': 'on_failure'}, {'from': 'fix', 'to': 'loop', 'label': 'continue'},
         {'from': 'loop', 'to': 'which', 'label': 'done'},
         {'from': 'which', 'to': 'fast', 'label': 'yes'}, {'from': 'which', 'to': 'slow', 'label': 'no'},
-        ['fast', 'done'], ['slow', 'done'], ['done', 'teardown'], ['teardown', 'release'], ['release', 'end'],
+        ['fast', 'done'], ['slow', 'done'], ['done', 'ramp'],
+        {'from': 'ramp', 'to': 'chamber', 'label': 'branch'}, {'from': 'chamber', 'to': 'ramp', 'label': 'join'},
+        {'from': 'ramp', 'to': 'psu', 'label': 'branch'}, {'from': 'psu', 'to': 'ramp', 'label': 'join'},
+        {'from': 'ramp', 'to': 'teardown', 'label': 'done'}, ['teardown', 'release'], ['release', 'end'],
     ],
 }
 
@@ -81,18 +87,39 @@ class TestReport(unittest.TestCase):
         cls.out = os.path.join(cls.tmp.name, 'out')
         rc = run(cls.flow, parser='robot.flow', outputdir=cls.out, output='output.xml',
                  log=None, report=None, stdout=io.StringIO(),
-                 variable=['FAIL_AT:2', 'MODE:slow', 'CYCLES:4'])
+                 variable=['FAIL_AT:2', 'MODE:slow', 'CYCLES:4', 'PSU_FAIL:5'])
         cls.rc = rc
         cls.data = collect(os.path.join(cls.out, 'output.xml'))
         cls.stats = cls.data['flows'][0]['stats']
 
-    def test_run_passed_and_one_flow_found(self):
-        self.assertEqual(self.rc, 0)
+    def test_run_failed_in_the_region_and_one_flow_found(self):
+        self.assertEqual(self.rc, 1)
         self.assertEqual(len(self.data['flows']), 1)
         flow = self.data['flows'][0]
         self.assertEqual(flow['name'], 'Report Flow')
         self.assertEqual([l['role'] for l in flow['lanes']], ['setup', 'test', 'teardown'])
-        self.assertEqual([l['status'] for l in flow['lanes']], ['PASS'] * 3)
+        self.assertEqual([l['status'] for l in flow['lanes']], ['PASS', 'FAIL', 'PASS'])
+
+    def test_parallel_region_branches_and_edges(self):
+        ramp = self.stats['ramp']
+        self.assertEqual((ramp['runs'], ramp['status']), (1, {'FAIL': 1}))
+        self.assertEqual(ramp['edges'], {'branch': 2, 'join': 2, 'done': 0})
+        self.assertEqual(ramp['last_error'], "Branch 'psu' of 'ramp' failed: cycle 5 broke")
+        self.assertEqual([(b['branch'], b['status'], b['error']) for b in ramp['branches']],
+                         [('chamber', 'PASS', ''), ('psu', 'FAIL', 'cycle 5 broke')])
+        self.assertEqual([b['name'] for b in ramp['branches']], ['flow.ramp.chamber', 'flow.ramp.psu'])
+        # Flow Phase, the gate, Flow Loop, the WHILE, the IF's two branches,
+        # 'done', then the region: its start, two threads and the join.
+        self.assertTrue(ramp['branches'][1]['id'].endswith('-k10'), ramp['branches'][1]['id'])
+        self.assertTrue(ramp['last'].endswith('-k11'), 'the join is the node')
+        # The nodes inside the branches have their own records, found through the threads.
+        self.assertEqual((self.stats['chamber']['runs'], self.stats['chamber']['status']), (1, {'PASS': 1}))
+        self.assertEqual(self.stats['psu']['status'], {'FAIL': 1})
+        self.assertTrue(self.stats['psu']['last'].endswith('-k10-k1-k1-k1'), self.stats['psu']['last'])
+        step = self.data['flows'][0]['plan'][1]['steps'][4]
+        self.assertEqual((step['kind'], step['timeout'], step['stop_others']), ('parallel', '1 min', True))
+        self.assertEqual([(b['id'], [s['id'] for s in b['steps']]) for b in step['branches']],
+                         [('chamber', ['chamber']), ('psu', ['psu'])])
 
     def test_nodes_in_setup_and_teardown(self):
         self.assertEqual(self.stats['power']['runs'], 1)
@@ -138,7 +165,7 @@ class TestReport(unittest.TestCase):
         plan = self.data['flows'][0]['plan']
         self.assertEqual([l['name'] for l in plan], ['Setup', 'Cycle', 'Teardown'])
         steps = plan[1]['steps']
-        self.assertEqual([s['kind'] for s in steps], ['gate', 'loop', 'decision', 'keyword'])
+        self.assertEqual([s['kind'] for s in steps], ['gate', 'loop', 'decision', 'keyword', 'parallel'])
         self.assertEqual(steps[0]['label'], 'Bench ready')
         self.assertEqual([s['id'] for s in steps[1]['body']], ['work'])
         self.assertEqual([s['id'] for s in steps[1]['recovery']], ['fix'])

@@ -21,7 +21,9 @@ about a bench (signals, services, devices) belong to application libraries
 and are referenced from the flow by name.
 
 ``Flow Gate`` is the wait of a ``gate`` node; ``Flow Retry`` runs a ``keyword``
-node that has a ``retry`` policy or a ``timeout``. ``Flow Phase`` and
+node that has a ``retry`` policy or a ``timeout``. ``Flow Parallel Start``,
+``Flow Branch`` and ``Flow Join`` run a ``parallel`` node: the branches in
+``THREAD`` blocks, joined before the plan goes on. ``Flow Phase`` and
 ``Flow Loop`` are bookkeeping the builder adds for the checkpoint (see
 :mod:`robot.flow.control`; the iterations are counted by the WHILE runner's
 hook, without a keyword). ``Flow Pause``, ``Flow Resume`` and
@@ -29,10 +31,13 @@ hook, without a keyword). ``Flow Pause``, ``Flow Resume`` and
 """
 
 import os
+import threading
+import time
 
 from robot.api import logger, SkipExecution
 from robot.errors import DataError, ExecutionFailed, UnknownAssertionError
 from robot.libraries.BuiltIn import BuiltIn
+from robot.running.bodyrunner import THREAD_STOP_MESSAGE
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.running.runkwregister import RUN_KW_REGISTER
 from robot.running.timeouts import KeywordTimeout
@@ -43,8 +48,9 @@ from . import control as _control
 from .control import CONTROL as _CONTROL
 
 
-__all__ = ['flow_gate', 'flow_retry', 'flow_phase', 'flow_loop',
-           'flow_pause', 'flow_resume', 'flow_stop', 'flow_snapshot']
+__all__ = ['flow_gate', 'flow_retry', 'flow_parallel_start', 'flow_branch', 'flow_join',
+           'flow_phase', 'flow_loop', 'flow_pause', 'flow_resume', 'flow_stop',
+           'flow_snapshot']
 
 ROBOT_LIBRARY_VERSION = get_version()
 ROBOT_LIBRARY_SCOPE = 'GLOBAL'
@@ -204,6 +210,227 @@ def _positive_int(attr, value, name):
     except ValueError:
         raise DataError(f"'{attr}' of '{name}' must be a positive integer, got {value!r}.")
     return int(number)
+
+
+# ---------------------------------------------------------- parallel regions
+
+JOIN_SLICE_S = 0.2      # how often the join looks at the branches
+STOP_GRACE_S = 10.0     # how long a branch asked to stop gets to reach its next step
+STOPPED, ABANDONED = 'STOPPED', 'ABANDONED'
+
+
+class _Region:
+    """One run of a parallel region: its branches' threads and their verdicts."""
+
+    def __init__(self, id, branches, names, deadline, stop_others):
+        self.id = id
+        self.branches = list(branches)      # branch ids, in plan order
+        self.names = list(names)            # the threads, in the same order
+        self.deadline = deadline            # on the flow clock, or None
+        self.stop_others = stop_others
+        self.started = _CONTROL.clock()
+        self.results = {}                   # thread name -> (status, message)
+        self.stopping = False
+        self.lock = threading.Lock()
+
+    def branch(self, name):
+        return self.branches[self.names.index(name)]
+
+    def record(self, name, status, message=''):
+        with self.lock:
+            self.results[name] = (status, message)
+
+    def result(self, name):
+        with self.lock:
+            return self.results.get(name)
+
+
+_REGIONS = {}       # region id -> its current run
+_BY_THREAD = {}     # thread name -> the run it belongs to
+_RUNS = {}          # region id -> how often it started in this process
+_REGIONS_LOCK = threading.Lock()
+
+
+def flow_parallel_start(region, timeout, stop_others, *branches):
+    """Starts the parallel region ``region``: returns the name of each branch's thread.
+
+    The builder adds this before the ``THREAD`` blocks of a ``parallel`` node
+    and assigns the names it returns to them. The names are unique in the
+    process (``flow.<region>.<branch>``, numbered from the second run of the
+    region on), so a region inside a loop keeps every iteration's branch logs.
+
+    ``timeout`` (``NONE`` for none) is how long the branches have to join, on
+    the flow clock; ``stop_others`` whether a failed branch stops the others.
+    """
+    if len(branches) < 2:
+        raise DataError(f"Region '{region}' needs at least two branches.")
+    try:
+        seconds = timestr_to_secs(timeout) if _given(timeout) else None
+    except ValueError:
+        raise DataError(f"'timeout' of region '{region}' must be a valid time, "
+                        f"got {timeout!r}.")
+    deadline = _CONTROL.clock() + seconds if seconds is not None else None
+    with _REGIONS_LOCK:
+        number = _RUNS[region] = _RUNS.get(region, 0) + 1
+        suffix = f'.{number}' if number > 1 else ''
+        names = [f'flow.{region}.{branch}{suffix}' for branch in branches]
+        run = _Region(region, branches, names, deadline, is_truthy(stop_others))
+        _REGIONS[region] = run
+        for name in names:
+            _BY_THREAD[name] = run
+    within = f' to join within {secs_to_timestr(seconds)}' if seconds is not None else ''
+    logger.info(f"Region '{region}' starts branches {', '.join(branches)}{within}.")
+    return names
+
+
+def flow_branch(name, keyword, *args):
+    """Runs one branch of a parallel region and records how it ended.
+
+    ``name`` is the branch's thread (from ``Flow Parallel Start``), ``keyword``
+    the generated user keyword holding the branch's steps. How the branch
+    ended is recorded for ``Flow Join``, which gives the region its verdict;
+    the branch's own failure is logged here and not raised again, so a
+    failed branch is not also a warning of the run (a ``THREAD`` failure
+    would be). A branch stopped at the region's request says so.
+    """
+    run = _BY_THREAD.get(name)
+    branch = run.branch(name) if run is not None else name
+    region = run.id if run is not None else '?'
+    try:
+        BuiltIn().run_keyword(keyword, *args)
+    except ExecutionFailed as err:
+        if err.dont_continue and err.message != THREAD_STOP_MESSAGE:
+            raise           # a fatal error of the run, not of this branch
+        if err.message == THREAD_STOP_MESSAGE:
+            status, message = STOPPED, f"Branch '{branch}' of '{region}' was stopped."
+        else:
+            status, message = err.status, err.message
+        if run is not None:
+            run.record(name, status, message)
+        error = ExecutionFailed(message, unknown=status != 'FAIL')
+        # The join reports it; the thread does not add a warning of its own.
+        error.collected = True
+        raise error
+    if run is not None:
+        run.record(name, 'PASS')
+
+
+RUN_KW_REGISTER.register_run_keyword('robot.flow.keywords', 'flow_branch', 1,
+                                     deprecation_warning=False, dry_run=True)
+
+
+def flow_join(region):
+    """Waits until every branch of the parallel region ``region`` has ended.
+
+    The wait is in slices on the flow clock and at the pause point: a pause
+    holds the join and the branches, a stop stops the branches first and
+    then ends the flow as usual. With ``stop_others`` a failed branch stops
+    the others at their next step. When all have joined the step passes, or
+    fails naming each failed branch with its error; the status is the worst
+    of the branches' (UNKNOWN over FAIL). A region that does not join within
+    its ``timeout`` fails naming the branches still running, which are
+    stopped; a branch that does not stop within the grace is abandoned.
+    """
+    run = _REGIONS.get(region)
+    if run is None:
+        raise DataError(f"Region '{region}' has not been started "
+                        f"('Flow Parallel Start' did not run).")
+    context = EXECUTION_CONTEXTS.current
+    abandoned = []
+    timed_out = False
+    while True:
+        running = _running(context, run)
+        failed = [name for name in run.names
+                  if (run.result(name) or ('',))[0] in ('FAIL', 'UNKNOWN')]
+        if failed and run.stop_others and running and not run.stopping:
+            run.stopping = True
+            logger.info(f"Branch '{run.branch(failed[0])}' of '{region}' failed; "
+                        f"stopping the other branch(es): "
+                        f"{', '.join(run.branch(name) for name in running)}.")
+            _request_stop(context, running)
+        if not running:
+            break
+        if _CONTROL.stop_requested:
+            abandoned += _stop_branches(context, run, running)
+            running = []
+        try:
+            _CONTROL.pause_point(context)
+        except ExecutionFailed:
+            _stop_branches(context, run, _running(context, run))
+            raise
+        if run.deadline is not None and _CONTROL.clock() >= run.deadline:
+            timed_out = True
+            abandoned += _stop_branches(context, run, running)
+            break
+        time.sleep(JOIN_SLICE_S)
+    elapsed = secs_to_timestr(round(_CONTROL.clock() - run.started, 1))
+    lines, unknown = [], False
+    if timed_out:
+        still = [run.branch(name) for name in running]
+        lines.append(f"Region '{region}' did not join within "
+                     f"{secs_to_timestr(run.deadline - run.started)}; still running: "
+                     f"{', '.join(still)}.")
+    for name, branch in zip(run.names, run.branches):
+        status, message = run.result(name) or (None, '')
+        if name in abandoned:
+            lines.append(f"Branch '{branch}' of '{region}' did not stop within "
+                         f"{secs_to_timestr(STOP_GRACE_S)} and was abandoned.")
+        elif status == 'FAIL':
+            lines.append(f"Branch '{branch}' of '{region}' failed: {message}")
+        elif status == 'UNKNOWN':
+            unknown = True
+            lines.append(f"Branch '{branch}' of '{region}' is unknown: {message}")
+        elif status is None and not timed_out:
+            unknown = True
+            lines.append(f"Branch '{branch}' of '{region}' ended without a verdict.")
+    if not lines:
+        logger.info(f"Region '{region}': {len(run.names)} branches joined after {elapsed}.")
+        return
+    message = '\n'.join(lines)
+    if unknown:
+        raise UnknownAssertionError(message)
+    raise AssertionError(message)
+
+
+def _running(context, run):
+    """The branches of ``run`` whose threads are still alive, in plan order."""
+    threads = context.active_threads
+    alive = []
+    for name in run.names:
+        entry = threads.get(name)
+        if entry is not None and entry['worker'].is_alive():
+            alive.append(name)
+    return alive
+
+
+def _request_stop(context, names):
+    threads = context.active_threads
+    for name in names:
+        entry = threads.get(name)
+        if entry is not None:
+            entry['stop_event'].set()
+
+
+def _stop_branches(context, run, names):
+    """Stop the branches ``names`` at their next step; wait up to the grace
+    for them. Returns the ones that did not stop, which are abandoned."""
+    if not names:
+        return []
+    _request_stop(context, names)
+    threads = context.active_threads
+    deadline = time.time() + STOP_GRACE_S
+    abandoned = []
+    for name in names:
+        entry = threads.get(name)
+        if entry is None:
+            continue
+        entry['worker'].join(max(0.0, deadline - time.time()))
+        if entry['worker'].is_alive():
+            abandoned.append(name)
+            logger.warn(f"Branch '{run.branch(name)}' of '{run.id}' did not stop within "
+                        f"{secs_to_timestr(STOP_GRACE_S)} and was abandoned.")
+            threads.pop(name, None)
+    return abandoned
 
 
 # ------------------------------------------------------------- bookkeeping
@@ -396,6 +623,9 @@ class _Listener:
             _CONTROL.publish('stopped' if run.stopped else 'finished')
             # Nothing is left to control; the next run binds the poller again.
             _CONTROL.stop_polling()
+        with _REGIONS_LOCK:
+            _REGIONS.clear()
+            _BY_THREAD.clear()
 
 
 ROBOT_LIBRARY_LISTENER = _Listener()

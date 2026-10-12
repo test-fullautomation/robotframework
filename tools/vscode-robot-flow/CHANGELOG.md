@@ -2,6 +2,10 @@
 
 ## 0.1.0 — not released
 
+- The fork's `parallel` node (branches run side by side as threads and join)
+  is validated, run and reported; the Diagram draws it as one box with its
+  branches listed in the inspection data until the flow view learns the kind.
+
 - Grid of `.robot` / `.resource` files and Diagram of `*.flow.json` files as
   VS Code editors of the text, with the Manager GUI's own views and helpers.
 - Edits made in a view are text edits (dirty, Save, Ctrl+Z); typing redraws

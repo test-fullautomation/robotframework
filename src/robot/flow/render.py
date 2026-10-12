@@ -21,7 +21,7 @@ review and debugging; the run itself never writes it to disk.
 """
 
 from robot.model import BodyItem
-from robot.running import For, If, Keyword, Try, While
+from robot.running import For, If, Keyword, Thread, Try, While
 from robot.running import Import
 
 
@@ -149,6 +149,10 @@ def _body(lines, body, indent):
             _row(lines, indent, 'END')
         elif isinstance(item, For):
             _row(lines, indent, 'FOR', *item.assign, item.flavor, *item.values)
+            _body(lines, item.body, indent + 1)
+            _row(lines, indent, 'END')
+        elif isinstance(item, Thread):
+            _row(lines, indent, 'THREAD', item.name, f'${{{item.daemon}}}')
             _body(lines, item.body, indent + 1)
             _row(lines, indent, 'END')
         else:

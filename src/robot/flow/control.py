@@ -471,8 +471,9 @@ class FlowControl:
             self.run = None
 
 
-# Keywords the builder emits for bookkeeping; step mode does not stop at them.
-_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop')
+# Keywords the builder emits for bookkeeping; step mode does not stop at them
+# (a parallel region's node is its 'Flow Parallel Start').
+_INTERNAL_KEYWORDS = ('Flow Phase', 'Flow Loop', 'Flow Branch', 'Flow Join')
 
 
 def _seq(entry):

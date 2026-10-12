@@ -124,6 +124,57 @@ Keyword nodes retry under a policy and time out per attempt
     Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for RIG_T.
     Should Be Equal    ${SUITE.status}    UNKNOWN
 
+Parallel regions run their branches as threads and join before the plan goes on
+    [Documentation]    A 'parallel' node starts one THREAD per branch (named after the plan,
+    ...    numbered from the region's second run on) and joins them: the join fails naming
+    ...    each failed branch, with the worst status; a failed branch stops the others at
+    ...    their next step unless 'stop_others' is false; a region times out naming the
+    ...    branches still running; 'on_failure' recovers the join's failure; a flow stop
+    ...    stops the branches first. The join reports the branches: no thread warnings.
+    Run Tests    ${PARSER}    flow/parallel.flow.json
+    ${tc} =    Check Test Case    Two Branches Join    PASS
+    Should Be Equal    ${tc.body[0].name}    Flow Parallel Start
+    Should Be Equal    ${tc.body[1].type}    THREAD
+    Should Be Equal    ${tc.body[1].name}    flow.p1.a1
+    Should Be Equal    ${tc.body[2].name}    flow.p1.b1
+    Should Be Equal    ${tc.body[1].body[0].name}    Flow Branch
+    Should Be Equal    ${tc.body[1].body[0].body[0].name}    Flow Branch: p1/a1
+    Check Log Message    ${tc.body[1].body[0].body[0].body[2].messages[0]}    A ends
+    Check Log Message    ${tc.body[2].body[0].body[0].body[1].messages[0]}    B ends
+    Should Be Equal    ${tc.body[3].name}    Flow Join
+    Check Log Message    ${tc.body[3].messages[0]}    Region 'p1': 2 branches joined after * milliseconds.    pattern=True
+    Check Log Message    ${tc.body[4].messages[0]}    joined
+    ${tc} =    Check Test Case    Failed Branch Stops The Other    FAIL    Branch 'c1' of 'p2' failed: PSU tripped.
+    Should Be Equal    ${tc.body[1].body[0].status}    FAIL
+    Should Be Equal    ${tc.body[1].body[0].message}    PSU tripped.
+    # The other branch was stopped after its first step: the two after it did not run.
+    Should Be Equal    ${tc.body[2].body[0].status}    UNKNOWN
+    Should Be Equal    ${tc.body[2].body[0].message}    Branch 'd1' of 'p2' was stopped.
+    Length Should Be    ${tc.body[2].body[0].body[0].body}    1
+    Check Log Message    ${tc.body[3].messages[0]}    Branch 'c1' of 'p2' failed; stopping the other branch(es): d1.
+    ${tc} =    Check Test Case    Failed Branch Lets The Other Finish    FAIL    Branch 'e1' of 'p3' failed: E broke.
+    Check Log Message    ${tc.body[2].body[0].body[0].body[1].messages[0]}    F finished
+    Check Test Case    Gate Timeout In A Branch Is Unknown    UNKNOWN
+    ...    GLOB:Branch 'g1' of 'p4' is unknown: Gate 'Signal Should Be' did not pass within 200 milliseconds (* attempts, waited * milliseconds). Last error: bench.never is 0, expected != 0.
+    Check Test Case    Unknown Wins Over Fail    UNKNOWN
+    ...    GLOB:Branch 'g2' of 'p4b' failed: G2 failed.\nBranch 'h3' of 'p4b' is unknown: Gate 'Signal Should Be' did not pass within 100 milliseconds (*
+    ${tc} =    Check Test Case    Region Timeout    FAIL    Region 'p5' did not join within 300 milliseconds; still running: i1.
+    Should Be Equal    ${tc.body[1].body[0].message}    Branch 'i1' of 'p5' was stopped.
+    ${tc} =    Check Test Case    Recovery After A Failed Branch    PASS
+    Should Be Equal    ${tc.body[0].body[0].status}    FAIL
+    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for RIG_P.
+    Check Log Message    ${tc.body[1].messages[0]}    after recovery
+    ${tc} =    Check Test Case    Region In A Loop    PASS
+    ${second} =    Set Variable    ${tc.body[0].body[1]}
+    Should Be Equal    ${second.body[1].name}    flow.p7.m1.2
+    Should Be Equal    ${second.body[2].name}    flow.p7.n1.2
+    Check Log Message    ${second.body[1].body[0].body[0].body[0].messages[0]}    Iteration 2.
+    ${tc} =    Check Test Case    Stop During A Region    UNKNOWN    Stopped by operator.
+    Should Be Equal    ${tc.body[2].body[0].message}    Branch 'q1' of 'p8' was stopped.
+    Should Be Equal    ${tc.body[4].status}    NOT RUN
+    Should Be Equal    ${SUITE.status}    UNKNOWN
+    Length Should Be    ${ERRORS}    0
+
 Finished loop iterations leave memory, the output keeps them
     [Documentation]    A flow's loops run for hours: once an iteration is in output.xml its
     ...    results are dropped from the model (only the last one stays). Suites keep
@@ -148,6 +199,9 @@ Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/retry_timeout.flow.json
     Check Test Case    Passes After Retries    PASS
     Should Be Equal    ${SUITE.status}    PASS
+    Run Tests    ${PARSER} --dryrun    flow/parallel.flow.json
+    Check Test Case    Two Branches Join    PASS
+    Should Be Equal    ${SUITE.status}    PASS
     Run Tests    ${PARSER} --dryrun    flow/invalid_keyword.flow.json
     Check Test Case    Invalid Keyword    UNKNOWN
     ...    Several failures occurred:\n\n1) No keyword with name 'No Such Keyword' found.\n\n2) Keyword 'FlowStubs.Signal Should Be' expected 3 arguments, got 1.
@@ -158,6 +212,8 @@ Invalid flow files are rejected naming the node
     invalid_body_no_next       Node 'loop': The body of loop 'loop' must return to it with an edge labelled 'next'; it ends at 'loop' via 'then'.
     invalid_unreachable        Unreachable node(s): orphan.
     invalid_unbounded_loop     Node 'loop': A loop needs 'max_loops' and/or 'max_seconds'; unbounded loops are not allowed.
+    invalid_branch_no_join     Node 'region': The branch of 'region' starting at 'b' must return to it with an edge labelled 'join'; it ends at 'end' via 'then'.
+    invalid_nested_parallel    Node 'inner': A parallel region cannot be inside a branch of another parallel region ('outer'); split the plan or run the inner branches one after the other.
 
 Sub-flows run as one keyword each, with parameters, nesting and recovery
     Run Tests    ${PARSER}    flow/subflow.flow.json

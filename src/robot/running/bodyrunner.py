@@ -37,6 +37,8 @@ from . import pausepoint
 from .statusreporter import StatusReporter
 
 DEFAULT_WHILE_LIMIT = 10_000
+# cuongnht thread scope: the failure a worker raises when it was asked to stop.
+THREAD_STOP_MESSAGE = "Thread stop requested."
 
 
 class BodyRunner:
@@ -53,7 +55,7 @@ class BodyRunner:
             # cuongnht thread scope: worker threads stop cooperatively at
             # keyword boundaries when their scope (test/suite) has ended.
             if self._run and self._context.thread_stop_requested():
-                raise ExecutionFailed("Thread stop requested.")
+                raise ExecutionFailed(THREAD_STOP_MESSAGE)
             # cuongnht flow pause: a paused flow waits here, between two
             # steps; a stopped one leaves here. No hook, no cost.
             if self._run and pausepoint.hook:
@@ -611,7 +613,12 @@ class ThreadRunner:
         self._templated = templated
 
     def run(self, data, result):
-        thread_result = result.body.create_thread(data.name, data.daemon)
+        # The name may hold variables (a flow's parallel region names its
+        # branches' threads per run); in a dry run they may not resolve.
+        name = self._context.variables.replace_string(
+            data.name, ignore_errors=self._context.dry_run
+        )
+        thread_result = result.body.create_thread(name, data.daemon)
         with StatusReporter(data, thread_result, self._context, self._run):
             if data.error:
                 raise DataError(data.error, syntax=True)
@@ -628,21 +635,21 @@ class ThreadRunner:
             scope_snapshot = self._context.variables.current.copy()
             worker = threading.Thread(
                 target=self._run_worker,
-                args=(data, stop_event, scope_snapshot),
-                name=data.name,
+                args=(data, name, stop_event, scope_snapshot),
+                name=name,
                 daemon=True,
             )
-            logger.add_thread_logging(data.name)
-            self._context.register_thread(data.name, worker, stop_event, data.daemon)
+            logger.add_thread_logging(name)
+            self._context.register_thread(name, worker, stop_event, data.daemon)
             worker.start()
 
-    def _run_worker(self, data, stop_event, scope_snapshot):
+    def _run_worker(self, data, name, stop_event, scope_snapshot):
         context = self._context
-        context.thread_message_queue_dict[data.name] = PriorityQueue(queue_type="FIFO")
+        context.thread_message_queue_dict[name] = PriorityQueue(queue_type="FIFO")
         # The worker's own result: it is not attached to the main model, the
         # body is streamed into the thread's output file and grafted into
         # the placeholder when the outputs are merged.
-        thread_result = data.result_class(data.name, data.daemon)
+        thread_result = data.result_class(name, data.daemon)
         try:
             with StatusReporter(data, thread_result, context, self._run):
                 context.variables.start_thread(scope_snapshot)
@@ -654,19 +661,26 @@ class ThreadRunner:
                     if stop_event.is_set():
                         # cuongnht thread scope: normal cleanup, not a failure.
                         logger.info(
-                            f"Thread '{data.name}' stopped because its scope ended."
+                            f"Thread '{name}' stopped because its scope ended."
                         )
+                    elif all(
+                        getattr(error, "collected", False)
+                        for error in failed.get_errors()
+                    ):
+                        # Whoever started the thread reports the failure (a
+                        # flow's Flow Join): no warning of the thread's own.
+                        pass
                     else:
                         context.warn(
-                            f"An exception occurred in '{data.name}' thread. "
+                            f"An exception occurred in '{name}' thread. "
                             f"Exception: {failed.message}"
                         )
                 finally:
                     context.variables.end_thread()
         finally:
-            context.thread_message_queue_dict.pop(data.name, None)
-            logger.remove_thread_logging(data.name)
-            context.unregister_thread(data.name)
+            context.thread_message_queue_dict.pop(name, None)
+            logger.remove_thread_logging(name)
+            context.unregister_thread(name)
 
 
 class IfRunner:

@@ -1,0 +1,120 @@
+{
+  "flow": { "name": "Parallel", "checkpoint": false },
+  "imports": { "libraries": ["FlowStubs.py"] },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+
+    { "id": "join", "kind": "phase", "role": "test", "name": "Two Branches Join" },
+    { "id": "p1", "kind": "parallel", "label": "Ramp and sweep" },
+    { "id": "a1", "kind": "keyword", "keyword": "Log", "args": ["A starts"] },
+    { "id": "a2", "kind": "keyword", "keyword": "Take Time", "args": ["0.2s"] },
+    { "id": "a3", "kind": "keyword", "keyword": "Log", "args": ["A ends"] },
+    { "id": "b1", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "b2", "kind": "keyword", "keyword": "Log", "args": ["B ends"] },
+    { "id": "after1", "kind": "keyword", "keyword": "Log", "args": ["joined"] },
+
+    { "id": "stops", "kind": "phase", "role": "test", "name": "Failed Branch Stops The Other" },
+    { "id": "p2", "kind": "parallel" },
+    { "id": "c1", "kind": "keyword", "keyword": "Break Something", "args": ["PSU tripped."] },
+    { "id": "d1", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "d2", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "d3", "kind": "keyword", "keyword": "Log", "args": ["D was not stopped"] },
+
+    { "id": "finishes", "kind": "phase", "role": "test", "name": "Failed Branch Lets The Other Finish" },
+    { "id": "p3", "kind": "parallel", "stop_others": false },
+    { "id": "e1", "kind": "keyword", "keyword": "Break Something", "args": ["E broke."] },
+    { "id": "f1", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "f2", "kind": "keyword", "keyword": "Log", "args": ["F finished"] },
+
+    { "id": "unknown", "kind": "phase", "role": "test", "name": "Gate Timeout In A Branch Is Unknown" },
+    { "id": "p4", "kind": "parallel" },
+    { "id": "g1", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.never", "!=", 0],
+                                  "timeout": "0.2s", "interval": "0.05s" },
+    { "id": "h1", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "h2", "kind": "keyword", "keyword": "Log", "args": ["H was not stopped"] },
+
+    { "id": "worst", "kind": "phase", "role": "test", "name": "Unknown Wins Over Fail" },
+    { "id": "p4b", "kind": "parallel", "stop_others": false },
+    { "id": "g2", "kind": "keyword", "keyword": "Break Something", "args": ["G2 failed."] },
+    { "id": "h3", "kind": "gate", "keyword": "Signal Should Be", "args": ["bench.never", "!=", 0],
+                                  "timeout": "0.1s", "interval": "0.05s" },
+
+    { "id": "timeout", "kind": "phase", "role": "test", "name": "Region Timeout" },
+    { "id": "p5", "kind": "parallel", "timeout": "0.3s" },
+    { "id": "i1", "kind": "keyword", "keyword": "Take Time", "args": ["1s"] },
+    { "id": "i2", "kind": "keyword", "keyword": "Log", "args": ["I was not stopped"] },
+    { "id": "j1", "kind": "keyword", "keyword": "Log", "args": ["J done"] },
+
+    { "id": "recovered", "kind": "phase", "role": "test", "name": "Recovery After A Failed Branch" },
+    { "id": "p6", "kind": "parallel" },
+    { "id": "k1", "kind": "keyword", "keyword": "Break Something", "args": ["K broke."] },
+    { "id": "l1", "kind": "keyword", "keyword": "Log", "args": ["L done"] },
+    { "id": "fix", "kind": "keyword", "keyword": "Recover DUT", "args": ["RIG_P"] },
+    { "id": "after6", "kind": "keyword", "keyword": "Log", "args": ["after recovery"] },
+
+    { "id": "looped", "kind": "phase", "role": "test", "name": "Region In A Loop" },
+    { "id": "cycles", "kind": "loop", "max_loops": 2 },
+    { "id": "p7", "kind": "parallel" },
+    { "id": "m1", "kind": "keyword", "keyword": "Count Iteration" },
+    { "id": "n1", "kind": "keyword", "keyword": "Log", "args": ["N done"] },
+
+    { "id": "stopped", "kind": "phase", "role": "test", "name": "Stop During A Region" },
+    { "id": "p8", "kind": "parallel" },
+    { "id": "o1", "kind": "keyword", "keyword": "Work", "args": [0, 1] },
+    { "id": "q1", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "q2", "kind": "keyword", "keyword": "Take Time", "args": ["0.3s"] },
+    { "id": "q3", "kind": "keyword", "keyword": "Log", "args": ["Q was not stopped"] },
+    { "id": "never", "kind": "keyword", "keyword": "Log", "args": ["after the stop"] },
+
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "join"], ["join", "p1"],
+    { "from": "p1", "to": "a1", "label": "branch" }, ["a1", "a2"], ["a2", "a3"], { "from": "a3", "to": "p1", "label": "join" },
+    { "from": "p1", "to": "b1", "label": "branch" }, ["b1", "b2"], { "from": "b2", "to": "p1", "label": "join" },
+    { "from": "p1", "to": "after1", "label": "done" }, ["after1", "stops"],
+
+    ["stops", "p2"],
+    { "from": "p2", "to": "c1", "label": "branch" }, { "from": "c1", "to": "p2", "label": "join" },
+    { "from": "p2", "to": "d1", "label": "branch" }, ["d1", "d2"], ["d2", "d3"], { "from": "d3", "to": "p2", "label": "join" },
+    { "from": "p2", "to": "finishes", "label": "done" },
+
+    ["finishes", "p3"],
+    { "from": "p3", "to": "e1", "label": "branch" }, { "from": "e1", "to": "p3", "label": "join" },
+    { "from": "p3", "to": "f1", "label": "branch" }, ["f1", "f2"], { "from": "f2", "to": "p3", "label": "join" },
+    { "from": "p3", "to": "unknown", "label": "done" },
+
+    ["unknown", "p4"],
+    { "from": "p4", "to": "g1", "label": "branch" }, { "from": "g1", "to": "p4", "label": "join" },
+    { "from": "p4", "to": "h1", "label": "branch" }, ["h1", "h2"], { "from": "h2", "to": "p4", "label": "join" },
+    { "from": "p4", "to": "worst", "label": "done" },
+
+    ["worst", "p4b"],
+    { "from": "p4b", "to": "g2", "label": "branch" }, { "from": "g2", "to": "p4b", "label": "join" },
+    { "from": "p4b", "to": "h3", "label": "branch" }, { "from": "h3", "to": "p4b", "label": "join" },
+    { "from": "p4b", "to": "timeout", "label": "done" },
+
+    ["timeout", "p5"],
+    { "from": "p5", "to": "i1", "label": "branch" }, ["i1", "i2"], { "from": "i2", "to": "p5", "label": "join" },
+    { "from": "p5", "to": "j1", "label": "branch" }, { "from": "j1", "to": "p5", "label": "join" },
+    { "from": "p5", "to": "recovered", "label": "done" },
+
+    ["recovered", "p6"],
+    { "from": "p6", "to": "k1", "label": "branch" }, { "from": "k1", "to": "p6", "label": "join" },
+    { "from": "p6", "to": "l1", "label": "branch" }, { "from": "l1", "to": "p6", "label": "join" },
+    { "from": "p6", "to": "fix", "label": "on_failure" }, { "from": "fix", "to": "p6", "label": "continue" },
+    { "from": "p6", "to": "after6", "label": "done" }, ["after6", "looped"],
+
+    ["looped", "cycles"],
+    { "from": "cycles", "to": "p7", "label": "body" },
+    { "from": "p7", "to": "m1", "label": "branch" }, { "from": "m1", "to": "p7", "label": "join" },
+    { "from": "p7", "to": "n1", "label": "branch" }, { "from": "n1", "to": "p7", "label": "join" },
+    { "from": "p7", "to": "cycles", "label": "next" },
+    { "from": "cycles", "to": "stopped", "label": "done" },
+
+    ["stopped", "p8"],
+    { "from": "p8", "to": "o1", "label": "branch" }, { "from": "o1", "to": "p8", "label": "join" },
+    { "from": "p8", "to": "q1", "label": "branch" }, ["q1", "q2"], ["q2", "q3"], { "from": "q3", "to": "p8", "label": "join" },
+    { "from": "p8", "to": "never", "label": "done" }, ["never", "end"]
+  ]
+}

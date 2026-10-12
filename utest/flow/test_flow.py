@@ -2,10 +2,12 @@ import contextlib
 import copy
 import unittest
 
+import threading
+
 from robot.errors import DataError
 from robot.flow import FlowError, build_suite, load_flow, render_robot, structure
 from robot.flow import keywords
-from robot.flow.graph import Decision, GateStep, KeywordStep, Loop, Try
+from robot.flow.graph import Decision, GateStep, KeywordStep, Loop, Parallel, Try
 from robot.model import BodyItem
 
 
@@ -51,6 +53,27 @@ PHASED_FLOW = flow(
     imports={'libraries': ['Bench', ['Signals', '127.0.0.1:9000']],
              'resources': ['bench.resource']},
     variables={'ARG': 'value', 'N': 3}
+)
+
+
+PARALLEL_FLOW = flow(
+    [START,
+     {'id': 'ramp', 'kind': 'parallel', 'timeout': '10 min', 'label': 'Ramp and sweep'},
+     kw('chamber', 'Set Chamber', '-40'),
+     {'id': 'wait', 'kind': 'gate', 'keyword': 'Chamber At', 'args': ['-40'], 'timeout': '5 min'},
+     kw('psu', 'Sweep PSU', '8', '16'),
+     kw('recover', 'Recover'),
+     kw('measure', 'Measure'),
+     END],
+    [['start', 'ramp'],
+     {'from': 'ramp', 'to': 'chamber', 'label': 'branch'}, ['chamber', 'wait'],
+     {'from': 'wait', 'to': 'ramp', 'label': 'join'},
+     {'from': 'ramp', 'to': 'psu', 'label': 'branch'},
+     {'from': 'psu', 'to': 'ramp', 'label': 'join'},
+     {'from': 'ramp', 'to': 'recover', 'label': 'on_failure'},
+     {'from': 'recover', 'to': 'ramp', 'label': 'continue'},
+     {'from': 'ramp', 'to': 'measure', 'label': 'done'},
+     ['measure', 'end']]
 )
 
 
@@ -262,7 +285,7 @@ class TestStructure(unittest.TestCase):
         self._error(flow([START, kw('a'), kw('b'), END],
                          [['start', 'a'], {'from': 'a', 'to': 'b', 'label': 'next'},
                           ['b', 'end']]),
-                    "Edge labelled 'next' must lead to the enclosing loop or try node")
+                    "Edge labelled 'next' must lead to the enclosing loop, try or parallel node")
 
     def test_decision_rejoins(self):
         data = flow([START, {'id': 'd', 'kind': 'decision', 'condition': '$X'},
@@ -327,6 +350,107 @@ class TestStructure(unittest.TestCase):
         self._error(flow([START, {'id': 's2', 'kind': 'start'}, END],
                          [['start', 'end'], ['s2', 'end']]),
                     'exactly one start node, found 2')
+
+    def test_parallel_region(self):
+        region, measure = structure(load_flow(PARALLEL_FLOW)).tests[0].steps
+        self.assertIsInstance(region, Parallel)
+        self.assertEqual([b.id for b in region.branches], ['chamber', 'psu'])
+        self.assertEqual([s.id for s in region.branches[0].steps], ['chamber', 'wait'])
+        self.assertIsInstance(region.branches[0].steps[1], GateStep)
+        self.assertEqual([s.id for s in region.branches[1].steps], ['psu'])
+        self.assertEqual((region.timeout, region.stop_others), ('10 min', True))
+        self.assertEqual([s.id for s in region.recovery], ['recover'])
+        self.assertEqual(region.then, 'continue')
+        self.assertIsNone(region.body)
+        self.assertEqual(measure.id, 'measure')
+
+    def test_parallel_defaults_and_shape(self):
+        data = copy.deepcopy(PARALLEL_FLOW)
+        data['nodes'][1] = {'id': 'ramp', 'kind': 'parallel', 'stop_others': False}
+        region = structure(load_flow(data)).tests[0].steps[0]
+        self.assertEqual((region.timeout, region.stop_others), (None, False))
+        data['nodes'][1]['stop_others'] = 'no'
+        with self.assertRaises(FlowError) as cm:
+            load_flow(data)
+        self.assertIn("'stop_others' must be true or false", str(cm.exception))
+
+    def test_parallel_errors(self):
+        def edges(*changes):
+            data = copy.deepcopy(PARALLEL_FLOW)
+            for index, edge in changes:
+                data['edges'][index] = edge
+            return data
+
+        # The psu branch leaves with 'then' instead of 'join'.
+        self._error(edges((5, ['psu', 'ramp'])),
+                    "Node 'ramp': The branch of 'ramp' starting at 'psu' must return to it "
+                    "with an edge labelled 'join'; it ends at 'ramp' via 'then'")
+        # A branch that runs into the node after the region.
+        self._error(edges((5, ['psu', 'measure'])),
+                    "The branch of 'ramp' starting at 'psu' must return to it with an edge "
+                    "labelled 'join'; it ends at 'end' via 'then'")
+        # One branch only.
+        data = copy.deepcopy(PARALLEL_FLOW)
+        del data['edges'][4:6]
+        data['nodes'].remove(next(n for n in data['nodes'] if n['id'] == 'psu'))
+        self._error(data, "A parallel node must have two or more outgoing edges labelled "
+                          "'branch'")
+        # 'branch' from a keyword, 'join' outside a region.
+        self._error(flow([START, kw('a'), kw('b'), END],
+                         [['start', 'a'], {'from': 'a', 'to': 'b', 'label': 'branch'},
+                          ['b', 'end']]),
+                    "Node 'a': Only a parallel node has edges labelled 'branch'")
+        self._error(flow([START, kw('a'), kw('b'), END],
+                         [['start', 'a'], {'from': 'a', 'to': 'b', 'label': 'join'},
+                          ['b', 'end']]),
+                    "Edge labelled 'join' must lead to the enclosing loop, try or parallel "
+                    "node, not to 'b'")
+        # A node in two branches.
+        self._error(edges((4, {'from': 'ramp', 'to': 'chamber', 'label': 'branch'})),
+                    "Node 'chamber': Is reached twice in the same sequence")
+
+    def test_region_as_the_last_node_of_a_loop_body_leaves_with_next(self):
+        data = copy.deepcopy(PARALLEL_FLOW)
+        data['nodes'].insert(1, {'id': 'loop', 'kind': 'loop', 'max_loops': 2})
+        data['edges'][0] = ['start', 'loop']
+        data['edges'][8] = {'from': 'ramp', 'to': 'loop', 'label': 'next'}
+        data['edges'] += [{'from': 'loop', 'to': 'ramp', 'label': 'body'},
+                          {'from': 'loop', 'to': 'measure', 'label': 'done'}]
+        loop = structure(load_flow(data)).tests[0].steps[0]
+        self.assertIsInstance(loop.body[0], Parallel)
+        self.assertEqual(loop.body[0].then, 'continue')
+
+    def test_nested_parallel_is_rejected(self):
+        data = flow([START, {'id': 'outer', 'kind': 'parallel'}, kw('a'),
+                     {'id': 'inner', 'kind': 'parallel'}, kw('b'), kw('c'), END],
+                    [['start', 'outer'],
+                     {'from': 'outer', 'to': 'a', 'label': 'branch'},
+                     {'from': 'a', 'to': 'outer', 'label': 'join'},
+                     {'from': 'outer', 'to': 'inner', 'label': 'branch'},
+                     {'from': 'inner', 'to': 'outer', 'label': 'join'},
+                     {'from': 'inner', 'to': 'b', 'label': 'branch'},
+                     {'from': 'b', 'to': 'inner', 'label': 'join'},
+                     {'from': 'inner', 'to': 'c', 'label': 'branch'},
+                     {'from': 'c', 'to': 'inner', 'label': 'join'},
+                     {'from': 'outer', 'to': 'end', 'label': 'done'}])
+        self._error(data, "Node 'inner': A parallel region cannot be inside a branch of "
+                          "another parallel region ('outer')")
+
+    def test_loop_inside_a_branch_leaves_with_join(self):
+        data = flow([START, {'id': 'p', 'kind': 'parallel'},
+                     {'id': 'loop', 'kind': 'loop', 'max_loops': 2}, kw('w', 'W'),
+                     kw('other', 'Other'), END],
+                    [['start', 'p'],
+                     {'from': 'p', 'to': 'loop', 'label': 'branch'},
+                     {'from': 'loop', 'to': 'w', 'label': 'body'},
+                     {'from': 'w', 'to': 'loop', 'label': 'next'},
+                     {'from': 'loop', 'to': 'p', 'label': 'join'},
+                     {'from': 'p', 'to': 'other', 'label': 'branch'},
+                     {'from': 'other', 'to': 'p', 'label': 'join'},
+                     {'from': 'p', 'to': 'end', 'label': 'done'}])
+        region = structure(load_flow(data)).tests[0].steps[0]
+        self.assertIsInstance(region.branches[0].steps[0], Loop)
+        self.assertEqual(region.branches[1].steps[0].keyword, 'Other')
 
     def test_action_needs_one_edge(self):
         self._error(flow([START, kw('a'), kw('b'), END],
@@ -524,6 +648,62 @@ class TestBuilder(unittest.TestCase):
         self.assertEqual(no.type, BodyItem.ELSE)
         self.assertEqual(no.body[0].name, 'No Operation')
 
+    def test_parallel_region_builds_threads_and_branch_keywords(self):
+        suite = build(PARALLEL_FLOW)
+        try_ = suite.tests[0].body[1]
+        self.assertEqual(try_.type, BodyItem.TRY_EXCEPT_ROOT)
+        start, chamber, psu, join = try_.body[0].body
+        self.assertEqual(start.name, 'Flow Parallel Start')
+        self.assertEqual(list(start.args), ['ramp', '10 min', 'True', 'chamber', 'psu'])
+        self.assertEqual(list(start.assign), ['${flow_thread_ramp_chamber}', '${flow_thread_ramp_psu}'])
+        self.assertEqual((chamber.type, chamber.name, chamber.daemon),
+                         (BodyItem.THREAD, '${flow_thread_ramp_chamber}', True))
+        self.assertEqual(psu.name, '${flow_thread_ramp_psu}')
+        call = chamber.body[0]
+        self.assertEqual((call.name, list(call.args)),
+                         ('Flow Branch', ['${flow_thread_ramp_chamber}', 'Flow Branch: ramp/chamber']))
+        self.assertEqual((join.name, list(join.args)), ('Flow Join', ['ramp']))
+        keywords_ = {k.name: k for k in suite.resource.keywords}
+        self.assertEqual([s.name for s in keywords_['Flow Branch: ramp/chamber'].body],
+                         ['Set Chamber', 'Flow Gate'])
+        self.assertEqual([s.name for s in keywords_['Flow Branch: ramp/psu'].body], ['Sweep PSU'])
+        self.assertEqual(try_.body[1].body[0].name, 'Recover')
+        # The checkpoint collects no variable a branch assigns: it stays in the thread.
+        data = copy.deepcopy(PARALLEL_FLOW)
+        data['nodes'][4]['assign'] = '${I}'
+        data['nodes'].insert(1, {'id': 'phase', 'kind': 'phase', 'role': 'test', 'name': 'T'})
+        data['nodes'].insert(2, {'id': 'loop', 'kind': 'loop', 'max_loops': 2})
+        data['edges'][0] = ['start', 'phase']
+        data['edges'][8] = {'from': 'ramp', 'to': 'loop', 'label': 'next'}
+        data['edges'] += [['phase', 'loop'],
+                          {'from': 'loop', 'to': 'ramp', 'label': 'body'},
+                          {'from': 'loop', 'to': 'measure', 'label': 'done'}]
+        loop_start = build(data).tests[0].body[1]
+        self.assertEqual(loop_start.name, 'Flow Loop')
+        self.assertEqual(list(loop_start.args), ['loop', '2', 'NONE'])
+
+    def test_render_parallel(self):
+        data = copy.deepcopy(PARALLEL_FLOW)
+        del data['edges'][6:8]
+        data['nodes'].remove(next(n for n in data['nodes'] if n['id'] == 'recover'))
+        text = render_robot(build(data))
+        self.assertIn('''\
+    ${flow_thread_ramp_chamber}    ${flow_thread_ramp_psu}=    Flow Parallel Start    ramp    10 min    True    chamber    psu
+    THREAD    ${flow_thread_ramp_chamber}    ${True}
+        Flow Branch    ${flow_thread_ramp_chamber}    Flow Branch: ramp/chamber
+    END
+    THREAD    ${flow_thread_ramp_psu}    ${True}
+        Flow Branch    ${flow_thread_ramp_psu}    Flow Branch: ramp/psu
+    END
+    Flow Join    ramp
+    Measure
+''', text)
+        self.assertIn('''\
+Flow Branch: ramp/chamber
+    Set Chamber    -40
+    Flow Gate    5 min    2s    unknown    Chamber At    -40
+''', text)
+
     def test_render(self):
         text = render_robot(build(LOOP_FLOW))
         expected = '''\
@@ -675,6 +855,152 @@ class TestFlowRetry(unittest.TestCase):
             with self.subTest(kwargs), self.assertRaises(DataError):
                 self.retry(**kwargs)
         self.assertEqual(RetryBuiltIn.calls, [])
+
+
+class FakeWorker:
+    """A branch's thread: alive until its verdict is recorded, or until it is
+    asked to stop (unless it is stuck); a stopped branch records that."""
+
+    def __init__(self, name, stop_event, stuck=False):
+        self.name = name
+        self.stop_event = stop_event
+        self.stuck = stuck
+        self.done = False
+
+    def is_alive(self):
+        if self.done:
+            return False
+        if self.stop_event.is_set() and not self.stuck:
+            keywords._BY_THREAD[self.name].record(self.name, keywords.STOPPED, 'stopped')
+            return False
+        return True
+
+    def join(self, timeout=None):
+        pass
+
+
+class JoinContext:
+    in_teardown = False
+
+    def __init__(self):
+        self.active_threads = {}
+
+    def thread_stop_requested(self):
+        return False
+
+
+class TestParallelRegion(unittest.TestCase):
+
+    def setUp(self):
+        self._builtin, self._contexts = keywords.BuiltIn, keywords.EXECUTION_CONTEXTS
+        self._slice, self._grace = keywords.JOIN_SLICE_S, keywords.STOP_GRACE_S
+        keywords.BuiltIn = RetryBuiltIn
+        self.context = JoinContext()
+        keywords.EXECUTION_CONTEXTS = type('Contexts', (), {'current': self.context})
+        keywords.JOIN_SLICE_S, keywords.STOP_GRACE_S = 0.001, 0.01
+        keywords._REGIONS.clear()
+        keywords._BY_THREAD.clear()
+        keywords._RUNS.clear()
+        RetryBuiltIn.calls = []
+
+    def tearDown(self):
+        keywords.BuiltIn, keywords.EXECUTION_CONTEXTS = self._builtin, self._contexts
+        keywords.JOIN_SLICE_S, keywords.STOP_GRACE_S = self._slice, self._grace
+
+    def start(self, timeout='NONE', stop_others='True', stuck=()):
+        names = keywords.flow_parallel_start('r', timeout, stop_others, 'a', 'b')
+        self.workers = {}
+        for name in names:
+            event = threading.Event()
+            self.workers[name] = FakeWorker(name, event, stuck=name in stuck)
+            self.context.active_threads[name] = {'worker': self.workers[name], 'stop_event': event}
+        return names
+
+    def end(self, name, status, message=''):
+        keywords._BY_THREAD[name].record(name, status, message)
+        self.workers[name].done = True
+
+    def test_start_names_the_threads_uniquely_per_run(self):
+        self.assertEqual(self.start(), ['flow.r.a', 'flow.r.b'])
+        self.assertEqual(keywords.flow_parallel_start('r', 'NONE', 'True', 'a', 'b'),
+                         ['flow.r.a.2', 'flow.r.b.2'])
+        with self.assertRaises(DataError):
+            keywords.flow_parallel_start('r', 'NONE', 'True', 'a')
+        with self.assertRaises(DataError):
+            keywords.flow_parallel_start('r', 'soon', 'True', 'a', 'b')
+
+    def test_join_passes_when_every_branch_passed(self):
+        a, b = self.start()
+        self.end(a, 'PASS')
+        self.end(b, 'PASS')
+        self.assertIsNone(keywords.flow_join('r'))
+
+    def test_failed_branch_stops_the_others_and_fails_the_join(self):
+        a, b = self.start()
+        self.end(b, 'FAIL', 'PSU tripped.')
+        with self.assertRaises(AssertionError) as cm:
+            keywords.flow_join('r')
+        self.assertEqual(str(cm.exception), "Branch 'b' of 'r' failed: PSU tripped.")
+        self.assertTrue(self.workers[a].stop_event.is_set(), 'the other branch was stopped')
+
+    def test_without_stop_others_the_join_waits_for_the_rest(self):
+        a, b = self.start(stop_others='False')
+        self.end(b, 'FAIL', 'PSU tripped.')
+        threading.Timer(0.02, lambda: self.end(a, 'UNKNOWN', 'Chamber never ready.')).start()
+        with self.assertRaises(keywords.UnknownAssertionError) as cm:
+            keywords.flow_join('r')
+        self.assertEqual(str(cm.exception), "Branch 'a' of 'r' is unknown: Chamber never ready.\n"
+                                            "Branch 'b' of 'r' failed: PSU tripped.")
+        self.assertFalse(self.workers[a].stop_event.is_set())
+
+    def test_timeout_names_the_running_branches_and_abandons_a_stuck_one(self):
+        a, b = self.start(timeout='0.01s', stuck=('flow.r.a',))
+        self.end(b, 'PASS')
+        with self.assertRaises(AssertionError) as cm:
+            keywords.flow_join('r')
+        self.assertEqual(str(cm.exception),
+                         "Region 'r' did not join within 10 milliseconds; still running: a.\n"
+                         "Branch 'a' of 'r' did not stop within 10 milliseconds and was abandoned.")
+        self.assertNotIn(a, self.context.active_threads)
+
+    def test_branch_without_a_verdict_is_unknown(self):
+        a, b = self.start()
+        self.end(a, 'PASS')
+        self.workers[b].done = True
+        with self.assertRaises(keywords.UnknownAssertionError) as cm:
+            keywords.flow_join('r')
+        self.assertEqual(str(cm.exception), "Branch 'b' of 'r' ended without a verdict.")
+
+    def test_join_needs_a_started_region(self):
+        with self.assertRaises(DataError):
+            keywords.flow_join('nowhere')
+
+    def test_flow_branch_records_and_raises_a_collected_failure(self):
+        a, b = self.start()
+        RetryBuiltIn.results = [None]
+        keywords.flow_branch(a, 'Flow Branch: r/a')
+        self.assertEqual(RetryBuiltIn.calls, [('Flow Branch: r/a', ())])
+        self.assertEqual(keywords._BY_THREAD[a].result(a), ('PASS', ''))
+        RetryBuiltIn.results = [failed('PSU tripped.')]
+        with self.assertRaises(keywords.ExecutionFailed) as cm:
+            keywords.flow_branch(b, 'Flow Branch: r/b')
+        self.assertEqual((cm.exception.message, cm.exception.status, cm.exception.collected),
+                         ('PSU tripped.', 'FAIL', True))
+        self.assertEqual(keywords._BY_THREAD[b].result(b), ('FAIL', 'PSU tripped.'))
+        RetryBuiltIn.results = [failed('not ready', unknown=True)]
+        with self.assertRaises(keywords.ExecutionFailed) as cm:
+            keywords.flow_branch(b, 'Flow Branch: r/b')
+        self.assertEqual(cm.exception.status, 'UNKNOWN')
+        RetryBuiltIn.results = [failed(keywords.THREAD_STOP_MESSAGE)]
+        with self.assertRaises(keywords.ExecutionFailed) as cm:
+            keywords.flow_branch(b, 'Flow Branch: r/b')
+        self.assertEqual(cm.exception.message, "Branch 'b' of 'r' was stopped.")
+        self.assertEqual(keywords._BY_THREAD[b].result(b)[0], keywords.STOPPED)
+        # A fatal error of the run is not a branch's verdict.
+        RetryBuiltIn.results = [failed('exit', exit=True)]
+        with self.assertRaises(keywords.ExecutionFailed) as cm:
+            keywords.flow_branch(b, 'Flow Branch: r/b')
+        self.assertFalse(getattr(cm.exception, 'collected', False))
 
 
 if __name__ == '__main__':

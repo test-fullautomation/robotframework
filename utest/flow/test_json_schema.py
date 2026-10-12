@@ -36,6 +36,9 @@ VALID = {
          'retry': {'max_attempts': 3, 'interval': '2s', 'backoff': 2, 'on_exhausted': 'unknown'},
          'timeout': '30s'},
         {'id': 'pause', 'kind': 'sleep', 'duration': '1s'},
+        {'id': 'ramp', 'kind': 'parallel', 'timeout': '10 min', 'stop_others': False},
+        {'id': 'chamber', 'kind': 'keyword', 'keyword': 'Set Chamber', 'args': [-40]},
+        {'id': 'psu', 'kind': 'keyword', 'keyword': 'Sweep PSU'},
         {'id': 'end', 'kind': 'end'},
     ],
     'edges': [
@@ -44,7 +47,12 @@ VALID = {
         {'from': 'emc', 'to': 'burst', 'label': 'yes'},
         {'from': 'emc', 'to': 'pause', 'label': 'no'}, ['burst', 'pause'],
         {'from': 'pause', 'to': 'loop', 'label': 'next'},
-        {'from': 'loop', 'to': 'end', 'label': 'done'},
+        {'from': 'loop', 'to': 'ramp', 'label': 'done'},
+        {'from': 'ramp', 'to': 'chamber', 'label': 'branch'},
+        {'from': 'chamber', 'to': 'ramp', 'label': 'join'},
+        {'from': 'ramp', 'to': 'psu', 'label': 'branch'},
+        {'from': 'psu', 'to': 'ramp', 'label': 'join'},
+        {'from': 'ramp', 'to': 'end', 'label': 'done'},
     ],
 }
 
@@ -77,6 +85,8 @@ BROKEN = {
     'on_exhausted typo': lambda d: node(d, 'burst')['retry'].update({'on_exhausted': 'skip'}),
     'retry on a gate': lambda d: node(d, 'ready').update({'retry': 2}),
     'keyword timeout as object': lambda d: node(d, 'measure').update({'timeout': {'s': 1}}),
+    'stop_others as text': lambda d: node(d, 'ramp').update({'stop_others': 'no'}),
+    'parallel timeout as object': lambda d: node(d, 'ramp').update({'timeout': {'s': 1}}),
     'missing flow name': lambda d: d['flow'].pop('name'),
     'wrong version': lambda d: d['flow'].update({'version': 2}),
     'keyword without name': lambda d: node(d, 'measure').pop('keyword'),
@@ -147,7 +157,7 @@ class TestSchemaAgreesWithValidator(unittest.TestCase):
         # Structural rules (re-joining branches, reachability) are the
         # validator's alone, so only shape errors must agree.
         structural = {'invalid_body_no_next', 'invalid_no_join', 'invalid_unreachable',
-                      'invalid_keyword'}
+                      'invalid_keyword', 'invalid_branch_no_join', 'invalid_nested_parallel'}
         for path in glob.glob(os.path.join(TESTDATA, '*.flow.json')):
             name = os.path.basename(path)[:-len('.flow.json')]
             with self.subTest(name):

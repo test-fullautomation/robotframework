@@ -41,20 +41,22 @@ FLOW_VERSION = 1
 VARIABLE_PATTERN = r'^\s*\$\{[^{}$]+\}\s*$'
 VARIABLE_RE = re.compile(VARIABLE_PATTERN)
 
-START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW = (
-    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow'
+START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW, PARALLEL = (
+    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow',
+    'parallel'
 )
-NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW)
+NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW, PARALLEL)
 ACTION_KINDS = (KEYWORD, GATE, SLEEP, FLOW)
 CONTAINER_KINDS = (LOOP, TRY)
 
 SETUP, TEST, TEARDOWN = 'setup', 'test', 'teardown'
 PHASE_ROLES = (SETUP, TEST, TEARDOWN)
 
-THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO = (
-    '', 'body', 'next', 'on_failure', 'continue', 'abort', 'done', 'yes', 'no'
+THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO, BRANCH, JOIN = (
+    '', 'body', 'next', 'on_failure', 'continue', 'abort', 'done', 'yes', 'no', 'branch',
+    'join'
 )
-EDGE_LABELS = (THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO)
+EDGE_LABELS = (THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO, BRANCH, JOIN)
 
 ON_TIMEOUT_UNKNOWN, ON_TIMEOUT_FAIL = 'unknown', 'fail'
 DEFAULT_GATE_INTERVAL = '2s'
@@ -95,6 +97,7 @@ class Node:
         self.max_seconds = attrs.pop('max_seconds', None)
         self.every = attrs.pop('every', None)
         self.file = attrs.pop('file', None)
+        self.stop_others = attrs.pop('stop_others', None)
         self.extra = attrs
 
     def __repr__(self):
@@ -245,7 +248,7 @@ def _validate_node(raw):
         START: _no_attributes, END: _no_attributes, PHASE: _validate_phase,
         KEYWORD: _validate_keyword_node, GATE: _validate_gate, SLEEP: _validate_sleep,
         DECISION: _validate_decision, LOOP: _validate_loop, TRY: _no_attributes,
-        FLOW: _validate_flow_call,
+        FLOW: _validate_flow_call, PARALLEL: _validate_parallel,
     }[kind]
     validator(node)
     return node
@@ -397,6 +400,17 @@ def _validate_loop(node):
     if node.max_loops is None and node.max_seconds is None:
         raise FlowError("A loop needs 'max_loops' and/or 'max_seconds'; "
                         "unbounded loops are not allowed.", node.id)
+
+
+def _validate_parallel(node):
+    """A parallel region: branches run at the same time and join before the
+    plan goes on. ``timeout`` bounds the whole region; ``stop_others`` says
+    whether a failed branch stops the others (the default) or lets them end."""
+    node.timeout = _validate_time(node, 'timeout')
+    if node.stop_others is None:
+        node.stop_others = True
+    elif not isinstance(node.stop_others, bool):
+        raise FlowError("'stop_others' must be true or false.", node.id)
 
 
 def _validate_time(node, attr, required=False, default=None):
@@ -568,6 +582,17 @@ def json_schema():
                     'every': dict(time, description='Minimum time per round.')},
              anyOf=[{'required': ['max_loops']}, {'required': ['max_seconds']}]),
         kind(TRY, "Failure routing without a loop: 'body', 'on_failure', 'done'."),
+        kind(PARALLEL, "Branches that run at the same time: two or more 'branch' edges "
+                       "to their first nodes, a 'join' edge back from the last node of "
+                       "each, 'done' out, optional 'on_failure'.",
+             extra={'timeout': dict(time, description='The branches must all have joined '
+                                                      'within this time (on the flow '
+                                                      'clock); none by default.'),
+                    'stop_others': {'type': 'boolean',
+                                    'description': 'When a branch fails, stop the other '
+                                                   'branches at their next step (true, '
+                                                   'the default) or let them run to '
+                                                   'their end (false).'}}),
         kind(FLOW, 'Call another flow file (a sub-flow) as one step.', required=('file',),
              extra={'file': {'type': 'string', 'pattern': r'\S',
                              'description': 'The sub-flow file, relative to this file. '
@@ -590,7 +615,9 @@ def json_schema():
          'properties': {'from': {'type': 'string'}, 'to': {'type': 'string'},
                         'label': {'enum': list(EDGE_LABELS),
                                   'description': 'Needed only where a node has more '
-                                                 'than one way out.'}}},
+                                                 "than one way out. 'branch' (several "
+                                                 "per parallel node) and 'join' belong "
+                                                 'to parallel regions.'}}},
     ]}
     return {
         '$schema': 'http://json-schema.org/draft-07/schema#',

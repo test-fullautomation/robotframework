@@ -126,6 +126,10 @@ library constructors run, so keep bench access out of those.
   setup/test/teardown **phases**.
 - **Sub-flows** — a region of the plan becomes a file of its own and is called as one step,
   with parameters.
+- **Parallel regions** — a `parallel` node runs its branches at the same time ("ramp the
+  chamber while the PSU sweeps") as `THREAD` blocks and joins them before the plan goes on;
+  a failed branch stops the others, the join names it, the report draws the branches side
+  by side.
 - **Two flows as two processes, or two machines** — with the `robot.flow.signals` library
   two flows meet and run in lockstep through the signal store of the run: a small JSON
   file on one PC, or for a distributed bench `python -m robot.flow server` (nothing to

@@ -62,6 +62,11 @@ def _step(step, where):
                    then=_text(step.then))
     if isinstance(step, graph.Loop):
         out.update(max_loops=_text(step.max_loops), max_seconds=_text(step.max_seconds), every=_text(step.every))
+    if getattr(graph, "Parallel", None) and isinstance(step, graph.Parallel):
+        # The branches of a parallel region; the diagram draws the region as
+        # one box until the flow view learns the kind.
+        out.update(timeout=_text(step.timeout), stop_others=bool(step.stop_others),
+                   branches=[{"id": b.id, "steps": _steps(b.steps, where)} for b in step.branches])
     if getattr(graph, "FlowStep", None) and isinstance(step, graph.FlowStep):
         out.update(file=step.file, args={str(k): _text(v) for k, v in (step.args or {}).items()},
                    subflow=_subflow(step.file, where))

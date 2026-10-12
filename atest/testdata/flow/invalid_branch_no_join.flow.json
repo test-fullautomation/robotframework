@@ -1,0 +1,16 @@
+{
+  "flow": { "name": "Invalid Branch" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "region", "kind": "parallel" },
+    { "id": "a", "kind": "keyword", "keyword": "Log", "args": ["a"] },
+    { "id": "b", "kind": "keyword", "keyword": "Log", "args": ["b"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "region"],
+    { "from": "region", "to": "a", "label": "branch" }, { "from": "a", "to": "region", "label": "join" },
+    { "from": "region", "to": "b", "label": "branch" }, ["b", "end"],
+    { "from": "region", "to": "end", "label": "done" }
+  ]
+}
