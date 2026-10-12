@@ -77,6 +77,7 @@ async function run() {
     console.log(`ok definition of ${JSON.stringify(piece)} in ${path.basename(doc.uri.fsPath)}: ${got.file}:${got.line}`);
   }
 
+  await editAndUndo(api);
   await debugAFlow(api);
   await pauseAFlow(api);
   if (process.env.ROBOT_FLOW_WITH_PYTHON) await stepIntoPython();
@@ -132,6 +133,39 @@ async function stepIntoPython() {
 
 // The fork's flow control through the extension: pause and resume a running
 // flow, stop it with a checkpoint, then Continue (the command) from there.
+// An edit made in the Diagram changes the text; Undo puts the text back. The
+// document-change event of our own edit must not count as the user typing
+// (which clears what can be undone).
+async function editAndUndo(api) {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'robot-flow-edit-'));
+  const file = path.join(dir, 'countdown.flow.json');
+  fs.copyFileSync(path.join(__dirname, '..', 'fixtures', 'countdown.flow.json'), file);
+  try {
+    const uri = vscode.Uri.file(file);
+    await vscode.window.showTextDocument(uri);
+    await vscode.commands.executeCommand('robotFlow.openDiagram', uri);
+    await until('the diagram of the copy', () => api.report('robotFlow.diagram', file), 90000);
+    const before = (await vscode.workspace.openTextDocument(uri)).getText();
+    const changed = await api.edit('robotFlow.diagram', file, { op: 'update', node: 'tick', attrs: { args: ['tock'] } });
+    assert.equal(changed.ok, true, `the edit: ${changed.error}`);
+    const after = (await vscode.workspace.openTextDocument(uri)).getText();
+    assert.ok(after.includes('"tock"') && !after.includes('"tick"]'), 'the text changed');
+    await new Promise((r) => setTimeout(r, 300));   // the change event has been handled by now
+    assert.equal(changed.undo, 1, 'one edit to undo');
+    const undone = await api.edit('robotFlow.diagram', file, { op: 'undo' });
+    assert.equal(undone.ok, true, `undo: ${undone.error}`);
+    assert.equal((await vscode.workspace.openTextDocument(uri)).getText(), before, 'the text is back');
+    assert.equal(undone.undo, 0);
+    console.log('ok diagram edit: changed the text, Undo put it back');
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+  } finally {
+    // VS Code may still hold the file for a moment on Windows: a temp folder left behind is no failure.
+    try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 }); } catch { /* left in the temp folder */ }
+  }
+}
+
 async function pauseAFlow(api) {
   const commands = await vscode.commands.getCommands(true);
   for (const c of ['robotFlow.pause', 'robotFlow.resume', 'robotFlow.continue', 'robotFlow.runStep']) {

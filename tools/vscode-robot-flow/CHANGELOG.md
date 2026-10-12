@@ -2,6 +2,16 @@
 
 ## 0.1.0 — not released
 
+- Completion in the text of flow files: the fork's JSON schema registered for
+  `*.flow.json` (keys, kinds, enum values), node ids in edges, the labels the
+  source node allows, keywords of the imports with their parameters (through
+  `robot_grid.py --catalog`), variables after `${`, sub-flow files. The same
+  in the Diagram's step editor: keywords in the *Keyword* field with the
+  parameters as the arguments' placeholder, variables in every value field,
+  flow files in the sub-flow field (the extension's host layer; the shared
+  view is unchanged).
+- Fixed: *Undo* in the Diagram's edit mode was always disabled, because the
+  change event of the extension's own edit was taken for the user typing.
 - The fork's `parallel` node (branches run side by side as threads and join)
   is validated, run and reported; the Diagram draws it as one box with its
   branches listed in the inspection data until the flow view learns the kind.

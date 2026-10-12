@@ -262,6 +262,10 @@
       {
         "fileMatch": "testproject.json",
         "url": "./schemas/testproject.schema.json"
+      },
+      {
+        "fileMatch": "*.flow.json",
+        "url": "./schemas/flow.schema.json"
       }
     ],
     "configuration": {
@@ -406,7 +410,7 @@
     "sync": "node scripts/sync-vendor.mjs",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test test/backend.test.mjs test/run.test.mjs test/define.test.mjs test/debug.test.mjs test/control.test.mjs",
+    "test": "npm run compile && node --test test/backend.test.mjs test/run.test.mjs test/define.test.mjs test/complete.test.mjs test/debug.test.mjs test/control.test.mjs",
     "test:webview": "npm run compile && node test/webview/render.mjs",
     "test:vscode": "npm run compile && node test/integration/run.mjs",
     "package": "vsce package",

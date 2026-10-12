@@ -47,6 +47,22 @@ and what you type in the text redraws the view, unsaved changes included.
   libraries (the Python source), BuiltIn. Robot's name matching applies
   (case, spaces, `Given`/`When`/`Then`). On an import or a sub-flow
   (`"file": "sub/x.flow.json"`) it opens that file. Unsaved text counts.
+- **Completion in flow files** (Ctrl+Space, or as you type `"`, `$`, `{`,
+  `/`) — the structure comes from the fork's JSON schema, registered here for
+  `*.flow.json`: keys, node kinds, enum values, with their descriptions. On
+  top of it: in `"from"` and `"to"` the node ids of the file (with the kind);
+  in `"label"` the labels the source node's kind allows (`body`, `done` and
+  `on_failure` after a loop, `yes` and `no` after a decision, `branch` and
+  `join` for a parallel region); in `"keyword"` every keyword of the file's
+  imports with its parameters, the flow library's `Flow Pause` / `Resume` /
+  `Stop` / `Snapshot`, and BuiltIn; after `${` the variables of the file and
+  of its resources; in `"file"` the other flow files of the workspace. The
+  keywords are read with the configured Robot, so what is offered is what
+  runs; the text may be half typed. The Diagram's step editor has the same
+  help: the *Keyword* field lists the keywords as you type (name, owner and
+  parameters; Enter or a click takes one), the *Arguments* field then shows
+  the parameters as its placeholder, every value field offers variables
+  after `${`, and the sub-flow *File* field the other flow files.
 - **Debug** — run a suite or a flow with breakpoints (see *Debug* below):
   stop at a flow step or a line, step into resource keywords and sub-flows,
   see variables, run keywords in the Debug Console. The Diagram shows the

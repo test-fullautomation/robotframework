@@ -2,9 +2,13 @@
 // get in the Manager GUI's sandboxed frame -- selection(), onSelection(fn),
 // reveal(target), edit(change) -> Promise -- over VS Code's postMessage.
 // The views are the Manager GUI's own files, unchanged.
+import { attach as attachCompletion } from './complete.js';
+
 const vscode = acquireVsCodeApi();
 
 let selection = null;
+// What the Diagram's field editor may complete: keywords of the imports, variables, flow files.
+let catalog = { keywords: [], variables: [], files: [] };
 const listeners = [];
 const pending = new Map();
 let seq = 0;
@@ -108,6 +112,8 @@ window.addEventListener('message', (event) => {
     showStatus(msg.status);
   } else if (msg.type === 'toolbar') {
     showToolbar(msg.toolbar);
+  } else if (msg.type === 'catalog') {
+    catalog = { keywords: msg.keywords || [], variables: msg.variables || [], files: msg.files || [] };
   } else if (msg.type === 'result') {
     const resolve = pending.get(msg.id);
     pending.delete(msg.id);
@@ -119,6 +125,7 @@ window.addEventListener('message', (event) => {
 export function start(mount) {
   try {
     mount(document.getElementById('view'), ctx);
+    attachCompletion(document.getElementById('view'), () => catalog);
   } catch (e) {
     showStatus({ kind: 'error', text: 'The view could not start: ' + e.message });
   }

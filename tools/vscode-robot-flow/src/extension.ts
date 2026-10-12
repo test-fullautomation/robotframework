@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeFlow } from './backend/control';
 import { PROJECT_FILE, Project, RunGroup, readProject } from './backend/project';
+import { registerCompletion } from './completion';
 import { registerDebugger } from './debug';
 import { registerDefinitions } from './definitions';
 import { diagramUnavailable, probeRobot } from './backend/robot';
@@ -18,6 +19,9 @@ import { VIEWS, ViewEditorProvider, forgetRobots } from './viewEditor';
 export interface RobotFlowApi {
   /** The last read of an open Grid / Diagram of `file`: { ok, error?, drawn }, or null. */
   report(viewType: string, file: string): { ok: boolean; error?: string; drawn: boolean } | null;
+  /** A change as the view sends it ({ op: 'update' | 'undo' | ... }), applied to the open view of `file`;
+   *  the answer carries `undo`, how many of the view's edits can be undone. */
+  edit(viewType: string, file: string, change: { op?: string }): Promise<{ ok: boolean; error?: string; undo?: number }>;
   /** The last read of an open group Diagram. */
   groupReport(projectFile: string, groupId: string): GroupPanel['report'];
   /** The state of the last run of a file, or of a group ('<testproject.json>#<id>'). */
@@ -69,6 +73,7 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
   const log = vscode.window.createOutputChannel('Robot Flow');
   const runs = new RunManager(context);
   registerDefinitions(context);
+  registerCompletion(context);
   registerDebugger(context, runs);
   const providers = Object.values(VIEWS).map((kind) => {
     const provider = new ViewEditorProvider(kind, context, log, runs);
@@ -243,6 +248,7 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
   };
   return {
     report: (viewType, file) => byType.get(viewType)?.reportFor(file) ?? null,
+    edit: (viewType, file, change) => byType.get(viewType)?.editIn(file, change) ?? Promise.resolve({ ok: false, error: 'No such view.' }),
     groupReport: (projectFile, id) => {
       const found = findGroup(projectFile, id);
       return found ? GroupPanel.reportFor(found.project, found.group) : null;
