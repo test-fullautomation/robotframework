@@ -27,9 +27,9 @@ from robot.errors import (
 )
 from robot.output import librarylogger as logger
 from robot.utils import (
-    cut_assign_value, frange, get_error_message, is_list_like, Matcher, normalize,
-    plural_or_not as s, PriorityQueue, secs_to_timestr, seq2str, split_from_equals,
-    timestr_to_secs, type_name
+    cut_assign_value, frange, get_error_message, is_list_like, Matcher,
+    next_thread_key, normalize, plural_or_not as s, PriorityQueue, secs_to_timestr,
+    seq2str, split_from_equals, timestr_to_secs, type_name
 )
 from robot.variables import evaluate_expression, is_dict_variable, search_variable
 
@@ -619,6 +619,11 @@ class ThreadRunner:
             data.name, ignore_errors=self._context.dry_run
         )
         thread_result = result.body.create_thread(name, data.daemon)
+        # The key tells this thread from every other one of the same name
+        # (a THREAD in a loop, the same name in two tests): the result, the
+        # worker, its file, its scopes and its queue all carry it.
+        key = next_thread_key(name) if self._run else None
+        thread_result.identity = key
         with StatusReporter(data, thread_result, self._context, self._run):
             if data.error:
                 raise DataError(data.error, syntax=True)
@@ -639,28 +644,30 @@ class ThreadRunner:
             scope_snapshot = self._context.variables.current.copy()
             worker = threading.Thread(
                 target=self._run_worker,
-                args=(data, name, stop_event, scope_snapshot),
+                args=(data, name, key, stop_event, scope_snapshot),
                 name=name,
                 daemon=True,
             )
+            worker.robot_key = key
             # The worker reads its stop flag from itself: an abandoned
             # thread's registry entry is gone, the flag must still reach it.
             worker.robot_stop_event = stop_event
             # The queue exists before the worker runs: a notification sent
             # right after the start is not lost.
-            self._context.thread_message_queue_dict[name] = PriorityQueue(
+            self._context.thread_message_queue_dict[key] = PriorityQueue(
                 queue_type="FIFO"
             )
-            logger.add_thread_logging(name)
-            self._context.register_thread(name, worker, stop_event, data.daemon)
+            logger.add_thread_logging(key)
+            self._context.register_thread(key, name, worker, stop_event, data.daemon)
             worker.start()
 
-    def _run_worker(self, data, name, stop_event, scope_snapshot):
+    def _run_worker(self, data, name, key, stop_event, scope_snapshot):
         context = self._context
         # The worker's own result: it is not attached to the main model, the
         # body is streamed into the thread's output file and grafted into
         # the placeholder when the outputs are merged.
         thread_result = data.result_class(name, data.daemon)
+        thread_result.identity = key
         try:
             try:
                 with StatusReporter(data, thread_result, context, self._run):
@@ -696,9 +703,9 @@ class ThreadRunner:
             except ExecutionFailed:
                 pass            # recorded above; the worker ends quietly
         finally:
-            context.thread_message_queue_dict.pop(name, None)
-            logger.remove_thread_logging(name)
-            context.unregister_thread(name)
+            context.thread_message_queue_dict.pop(key, None)
+            logger.remove_thread_logging(key)
+            context.unregister_thread(key)
 
 
 class IfRunner:

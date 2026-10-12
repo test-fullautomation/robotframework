@@ -17,7 +17,9 @@ import threading
 from pathlib import Path
 
 from robot.errors import DataError
-from robot.utils import file_writer, in_worker_thread, seq2str2, ThreadSafeDict
+from robot.utils import (
+    file_writer, in_worker_thread, seq2str2, thread_key, ThreadSafeDict
+)
 
 from .logger import LOGGER
 from .loggerapi import LoggerApi
@@ -77,10 +79,10 @@ class _DebugFileWriter(LoggerApi):
         # Created lazily: with a log level above INFO start_thread does not
         # register the thread, but a keyword with a visible own level (e.g.
         # `Log msg USER` at --loglevel USER) still needs the bookkeeping.
-        name = threading.current_thread().name
-        if name not in self._thread_info:
-            self._thread_info[name] = {"level": 0, "indent": 0}
-        return self._thread_info[name]
+        key = thread_key()
+        if key not in self._thread_info:
+            self._thread_info[key] = {"level": 0, "indent": 0}
+        return self._thread_info[key]
 
     def _get_kw_level(self):
         return self._info()["level"] if self._in_worker_thread() else self._kw_level
@@ -155,7 +157,7 @@ class _DebugFileWriter(LoggerApi):
         if visible:
             self._separator("THREAD")
         # cuongnht memory cap: forget the worker's bookkeeping.
-        self._thread_info.pop(threading.current_thread().name, None)
+        self._thread_info.pop(thread_key(), None)
 
     def _keyword_level(self, result):
         # `BuiltIn.Log` has its own log level: its start/end lines follow the

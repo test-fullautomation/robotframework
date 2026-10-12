@@ -18,7 +18,7 @@ import threading
 from contextlib import contextmanager
 
 from robot.errors import DataError
-from robot.utils import in_worker_thread
+from robot.utils import in_worker_thread, thread_key
 
 from .console import ConsoleOutput
 from .filelogger import FileLogger
@@ -62,7 +62,7 @@ class _ThreadParents:
         if not in_worker_thread():
             return self._main
         with self._lock:
-            return self._others.setdefault(threading.current_thread().name, [])
+            return self._others.setdefault(thread_key(), [])
 
     def append(self, item):
         self._current().append(item)
@@ -72,7 +72,7 @@ class _ThreadParents:
 
     def discard_current_thread(self):
         with self._lock:
-            self._others.pop(threading.current_thread().name, None)
+            self._others.pop(thread_key(), None)
 
     def __bool__(self):
         return bool(self._current())

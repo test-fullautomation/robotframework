@@ -165,7 +165,9 @@ from .text import (
 from .robotthread import (  # cuongnht add thread
     get_execution_thread as get_execution_thread,
     in_worker_thread as in_worker_thread,
+    next_thread_key as next_thread_key,
     set_execution_thread as set_execution_thread,
+    thread_key as thread_key,
 )
 from .threadsafedict import ThreadSafeDict as ThreadSafeDict  # cuongnht add thread
 from .typehints import (

@@ -165,19 +165,26 @@ class JsonLogger:
     def start_thread(self, item):
         # cuongnht add thread: JSON output cannot be written concurrently by
         # several threads, so only the THREAD element itself is recorded
-        # from the main thread; what the worker does is not logged.
-        if self._on_worker_thread():
-            return
-        self._start(type=item.type)
-        # A placeholder, as in the XML output: the block has no status yet
-        # ("NOT SET" would break the log and rebot), and daemon=False must be
-        # written although it is false, or it reads as True again.
-        status = self._status(item)
-        status["status"] = "PASS"
-        self._end(name=item.name, daemon=UnlessNone(item.daemon), **status)
+        # from the spawning thread, when the block ends there; what the
+        # worker does is not logged.
+        pass
 
     def end_thread(self, item):
-        pass
+        if item.identity is not None and item.identity == self._thread_key():
+            return          # the worker's own call
+        self._start(type=item.type)
+        # A placeholder, as in the XML output: the block has no status yet
+        # ("NOT SET" would break the log and rebot) unless it was not run,
+        # and daemon=False must be written although it is false, or it
+        # reads as True again.
+        status = self._status(item)
+        status["status"] = item.NOT_RUN if item.not_run else "PASS"
+        self._end(name=item.name, daemon=UnlessNone(item.daemon), **status)
+
+    def _thread_key(self):
+        from robot.utils import thread_key
+
+        return thread_key()
 
     def _on_worker_thread(self):
         from robot.utils import in_worker_thread

@@ -59,34 +59,44 @@ def merge_thread_outputs(output_path, thread_files=None, remove=True, logger=Non
     if not thread_files:
         return 0
     tree = ET.parse(output_path)
-    placeholders = _find_placeholders(tree.getroot())
     merged = 0
     used_files = set()
-    for name, elements in placeholders.items():
-        path = thread_files.get(name)
-        if not path or not os.path.isfile(path):
-            logger.warn(f"No output file found for thread '{name}'.")
-            continue
-        if len(elements) > 1:
-            # Same thread name used more than once: only the last run survives
-            # on disk (earlier files were overwritten), so attach to the last
-            # placeholder and leave the earlier ones as they are.
-            logger.warn(
-                f"Multiple THREAD blocks use name '{name}'. Thread log "
-                f"is attached only to the last occurrence."
-            )
-        # cuongnht add segmented output: long living threads may have been
-        # rotated into segments; join them back before grafting.
-        try:
-            merge_segments(path, remove=remove, logger=logger)
-        except Exception as err:
-            logger.warn(f"Merging segments of thread output '{path}' failed: {err}")
-        thread_root = _parse_thread_file(path, logger)
-        if thread_root is None:
-            continue
-        _graft(elements[-1], thread_root)
-        merged += 1
-        used_files.add(path)
+    missing = set()
+    # In rounds: a THREAD started inside another thread has its placeholder
+    # in that thread's file, which is in the tree only once grafted.
+    while True:
+        filled = 0
+        for key, elements in _find_placeholders(tree.getroot()).items():
+            if key in missing:
+                continue
+            path = thread_files.get(key)
+            if not path or not os.path.isfile(path):
+                missing.add(key)
+                logger.warn(f"No output file found for thread '{key}'.")
+                continue
+            if len(elements) > 1:
+                # Placeholders without a key (an output of an earlier version,
+                # keyed by the name): only the last file of a name survives.
+                logger.warn(
+                    f"Multiple THREAD blocks use name '{key}'. Thread log "
+                    f"is attached only to the last occurrence."
+                )
+            # cuongnht add segmented output: long living threads may have been
+            # rotated into segments; join them back before grafting.
+            try:
+                merge_segments(path, remove=remove, logger=logger)
+            except Exception as err:
+                logger.warn(f"Merging segments of thread output '{path}' failed: {err}")
+            thread_root = _parse_thread_file(path, logger)
+            if thread_root is None:
+                missing.add(key)
+                continue
+            _graft(elements[-1], thread_root)
+            filled += 1
+            used_files.add(path)
+        merged += filled
+        if not filled:
+            break
     if merged:
         tree.write(output_path, encoding="UTF-8", xml_declaration=True)
         logger.info(f"Merged {merged} thread output file(s) into {output_path}.")
@@ -116,7 +126,9 @@ def _discover_thread_files(output_path):
             with open(path, "rb") as file:
                 for _, elem in ET.iterparse(file, events=("start",)):
                     if elem.tag == "thread":
-                        files[elem.get("name") or name] = path
+                        # The key (`id`) of the thread; the name for a file
+                        # of an earlier version.
+                        files[elem.get("id") or elem.get("name") or name] = path
                     break
         except ET.ParseError:
             # Possibly truncated (crashed/daemon thread); _parse_thread_file
@@ -135,7 +147,11 @@ def _find_placeholders(root):
     placeholders = {}
     for elem in root.iter("thread"):
         if all(child.tag in ("status", "doc") for child in elem):
-            placeholders.setdefault(elem.get("name"), []).append(elem)
+            status = elem.find("status")
+            if status is not None and status.get("status") == "NOT RUN":
+                continue        # inside `IF False`, a dry run: no thread ran, no file
+            key = elem.get("id") or elem.get("name")
+            placeholders.setdefault(key, []).append(elem)
     return placeholders
 
 
@@ -194,6 +210,8 @@ def _graft(placeholder, thread_root):
     doc = placeholder.find("doc")
     provisional = placeholder.find("status")
     real_status = thread_root.find("status")
+    # The key served the merge; the merged element reads as any other.
+    placeholder.attrib.pop("id", None)
     if real_status is None:
         # cuongnht thread scope: the thread never wrote its final status --
         # it was abandoned at scope end or was still running when execution

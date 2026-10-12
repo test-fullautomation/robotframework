@@ -148,7 +148,8 @@ the corresponding element and flashes it so you can see where you landed.
   `log.html`.
 
 !!! tip "Naming threads"
-    The merged block and the timeline lane are keyed by the thread name. Using
-    the same name twice is allowed, but the second run overwrites the first
-    file; the merger warns and attaches the surviving log to the last
-    placeholder. Give concurrent or repeated workers distinct names.
+    Every started thread has a key of its own (`<name>#<n>`), which is what
+    the per-thread file and the placeholder carry, so the same name used
+    twice, or a `THREAD` inside a loop, gives one merged block per thread and
+    one lane each. Distinct names still make the log and the timeline easier
+    to read.

@@ -19,7 +19,7 @@ import time
 from datetime import datetime
 
 from robot.result import Keyword, ResultVisitor, TestCase, TestSuite
-from robot.utils import NullMarkupWriter, XmlWriter
+from robot.utils import NullMarkupWriter, thread_key, XmlWriter
 from robot.version import get_full_version
 
 
@@ -183,37 +183,53 @@ class XmlLogger(ResultVisitor):
         thread = threading.current_thread()
         if thread is self._main_thread or not self._path:
             return self._main_writer
+        key = thread_key(thread)
         with self._thread_writers_lock:
-            writer = self._thread_writers.get(thread.name)
+            writer = self._thread_writers.get(key)
             if writer is None:
                 if self._closed:
                     # Execution has ended and the thread files are merged:
                     # a worker that still runs has nowhere to write.
                     return NullMarkupWriter()
-                writer = self._create_thread_writer(thread.name)
-                self._thread_writers[thread.name] = writer
+                writer = self._create_thread_writer(key, thread.name)
+                self._thread_writers[key] = writer
             return writer
 
-    def _create_thread_writer(self, name):
+    def _create_thread_writer(self, key, name):
         base, ext = os.path.splitext(self._path)
-        path = f"{base}_{name}{ext}"
-        self.thread_output_files[name] = path
+        # One file per thread, by its key: two threads of one name are two files.
+        path = f"{base}_{key}{ext}"
+        self.thread_output_files[key] = path
         writer = _TrackingWriter(path)
-        attrs = {"name": name, **self._get_start_attrs(self._rpa)}
+        attrs = {"name": name, "id": key, **self._get_start_attrs(self._rpa)}
         writer.start("thread", attrs)
         return writer
 
+    def _spawning_side(self, thread):
+        # cuongnht add thread. Both the spawning thread and the worker report
+        # the block; they are told apart by identity, not by "is the main
+        # thread": the spawning thread may itself be a worker (a nested THREAD).
+        return thread.identity is None or thread.identity != thread_key()
+
     def start_thread(self, thread):
-        # cuongnht add thread. Called twice: on the spawning thread (write
-        # a placeholder that the merger fills later) and on the worker (its
-        # own file is opened lazily by the `_writer` property, nothing to do).
-        if threading.current_thread() is not self._main_thread:
-            return
+        # Called twice: on the spawning thread (nothing yet: the placeholder
+        # is written when the block ends there, a moment later) and on the
+        # worker (its own file is opened lazily by the `_writer` property).
+        pass
+
+    def _write_placeholder(self, thread):
+        # The spawning thread's record of the block, into its own file (the
+        # main output, or a worker's file for a nested THREAD): the merger
+        # fills it with the worker's file. A block not run (`IF False`, a dry
+        # run) is complete as it is.
         writer = self._writer
-        writer.start("thread", {"name": thread.name, "daemon": str(thread.daemon)})
+        attrs = {"name": thread.name, "daemon": str(thread.daemon)}
+        if thread.identity:
+            attrs["id"] = thread.identity
+        writer.start("thread", attrs)
         writer.element("doc", thread.doc)
         attrs = {
-            "status": thread.PASS,
+            "status": thread.NOT_RUN if thread.not_run else thread.PASS,
             "start": thread.start_time.isoformat() if thread.start_time else None,
             "elapsed": "0",
         }
@@ -221,14 +237,15 @@ class XmlLogger(ResultVisitor):
         writer.end("thread")
 
     def end_thread(self, thread):
-        if threading.current_thread() is self._main_thread:
+        if self._spawning_side(thread):
+            self._write_placeholder(thread)
             return
         self._write_status(thread)
         writer = self._writer
         writer.end("thread")
         writer.close()
         with self._thread_writers_lock:
-            self._thread_writers.pop(threading.current_thread().name, None)
+            self._thread_writers.pop(thread_key(), None)
 
     def _close_leftover_thread_writers(self):
         # cuongnht add thread: threads still running when execution ends
@@ -515,15 +532,17 @@ class XmlLogger(ResultVisitor):
 
 class LegacyXmlLogger(XmlLogger):
 
-    def start_thread(self, thread):
+    def _write_placeholder(self, thread):
         # cuongnht add thread: legacy format placeholder.
-        if threading.current_thread() is not self._main_thread:
-            return
         writer = self._writer
-        writer.start("thread", {"name": thread.name, "daemon": str(thread.daemon)})
+        attrs = {"name": thread.name, "daemon": str(thread.daemon)}
+        if thread.identity:
+            attrs["id"] = thread.identity
+        writer.start("thread", attrs)
         writer.element("doc", thread.doc)
         ts = self._datetime_to_timestamp(thread.start_time)
-        attrs = {"status": thread.PASS, "starttime": ts, "endtime": ts}
+        status = thread.NOT_RUN if thread.not_run else thread.PASS
+        attrs = {"status": status, "starttime": ts, "endtime": ts}
         writer.element("status", thread.message, attrs)
         writer.end("thread")
 

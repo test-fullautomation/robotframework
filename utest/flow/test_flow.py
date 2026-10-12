@@ -896,7 +896,11 @@ class JoinContext:
     in_teardown = False
 
     def __init__(self):
-        self.active_threads = {}
+        self.active_threads = {}     # keyed by the thread name here: one thread per name
+
+    def thread_entry(self, name):
+        entry = self.active_threads.get(name)
+        return (name, entry) if entry is not None else (None, None)
 
     def thread_stop_requested(self):
         return False

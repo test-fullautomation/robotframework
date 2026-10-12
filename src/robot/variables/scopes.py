@@ -22,7 +22,8 @@ from robot.errors import DataError
 from robot.model import Tags
 from robot.output import LOGGER
 from robot.utils import (
-    abspath, DotDict, find_file, get_error_details, in_worker_thread, NormalizedDict
+    abspath, DotDict, find_file, get_error_details, in_worker_thread, NormalizedDict,
+    thread_key
 )
 
 from .resolvable import GlobalVariableValue
@@ -38,13 +39,27 @@ class VariableScopes:
         self._suite_locals = []
         self._scopes = [self._global]
         # cuongnht add thread: THREAD workers get scope stacks of their own
-        # so that they never touch the main thread's stack.
+        # so that they never touch the main thread's stack. Keyed by the
+        # thread key: two threads of one name are two threads.
         self._thread_scopes = {}
-        self._variables_set = SetVariables()
+        self._thread_set = {}           # key -> the worker's own SetVariables
+        self._thread_owners = {}        # key -> the serial of the test it started in
+        self._test_serial = 0
+        self._main_variables_set = SetVariables()
+
+    @property
+    def _variables_set(self):
+        # The main thread's, or the worker's own: one shared stack would be
+        # pushed and popped by every thread at once.
+        if self._in_worker_thread():
+            own = self._thread_set.get(thread_key())
+            if own is not None:
+                return own
+        return self._main_variables_set
 
     def _current_thread_scope(self):
         """Returns the current scope of the active worker thread, or None."""
-        stack = self._thread_scopes.get(threading.current_thread().name)
+        stack = self._thread_scopes.get(thread_key())
         return stack[-1] if stack else None
 
     def _in_worker_thread(self):
@@ -91,6 +106,7 @@ class VariableScopes:
     def start_test(self):
         self._test = self._suite.copy(update=self._suite_locals[-1])
         self._scopes.append(self._test)
+        self._test_serial += 1
         self._variables_set.start_test()
 
     def end_test(self):
@@ -110,15 +126,14 @@ class VariableScopes:
             # scope stack. A worker without a registered scope (e.g. a
             # keyword still unwinding after its thread scope was reaped)
             # gets its own stack created on the fly.
-            name = threading.current_thread().name
-            self._thread_scopes.setdefault(name, []).append(kw)
+            self._thread_scopes.setdefault(thread_key(), []).append(kw)
 
     def end_keyword(self):
         if not self._in_worker_thread():
             self._scopes.pop()
             self._variables_set.end_keyword()
         else:
-            stack = self._thread_scopes.get(threading.current_thread().name)
+            stack = self._thread_scopes.get(thread_key())
             if stack:
                 stack.pop()
                 self._variables_set.end_keyword()
@@ -130,11 +145,40 @@ class VariableScopes:
         ``current`` from the worker races with the main thread pushing and
         popping its own stack and can miss recently set variables.
         """
+        key = thread_key()
         current = scope if scope is not None else self.current.copy()
-        self._thread_scopes[threading.current_thread().name] = [current]
+        self._thread_scopes[key] = [current]
+        # Its own record of the variables set in it, started from the main
+        # thread's view at this moment, and the test it belongs to.
+        own = SetVariables()
+        own._scopes = [self._main_variables_set.top_copy()]
+        self._thread_set[key] = own
+        self._thread_owners[key] = self._test_serial if self._test is not None else None
 
     def end_thread(self):
-        self._thread_scopes.pop(threading.current_thread().name, None)
+        key = thread_key()
+        self._thread_scopes.pop(key, None)
+        self._thread_set.pop(key, None)
+        self._thread_owners.pop(key, None)
+
+    def _worker_may_set_test(self):
+        """A worker writes test variables to the main thread while the test it
+        started in runs. Later (a suite-scoped thread outliving its test) the
+        write would land in another test: it is dropped, with a note."""
+        key = thread_key()
+        if key not in self._thread_owners:
+            return True
+        owner = self._thread_owners[key]
+        if self._test is not None and owner == self._test_serial:
+            return True
+        LOGGER.debug(f"Thread '{threading.current_thread().name}' set a test "
+                     f"variable after its test ended: not applied to the test now running.")
+        return False
+
+    def _set_in_own_stack(self, name, value):
+        """A worker also sees what it set itself."""
+        for scope in self._thread_scopes.get(thread_key(), ()):
+            self._set_global_suite_or_test(scope, name, value)
 
     def __getitem__(self, name):
         return self.current[name]
@@ -175,13 +219,23 @@ class VariableScopes:
         for scope in self._scopes_until_suite:
             scope.resolve_delayed()
 
+    def _variables_sets(self):
+        """The main thread's record of set variables and, in a worker, its own."""
+        sets = [self._main_variables_set]
+        if self._in_worker_thread():
+            own = self._thread_set.get(thread_key())
+            if own is not None:
+                sets.append(own)
+        return sets
+
     def set_global(self, name, value):
         for scope in self._all_scopes:
             name, value = self._set_global_suite_or_test(scope, name, value)
         for stack in list(self._thread_scopes.values()):  # cuongnht add thread
             for scope in stack:
                 name, value = self._set_global_suite_or_test(scope, name, value)
-        self._variables_set.set_global(name, value)
+        for variables_set in self._variables_sets():
+            variables_set.set_global(name, value)
 
     def _set_global_suite_or_test(self, scope, name, value):
         scope[name] = value
@@ -197,17 +251,30 @@ class VariableScopes:
             return
         for scope in self._scopes_until_suite:
             name, value = self._set_global_suite_or_test(scope, name, value)
-        self._variables_set.set_suite(name, value, children)
+        # cuongnht add thread: a worker's write reaches the main thread, and
+        # the worker sees it itself.
+        self._set_in_own_stack(name, value)
+        for variables_set in self._variables_sets():
+            variables_set.set_suite(name, value, children)
         # Override possible "suite local variables" (i.e. test variables set on
         # suite level) if real suite level variable is set.
         if name in self._suite_locals[-1]:
             self._suite_locals[-1].pop(name)
 
     def set_test(self, name, value):
+        if self._in_worker_thread():
+            # cuongnht add thread: the worker sees what it set; the main
+            # thread gets it while the test the thread started in runs.
+            self._set_in_own_stack(name, value)
+            own = self._thread_set.get(thread_key())
+            if own is not None:
+                own.set_test(name, value)
+            if not self._worker_may_set_test():
+                return
         if self._test:
             for scope in self._scopes_until_test:
                 name, value = self._set_global_suite_or_test(scope, name, value)
-            self._variables_set.set_test(name, value)
+            self._main_variables_set.set_test(name, value)
         else:
             # Set test scope variable on suite level. Keep track on added and
             # overridden variables to allow updating variables when test starts.
@@ -367,6 +434,10 @@ class SetVariables:
 
     def set_keyword(self, name, value):
         self._scopes[-1][name] = value
+
+    def top_copy(self):
+        """A copy of the innermost record, for a THREAD worker's own record."""
+        return self._scopes[-1].copy() if self._scopes else NormalizedDict(ignore="_")
 
     def update(self, variables):
         for name, value in self._scopes[-1].items():

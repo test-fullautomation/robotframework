@@ -35,7 +35,7 @@ from robot.running import Keyword, RUN_KW_REGISTER, TypeInfo
 from robot.running.context import EXECUTION_CONTEXTS
 from robot.utils import (
     DotDict, escape, format_assign_message, get_error_message, get_time, html_escape,
-    in_worker_thread, is_truthy, Matcher, normalize, normalize_whitespace,
+    in_worker_thread, is_truthy, Matcher, normalize, normalize_whitespace, thread_key,
     NormalizedDict, parse_re_flags,
     parse_time, plural_or_not as s, prepr, PriorityQueue, QueuedNotification, safe_str,
     secs_to_timestr, seq2str, split_from_equals, timestr_to_secs, type_name, unescape
@@ -4027,39 +4027,48 @@ class _Misc(_BuiltInBase):
         Use [Wait Thread Notification] on the receiving side. This keyword is
         a RobotFramework AIO extension.
         """
+        # The queues are keyed by the thread key; a name is resolved to the
+        # newest running thread of that name (the main thread's key is its name).
         queues = self._context.thread_message_queue_dict
         if dst_thread is None:
-            current = threading.current_thread().name
-            for thread in threading.enumerate():
-                if thread.name != current and thread.name in queues:
+            current = thread_key()
+            for key in list(queues):
+                if key != current:
                     notification = QueuedNotification(name)
                     notification.params = params
                     try:
-                        self._put_notification(thread.name, notification)
+                        self._put_notification(key, notification)
                     except Exception:
                         pass
-        elif dst_thread in queues:
+            return
+        key = dst_thread if dst_thread in queues else self._context.thread_entry(dst_thread)[0]
+        if key is not None and key in queues:
             notification = QueuedNotification(name)
             notification.params = params
-            self._put_notification(dst_thread, notification)
+            self._put_notification(key, notification)
         else:
-            existing = ", ".join(thread.name for thread in threading.enumerate())
+            existing = ", ".join(sorted({
+                self._context.active_threads[k]["name"] if k in self._context.active_threads else k
+                for k in queues
+            }))
             self.log(
                 f"Unable to send notification. Thread '{dst_thread}' does not "
                 f"exist. Existing threads: {existing}",
                 "WARN",
             )
 
-    def _put_notification(self, thread_name, notification):
+    def _put_notification(self, key, notification):
         # cuongnht memory cap: queues drop their oldest entries when full
         # (see robot.utils.PriorityQueue.max_items); warn once per queue so
         # a never-consuming destination becomes visible in the log.
-        thread_queue = self._context.thread_message_queue_dict[thread_name]
+        thread_queue = self._context.thread_message_queue_dict[key]
         thread_queue.put(notification)
         if thread_queue.dropped and not getattr(thread_queue, "_drop_warned", False):
             thread_queue._drop_warned = True
+            entry = self._context.active_threads.get(key)
+            shown = entry["name"] if entry else key
             self.log(
-                f"Notification queue of thread '{thread_name}' reached its limit "
+                f"Notification queue of thread '{shown}' reached its limit "
                 f"({thread_queue.max_items}); oldest notifications are being "
                 f"dropped. Is any thread consuming them with "
                 f"'Wait Thread Notification'?",
@@ -4101,13 +4110,12 @@ class _Misc(_BuiltInBase):
         keyword is a RobotFramework AIO extension.
         """
         timeout = float(timeout)
-        current = threading.current_thread().name
-        notification_queue = self._context.thread_message_queue_dict.get(current)
+        notification_queue = self._context.thread_message_queue_dict.get(thread_key())
         if notification_queue is None:
             raise RuntimeError(
-                f"Thread '{current}' has no notification queue. 'Wait Thread "
-                f"Notification' can only be used in the main thread or inside "
-                f"a THREAD block."
+                f"Thread '{threading.current_thread().name}' has no notification "
+                f"queue. 'Wait Thread Notification' can only be used in the main "
+                f"thread or inside a THREAD block."
             )
         is_receive = False
         payloads = None
@@ -4251,7 +4259,7 @@ class _Misc(_BuiltInBase):
         RobotFramework AIO extension.
         """
         # cuongnht thread scope
-        entry = self._context.active_threads.get(name)
+        key, entry = self._context.thread_entry(name)
         if entry is not None:
             secs = timeout.total_seconds() if timeout is not None else None
             entry["worker"].join(secs)
@@ -4259,7 +4267,7 @@ class _Misc(_BuiltInBase):
                 raise AssertionError(
                     f"Thread '{name}' did not finish in {secs_to_timestr(secs)}."
                 )
-            self._context.unregister_thread(name)
+            self._context.unregister_thread(key)
         failure = self._context.thread_failures.get(name)
         if failure and fail_on_error:
             raise AssertionError(f"Thread '{name}' failed: {failure}")
@@ -4284,7 +4292,7 @@ class _Misc(_BuiltInBase):
         AIO extension.
         """
         # cuongnht thread scope
-        entry = self._context.active_threads.get(name)
+        key, entry = self._context.thread_entry(name)
         if entry is None:
             self.log(f"Thread '{name}' is not running.")
             return
@@ -4295,7 +4303,7 @@ class _Misc(_BuiltInBase):
             raise AssertionError(
                 f"Thread '{name}' did not stop in {secs_to_timestr(secs)}."
             )
-        self._context.unregister_thread(name)
+        self._context.unregister_thread(key)
         self.log(f"Thread '{name}' stopped.")
 
     # -----------------------------------------------------------------------

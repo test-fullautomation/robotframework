@@ -20,7 +20,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from robot.errors import DataError
-from robot.utils import get_error_message
+from robot.utils import get_error_message, thread_key
 
 from .jsonlogger import JsonLogger
 from .loggerapi import LoggerApi
@@ -74,21 +74,48 @@ class OutputFile(LoggerApi):
     ):
         # cuongnht add segmented output: interval in seconds or None.
         self._segment_interval = segment_interval
+        # cuongnht add thread: what flattening and timeouts change is per
+        # thread (`logger`, `flatten_level`, the delayed messages): a
+        # flattened keyword in the main thread must not swallow a running
+        # worker's XML, nor a main-thread timeout park a worker's messages.
+        self._local = threading.local()
         # `self.logger` is replaced with `NullLogger` when flattening.
-        self.logger = self.real_logger = self._get_logger(path, rpa, legacy_output)
+        self.real_logger = self._get_logger(path, rpa, legacy_output)
         self.log_level = log_level
         self.is_logged = log_level.is_logged
-        self.flatten_level = 0
         self.errors = []
         self._errors_dropped = 0
         self._errors_spill_path = None
         self._errors_spill_file = None
         self._errors_spill_lock = threading.Lock()
         self._path = path
-        self._delayed_messages = None
-        # Held-back `BuiltIn.Log` keywords, keyed by thread name because
+        # Held-back `BuiltIn.Log` keywords, keyed by thread key because
         # each thread streams to its own writer.
         self._pending_log_kws = {}
+
+    @property
+    def logger(self):
+        return getattr(self._local, "logger", self.real_logger)
+
+    @logger.setter
+    def logger(self, logger):
+        self._local.logger = logger
+
+    @property
+    def flatten_level(self):
+        return getattr(self._local, "flatten_level", 0)
+
+    @flatten_level.setter
+    def flatten_level(self, level):
+        self._local.flatten_level = level
+
+    @property
+    def _delayed_messages(self):
+        return getattr(self._local, "delayed_messages", None)
+
+    @_delayed_messages.setter
+    def _delayed_messages(self, messages):
+        self._local.delayed_messages = messages
 
     def _get_logger(self, path, rpa, legacy_output):
         if not path:
@@ -162,7 +189,7 @@ class OutputFile(LoggerApi):
         if self._should_suppress_log_kw(result):
             # cuongnht log level shortening: hold the element back;
             # log_message writes it if anything visible is logged inside.
-            self._pending_log_kws[threading.current_thread().name] = result
+            self._pending_log_kws[thread_key()] = result
             return
         self._flush_pending_log_kw()
         self.logger.start_keyword(result)
@@ -173,7 +200,7 @@ class OutputFile(LoggerApi):
     def end_keyword(self, data, result):
         # NOTE: `BuiltIn.Log` has no child items, so a pending entry here
         # always belongs to this keyword.
-        pending = self._pending_log_kws.pop(threading.current_thread().name, None)
+        pending = self._pending_log_kws.pop(thread_key(), None)
         if pending is not None:
             if result.status == "PASS":
                 # Executed successfully and nothing visible was logged
@@ -195,7 +222,7 @@ class OutputFile(LoggerApi):
         return level is not None and LEVELS[level] < self.log_level.priority
 
     def _flush_pending_log_kw(self):
-        kw = self._pending_log_kws.pop(threading.current_thread().name, None)
+        kw = self._pending_log_kws.pop(thread_key(), None)
         if kw is not None:
             self.logger.start_keyword(kw)
 

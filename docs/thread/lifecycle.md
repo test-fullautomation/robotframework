@@ -33,8 +33,19 @@ Example
     Log    main thread continues here immediately
 ```
 
-The name identifies the thread for synchronisation, merging and the timeline.
-The daemon flag selects the thread's **lifecycle scope**.
+The name is how you address the thread (`Wait For Thread`, `Stop Thread`,
+`Send Thread Notification`) and how it is labelled in the log and the timeline.
+It need not be unique: a `THREAD` inside a `FOR` loop, or the same name in two
+tests, gives several threads of that name, each with its own variables, its own
+log and its own place in the output. A keyword given the name addresses the
+newest of them still running. The daemon flag selects the thread's
+**lifecycle scope**.
+
+Each thread runs with runtime state of its own: a keyword timeout inside a
+worker ends that worker's keyword and nothing in the main thread, and a
+`robot:continue-on-failure` tag on a worker's keyword does not change what the
+main thread does after a failure. A `THREAD` may start another `THREAD`; the
+inner block appears inside the outer one in the log.
 
 ## Scopes
 
@@ -98,6 +109,28 @@ verdict: a thread whose keyword failed only logs a warning while it runs (its
 `THREAD` block shows FAIL in the log), and `Wait For Thread` on it fails with
 that message. `fail_on_error=False` only logs it, for a thread whose failure
 the test judges itself afterwards.
+
+## Variables set in a thread
+
+A worker starts with a copy of the variables in scope where the `THREAD`
+began, and what it sets with plain assignment stays its own. `Set Test
+Variable`, `Set Suite Variable` and `Set Global Variable` in a worker reach the
+main thread as well, which is how a worker hands a result back:
+
+```robotframework
+Measure In The Background
+    THREAD    METER    True
+        ${v}=    Read Voltage
+        Set Test Variable    ${VOLTAGE}    ${v}
+    END
+    Wait For Thread    METER
+    Should Be True    ${VOLTAGE} > 11.5
+```
+
+One guard keeps this honest: a `Set Test Variable` from a suite-scoped thread
+that outlives the test it started in is dropped, with a note at DEBUG level,
+instead of landing in whatever test runs next. Suite and global variables are
+always applied.
 
 !!! warning "Timeouts inside a worker"
     On Linux and macOS keyword and test timeouts rely on signals, which only

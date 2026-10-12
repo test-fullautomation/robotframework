@@ -394,19 +394,17 @@ def flow_join(region):
 
 def _running(context, run):
     """The branches of ``run`` whose threads are still alive, in plan order."""
-    threads = context.active_threads
     alive = []
     for name in run.names:
-        entry = threads.get(name)
+        _, entry = context.thread_entry(name)
         if entry is not None and entry['worker'].is_alive():
             alive.append(name)
     return alive
 
 
 def _request_stop(context, names):
-    threads = context.active_threads
     for name in names:
-        entry = threads.get(name)
+        _, entry = context.thread_entry(name)
         if entry is not None:
             entry['stop_event'].set()
 
@@ -417,11 +415,10 @@ def _stop_branches(context, run, names):
     if not names:
         return []
     _request_stop(context, names)
-    threads = context.active_threads
     deadline = time.time() + STOP_GRACE_S
     abandoned = []
     for name in names:
-        entry = threads.get(name)
+        key, entry = context.thread_entry(name)
         if entry is None:
             continue
         entry['worker'].join(max(0.0, deadline - time.time()))
@@ -429,7 +426,7 @@ def _stop_branches(context, run, names):
             abandoned.append(name)
             logger.warn(f"Branch '{run.branch(name)}' of '{run.id}' did not stop within "
                         f"{secs_to_timestr(STOP_GRACE_S)} and was abandoned.")
-            threads.pop(name, None)
+            context.active_threads.pop(key, None)
     return abandoned
 
 
