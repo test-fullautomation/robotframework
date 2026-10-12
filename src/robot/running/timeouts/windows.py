@@ -51,13 +51,17 @@ class WindowsRunner(Runner):
         return result
 
     def extend(self, seconds):
-        # The timer is replaced by one with what is left plus the extension.
-        super().extend(seconds)
+        # The timer is replaced by one with what was left when the pause
+        # began (`seconds` ago): a timer that fired during the pause is
+        # forgotten, the pause is given back whole.
         timer = self._timer
-        if timer is None or self.exceeded:
+        if timer is None:
+            super().extend(seconds)
             return
         timer.cancel()
-        left = max(0.0, self._deadline - time.time()) + seconds
+        left = max(0.001, self._deadline - (time.time() - seconds))
+        super().extend(seconds)
+        self._timeout_pending = False
         self._deadline = time.time() + left
         self._timer = Timer(left, self._timeout_exceeded)
         self._timer.start()

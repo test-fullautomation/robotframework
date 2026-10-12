@@ -178,7 +178,7 @@ class JsonLogger:
         # and daemon=False must be written although it is false, or it
         # reads as True again.
         status = self._status(item)
-        status["status"] = item.NOT_RUN if item.not_run else "PASS"
+        status["status"] = "PASS" if item.identity else item.status
         self._end(name=item.name, daemon=UnlessNone(item.daemon), **status)
 
     def _thread_key(self):

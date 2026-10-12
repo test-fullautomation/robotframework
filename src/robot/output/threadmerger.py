@@ -62,12 +62,14 @@ def merge_thread_outputs(output_path, thread_files=None, remove=True, logger=Non
     merged = 0
     used_files = set()
     missing = set()
+    grafted = set()      # a grafted thread with an empty body looks like a placeholder
     # In rounds: a THREAD started inside another thread has its placeholder
     # in that thread's file, which is in the tree only once grafted.
     while True:
         filled = 0
         for key, elements in _find_placeholders(tree.getroot()).items():
-            if key in missing:
+            elements = [e for e in elements if id(e) not in grafted]
+            if not elements or key in missing:
                 continue
             path = thread_files.get(key)
             if not path or not os.path.isfile(path):
@@ -92,6 +94,7 @@ def merge_thread_outputs(output_path, thread_files=None, remove=True, logger=Non
                 missing.add(key)
                 continue
             _graft(elements[-1], thread_root)
+            grafted.add(id(elements[-1]))
             filled += 1
             used_files.add(path)
         merged += filled
@@ -148,8 +151,8 @@ def _find_placeholders(root):
     for elem in root.iter("thread"):
         if all(child.tag in ("status", "doc") for child in elem):
             status = elem.find("status")
-            if status is not None and status.get("status") == "NOT RUN":
-                continue        # inside `IF False`, a dry run: no thread ran, no file
+            if status is not None and status.get("status") != "PASS":
+                continue        # not run, a syntax error: no thread ran, no file
             key = elem.get("id") or elem.get("name")
             placeholders.setdefault(key, []).append(elem)
     return placeholders

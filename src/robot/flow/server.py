@@ -47,6 +47,7 @@ stop and change a run, so on a bench network the token is the fence.
 """
 
 import argparse
+import hmac
 import json
 import os
 import sys
@@ -197,8 +198,11 @@ class _Handler(BaseHTTPRequestHandler):
         if not token:
             return True
         given = self.headers.get('Authorization') or ''
-        if given.strip() == f'Bearer {token}':
+        if hmac.compare_digest(given.strip(), f'Bearer {token}'):
             return True
+        # The body, if any, is not read: the connection goes, so it cannot
+        # be taken for the next request.
+        self.close_connection = True
         self._send(401, {'error': 'a token is required: Authorization: Bearer <token>'})
         return False
 
@@ -290,12 +294,24 @@ def main(argv=None):
     parser.add_argument('--token', help=f'the token every request must carry as '
                                         f'"Authorization: Bearer <token>" (default: '
                                         f'{TOKEN_VARIABLE} of the environment, if set)')
+    parser.add_argument('--open', action='store_true',
+                        help='serve the network without a token (anyone who reaches '
+                             'the server may then control every run on it)')
     args = parser.parse_args(argv)
-    return serve(args.host, args.port, args.file, args.token)
+    return serve(args.host, args.port, args.file, args.token, args.open)
 
 
-def serve(host=DEFAULT_HOST, port=8765, file=None, token=None):
+def _loopback(host):
+    return host in ('127.0.0.1', 'localhost', '::1', '')
+
+
+def serve(host=DEFAULT_HOST, port=8765, file=None, token=None, open_=False):
     """Run the server until Ctrl+C; the exit code of the command line."""
+    if not _loopback(host) and not (token or token_from_environment()) and not open_:
+        sys.stderr.write(f'Refusing to serve {host} without a token: anyone who reaches '
+                         f'the server could control every run on it. Give --token (or '
+                         f'{TOKEN_VARIABLE}), or --open to serve without one.\n')
+        return 1
     try:
         server = SignalServer(host, port, file, token)
     except OSError as err:

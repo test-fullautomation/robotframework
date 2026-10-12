@@ -622,14 +622,15 @@ class ThreadRunner:
         # The key tells this thread from every other one of the same name
         # (a THREAD in a loop, the same name in two tests): the result, the
         # worker, its file, its scopes and its queue all carry it.
-        key = next_thread_key(name) if self._run else None
+        key = next_thread_key(name) if self._run and not data.error else None
         thread_result.identity = key
         with StatusReporter(data, thread_result, self._context, self._run):
             if data.error:
                 raise DataError(data.error, syntax=True)
             if not self._run:
-                # Inside `IF False`, or a dry run: the placeholder says NOT
-                # RUN and no worker is started.
+                # Inside `IF False`: the placeholder says NOT RUN and no
+                # worker is started. (A dry run does run the body, as a dry
+                # run, in a worker: its keywords are checked like any other.)
                 return
             # cuongnht thread scope: workers are always Python daemons so
             # they can never block interpreter exit; their lifecycle is
@@ -696,7 +697,7 @@ class ThreadRunner:
                             )
                             # The thread's result says FAIL in the merged
                             # output, and `Wait For Thread` reports it.
-                            context.thread_failures[name] = failed.message
+                            context.thread_failed(key, failed.message, failed.unknown)
                             raise
                     finally:
                         context.variables.end_thread()

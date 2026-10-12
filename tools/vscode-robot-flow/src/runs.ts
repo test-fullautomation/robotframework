@@ -403,6 +403,17 @@ export class RunManager implements vscode.Disposable {
       run.on('output', (text: string) => {
         output.append(group ? text.replace(/^(?=.)/gm, `[${id}] `) : text);
       });
+      run.on('output', function once() {
+        // The processes are known once started: their ids tell the Runs view
+        // (and Delete Old Runs) that the run is still on, however quiet it is.
+        run.off('output', once);
+        const info = readRunInfo(outDir);
+        if (info) {
+          try {
+            writeRunInfo(outDir, { ...info, pids: Object.fromEntries([...processes].map(([m, p]) => [m, p.pid])) });
+          } catch { /* the folder is gone */ }
+        }
+      });
       run.on('position', (pos: Position) => {
         state.positions[id] = pos;
         this.changed.fire(key);

@@ -16,7 +16,7 @@
 from collections.abc import Callable, Mapping, Sequence
 
 from robot.errors import DataError, TimeoutExceeded
-from robot.utils import WINDOWS
+from robot.utils import in_worker_thread, WINDOWS
 
 
 class Runner:
@@ -41,10 +41,27 @@ class Runner:
         timeout_error: TimeoutExceeded,
         data_error: "DataError | None" = None,
     ) -> "Runner":
-        runner = cls.runner_implementation
-        if not runner:
-            runner = cls.runner_implementation = cls._get_runner_implementation()
+        # cuongnht add thread: the POSIX runner uses signals, which reach the
+        # main thread only. A THREAD worker gets the timer-based runner (the
+        # Windows one), which works on any CPython; without CPython's C API
+        # a worker runs its keywords without a timeout.
+        if in_worker_thread():
+            runner = cls._get_thread_runner_implementation()
+        else:
+            runner = cls.runner_implementation
+            if not runner:
+                runner = cls.runner_implementation = cls._get_runner_implementation()
         return runner(timeout, timeout_error, data_error)
+
+    @classmethod
+    def _get_thread_runner_implementation(cls) -> "type[Runner]":
+        import ctypes
+
+        if hasattr(ctypes, "pythonapi"):
+            from .windows import WindowsRunner
+
+            return WindowsRunner
+        return NoTimeoutRunner
 
     @classmethod
     def _get_runner_implementation(cls) -> "type[Runner]":
@@ -81,8 +98,14 @@ class Runner:
         raise NotImplementedError
 
     def extend(self, seconds: float):
-        """Give the running timeout ``seconds`` more: the time a flow spent paused."""
+        """Give the running timeout ``seconds`` more: the time a flow spent paused.
+
+        Called after the pause, during which the runner was paused (see
+        :meth:`pause`): a timer that fired meanwhile is forgotten and the
+        timer is armed again with what was left when the pause began.
+        """
         self.timeout += seconds
+        self.exceeded = False
 
     def pause(self):
         self.paused += 1
@@ -91,3 +114,10 @@ class Runner:
         self.paused -= 1
         if self.exceeded and not self.paused:
             raise self.timeout_error
+
+
+class NoTimeoutRunner(Runner):
+    """Runs without a timeout: a worker thread on an interpreter without the C API."""
+
+    def _run(self, runnable):
+        return runnable()

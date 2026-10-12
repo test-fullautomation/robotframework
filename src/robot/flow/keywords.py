@@ -568,11 +568,6 @@ def _current_run():
 
 
 def _start_run(builtin, source):
-    # A new flow in the same process (the API, a test runner) starts with
-    # the control state of its own: a stop given to the earlier flow, its
-    # step mode and its paused time belong to that flow.
-    if _CONTROL.run is not None:
-        _CONTROL.reset()
     value = builtin.get_variable_value
     outputdir = str(value('${OUTPUT DIR}') or '')
     path = value(CHECKPOINT_VARIABLE)
@@ -623,29 +618,37 @@ class _Listener:
         # A flow's loops run for hours: finished iterations leave memory once
         # they are in the output file (what --pruneresults does for suites).
         EXECUTION_CONTEXTS.current.prune_results = True
+        # A new flow in the same process (the API, a test runner) starts with
+        # the control state of its own: a stop given to the earlier flow, its
+        # step mode and its paused time belong to that flow, checkpoint or not.
+        run = _CONTROL.run
+        if run is None or run.finished or run.source != str(data.source or ''):
+            _CONTROL.new_run()
 
     def end_test(self, data, result):
         run = _CONTROL.run
         if run is None:
             return
-        if result.message.startswith('Execution terminated by signal'):
-            # Ctrl+C, a CI cancel: the run ends as an orderly stop would, the
-            # phase not counted as done and the checkpoint kept to continue.
+        if 'Execution terminated by signal' in result.message:
+            # Ctrl+C, a CI cancel (alone, or among the failures of the test):
+            # the run ends as an orderly stop would, the phase not counted
+            # as done and the checkpoint kept to continue.
             _CONTROL.stopped = True
             run.stop()
             _CONTROL.publish('stopped')
             return
         run.phase_ended(result.name, result.status)
-        if _CONTROL.stop_requested:
-            # `Flow Stop` as the phase's last step: no step boundary follows
-            # to leave at. The phase is done; the checkpoint is kept, and the
-            # next phase's first step is where the run stops.
-            run.stop()
-            _CONTROL.stopped = True
+        # `Flow Stop` as the phase's last step: no step boundary follows to
+        # leave at. The phase is done and recorded; the stop stays pending
+        # and the next phase's first step is where the run stops. After the
+        # last phase there is nothing to stop: the run completed.
 
     def end_suite(self, data, result):
         run = _CONTROL.run
         if run is not None and str(data.source or '') == run.source:
+            if _CONTROL.stop_requested and not run.stopped:
+                logger.info('Flow stop requested after the last step: the run completed.')
+                _CONTROL.clear_stop_request()
             run.finish()
             _CONTROL.publish('stopped' if run.stopped else 'finished')
             # Nothing is left to control; the next run binds the poller again.

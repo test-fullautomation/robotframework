@@ -229,7 +229,9 @@ class XmlLogger(ResultVisitor):
         writer.start("thread", attrs)
         writer.element("doc", thread.doc)
         attrs = {
-            "status": thread.NOT_RUN if thread.not_run else thread.PASS,
+            # A started thread: PASS until its file says otherwise. A block
+            # that started none (not run, a syntax error) is complete here.
+            "status": thread.PASS if thread.identity else thread.status,
             "start": thread.start_time.isoformat() if thread.start_time else None,
             "elapsed": "0",
         }
@@ -541,7 +543,7 @@ class LegacyXmlLogger(XmlLogger):
         writer.start("thread", attrs)
         writer.element("doc", thread.doc)
         ts = self._datetime_to_timestamp(thread.start_time)
-        status = thread.NOT_RUN if thread.not_run else thread.PASS
+        status = thread.PASS if thread.identity else thread.status
         attrs = {"status": status, "starttime": ts, "endtime": ts}
         writer.element("status", thread.message, attrs)
         writer.end("thread")

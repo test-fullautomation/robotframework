@@ -107,8 +107,16 @@ Wait For Thread    SUITEWORKER    timeout=1 min   # join without stopping; fail 
 `Wait For Thread` is the way to make a thread's result part of the test
 verdict: a thread whose keyword failed only logs a warning while it runs (its
 `THREAD` block shows FAIL in the log), and `Wait For Thread` on it fails with
-that message. `fail_on_error=False` only logs it, for a thread whose failure
-the test judges itself afterwards.
+that message, with the thread's own kind of failure (a thread that could not
+judge, a missing keyword say, gives UNKNOWN). `fail_on_error=False` only logs
+it, for a thread whose failure the test judges itself afterwards. The failure
+is reported once, for the thread that was waited for; the failure of a
+test-scoped thread nobody waited for is forgotten when its test ends.
+
+!!! note "Changed behaviour"
+    Earlier versions let `Wait For Thread` pass whatever the thread did. A
+    suite that tolerated a failing thread on purpose now needs
+    `fail_on_error=False` on that `Wait For Thread`.
 
 ## Variables set in a thread
 
@@ -132,10 +140,12 @@ that outlives the test it started in is dropped, with a note at DEBUG level,
 instead of landing in whatever test runs next. Suite and global variables are
 always applied.
 
-!!! warning "Timeouts inside a worker"
-    On Linux and macOS keyword and test timeouts rely on signals, which only
-    work in the thread executing the suite. Keywords run by a `THREAD` worker
-    there run without timeouts; on Windows timeouts apply as usual.
+!!! note "Timeouts inside a worker"
+    A keyword timeout inside a `THREAD` worker applies on every platform: the
+    worker runs it with a timer (the way Windows runs every timeout), since
+    the signal-based timeout of Linux and macOS reaches the main thread only.
+    The test timeout belongs to the main thread; a worker starts without it.
+    On an interpreter without CPython's C API a worker runs without timeouts.
 
 ## Variable scoping
 

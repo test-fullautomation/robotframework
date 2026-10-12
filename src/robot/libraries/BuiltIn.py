@@ -4268,11 +4268,18 @@ class _Misc(_BuiltInBase):
                     f"Thread '{name}' did not finish in {secs_to_timestr(secs)}."
                 )
             self._context.unregister_thread(key)
-        failure = self._context.thread_failures.get(name)
+        # The failure of the thread waited for (by its key), or of the newest
+        # ended thread of the name; reported once.
+        failure = self._context.take_thread_failure(key=key, name=None if key else name)
         if failure and fail_on_error:
-            raise AssertionError(f"Thread '{name}' failed: {failure}")
+            message = f"Thread '{name}' failed: {failure['message']}"
+            # The thread's verdict is the test's: a thread that could not
+            # judge gives UNKNOWN, not FAIL.
+            if failure["unknown"]:
+                raise UnknownAssertionError(message)
+            raise AssertionError(message)
         if failure:
-            self.log(f"Thread '{name}' finished with a failure: {failure}")
+            self.log(f"Thread '{name}' finished with a failure: {failure['message']}")
         elif entry is None:
             self.log(f"Thread '{name}' is not running.")
         else:

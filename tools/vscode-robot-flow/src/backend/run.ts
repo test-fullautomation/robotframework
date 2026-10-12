@@ -230,6 +230,11 @@ export class RobotRun extends EventEmitter {
     return this.status === 'running' || this.status === 'stopping';
   }
 
+  /** The process id, once started. */
+  get pid(): number | null {
+    return this.child?.pid ?? null;
+  }
+
   file(name: string): string | null {
     const p = path.join(this.plan.outDir, name);
     return fs.existsSync(p) ? p : null;

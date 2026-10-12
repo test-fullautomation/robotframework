@@ -31,6 +31,8 @@ export interface RunInfo {
   ended?: number | null;
   status?: string | null;
   exitCodes?: Record<string, number | null>;
+  /** The Robot processes, by member id ('main' for a file run): a live one means the run is on. */
+  pids?: Record<string, number | null>;
 }
 
 export interface Counts {
@@ -72,7 +74,7 @@ export interface RunRecord {
   status: HistoryStatus;
   /** When it started (ms): run.json, the output, or the folder's stamp. */
   started: number | null;
-  /** When its output.xml (else the folder) was last written (ms): a run with no end still writing it is alive. */
+  /** When the run last wrote anything (ms): its output, checkpoint, snapshots, signals or position file. */
   updated: number | null;
   elapsed: number | null;
   total: Counts | null;
@@ -129,6 +131,7 @@ export function readRunInfo(dir: string): RunInfo | null {
       ended: typeof data.ended === 'number' ? data.ended : null,
       status: data.status ? String(data.status) : null,
       exitCodes: data.exitCodes && typeof data.exitCodes === 'object' ? data.exitCodes : undefined,
+      pids: data.pids && typeof data.pids === 'object' ? data.pids : undefined,
     };
   } catch {
     return null;
@@ -278,6 +281,30 @@ function mtimeOf(file: string | null): number | null {
   }
 }
 
+/** The newest write of a run folder: its output, checkpoint and snapshots, signal store, position file, or the folder. */
+function lastWritten(dir: string, output: string | null): number | null {
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(dir).filter((f) => /\.(xml|json)$/i.test(f) && f !== RUN_INFO_FILE);
+  } catch {
+    return mtimeOf(dir);
+  }
+  const times = [mtimeOf(output), mtimeOf(dir), ...names.map((f) => mtimeOf(path.join(dir, f)))]
+    .filter((t): t is number => t !== null);
+  return times.length ? Math.max(...times) : null;
+}
+
+/** Whether a process of the run is still there (the run's own pids, from run.json). */
+export function processAlive(pid: number | null | undefined): boolean {
+  if (!pid) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM';   // exists, not ours
+  }
+}
+
 function fileIn(dir: string, name: string): string | null {
   const f = path.join(dir, name);
   return fs.existsSync(f) ? f : null;
@@ -314,7 +341,7 @@ export function readRun(dir: string, name = path.basename(dir), member = false):
   const title = member ? name : info?.title || (stamp?.name ? stamp.name : summary?.suite || name);
   const record: RunRecord = {
     dir, name, title, kind, status: 'unknown', started: info?.started ?? summary?.start ?? stamp?.time ?? null,
-    updated: mtimeOf(output) ?? mtimeOf(dir),
+    updated: lastWritten(dir, output),
     elapsed: summary?.elapsed ?? (info?.ended && info.started ? (info.ended - info.started) / 1000 : null),
     total: summary?.total ?? null, info, target, members,
     files: { log: fileIn(dir, 'log.html'), report: fileIn(dir, 'report.html'), flow: fileIn(dir, 'flow.html'), output },
@@ -374,13 +401,22 @@ export function scanRuns(root: string, limit = LIST_LIMIT): RunRecord[] {
   return out.sort((a, b) => (b.started || 0) - (a.started || 0));
 }
 
-/** A run with no end written counts as still alive while its output was written less than this long ago. */
-export const ALIVE_MS = 3600 * 1000;
+/**
+ * A run with no end written counts as still alive while it wrote anything
+ * less than this long ago: a paused or gated flow writes nothing for a while.
+ */
+export const ALIVE_MS = 24 * 3600 * 1000;
 
-/** A run of this folder may still be running: no end was written, and the output is recent. */
+/**
+ * A run of this folder may still be running: no end was written, and either
+ * a process of it is still there (a run of the extension, which records its
+ * pids) or it wrote something recently (a command-line run).
+ */
 export function maybeAlive(r: RunRecord, now = Date.now()): boolean {
   if (r.status === 'running' || r.status === 'stopping') return true;
   if (r.status !== 'incomplete' && r.status !== 'unknown') return false;
+  const pids = Object.values(r.info?.pids || {});
+  if (pids.length) return pids.some(processAlive);
   return r.updated !== null && now - r.updated < ALIVE_MS;
 }
 

@@ -182,33 +182,49 @@ class FlowControl:
         position = where or self._position()
         logger.info(f"Flow paused by {reason}{' ' + position if position else ''}.",
                     also_console=_on_main_thread())
+        runners = self._pause_timeouts()
         started = time.time()
         while self._paused.is_set() and self._stop_reason is None:
+            if _signal_received():
+                # Ctrl+C while paused: the run ends as a stop at the step
+                # boundary this wait returns to; a second signal would end
+                # the process without log or report.
+                logger.info('Signal received while paused: the flow leaves the pause.')
+                self.resume()
+                break
             time.sleep(self.SLICE_S)
         seconds = time.time() - started
-        self._extend_timeouts(seconds)
+        self._resume_timeouts(runners, seconds)
         waited = secs_to_timestr(round(seconds, 1))
         if self._stop_reason is None:
             logger.info(f'Flow resumed after {waited}.', also_console=_on_main_thread())
         else:
             logger.info(f'Flow stopped while paused ({waited}).')
 
-    def _extend_timeouts(self, seconds):
-        """Keyword and test timeouts run on the wall clock: the pause is
-        given back to them, so a timed step paused for an hour has all of
-        its timeout afterwards, as a gate has."""
-        if seconds <= 0 or not _on_main_thread():
-            return
+    def _pause_timeouts(self):
+        """Keyword and test timeouts run on the wall clock: they are held
+        while the flow is paused and given the pause back afterwards, so a
+        timed step paused for an hour has all of its timeout, as a gate has."""
+        if not _on_main_thread():
+            return []
         context = EXECUTION_CONTEXTS.current
         if context is None:
-            return
-        for timeout in getattr(context, 'timeouts', ()):
-            if getattr(timeout, 'start_time', -1) >= 0:
-                timeout.start_time += seconds
-        for runner in getattr(context, 'active_timeouts', ()):
-            extend = getattr(runner, 'extend', None)
-            if extend is not None:
-                extend(seconds)
+            return []
+        runners = [r for r in getattr(context, 'active_timeouts', ()) if hasattr(r, 'pause')]
+        for runner in runners:
+            runner.pause()
+        return runners
+
+    def _resume_timeouts(self, runners, seconds):
+        context = EXECUTION_CONTEXTS.current
+        if context is not None and seconds > 0:
+            for timeout in getattr(context, 'timeouts', ()):
+                if getattr(timeout, 'start_time', -1) >= 0:
+                    timeout.start_time += seconds
+        for runner in runners:
+            if seconds > 0:
+                runner.extend(seconds)      # forgets a timer that fired meanwhile
+            runner.resume()
 
     def _raise_stop(self, where):
         with self._lock:
@@ -323,10 +339,11 @@ class FlowControl:
             try:
                 entries = self._entries()
                 newest = max((_seq(entry) for entry in entries.values()), default=0)
-                if entries and newest < self._since_seq:
+                if entries and newest < max(last, self._since_seq):
                     # The store numbers its writes from the start again (the
                     # server restarted without its file, Redis was flushed):
-                    # what it holds now is new to this process.
+                    # what it holds now is new to this process, whatever was
+                    # seen or applied before.
                     with self._lock:
                         self._since_seq = 0
                         self._seen = None
@@ -482,6 +499,23 @@ class FlowControl:
     def publish(self, state):
         self._publish(state)
 
+    def new_run(self):
+        """A new flow starts in this process: the state of the one before
+        (a stop given to it, its step mode, its paused time) is not its own.
+        The store and its poller stay: `_follow_store` rebinds them."""
+        self.resume()
+        with self._lock:
+            self._paused_total = 0.0
+            self._stop_reason = None
+            self._pending = []
+            self.step_mode = False
+            self.stopped = False
+            self.run = None
+
+    def clear_stop_request(self):
+        with self._lock:
+            self._stop_reason = None
+
     def reset(self):
         """Forget everything; for tests and for a new run in the same process."""
         self.stop_polling()
@@ -532,6 +566,15 @@ def clock():
 def _on_main_thread():
     # The thread executing the suite; `robot.run()` may be called from any thread.
     return not in_worker_thread()
+
+
+def _signal_received():
+    """Whether Ctrl+C or SIGTERM reached the run (Robot raises it at the next keyword)."""
+    try:
+        from robot.running.signalhandler import STOP_SIGNAL_MONITOR
+        return bool(getattr(STOP_SIGNAL_MONITOR, '_signal_count', 0))
+    except Exception:
+        return False
 
 
 def _hook(context, step):

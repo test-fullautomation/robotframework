@@ -175,8 +175,17 @@ test('a results root: runs newest first, groups by their members, checkpoints, t
     assert.ok(died.updated !== null && Date.now() - died.updated < 60000, 'written just now');
     assert.equal(maybeAlive(died), true, 'no end, written just now: it may still run');
     assert.ok(!olderThan(runs, 0).some((r) => r.name === died.name), 'never deleted while it may run');
-    assert.equal(olderThan(runs, 0, Date.now() + 2 * 3600 * 1000).some((r) => r.name === died.name), true, 'stale two hours later');
-    assert.equal(olderThan(runs, 0, Date.now() + 2 * 3600 * 1000).length, runs.length, 'all of them then');
+    // (a paused or gated flow writes nothing for a while: a day of silence means it is gone)
+    assert.equal(olderThan(runs, 0, Date.now() + 2 * 3600 * 1000).some((r) => r.name === died.name), false, 'still kept two hours later');
+    assert.equal(olderThan(runs, 0, Date.now() + 25 * 3600 * 1000).some((r) => r.name === died.name), true, 'stale a day later');
+    assert.equal(olderThan(runs, 0, Date.now() + 25 * 3600 * 1000).length, runs.length, 'all of them then');
+    // a run of the extension records its processes: gone processes mean a dead run, whatever the time
+    writeRunInfo(died.dir, { ...died.info, pids: { main: 999999999 } });
+    const [deadByPid] = scanRuns(root).filter((r) => r.name === died.name);
+    assert.equal(maybeAlive(deadByPid), false, 'its process is gone');
+    writeRunInfo(died.dir, { ...died.info, pids: { main: process.pid } });
+    const [aliveByPid] = scanRuns(root).filter((r) => r.name === died.name);
+    assert.equal(maybeAlive(aliveByPid, Date.now() + 48 * 3600 * 1000), true, 'its process lives: kept however long ago it wrote');
 
     assert.equal(readRunInfo(path.join(root, 'junk')), null);
     assert.equal(summarizeOutput(path.join(root, 'nothing.xml')), null);

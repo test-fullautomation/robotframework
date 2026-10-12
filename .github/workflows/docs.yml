@@ -50,7 +50,7 @@ jobs:
           mkdir -p tools
           curl -fsSL -o tools/plantuml.jar \
             https://github.com/plantuml/plantuml/releases/download/v1.2024.3/plantuml-1.2024.3.jar
-          echo "31dfa10cf42934ddd52e413fae5c3e3087b5c6529696d70519836608a02a29e5  tools/plantuml.jar" | sha256sum -c
+          echo "519a4a7284c6a0357c369e4bb0caf72c4bfbbde851b8c6d6bbdb7af3c01fc82f  tools/plantuml.jar" | sha256sum -c
 
       # plantuml-markdown imports requests and urllib3 at module level but
       # declares no dependencies, so they must be installed explicitly. Pinned
@@ -91,9 +91,6 @@ jobs:
           path: site
           retention-days: 7
 
-      - uses: actions/configure-pages@v5
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
@@ -110,5 +107,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Pages configuration needs the Pages permissions: here, not in build.
+      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4

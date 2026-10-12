@@ -68,12 +68,14 @@ comes back in time is not a failure.
 
 Whoever can reach the server can pause, stop and change every run on it, so
 by default it listens on `127.0.0.1` only, for flows on the same machine.
-`--host 0.0.0.0` opens it to the network; then give it a token, with
-`--token` or `ROBOT_FLOW_SIGNALS_TOKEN` in its environment, and set the same
+`--host 0.0.0.0` opens it to the network, and then a token is required:
+`--token` or `ROBOT_FLOW_SIGNALS_TOKEN` in its environment, and the same
 variable on every machine of the run and wherever `robot.flow control` is
-used: every request then carries `Authorization: Bearer <token>`, and one
-without it is refused (401). A request body is limited to 64 KiB, and a
-connection that stays silent longer than a long poll is dropped.
+used. Every request then carries `Authorization: Bearer <token>`, and one
+without it is refused (401). Without a token the server refuses to serve a
+network interface, unless `--open` says that is meant. A request body is
+limited to 64 KiB, and a connection that stays silent longer than a long
+poll is dropped.
 
 A `set` from outside becomes the value of a variable in the running flow,
 and a condition written as `${LIMIT} > 3` inlines that value into the

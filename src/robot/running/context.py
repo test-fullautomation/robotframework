@@ -150,7 +150,9 @@ class _ExecutionContext:
         #         'owner': name of the test that started it,
         #         'abandoned': True once its scope ended without it}
         self.active_threads = ThreadSafeDict()
-        # name -> the message of a thread that ended with a failure.
+        # key -> {'name', 'message', 'unknown', 'daemon'} of a thread that
+        # ended with a failure, until `Wait For Thread` reports it or the test
+        # it belonged to is over (a suite-scoped one: the suite).
         self.thread_failures = ThreadSafeDict()
 
     @staticmethod
@@ -364,6 +366,11 @@ class _ExecutionContext:
             if key not in keep and key != main:
                 self.thread_message_queue_dict.pop(key, None)
         self.thread_message_queue_dict[main] = PriorityQueue(queue_type="FIFO")
+        # A test-scoped thread's failure nobody waited for belongs to the
+        # test that is over, not to this one.
+        for key, failure in dict(self.thread_failures).items():
+            if failure["daemon"]:
+                self.thread_failures.pop(key, None)
         self.output.start_test(data, result)
 
     def _add_timeout(self, timeout):
@@ -480,8 +487,25 @@ class _ExecutionContext:
 
     # cuongnht thread scope -------------------------------------------------
 
+    def thread_failed(self, key, message, unknown=False):
+        """The worker ``key`` ended with a failure: kept for `Wait For Thread`."""
+        entry = self.active_threads.get(key) or {}
+        self.thread_failures[key] = {
+            "name": entry.get("name", key),
+            "message": message,
+            "unknown": unknown,
+            "daemon": entry.get("daemon", True),
+        }
+
+    def take_thread_failure(self, key=None, name=None):
+        """The recorded failure of thread ``key``, or of the newest ended
+        thread named ``name``, removed from the record; None without one."""
+        if key is not None:
+            return self.thread_failures.pop(key, None)
+        keys = [k for k, f in dict(self.thread_failures).items() if f["name"] == name]
+        return self.thread_failures.pop(keys[-1], None) if keys else None
+
     def register_thread(self, key, name, worker, stop_event, daemon):
-        self.thread_failures.pop(name, None)   # a new thread of the name: a clean slate
         self.active_threads[key] = {
             "name": name,
             "worker": worker,
@@ -498,14 +522,14 @@ class _ExecutionContext:
         ``(key, entry)``, or ``(None, None)``. Keywords address threads by
         their name; the registry by the key."""
         found = (None, None)
+        rank = lambda e: (not e.get("abandoned"), e["worker"].is_alive())
         for key, entry in dict(self.active_threads).items():
             if entry["name"] != name:
                 continue
-            if found[1] is None or (entry["worker"].is_alive()
-                                    and not found[1]["worker"].is_alive()):
+            # A thread abandoned by its scope ranks last, a live one first;
+            # among equals the one registered later wins.
+            if found[1] is None or rank(entry) >= rank(found[1]):
                 found = (key, entry)
-            elif entry["worker"].is_alive() == found[1]["worker"].is_alive():
-                found = (key, entry)     # registered later: the newest wins
         return found
 
     def thread_stop_requested(self):

@@ -13,7 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from signal import getitimer, ITIMER_REAL, setitimer, SIG_DFL, SIGALRM, signal
+import time
+from signal import ITIMER_REAL, setitimer, SIG_DFL, SIGALRM, signal
 
 from robot.errors import DataError, TimeoutExceeded
 
@@ -40,18 +41,23 @@ class PosixRunner(Runner):
             self._stop_timer()
 
     def _start_timer(self):
-        if not self._started:
+        self._owns_timer = not self._started
+        if self._owns_timer:
             self._orig_alrm = signal(SIGALRM, self._raise_timeout)
             setitimer(ITIMER_REAL, self.timeout)
+            self._deadline = time.time() + self.timeout
         type(self)._started += 1
 
     def extend(self, seconds):
-        # One interval timer serves the nested runners: it gets the extension.
+        # One interval timer serves the nested runners: the one that armed
+        # it gives the pause back, once, with what was left when the pause
+        # began; a timer that fired meanwhile is forgotten.
         super().extend(seconds)
-        if self._started and not self.exceeded:
-            left = getitimer(ITIMER_REAL)[0]
-            if left > 0:
-                setitimer(ITIMER_REAL, left + seconds)
+        if not self._started or not getattr(self, "_owns_timer", False):
+            return
+        left = max(0.001, self._deadline - (time.time() - seconds))
+        self._deadline = time.time() + left
+        setitimer(ITIMER_REAL, left)
 
     def _raise_timeout(self, signum, frame):
         self.exceeded = True

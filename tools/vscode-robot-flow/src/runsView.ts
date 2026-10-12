@@ -560,7 +560,7 @@ export function registerRunsView(context: vscode.ExtensionContext, runs: RunMana
       const pick = await vscode.window.showQuickPick(AGES.map((a) => ({ label: a.label, ms: a.ms })), { placeHolder: 'Delete the results of finished runs' });
       if (!pick) return;
       const confirm = await vscode.window.showWarningMessage(`${pick.label}: delete those run folders?`,
-                                                             { modal: true, detail: 'Runs still running, and folders whose output is still being written, are kept. This cannot be undone.' }, 'Delete');
+                                                             { modal: true, detail: 'Runs still running are kept: those of this window by their processes, others while they wrote anything in the last day. This cannot be undone.' }, 'Delete');
       if (confirm !== 'Delete') return;
       const n = provider.deleteOlder(pick.ms);
       void vscode.window.showInformationMessage(n ? `${n} run folder${n === 1 ? '' : 's'} deleted.` : 'Nothing to delete.');
