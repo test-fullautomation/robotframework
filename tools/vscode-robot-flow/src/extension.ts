@@ -8,9 +8,10 @@ import { PROJECT_FILE, Project, RunGroup, readProject } from './backend/project'
 import { registerDebugger } from './debug';
 import { registerDefinitions } from './definitions';
 import { diagramUnavailable, probeRobot } from './backend/robot';
+import { addFlowToGroup } from './groupActions';
 import { GroupPanel } from './groupPanel';
 import { RunManager, RunState, fileKey, groupKey } from './runs';
-import { forgetInterpreters, robotEnvFor } from './settings';
+import { forgetInterpreters, projectFor, robotEnvFor } from './settings';
 import { VIEWS, ViewEditorProvider, forgetRobots } from './viewEditor';
 
 /** What activate() returns: read-only, for tests and diagnostics. */
@@ -179,6 +180,26 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
     vscode.commands.registerCommand('robotFlow.openGroup', async () => {
       const picked = await pickGroup();
       if (picked) GroupPanel.show(context, runs, picked.project, picked.group);
+    }),
+    vscode.commands.registerCommand('robotFlow.addToGroup', async (uri?: vscode.Uri) => {
+      const target = uri instanceof vscode.Uri ? uri : activeFile();
+      if (!target || !/\.flow\.json$/i.test(target.fsPath)) {
+        void vscode.window.showInformationMessage('Open a .flow.json file to add it to a run group.');
+        return;
+      }
+      const project = projectFor(target);
+      if (!project) {
+        void vscode.window.showInformationMessage(`No ${PROJECT_FILE} above ${path.basename(target.fsPath)}: run groups live in a test project.`);
+        return;
+      }
+      try {
+        const added = await addFlowToGroup(project, target.fsPath);
+        if (!added) return;
+        const group = added.project.groups.find((g) => g.id === added.groupId);
+        if (group) GroupPanel.show(context, runs, added.project, group);
+      } catch (e) {
+        void vscode.window.showErrorMessage((e as Error).message);
+      }
     }),
     vscode.commands.registerCommand('robotFlow.showRobot', async () => {
       const uri = activeFile() ?? vscode.workspace.workspaceFolders?.[0]?.uri;

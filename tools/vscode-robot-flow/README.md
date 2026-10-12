@@ -78,6 +78,14 @@ or *Extensions → … → Install from VSIX…*. Build the `.vsix` with
   `robotFlow.resultsFolder`.
 - **Robot Flow: Open Run Group Diagram…** (or right-click a
   `testproject.json`) picks a group of the workspace's test projects.
+- **Add to Run Group…** (a flow file's title-bar menu or Explorer context)
+  puts the flow into a group of its project, or into a new one: pick the
+  group, give the member its id (its rig name) and its variables. In a
+  group's panel, **＋ Member…** adds another flow of the project and
+  **✎ Group…** renames the group, changes a member's variables, removes a
+  member or the group. Only the `groups` value of `testproject.json`
+  changes; the rest of the file stays as the Manager GUI wrote it. The file
+  has a JSON schema here, so editing it by hand gets completion too.
 - A file inside a test project is read and run with the project's `run`
   settings (interpreter, `pythonpath`, `args`, `env`), the same way the
   Manager GUI runs it.

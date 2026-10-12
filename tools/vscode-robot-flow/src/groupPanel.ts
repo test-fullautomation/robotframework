@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import { inspectGroup } from './backend/group';
 import { Project, RunGroup, memberPath, readProject } from './backend/project';
+import { addMemberToGroup, editGroup } from './groupActions';
 import { RunManager, groupKey } from './runs';
 import { robotEnvFor } from './settings';
 import { LiveOptions, revealIn, setOption, toolbar } from './shared';
@@ -81,6 +82,30 @@ export class GroupPanel implements vscode.Disposable {
     this.subs.forEach((s) => s.dispose());
   }
 
+  /** Add a member to the group, or rename / change variables / remove (edits testproject.json). */
+  private async editGroup(action: 'addMember' | 'editGroup'): Promise<void> {
+    if (this.runs.isRunning(this.key)) {
+      void vscode.window.showInformationMessage('The group is running: edit it when the run has ended.');
+      return;
+    }
+    try {
+      if (action === 'addMember') {
+        if (await addMemberToGroup(this.project, this.group)) this.reloadProject();
+        return;
+      }
+      const edited = await editGroup(this.project, this.group);
+      if (!edited) return;
+      if (edited.removed) {
+        void vscode.window.showInformationMessage(`Run group ${this.group.title} removed from testproject.json.`);
+        this.panel.dispose();
+        return;
+      }
+      this.reloadProject();
+    } catch (e) {
+      void vscode.window.showErrorMessage((e as Error).message);
+    }
+  }
+
   private reloadProject(): void {
     const fresh = readProject(`${this.project.root}/testproject.json`);
     const group = fresh?.groups.find((g) => g.id === this.group.id);
@@ -138,6 +163,7 @@ export class GroupPanel implements vscode.Disposable {
       live: !!live,
       hasLog: !!state && !!this.runs.artifact(this.key, 'log.html'),
       hasFlowReport: !!state && !!this.runs.artifact(this.key, 'flow.html'),
+      isGroup: true,
     }) });
   }
 
@@ -166,6 +192,7 @@ export class GroupPanel implements vscode.Disposable {
         const [command, member] = msg.action.split(/:(.*)/s) as ['pause' | 'resume', string?];
         await this.runs.control(this.key, command, member || '');
       }
+      else if (msg.action === 'addMember' || msg.action === 'editGroup') await this.editGroup(msg.action);
       else if (msg.action === 'set') await this.runs.setVariables(this.key);
       else if (msg.action === 'snapshot') await this.runs.snapshot(this.key);
       else if (msg.action === 'log' || msg.action === 'report' || msg.action === 'flow') await this.runs.open(this.key, `${msg.action}.html`);

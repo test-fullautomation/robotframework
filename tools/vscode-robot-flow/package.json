@@ -160,6 +160,12 @@
         "icon": "$(debug-restart)"
       },
       {
+        "command": "robotFlow.addToGroup",
+        "title": "Add to Run Group…",
+        "category": "Robot Flow",
+        "icon": "$(type-hierarchy)"
+      },
+      {
         "command": "robotFlow.openGroup",
         "title": "Open Run Group Diagram…",
         "category": "Robot Flow",
@@ -199,6 +205,11 @@
           "group": "1_run@2"
         },
         {
+          "command": "robotFlow.addToGroup",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "1_run@3"
+        },
+        {
           "command": "robotFlow.openGrid",
           "when": "resourceExtname == .robot || resourceExtname == .resource",
           "group": "navigation"
@@ -226,6 +237,11 @@
           "group": "navigation@8"
         },
         {
+          "command": "robotFlow.addToGroup",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@9"
+        },
+        {
           "command": "robotFlow.openGroup",
           "when": "resourceFilename == testproject.json",
           "group": "navigation@9"
@@ -242,6 +258,12 @@
         }
       ]
     },
+    "jsonValidation": [
+      {
+        "fileMatch": "testproject.json",
+        "url": "./schemas/testproject.schema.json"
+      }
+    ],
     "configuration": {
       "title": "Robot Flow",
       "properties": {
