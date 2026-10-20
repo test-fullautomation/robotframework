@@ -334,7 +334,7 @@ each branch is one thread block, and the timeline shows them side by side.
 | a gate timed out inside a branch | that branch is UNKNOWN, and so is the join: `Branch 'chamber' of 'ramp' is unknown: Gate ...` -- the worst status wins, UNKNOWN over FAIL, one line per branch |
 | the region's `timeout` passed | FAIL naming the branches still running, which are stopped; a branch that does not reach a step boundary within 10 seconds is abandoned and the message says so |
 | the flow is paused | the join and the branches wait at their next step; the region's timeout does not advance |
-| the flow is stopped | the branches are stopped first, then the flow ends as usual |
+| the flow is stopped | the branches are stopped first, then the flow ends as usual. A stop asked for while the region runs, from outside or by a branch's own step, is raised by the join once the branches have stopped, so the region is always joined and the node after it is NOT RUN |
 | `on_failure` | the recovery sees the join's failure, like a `try` node's; `continue` goes on with `done`, `abort` re-raises after the recovery |
 
 ### Bounds from variables

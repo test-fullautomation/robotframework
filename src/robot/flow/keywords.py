@@ -231,6 +231,8 @@ class _Region:
         self.started = _CONTROL.clock()
         self.results = {}                   # thread name -> (status, message)
         self.stopping = False
+        self.owner = threading.get_ident()  # the thread that started it and joins it
+        self.joined = False
         self.lock = threading.Lock()
 
     def branch(self, name):
@@ -249,6 +251,22 @@ _REGIONS = {}       # region id -> its current run
 _BY_THREAD = {}     # thread name -> the run it belongs to
 _RUNS = {}          # region id -> how often it started in this process
 _REGIONS_LOCK = threading.Lock()
+
+
+def _region_open():
+    """Whether the current thread started a region it has not joined yet.
+
+    While that is so, the step hook does not raise a flow stop: between the
+    region's start and its join the thread only starts the branches, and a
+    stop raised there would end the phase with the branches running and the
+    region unjoined. The join raises it, after it stopped the branches.
+    """
+    ident = threading.get_ident()
+    with _REGIONS_LOCK:
+        return any(run.owner == ident and not run.joined for run in _REGIONS.values())
+
+
+_CONTROL.region_open = _region_open
 
 
 def flow_parallel_start(region, timeout, stop_others, *branches):
@@ -338,31 +356,37 @@ def flow_join(region):
     context = EXECUTION_CONTEXTS.current
     abandoned = []
     timed_out = False
-    while True:
-        running = _running(context, run)
-        failed = [name for name in run.names
-                  if (run.result(name) or ('',))[0] in ('FAIL', 'UNKNOWN')]
-        if failed and run.stop_others and running and not run.stopping:
-            run.stopping = True
-            logger.info(f"Branch '{run.branch(failed[0])}' of '{region}' failed; "
-                        f"stopping the other branch(es): "
-                        f"{', '.join(run.branch(name) for name in running)}.")
-            _request_stop(context, running)
-        if not running:
-            break
-        if _CONTROL.stop_requested:
-            abandoned += _stop_branches(context, run, running)
-            running = []
-        try:
-            _CONTROL.pause_point(context)
-        except ExecutionFailed:
-            _stop_branches(context, run, _running(context, run))
-            raise
-        if run.deadline is not None and _CONTROL.clock() >= run.deadline:
-            timed_out = True
-            abandoned += _stop_branches(context, run, running)
-            break
-        time.sleep(JOIN_SLICE_S)
+    try:
+        while True:
+            running = _running(context, run)
+            failed = [name for name in run.names
+                      if (run.result(name) or ('',))[0] in ('FAIL', 'UNKNOWN')]
+            if failed and run.stop_others and running and not run.stopping:
+                run.stopping = True
+                logger.info(f"Branch '{run.branch(failed[0])}' of '{region}' failed; "
+                            f"stopping the other branch(es): "
+                            f"{', '.join(run.branch(name) for name in running)}.")
+                _request_stop(context, running)
+            if not running:
+                break
+            if _CONTROL.stop_requested:
+                abandoned += _stop_branches(context, run, running)
+                running = []
+            try:
+                _CONTROL.pause_point(context)
+            except ExecutionFailed:
+                _stop_branches(context, run, _running(context, run))
+                raise
+            if run.deadline is not None and _CONTROL.clock() >= run.deadline:
+                timed_out = True
+                abandoned += _stop_branches(context, run, running)
+                break
+            time.sleep(JOIN_SLICE_S)
+    finally:
+        run.joined = True
+    # A stop asked for while the branches ran was held back by the step hook
+    # until here (see _region_open): the branches are stopped, the flow ends.
+    _CONTROL.pause_point(context)
     elapsed = secs_to_timestr(round(_CONTROL.clock() - run.started, 1))
     lines, unknown = [], False
     if timed_out:

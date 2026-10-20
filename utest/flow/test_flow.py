@@ -992,6 +992,27 @@ class TestParallelRegion(unittest.TestCase):
         with self.assertRaises(DataError):
             keywords.flow_join('nowhere')
 
+    def test_a_region_is_open_for_its_thread_from_its_start_to_its_join(self):
+        # While it is, the step hook leaves a flow stop to the join.
+        self.assertFalse(keywords._region_open())
+        a, b = self.start()
+        self.assertTrue(keywords._region_open())
+        elsewhere = []
+        thread = threading.Thread(target=lambda: elsewhere.append(keywords._region_open()))
+        thread.start()
+        thread.join()
+        self.assertEqual(elsewhere, [False], 'another thread has no region open')
+        self.end(a, 'PASS')
+        self.end(b, 'PASS')
+        keywords.flow_join('r')
+        self.assertFalse(keywords._region_open())
+        # A join that raises has closed the region too.
+        a, b = self.start()
+        self.end(b, 'FAIL', 'PSU tripped.')
+        with self.assertRaises(AssertionError):
+            keywords.flow_join('r')
+        self.assertFalse(keywords._region_open())
+
     def test_flow_branch_records_and_raises_a_collected_failure(self):
         a, b = self.start()
         RetryBuiltIn.results = [None]

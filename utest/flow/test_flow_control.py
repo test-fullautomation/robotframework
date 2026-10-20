@@ -121,6 +121,25 @@ class TestStop(unittest.TestCase):
         self.control.pause_point(context)
         self.assertTrue(self.control.stop_requested)
 
+    def test_stop_is_held_back_while_a_parallel_region_is_open(self):
+        # The step hook between `Flow Parallel Start` and `Flow Join` only
+        # waits: the join raises the stop after it stopped the branches.
+        from robot.flow import control as module
+        self.control.stop()
+        self.control.pause_point(FakeContext(), raise_stop=False)
+        self.assertTrue(self.control.stop_requested)
+        saved = module.CONTROL
+        module.CONTROL = self.control
+        try:
+            self.control.region_open = lambda: True
+            module._hook(FakeContext(), None)
+            self.assertTrue(self.control.stop_requested, 'held for the join')
+            self.control.region_open = lambda: False
+            with self.assertRaises(ExecutionFailed):
+                module._hook(FakeContext(), None)
+        finally:
+            module.CONTROL = saved
+
     def test_stop_ends_a_pause(self):
         self.control.pause()
         threading.Timer(0.05, self.control.stop).start()

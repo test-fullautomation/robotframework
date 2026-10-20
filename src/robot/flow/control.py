@@ -96,6 +96,10 @@ class FlowControl:
         self.step_mode = False
         self.stopped = False
         self.run = None         # the FlowRun of the flow being executed, if any
+        # Whether the current thread has a parallel region open (started, not
+        # joined yet); robot.flow.keywords replaces it. A stop asked for while
+        # a region is open is raised by the join, after the branches stopped.
+        self.region_open = lambda: False
 
     # ------------------------------------------------------------- the clock
 
@@ -152,18 +156,19 @@ class FlowControl:
                 return
             self._stop_reason = reason
 
-    def pause_point(self, context=None, where=None):
+    def pause_point(self, context=None, where=None, raise_stop=True):
         """Wait here while paused; leave here when stopped.
 
         Called between steps by the body runner hook and between the polls of
         a gate. Worker threads wait like the main flow but are never the ones
-        to raise the stop: their scope ends them.
+        to raise the stop: their scope ends them. With ``raise_stop`` false
+        the point only waits: the caller raises the stop at a better place.
         """
         if self._paused.is_set():
             self._wait(where)
         if self._pending:
             self._apply_pending()
-        if self._stop_reason is not None and _on_main_thread() \
+        if raise_stop and self._stop_reason is not None and _on_main_thread() \
                 and not (context is not None and context.in_teardown):
             self._raise_stop(where)
 
@@ -605,7 +610,11 @@ def _hook(context, step):
         return
     if control.step_mode:
         control.step(context, step)
-    control.pause_point(context)
+    # Between `Flow Parallel Start` and `Flow Join` the branches run in their
+    # threads: a stop asked for meanwhile (by a branch, or from outside) is
+    # not raised here, where it would leave the region unjoined, but by the
+    # join, which stops the branches first. The pause is held here as usual.
+    control.pause_point(context, raise_stop=not control.region_open())
 
 
 def _iteration_hook(context, iteration):
