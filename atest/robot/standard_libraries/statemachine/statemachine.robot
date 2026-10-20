@@ -68,16 +68,20 @@ Stuck Keyword Is Interrupted By State Timeout
     Should Be Equal    ${state}    FAULT
 
 Interrupted Run Resumes From Checkpoint
+    [Documentation]    Each polling round takes at least 0.6 s (0.5 s in the
+    ...                during keyword, 0.1 s poll), so five rounds cannot fit
+    ...                into the 2 s budget however fast the machine is, while
+    ...                the first round has the whole 2 s to happen on a slow one.
     Remove File    ${CHECKPOINT}
     Set Test Variable    ${N}    ${0}
     Define State    INIT    enter=Prepare
-    Define State    WORK    during=Increment N
+    Define State    WORK    during=Increment N Slowly
     Define State    DONE    final=True
     Define Transition    INIT    WORK
     Define Transition    WORK    DONE    condition=$N >= 5
     Checkpoint Variable    \${N}
     Run Keyword And Expect Error    *max_duration*exceeded*
-    ...    Run State Machine    initial=INIT    max_duration=0.4 s
+    ...    Run State Machine    initial=INIT    max_duration=2 s
     ...    checkpoint=${CHECKPOINT}    poll_interval=0.1 s
     File Should Exist    ${CHECKPOINT}
     ${before}=    Set Variable    ${N}
@@ -238,6 +242,10 @@ Increment Cycles
 Increment N
     ${n}=    Evaluate    $N + 1
     Set Test Variable    ${N}    ${n}
+
+Increment N Slowly
+    Increment N
+    Sleep    0.5 s
 
 Increment N And Stop At 3
     Increment N

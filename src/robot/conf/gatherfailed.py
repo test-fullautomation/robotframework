@@ -25,7 +25,9 @@ class GatherFailedTests(SuiteVisitor):
         self.tests = []
 
     def visit_test(self, test):
-        if test.failed:
+        # cuongnht - add unknown state: an UNKNOWN test has no verdict yet, so
+        # it is exactly what a rerun is for.
+        if test.failed or test.unknown:
             self.tests.append(glob_escape(test.full_name))
 
     def visit_keyword(self, kw):
@@ -38,7 +40,7 @@ class GatherFailedSuites(SuiteVisitor):
         self.suites = []
 
     def start_suite(self, suite):
-        if any(test.failed for test in suite.tests):
+        if any(test.failed or test.unknown for test in suite.tests):
             self.suites.append(glob_escape(suite.full_name))
 
     def visit_test(self, test):

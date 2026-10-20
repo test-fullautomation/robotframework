@@ -7,7 +7,7 @@ Test name cannot be empty.
 ==============================================================================
 Run suite 'Empty Testcase And Uk' with 9 tests in *.
 
-UNKNOWNED
+UNKNOWN
 9 tests, 0 passed, 1 failed, 8 unknown
 
 Output:  *.xml

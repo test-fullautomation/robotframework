@@ -117,16 +117,25 @@ library constructors run, so keep bench access out of those.
 - **Gates instead of guessed sleeps** — a `gate` polls a keyword until it passes; on timeout
   the message carries the last error and the time waited, and the verdict is `UNKNOWN` (the
   bench was not ready) unless the gate says `fail`.
+- **Retry and timeout per step** — a `keyword` node declares `retry` (attempts, interval,
+  backoff, the verdict on exhaustion) and `timeout` (per attempt) instead of coding them
+  into the keyword; the attempts are in the log and on the flow report.
 - **Loops bounded by construction** (`max_loops` and/or `max_seconds`, paced with `every`;
   a bound may be a `${variable}` sized per run with `--variable`),
   **recovery** that continues the loop or aborts with the original error, **decisions**, and
   setup/test/teardown **phases**.
 - **Sub-flows** — a region of the plan becomes a file of its own and is called as one step,
   with parameters.
-- **Two flows as two processes** — with the `robot.flow.signals` library two flows meet and
-  run in lockstep through a small signal file of the run; a missing peer ends `UNKNOWN`
-  instead of hanging or failing falsely.
-- **Pause, stop and restart** — `python -m robot.flow control <store> pause | resume | stop`
+- **Parallel regions** — a `parallel` node runs its branches at the same time ("ramp the
+  chamber while the PSU sweeps") as `THREAD` blocks and joins them before the plan goes on;
+  a failed branch stops the others, the join names it, the report draws the branches side
+  by side.
+- **Two flows as two processes, or two machines** — with the `robot.flow.signals` library
+  two flows meet and run in lockstep through the signal store of the run: a small JSON
+  file on one PC, or for a distributed bench `python -m robot.flow server` (nothing to
+  install), a Redis server or an MQTT broker, or a store class of your own; a missing
+  peer ends `UNKNOWN` instead of hanging or failing falsely.
+- **Pause, stop, set, snapshot and restart** — `python -m robot.flow control <store> pause | resume | stop | set NAME=value | snapshot [name]`
   holds or ends a running flow between two steps, with loop deadlines, gate timeouts
   and watchdogs frozen meanwhile; a stopped or crashed flow leaves a checkpoint and the
   next run continues it (finished phases SKIP, the loop goes on with what is left).

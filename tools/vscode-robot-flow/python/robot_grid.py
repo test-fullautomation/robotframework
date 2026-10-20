@@ -33,6 +33,14 @@ Where a keyword is defined, for an editor's *Go to Definition*::
 call, or an import's name. Prints ``{"ok", "found", "source", "line",
 "name", "owner", "owner_type"}``; ``source`` is a file path, ``line`` 1-based
 (or null when only the file is known).
+
+Everything a flow file can call, for an editor's completion::
+
+    python robot_grid.py --catalog <path>   < {"text": ...}
+
+Prints ``{"ok", "keywords": [{name, owner, owner_type, args, shortdoc,
+source}], "variables": [{name, value, source}], "imports"}``. The text may
+be mid-edit: its ``imports`` and ``variables`` are read tolerantly.
 """
 
 import hashlib
@@ -1260,6 +1268,98 @@ def define(path, text, name):
             "name": entry["name"], "owner": entry["owner"], "owner_type": entry["owner_type"]}
 
 
+# The flow library's keywords a plan may call; the others are bookkeeping
+# the builder emits (Flow Gate, Flow Retry, Flow Phase, Flow Loop, the
+# parallel region's three).
+_FLOW_LIBRARY = "robot.flow.keywords"
+_FLOW_KEYWORDS_FOR_PLANS = ("flow pause", "flow resume", "flow stop", "flow snapshot")
+
+
+def catalog_of_flow(path, text):
+    """Every keyword and variable a flow file can use, for completion.
+
+    ``text`` is the file as it is being edited; when it is not valid JSON yet,
+    only its ``imports`` section is taken (by a tolerant read), else nothing is
+    imported and BuiltIn and the flow library remain.
+    """
+    from robot.api.parsing import get_model
+    flow = _tolerant_flow(text)
+    model = get_model(_flow_suite_text(flow))
+    catalog = build_catalog(model, path, False)
+    try:
+        doc = _libdoc(_FLOW_LIBRARY)
+        catalog.add("Flow", "library", [k for k in doc["keywords"]
+                                        if k["name"].lower() in _FLOW_KEYWORDS_FOR_PLANS])
+    except Exception as exc:  # noqa: BLE001
+        catalog.imports.append({"type": "library", "name": _FLOW_LIBRARY, "line": None, "ok": False,
+                                "error": str(exc)})
+    order = {"file": 0, "resource": 1, "library": 2}
+    keywords = [{"name": e["name"], "owner": e["owner"], "owner_type": e["owner_type"],
+                 "args": e.get("args") or [], "shortdoc": (e.get("shortdoc") or "")[:200],
+                 "source": e.get("source")}
+                for entries in catalog.by_name.values() for e in entries]
+    keywords.sort(key=lambda e: (order.get(e["owner_type"], 3), e["owner"].lower(), e["name"].lower()))
+    variables = list(catalog.variables)
+    if isinstance(flow.get("variables"), dict):
+        variables += [{"name": "${%s}" % str(name).strip().strip("${}"), "value": str(value)[:120],
+                       "source": os.path.basename(path)}
+                      for name, value in flow["variables"].items()]
+    return {"ok": True, "keywords": keywords, "variables": variables,
+            "imports": [dict(r, keywords=r.get("keywords", 0)) for r in catalog.imports]}
+
+
+def _tolerant_flow(text):
+    """The flow as a dict: the whole file, or its ``imports`` and ``variables``
+    sections alone when the rest is not valid JSON yet (an edit in progress)."""
+    try:
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    except ValueError:
+        pass
+    flow = {}
+    for key in ("imports", "variables"):
+        m = re.search(r'"%s"\s*:\s*(\{)' % key, text)
+        if not m:
+            continue
+        start = m.start(1)
+        depth = 0
+        in_string = False
+        for i in range(start, len(text)):
+            c = text[i]
+            if in_string:
+                if c == "\\":
+                    continue
+                if c == '"':
+                    in_string = False
+            elif c == '"':
+                in_string = True
+            elif c == "{":
+                depth += 1
+            elif c == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        flow[key] = json.loads(text[start:i + 1])
+                    except ValueError:
+                        pass
+                    break
+    return flow
+
+
+def main_catalog():
+    path = sys.argv[2]
+    try:
+        payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig", errors="replace") or "{}")
+    except ValueError as exc:
+        return {"ok": False, "error": f"Bad request: {exc}"}
+    try:
+        return catalog_of_flow(path, str(payload.get("text") or ""))
+    except ImportError as exc:
+        return {"ok": False, "missing": True, "error": f"This interpreter has no Robot Framework ({exc})."}
+    except Exception as exc:  # noqa: BLE001 -- an answer, not a traceback
+        return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
+
 def main_define():
     path = sys.argv[2]
     try:
@@ -1279,6 +1379,8 @@ def main():
         return main_edit()
     if len(sys.argv) > 2 and sys.argv[1] == "--define":
         return main_define()
+    if len(sys.argv) > 2 and sys.argv[1] == "--catalog":
+        return main_catalog()
     path = sys.argv[1]
     text = sys.stdin.buffer.read().decode("utf-8-sig", errors="replace")
     try:

@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 from robot.errors import DataError
 from robot.result import Keyword as KeywordResult
-from robot.utils import in_worker_thread, prepr, safe_str, WINDOWS
+from robot.utils import prepr, safe_str
 from robot.variables import contains_variable, is_list_variable, VariableAssignment
 
 from .bodyrunner import BodyRunner
@@ -111,12 +111,10 @@ class LibraryKeywordRunner:
         return f"Arguments: [ {' | '.join(args)} ]"
 
     def _get_timeout(self, context):
+        # cuongnht add thread: a THREAD worker has timeouts of its own (the
+        # context's per-thread frame) and runs them with a timer, so they
+        # work on every platform (see running.timeouts.Runner.for_platform).
         if not context.timeouts:
-            return None
-        # cuongnht add thread: the POSIX timeout implementation relies on
-        # signals, which only work in the main thread. Keywords executed by
-        # THREAD workers run without timeouts there.
-        if not WINDOWS and in_worker_thread():
             return None
         return min(context.timeouts)
 

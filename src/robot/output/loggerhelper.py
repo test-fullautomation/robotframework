@@ -70,12 +70,15 @@ class AbstractLogger:
         self.write(msg, "SKIP", html)
 
     def unknown(self, msg):
-        # nhtcuong
+        # nhtcuong: the note logged when a keyword fails without a verdict. It
+        # stays in the log: on the console it would show a failure that `Run
+        # Keyword And Ignore Error` or TRY has handled, and the test's own
+        # message is printed by the console reporter anyway.
         html = False
         if msg.startswith("*HTML*"):
             html = True
             msg = msg[6:].lstrip()
-        self.write(msg, "UNKNOWN", html)
+        self.message(Message(msg, "UNKNOWN", html, console=False))
 
     def error(self, msg):
         self.write(msg, "ERROR")
@@ -130,7 +133,9 @@ class Message(BaseMessage):
         level = level.upper()
         if console is None:
             # cuongnht - add unknown state: UNKNOWN messages go to the console
-            # like errors do.
+            # like errors do (an import error, say). The note logged when a
+            # keyword fails that way passes console=False: see
+            # `_ExecutionContext.unknown`.
             console = level in ("WARN", "ERROR", "UNKNOWN")
         if level == "HTML":
             return "INFO", True, console

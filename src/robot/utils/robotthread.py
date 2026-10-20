@@ -21,9 +21,28 @@ called from any thread, so the execution thread is registered when the
 suite starts and everything else compares against it.
 """
 
+import itertools
 import threading
 
 _execution_thread = None
+_keys = itertools.count(1)
+
+
+def next_thread_key(name):
+    """A key for a THREAD about to start: its name and a number unique in the process.
+
+    Names are not unique (a THREAD in a loop, the same name in two tests),
+    so everything kept per thread is keyed by this instead; the name stays
+    what the user sees.
+    """
+    return f"{name}#{next(_keys)}"
+
+
+def thread_key(thread=None):
+    """The key of a thread (the current one by default): a THREAD worker's
+    key, or the name for any other thread (the execution thread included)."""
+    thread = thread or threading.current_thread()
+    return getattr(thread, "robot_key", None) or thread.name
 
 
 def set_execution_thread(thread=None):

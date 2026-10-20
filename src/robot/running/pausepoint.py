@@ -32,6 +32,11 @@ import weakref
 
 hook = None     # callable(context, step) or None
 
+# Called by the WHILE runner when an iteration starts, with the iteration's
+# data (its ``parent`` is the WHILE). The flow runner counts the iterations
+# of its checkpointed loops here, so no keyword call is needed for that.
+iteration_hook = None     # callable(context, iteration) or None
+
 _listeners = weakref.WeakSet()
 _lock = threading.Lock()
 

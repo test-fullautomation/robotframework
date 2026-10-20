@@ -37,9 +37,13 @@ class Watchdog:
 
     When the watchdog fires it runs the configured ``on_timeout`` keyword
     (e.g. one that collects diagnostics or requests some component to stop)
-    and records the reason. Because keyword failures inside a ``THREAD`` do
-    not fail the test, the main test flow must check the outcome itself with
-    `Watchdog Should Not Have Fired`, typically in the test teardown.
+    and records the reason; the supervision ends there (state ``FIRED``),
+    and `Run Watchdog` again starts it afresh. An ``on_timeout`` that only
+    holds the flow, such as ``Flow Pause``, therefore leaves the rest of the
+    run unsupervised unless the watchdog is run again after the resume.
+    Because keyword failures inside a ``THREAD`` do not fail the test, the
+    main test flow must check the outcome itself with `Watchdog Should Not
+    Have Fired`, typically in the test teardown.
 
     This library is independent of what it supervises: the only contract is
     that the supervised code feeds the watchdog and that the ``on_timeout``
@@ -297,8 +301,11 @@ class _Watchdog:
             return seconds
 
     def feed(self):
-        self.last_feed = time.monotonic()
-        self.feeds += 1
+        with self._lock:
+            # While paused the clocks stand still: a feed now is a feed at the
+            # moment of the pause, so the resume shifts it like the others.
+            self.last_feed = self.paused_at if self.paused_at is not None else time.monotonic()
+            self.feeds += 1
 
     def check(self, now):
         """Returns the reason to fire, or None."""

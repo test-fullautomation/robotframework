@@ -5,18 +5,26 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeFlow } from './backend/control';
 import { PROJECT_FILE, Project, RunGroup, readProject } from './backend/project';
+import { registerCompletion } from './completion';
 import { registerDebugger } from './debug';
 import { registerDefinitions } from './definitions';
 import { diagramUnavailable, probeRobot } from './backend/robot';
+import { addFlowToGroup } from './groupActions';
 import { GroupPanel } from './groupPanel';
+import { RunRecord } from './backend/history';
 import { RunManager, RunState, fileKey, groupKey } from './runs';
-import { forgetInterpreters, robotEnvFor } from './settings';
+import { RunPage } from './runPage';
+import { registerRunsView } from './runsView';
+import { forgetInterpreters, projectFor, robotEnvFor } from './settings';
 import { VIEWS, ViewEditorProvider, forgetRobots } from './viewEditor';
 
 /** What activate() returns: read-only, for tests and diagnostics. */
 export interface RobotFlowApi {
   /** The last read of an open Grid / Diagram of `file`: { ok, error?, drawn }, or null. */
   report(viewType: string, file: string): { ok: boolean; error?: string; drawn: boolean } | null;
+  /** A change as the view sends it ({ op: 'update' | 'undo' | ... }), applied to the open view of `file`;
+   *  the answer carries `undo`, how many of the view's edits can be undone. */
+  edit(viewType: string, file: string, change: { op?: string }): Promise<{ ok: boolean; error?: string; undo?: number }>;
   /** The last read of an open group Diagram. */
   groupReport(projectFile: string, groupId: string): GroupPanel['report'];
   /** The state of the last run of a file, or of a group ('<testproject.json>#<id>'). */
@@ -27,6 +35,14 @@ export interface RobotFlowApi {
   control(file: string, command: 'pause' | 'resume' | 'stop'): Promise<boolean>;
   openGroup(projectFile: string, groupId: string): boolean;
   runGroup(projectFile: string, groupId: string): Promise<RunState | null>;
+  /** What the Runs view lists: the runs of every results root, as read from disk. */
+  history(): RunRecord[];
+  /** Open the Run page of a run folder (as a click in the Runs view does); false when there is no such run. */
+  openRun(dir: string): boolean;
+  /** The flow report of a run folder, written now when the run has none; null when it cannot be. */
+  flowReport(dir: string): Promise<string | null>;
+  /** The open Run page of a folder: its last data and what its report frames show; null when none is open. */
+  runPage(dir: string): { data: RunPage['data']; reportShown: RunPage['reportShown']; errors: string[] } | null;
 }
 
 /** The file of the active editor: a text editor or one of our custom editors. */
@@ -68,7 +84,9 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
   const log = vscode.window.createOutputChannel('Robot Flow');
   const runs = new RunManager(context);
   registerDefinitions(context);
+  registerCompletion(context);
   registerDebugger(context, runs);
+  const history = registerRunsView(context, runs);
   const providers = Object.values(VIEWS).map((kind) => {
     const provider = new ViewEditorProvider(kind, context, log, runs);
     context.subscriptions.push(vscode.window.registerCustomEditorProvider(kind.viewType, provider, {
@@ -155,6 +173,14 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
       const state = runOf(uri);
       return flowCommand(uri, state && describeFlow(state.flow)?.paused ? 'resume' : 'pause');
     }),
+    vscode.commands.registerCommand('robotFlow.setVariables', (uri?: vscode.Uri) => {
+      const state = runOf(uri);
+      return state ? runs.setVariables(state.key) : vscode.window.showInformationMessage('No flow of the active file is running.');
+    }),
+    vscode.commands.registerCommand('robotFlow.snapshot', (uri?: vscode.Uri) => {
+      const state = runOf(uri);
+      return state ? runs.snapshot(state.key) : vscode.window.showInformationMessage('No flow of the active file is running.');
+    }),
     vscode.commands.registerCommand('robotFlow.continue', async (uri?: vscode.Uri) => {
       const target = uri instanceof vscode.Uri ? uri : activeFile();
       if (!target) return null;
@@ -171,6 +197,26 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
     vscode.commands.registerCommand('robotFlow.openGroup', async () => {
       const picked = await pickGroup();
       if (picked) GroupPanel.show(context, runs, picked.project, picked.group);
+    }),
+    vscode.commands.registerCommand('robotFlow.addToGroup', async (uri?: vscode.Uri) => {
+      const target = uri instanceof vscode.Uri ? uri : activeFile();
+      if (!target || !/\.flow\.json$/i.test(target.fsPath)) {
+        void vscode.window.showInformationMessage('Open a .flow.json file to add it to a run group.');
+        return;
+      }
+      const project = projectFor(target);
+      if (!project) {
+        void vscode.window.showInformationMessage(`No ${PROJECT_FILE} above ${path.basename(target.fsPath)}: run groups live in a test project.`);
+        return;
+      }
+      try {
+        const added = await addFlowToGroup(project, target.fsPath);
+        if (!added) return;
+        const group = added.project.groups.find((g) => g.id === added.groupId);
+        if (group) GroupPanel.show(context, runs, added.project, group);
+      } catch (e) {
+        void vscode.window.showErrorMessage((e as Error).message);
+      }
     }),
     vscode.commands.registerCommand('robotFlow.showRobot', async () => {
       const uri = activeFile() ?? vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -214,6 +260,7 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
   };
   return {
     report: (viewType, file) => byType.get(viewType)?.reportFor(file) ?? null,
+    edit: (viewType, file, change) => byType.get(viewType)?.editIn(file, change) ?? Promise.resolve({ ok: false, error: 'No such view.' }),
     groupReport: (projectFile, id) => {
       const found = findGroup(projectFile, id);
       return found ? GroupPanel.reportFor(found.project, found.group) : null;
@@ -233,6 +280,16 @@ export function activate(context: vscode.ExtensionContext): RobotFlowApi {
     runGroup: async (projectFile, id) => {
       const found = findGroup(projectFile, id);
       return found ? runs.runGroup(found.project, found.group) : null;
+    },
+    history: () => history.list(),
+    openRun: (dir) => !!RunPage.show(context, history, runs, dir),
+    runPage: (dir) => {
+      const page = RunPage.get(dir);
+      return page ? { data: page.data, reportShown: page.reportShown, errors: page.errors } : null;
+    },
+    flowReport: async (dir) => {
+      const found = history.lookup(dir);
+      return found ? history.flowReportOf(found.run) : null;
     },
   };
 }

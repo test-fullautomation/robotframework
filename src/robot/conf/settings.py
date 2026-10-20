@@ -532,6 +532,7 @@ class RobotSettings(_BaseSettings):
         "MaxErrorLines"      : ("maxerrorlines", 40),
         "MaxAssignLength"    : ("maxassignlength", 200),
         "DryRun"             : ("dryrun", False),
+        "PruneResults"       : ("pruneresults", False),  # cuongnht flat memory
         "ExitOnFailure"      : ("exitonfailure", False),
         "ExitOnError"        : ("exitonerror", False),
         "Skip"               : ("skip", []),
@@ -671,6 +672,11 @@ class RobotSettings(_BaseSettings):
     @property
     def dry_run(self):
         return self["DryRun"]
+
+    @property
+    def prune_results(self):
+        # cuongnht flat memory
+        return self["PruneResults"]
 
     @property
     def exit_on_failure(self):

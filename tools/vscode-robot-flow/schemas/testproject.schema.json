@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RobotFramework AIO test project (testproject.json)",
+  "description": "A Manager GUI test project: how its files are run, and the run groups of flows that run together.",
+  "type": "object",
+  "properties": {
+    "schema": { "type": "integer", "description": "Version of this file's format." },
+    "runner": { "type": "string" },
+    "name": { "type": "string", "description": "Name of the project; the folder name otherwise." },
+    "layout": {
+      "type": "object",
+      "description": "Folders of the project, relative to this file.",
+      "properties": {
+        "suites": { "type": "string" },
+        "resources": { "type": "string" },
+        "proto": { "type": "string" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "description": "How files of this project are run (the extension and the Manager GUI alike).",
+      "properties": {
+        "python": { "type": "string", "description": "Interpreter; empty: the extension's robotFlow.python." },
+        "pythonpath": { "type": "array", "items": { "type": "string" }, "description": "Entries for PYTHONPATH, relative to this file." },
+        "args": { "type": "array", "items": { "type": "string" }, "description": "More Robot Framework options for every run." },
+        "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Environment of every run." }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "description": "Run groups: flows started together on one shared signal store, each as a rig named after its member id.",
+      "items": {
+        "type": "object",
+        "required": ["id", "members"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$", "description": "Id of the group." },
+          "title": { "type": "string", "description": "Shown in the editor; the id otherwise." },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "target"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$", "description": "The member's rig name (FLOW_RIG) and its name in the group's Diagram." },
+                "target": { "type": "string", "pattern": "\\.flow\\.json$", "description": "The flow file, relative to this file, with '/'." },
+                "variables": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean"] }, "description": "Passed as --variable to this member." }
+              }
+            }
+          },
+          "env": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Environment of every member; ${RUN_DIR} is the group run's folder." }
+        }
+      }
+    }
+  }
+}

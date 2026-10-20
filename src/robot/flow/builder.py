@@ -20,7 +20,8 @@ Mapping:
 - setup phase     -> suite setup calling the generated user keyword ``Flow Setup``
 - test phase      -> one test case
 - teardown phase  -> suite teardown calling ``Flow Teardown``
-- keyword         -> keyword call
+- keyword         -> keyword call; with a ``retry`` policy or a ``timeout``
+                     wrapped in ``Flow Retry`` from ``robot.flow.keywords``
 - gate            -> ``Flow Gate`` from ``robot.flow.keywords``
 - sleep           -> ``Sleep``
 - decision        -> ``IF`` / ``ELSE``
@@ -29,13 +30,19 @@ Mapping:
 - checkpoint      -> ``Flow Phase`` first in every test, and for the loops
                      directly in a test phase ``Flow Loop`` before the
                      ``WHILE`` (it returns the bounds, or what an earlier
-                     run left of them) and ``Flow Iteration`` first in its
-                     body; not emitted with ``"checkpoint": false``
+                     run left of them); the iterations themselves are
+                     counted by the WHILE runner's iteration hook, nothing
+                     is emitted for them; not emitted with ``"checkpoint": false``
 - on_failure      -> ``TRY`` / ``EXCEPT AS ${flow_error}``; ``abort`` re-raises
                      with ``Fail`` after the recovery ran
 - flow (sub-flow) -> a call of the generated user keyword ``Flow: <sub-flow name>``;
                      each sub-flow file becomes one keyword, its variables its
                      parameters, its imports added to the suite
+- parallel        -> ``Flow Parallel Start`` (names the branches' threads), one
+                     ``THREAD`` block per branch running ``Flow Branch`` on the
+                     generated user keyword ``Flow Branch: <region>/<branch>``
+                     that holds the branch's steps, then ``Flow Join``; with
+                     ``on_failure`` the whole region is in a ``TRY``
 """
 
 import os
@@ -46,21 +53,27 @@ from robot.model import BodyItem
 from robot.running import TestSuite
 from robot.utils import timestr_to_secs
 
-from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
-                    structure)
+from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, Parallel, SleepStep,
+                    Try, structure)
 from .schema import ABORT, PHASE, FlowError, is_variable, load_flow
 
 
 FLOW_LIBRARY = 'robot.flow.keywords'
 GATE_KEYWORD = 'Flow Gate'
+RETRY_KEYWORD = 'Flow Retry'
 SETUP_KEYWORD = 'Flow Setup'
 TEARDOWN_KEYWORD = 'Flow Teardown'
 ERROR_VARIABLE = '${flow_error}'
 DEADLINE_VARIABLE = '${flow_deadline_%s}'
 LIMIT_VARIABLE = '${flow_limit_%s}'
+THREAD_VARIABLE = '${flow_thread_%s}'
 PHASE_KEYWORD = 'Flow Phase'
 LOOP_KEYWORD = 'Flow Loop'
-ITERATION_KEYWORD = 'Flow Iteration'
+LOOP_END_KEYWORD = 'Flow Loop End'
+PARALLEL_KEYWORD = 'Flow Parallel Start'
+BRANCH_KEYWORD = 'Flow Branch'
+JOIN_KEYWORD = 'Flow Join'
+BRANCH_USER_KEYWORD = 'Flow Branch: %s/%s'
 # The flow clock stands still while the flow is paused, so a hold does not
 # use up a loop's time.
 CLOCK = 'robot.flow.control.clock()'
@@ -74,8 +87,8 @@ def build_suite(flow, source=None, origins=None):
     key, role)`` for every item built from a node: the key is the node id
     (``<sub-flow name>::<id>`` inside a sub-flow) and the role says what the
     item is for the node (``node`` for the item that is the node, else
-    ``phase``, ``loop-start``, ``iteration``, ``every``, ``deadline``,
-    ``guard`` or ``abort``). The flow report maps a run back to the plan
+    ``phase``, ``loop-start``, ``every``, ``deadline``, ``guard`` or
+    ``abort``). The flow report maps a run back to the plan
     with it.
     """
     data = flow.data
@@ -123,17 +136,25 @@ class _Emitter:
 
     def __init__(self, resource=None, source=None, origins=None):
         self._deadlines = {}     # loop node id -> deadline variable name
+        self._threads = {}       # 'region_branch' -> thread variable name
         self._resource = resource
         self.origins = origins   # id(item) -> (node key, role), or None
         # Sub-flow files resolve relative to the file that calls them.
         self._dirs = [Path(source).resolve().parent if source else Path.cwd()]
         self._calling = []       # sub-flow files being built, to reject cycles
         self._subflows = {}      # resolved sub-flow path -> (keyword name, parameters)
+        self._with_region = set()  # sub-flow paths whose keyword holds a parallel region
+        self._branch_depth = 0   # > 0 while the steps of a branch are emitted
 
     def origin(self, item, step, role='node'):
         """Record that ``item`` was built for ``step`` (a step or a phase)."""
         if self.origins is None:
             return item
+        self.origins[id(item)] = (self._key(step), role)
+        return item
+
+    def _key(self, step):
+        """The node key of ``step``: its id, prefixed inside a sub-flow."""
         key = step.id if getattr(step, 'id', None) else f'phase:{step.name}'
         if self._calling:
             # Inside a sub-flow the ids are the sub-flow file's own; its
@@ -141,8 +162,7 @@ class _Emitter:
             name = self._subflows.get(self._calling[-1], ('',))[0]
             name = name[len(SUBFLOW_KEYWORD % ''):] if name.startswith(SUBFLOW_KEYWORD % '') else name
             key = f'{name}::{key}'
-        self.origins[id(item)] = (key, role)
-        return item
+        return key
 
     def user_keyword(self, resource, name, steps):
         keyword = resource.keywords.create(name=name)
@@ -177,19 +197,34 @@ class _Emitter:
         args += ['\\' + name for name in names]
         start = body.create_keyword(name=LOOP_KEYWORD, args=args, assign=[limit, deadline])
         self.origin(start, step, 'loop-start')
-        while_ = body.create_while(condition=f'{CLOCK} < ${deadline[2:-1]}',
-                                   limit=limit, on_limit='pass')
+        # Only a loop with a time bound reads the clock each round. The others
+        # test the deadline marker: `Flow Loop` returns -1 for a loop that ran
+        # to its end in an earlier run, and no iteration may run then.
+        condition = (f'{CLOCK} < ${deadline[2:-1]}' if step.max_seconds
+                     else f'${deadline[2:-1]} != -1')
+        while_ = body.create_while(condition=condition, limit=limit, on_limit='pass')
         self.origin(while_, step)
-        mark = while_.body.create_keyword(name=ITERATION_KEYWORD, args=[_literal(step.id)])
-        self.origin(mark, step, 'iteration')
         self._guarded(while_.body, step, 'guard')
         if step.every:
             self.origin(while_.body.create_keyword(name='Sleep', args=[step.every]),
                         step, 'every')
+        # The loop ran to its end: recorded at once (see FlowRun.loop_ended).
+        end = body.create_keyword(name=LOOP_END_KEYWORD, args=[_literal(step.id)])
+        self.origin(end, step, 'loop-end')
 
     def _keyword(self, body, step):
-        self.origin(body.create_keyword(name=step.keyword, args=step.args,
-                                        assign=step.assign), step)
+        if step.retry is None and step.timeout is None:
+            self.origin(body.create_keyword(name=step.keyword, args=step.args,
+                                            assign=step.assign), step)
+            return
+        # Under a policy the node is one 'Flow Retry' call; its attempts show
+        # as the call's children in the log, like a gate's.
+        policy = step.retry or {'max_attempts': 1, 'interval': '0s', 'backoff': 1,
+                                'on_exhausted': 'fail'}
+        args = [str(policy['max_attempts']), policy['interval'], str(policy['backoff']),
+                policy['on_exhausted'], step.timeout or 'NONE', step.keyword, *step.args]
+        self.origin(body.create_keyword(name=RETRY_KEYWORD, args=args, assign=step.assign),
+                    step)
 
     def _gate(self, body, step):
         args = [step.timeout, step.interval, step.on_timeout, step.keyword, *step.args]
@@ -201,6 +236,10 @@ class _Emitter:
 
     def _flow(self, body, step):
         name, parameters = self._subflow(step)
+        if self._branch_depth and self._path(step) in self._with_region:
+            raise FlowError(f"Sub-flow '{step.file}' holds a parallel region and cannot "
+                            f"be called from a branch of one; nested regions are not "
+                            f"supported.", step.id)
         unknown = [arg for arg in step.args if arg not in parameters]
         if unknown:
             known = ', '.join(parameters) or 'none'
@@ -209,9 +248,12 @@ class _Emitter:
         args = [f'{arg}={value}' for arg, value in step.args.items()]
         self.origin(body.create_keyword(name=name, args=args), step)
 
+    def _path(self, step):
+        return (self._dirs[-1] / step.file).resolve()
+
     def _subflow(self, step):
         """The keyword built from ``step.file``, building it on first use."""
-        path = (self._dirs[-1] / step.file).resolve()
+        path = self._path(step)
         if path in self._calling:
             chain = ' -> '.join(p.name for p in self._calling + [path])
             raise FlowError(f'Sub-flows call each other in a cycle: {chain}.', step.id)
@@ -320,30 +362,66 @@ class _Emitter:
         a nested loop reusing its parent's variable would move the parent's
         deadline, so collisions get a numeric suffix.
         """
-        base = re.sub(r'\W', '_', step.id) or 'loop'
-        name, number = base, 1
-        while name in self._deadlines.values():
-            number += 1
-            name = f'{base}_{number}'
-        self._deadlines[step.id] = name
-        return name
+        return _unique_name(step.id, 'loop', self._deadlines)
 
     def _try(self, body, step):
         self._guarded(body, step, 'node')
 
-    def _guarded(self, body, step, role):
+    def _guarded(self, body, step, role, main=None):
+        """``step``'s body, inside a TRY when it has a recovery.
+
+        ``main`` emits the body into a given body; by default the step's
+        own steps.
+        """
+        main = main or (lambda into: self.emit(into, step.body))
         if step.recovery is None:
-            self.emit(body, step.body)
+            main(body)
             return
         try_ = self.origin(body.create_try(), step, role)
-        main = try_.body.create_branch(BodyItem.TRY)
-        self.emit(main.body, step.body)
+        main(try_.body.create_branch(BodyItem.TRY).body)
         # RF 7 renamed the EXCEPT branch's `variable` to `assign`.
         recovery = try_.body.create_branch(BodyItem.EXCEPT, assign=ERROR_VARIABLE)
         self.emit(recovery.body, step.recovery)
         if step.then == ABORT:
             self.origin(recovery.body.create_keyword(name='Fail', args=[ERROR_VARIABLE]),
                         step, 'abort')
+
+    def _parallel(self, body, step):
+        if self._branch_depth:
+            raise FlowError('A parallel region cannot be inside a branch of another; '
+                            'nested regions are not supported.', step.id)
+        for path in self._calling:
+            self._with_region.add(path)
+        self._guarded(body, step, 'guard', main=lambda into: self._region(into, step))
+
+    def _region(self, body, step):
+        """The region: the start keyword naming the threads, a THREAD per
+        branch running the user keyword that holds its steps, the join."""
+        names = [THREAD_VARIABLE % _unique_name(f'{step.id}_{branch.id}', 'branch',
+                                                self._threads)
+                 for branch in step.branches]
+        args = [_literal(step.id), step.timeout or 'NONE',
+                'True' if step.stop_others else 'False',
+                *[_literal(branch.id) for branch in step.branches]]
+        start = body.create_keyword(name=PARALLEL_KEYWORD, args=args, assign=names)
+        self.origin(start, step, 'start')
+        for branch, name in zip(step.branches, names):
+            keyword_name = BRANCH_USER_KEYWORD % (self._key(step), branch.id)
+            keyword = self._resource.keywords.create(name=keyword_name)
+            keyword.doc = f"Branch '{branch.id}' of the parallel region '{step.id}'."
+            self._branch_depth += 1
+            try:
+                self.emit(keyword.body, branch.steps)
+            finally:
+                self._branch_depth -= 1
+            # Test scope: a branch still running when the test ends is stopped.
+            thread = body.create_thread(name=name, daemon=True)
+            self.origin(thread, step, f'branch:{branch.id}')
+            self.origin(thread.body.create_keyword(name=BRANCH_KEYWORD,
+                                                   args=[name, keyword_name]),
+                        step, 'branch-run')
+        join = body.create_keyword(name=JOIN_KEYWORD, args=[_literal(step.id)])
+        self.origin(join, step)
 
     _emitters = {
         KeywordStep: _keyword,
@@ -353,7 +431,20 @@ class _Emitter:
         Decision: _decision,
         Loop: _loop,
         Try: _try,
+        Parallel: _parallel,
     }
+
+
+def _unique_name(text, fallback, taken):
+    """``text`` as a variable name part, unique among the values of ``taken``
+    (a dict the name is recorded in under ``text``)."""
+    base = re.sub(r'\W', '_', text) or fallback
+    name, number = base, 1
+    while name in taken.values():
+        number += 1
+        name = f'{base}_{number}'
+    taken[text] = name
+    return name
 
 
 def _literal(text):
@@ -362,7 +453,11 @@ def _literal(text):
 
 
 def _assigned(steps):
-    """The variables the steps assign, in order, for the checkpoint."""
+    """The variables the steps assign, in order, for the checkpoint.
+
+    What a branch of a parallel region assigns stays in the branch's thread
+    and is not collected.
+    """
     names = []
 
     def collect(items):

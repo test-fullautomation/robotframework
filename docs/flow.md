@@ -204,13 +204,14 @@ from the module search path.
 |------|------------|-----------|---------|
 | `start` / `end` | — | 1 / 0 | Exactly one start; at least one end. |
 | `phase` | `role`: setup, test, teardown; `name` for tests | 1 | Setup → suite setup, each test phase → one test case, teardown → suite teardown. Without phases the whole flow is one test named after the flow. |
-| `keyword` | `keyword`, `args`, `assign` | 1 | Call a keyword; `${var}` substitution applies. `assign` (`"${VERSION}"`) stores the return value for a later decision. |
+| `keyword` | `keyword`, `args`, `assign`, optional `retry`, `timeout` | 1 | Call a keyword; `${var}` substitution applies. `assign` (`"${VERSION}"`) stores the return value for a later decision. `retry` runs it again when it fails, `timeout` limits each attempt (see [Retry and timeout per step](#retry-and-timeout-per-step)). |
 | `gate` | `keyword`, `args`, `timeout`, `interval` (2s), `on_timeout`: unknown (default) or fail | 1 | Poll the keyword until it passes. On timeout the message carries the last error and the elapsed time. |
 | `sleep` | `duration` | 1 | `Sleep`. |
 | `decision` | `condition` (`$var` syntax) | `yes`, `no` | Branch; both branches must re-join at one node. |
 | `loop` | `max_loops` and/or `max_seconds`, `every` | `body`, `done`, optional `on_failure` | Bounded repetition. The body ends with an edge labelled `next` back to the loop. A bound may be a `${variable}` (see below). |
 | `try` | — | `body`, `on_failure`, `done` | Failure routing without a loop. |
 | `flow` | `file`, `args` (an object: parameter → value) | 1 | Call another flow file — a sub-flow — as one step. |
+| `parallel` | `timeout`, `stop_others` (true) | `branch` (two or more), `done`, optional `on_failure` | Run the branches at the same time and join them before going on. Each branch ends with an edge labelled `join` back to the node (see [Parallel regions](#parallel-regions)). |
 
 A recovery region ends with `continue` back to its loop or try node, or with
 `abort` to the node after it (or an end node); `abort` re-raises the failure
@@ -241,9 +242,105 @@ plan calls it as one box:
 
 `python -m robot.flow validate` checks every sub-flow file it reaches.
 
+### Retry and timeout per step
+
+A gate waits for the bench; a `keyword` node that *acts* on it sometimes needs
+a second chance too -- a reading that is noise once in a while, a command the
+device drops under load. The policy is declared on the node, not coded into
+the keyword:
+
+```json
+{ "id": "read", "kind": "keyword", "keyword": "Read Sensor", "args": ["ch1"], "assign": "${LEVEL}",
+  "retry": { "max_attempts": 5, "interval": "2s", "backoff": 2, "on_exhausted": "unknown" },
+  "timeout": "30s" }
+```
+
+| attribute | meaning |
+|-----------|---------|
+| `retry.max_attempts` | How many times the keyword may run (a number alone, `"retry": 3`, is this). |
+| `retry.interval` | The wait before the next attempt; default `1s`. Paused time does not count. |
+| `retry.backoff` | The factor the wait grows by after each attempt; default 1. With `2s` and `2`: 2 s, 4 s, 8 s ... |
+| `retry.on_exhausted` | The verdict when the last attempt fails too: `fail` (default, the keyword's own failure) or `unknown` (the bench did not cooperate; nothing was tested). |
+| `timeout` | A keyword timeout on each attempt: an attempt that exceeds it is interrupted and counts as failed -- retried under a `retry` policy, otherwise the step fails. |
+
+In the log the node is one `Flow Retry` step whose children are the attempts,
+with a message per failed attempt saying when the next one comes and why
+this one failed;
+the flow report shows the number of attempts on the box, like a gate's. The
+step's error names the attempts and carries the last error
+(`'Read Sensor' failed after 5 attempts. Last error: ...`). With one attempt
+the keyword's own failure is kept as it is; a timed-out step fails with
+`'Read Sensor' timed out after 30 seconds`, an ordinary failure the node's
+`on_failure` recovery can route. A skip, a test timeout, a syntax error or an
+exit-on-failure is never retried. `max_attempts`, `interval` and `timeout` may
+be `${variables}`, sized per run like loop bounds.
+
+### Parallel regions
+
+"Ramp the chamber while the PSU sweeps, then measure": two things happen at
+the same time, and the plan goes on when both are done. A `parallel` node
+draws that as one box with a branch per thing:
+
+```json
+{ "id": "ramp", "kind": "parallel", "label": "Ramp and sweep", "timeout": "10 min" },
+{ "id": "chamber", "kind": "keyword", "keyword": "Set Chamber", "args": [-40] },
+{ "id": "cold",    "kind": "gate",    "keyword": "Chamber At",  "args": [-40], "timeout": "5 min" },
+{ "id": "psu",     "kind": "keyword", "keyword": "Sweep PSU",   "args": [8, 16, 0.5] },
+{ "id": "measure", "kind": "keyword", "keyword": "Measure" }
+```
+
+```json
+{ "from": "ramp", "to": "chamber", "label": "branch" }, ["chamber", "cold"], { "from": "cold", "to": "ramp", "label": "join" },
+{ "from": "ramp", "to": "psu",     "label": "branch" },                      { "from": "psu",  "to": "ramp", "label": "join" },
+{ "from": "ramp", "to": "measure", "label": "done" }
+```
+
+- **Edges.** `branch` is the one label a node may carry several times: one
+  per branch, to its first node. A branch is an ordinary sequence --
+  keywords, gates, sleeps, decisions, loops, try regions, sub-flows -- and
+  its last node returns to the parallel node with `join`. `done` leaves the
+  region (or `next` / `continue` / `abort` when the region is the last node
+  of an enclosing body), and `on_failure` is a recovery region as for a loop
+  or try. A node belongs to one branch, a branch holds no phase, and a
+  region cannot be inside a branch of another (nor inside a sub-flow called
+  from one): the validator says so, naming the node.
+- **`timeout`** bounds the whole region on the flow clock: every branch must
+  have joined by then. **`stop_others`** (default `true`) stops the other
+  branches at their next step when one fails; `false` lets them run to their
+  end and reports everything.
+- **Each branch runs on a copy of the variables** as they were when the
+  region started, like a `THREAD` body: an `assign` inside a branch is the
+  branch's own. Data the plan needs after the join goes through
+  [signals](#two-flows) (`Set Signal` in the branch, `Get Signal` after) --
+  the same mechanism two flows use, now inside one process.
+- **A region is one step of its enclosing body**, not a restart unit: inside
+  a checkpointed loop the iteration is the unit, so an interrupted region runs
+  again as a whole with its iteration.
+- Node policies apply inside branches (`retry`, `timeout`, gates), with the
+  `THREAD` caveat that on Linux and macOS keyword timeouts do not work in
+  worker threads.
+
+What runs: `Flow Parallel Start` names the branches' threads
+(`flow.<region>.<branch>`, numbered from the region's second run on, so a
+region in a loop keeps every iteration's logs), a `THREAD` block per branch
+runs `Flow Branch` on a generated user keyword holding the branch's steps,
+and `Flow Join` waits for them in slices on the flow clock. In `log.html`
+each branch is one thread block, and the timeline shows them side by side.
+
+| What happened in the region | The join |
+|---|---|
+| every branch passed | PASS, `Region 'ramp': 2 branches joined after 3 minutes 10 seconds.` in the log |
+| a branch failed | FAIL with the branch's error: `Branch 'psu' of 'ramp' failed: PSU current 3.2 A, expected < 3 A.`; the others are stopped at their next step (`stop_others`), the log says which |
+| a gate timed out inside a branch | that branch is UNKNOWN, and so is the join: `Branch 'chamber' of 'ramp' is unknown: Gate ...` -- the worst status wins, UNKNOWN over FAIL, one line per branch |
+| the region's `timeout` passed | FAIL naming the branches still running, which are stopped; a branch that does not reach a step boundary within 10 seconds is abandoned and the message says so |
+| the flow is paused | the join and the branches wait at their next step; the region's timeout does not advance |
+| the flow is stopped | the branches are stopped first, then the flow ends as usual. A stop asked for while the region runs, from outside or by a branch's own step, is raised by the join once the branches have stopped, so the region is always joined and the node after it is NOT RUN |
+| `on_failure` | the recovery sees the join's failure, like a `try` node's; `continue` goes on with `done`, `abort` re-raises after the recovery |
+
 ### Bounds from variables
 
-`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval` and a
+`max_loops`, `max_seconds`, `every`, a gate's `timeout` and `interval`, a
+keyword's `timeout` and `retry` values, a parallel region's `timeout`, and a
 sleep's `duration` may be a single `${variable}` instead of a value. The
 default comes from the file's `variables`; a run overrides it on the command
 line, so the same plan runs as a one-hour smoke test and as the 48-hour
@@ -269,10 +366,11 @@ values.
 
 The validator rejects, naming the node, anything that is not a structured
 workflow: a second way out of an action node, decision branches that do not
-re-join, a loop body that does not return with `next`, an edge into a loop
-body from outside, an unbounded loop, an unreachable node. These are exactly
-the conditions under which the graph compiles losslessly to `IF`, `WHILE` and
-`TRY`.
+re-join, a loop body that does not return with `next`, a branch of a parallel
+region that does not return with `join`, an edge into a loop body from
+outside, an unbounded loop, a region inside a branch of another, an
+unreachable node. These are exactly the conditions under which the graph
+compiles losslessly to `IF`, `WHILE`, `TRY` and `THREAD`.
 
 ## What runs
 
@@ -298,10 +396,17 @@ Cycle
 | setup / teardown phase | generated user keywords `Flow Setup` / `Flow Teardown` as suite setup and teardown — they may hold loops and branches |
 | test phase | a test case |
 | `gate` | `Flow Gate` from `robot.flow.keywords`, built on retrying the keyword |
+| `keyword` with `retry` or `timeout` | `Flow Retry` from `robot.flow.keywords`: the attempts are its children, each under Robot's keyword timeout when the node has one; a node without a policy is the plain keyword call |
 | `decision` | `IF` / `ELSE` |
 | `loop` | `WHILE` with `limit=max_loops on_limit=pass`; `max_seconds` is a deadline on the flow clock in the condition, so reaching either bound ends the loop with **PASS** |
-| checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds) and `Flow Iteration` first in its body. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
+| checkpoint | `Flow Phase` first in every test; for a loop directly in a test phase `Flow Loop` before the `WHILE` (it returns the bounds). The iterations are counted by the runner itself as each one starts, without a keyword in the log. See [Pause, resume, stop and restart](#pause-resume-stop-and-restart). |
 | `on_failure` | `TRY` / `EXCEPT AS ${flow_error}`; `abort` adds `Fail ${flow_error}` after the recovery |
+| `parallel` | `Flow Parallel Start` (returns the threads' names), one `THREAD` block per branch running `Flow Branch` on the generated user keyword `Flow Branch: <region>/<branch>` that holds the branch's steps, then `Flow Join`; with `on_failure` the region is inside the `TRY` |
+
+A flow's loops keep memory flat: once an iteration is in `output.xml` its
+results leave the model (only the last one stays), so a million cycles cost
+the same memory as ten. Suites get the same with `--pruneresults`; see
+[Bounded memory](long-running.md#bounded-memory).
 
 ## Verdicts
 
@@ -309,6 +414,11 @@ Cycle
 |---------------|--------|
 | A keyword asserted and failed | FAIL |
 | A gate timed out | **UNKNOWN** — the bench or a peer was not ready; nothing was tested. `on_timeout: fail` per gate when a silent peer *is* the product failing |
+| A keyword failed on every attempt of its `retry` | FAIL with the last error and the number of attempts; `on_exhausted: unknown` per node when giving up means the bench did not cooperate |
+| A keyword attempt exceeded the node's `timeout` | The attempt is interrupted and counts as failed: retried under a `retry` policy, else FAIL (`timed out after ...`) |
+| A branch of a parallel region failed | FAIL of the join, naming the branch and its error; the other branches are stopped at their next step (`stop_others`) |
+| A gate timed out inside a branch | UNKNOWN for that branch and for the join: the worst status of the branches wins (UNKNOWN over FAIL) |
+| A parallel region did not join within its `timeout` | FAIL naming the branches still running |
 | A setup gate timed out | UNKNOWN for every test (`Setup unknown:`); teardown still runs |
 | A keyword in the flow does not exist or has wrong arguments | UNKNOWN, and `--dryrun` reports it per node — including the keyword behind a gate |
 | A loop reached `max_loops` or `max_seconds` | PASS — reaching the bound is the plan |
@@ -324,7 +434,7 @@ four nodes that cycled 600 times is 600 blocks to scroll. The *flow report*
 shows the plan **as it was drawn** -- lanes for the phases, boxes for the
 nodes, the edges between them -- with what the run did written on it: how
 often each node ran and with which outcome, how often each edge was taken,
-how many attempts a gate needed, where a failed cycle went through the
+how many attempts a gate or a retried keyword needed, where a failed cycle went through the
 recovery, where a stopped run stopped and what a restart would do. Every box
 links into `log.html` at the keyword, so the log stays the record and the
 report is the way in.
@@ -404,21 +514,58 @@ If the peer dies, the gate times out and the verdict is UNKNOWN, not FAIL.
 Never retract a flag the peer may not have read yet — mark the end with a new
 signal (`${RIG}.done`) instead.
 
-Where they live:
+Where they live: the *store* of the run, named by **`ROBOT_FLOW_SIGNALS`**,
+which whoever starts the group sets for every member. A store keeps the
+last value of each name with the time it was set and a sequence number, so
+a flow that joins late reads what was set before it came. Whatever the
+store, it is also the run's control channel (pause, resume, stop, set,
+snapshot, status), and the same `python -m robot.flow control <store> ...`
+works on it.
 
-- **`ROBOT_FLOW_SIGNALS`** -- a JSON file the processes of the run share
-  (created on first write; writes are locked, readers never see half a file;
-  a lock left behind by a killed process is taken over after 10 seconds).
-  Whoever starts the group sets it to a file *of that run*, so two runs can
-  never read each other's signals, for example `results/<run>/signals.json`.
-  Unset, it is `robot_flow_signals.json` in the
-  temporary directory, shared by every run on the machine that sets none.
-- **`ROBOT_FLOW_SIGNALS_BACKEND`** -- a class (`package.module.Class` or `package.module:Class`) for
-  flows on different machines: created with the `ROBOT_FLOW_SIGNALS` value,
-  it needs `get(name)` (returning `{"value": ..., "time": ...}` or `None`)
-  and `set(name, value)`.
+| `ROBOT_FLOW_SIGNALS` | the store |
+|---|---|
+| a path, e.g. `results/<run>/signals.json` | **a JSON file** the processes of the run share on one machine (the default; created on first write; writes are locked, readers never see half a file; a lock left behind by a killed process is taken over after 10 seconds). Unset: `robot_flow_signals.json` in the temporary directory, shared by every run on the machine that sets none. |
+| `http://<host>:8765/<run>` | **the signal server**: `python -m robot.flow server` on any machine of the bench; see below. |
+| `redis://<host>:6379/0?ns=<run>` | a **Redis** server already on the bench (`pip install redis`). The run's signals are one hash, the sequence numbers one counter. |
+| `mqtt://[user:pw@]<host>:1883/<run>` | an **MQTT broker** (`pip install paho-mqtt`): each signal is the retained message of `<run>/<name>`. The broker assigns no sequence numbers, so the publishers' clocks order the writes: keep the machines on NTP. |
+
+A fresh store per run (a new file, a new `<run>` name) means two runs can
+never read each other's signals.
+
+- **`ROBOT_FLOW_SIGNALS_BACKEND`** -- any other system (a bus the bench
+  already has, a database): a class (`package.module:Class`) created with
+  the `ROBOT_FLOW_SIGNALS` value. Subclass `robot.flow.signals.SignalStore`,
+  implement `get`, `set` and `read`, and prove it with the store contract
+  test; [Signal stores](signal-stores.md#a-store-of-your-own) shows a worked
+  class.
 - In a flow or suite, `Library    robot.flow.signals.FlowSignals    store=...    backend=...`
   sets both there.
+
+### Flows on several machines
+
+A distributed system is tested by flows on several machines meeting through
+one store. Nothing has to be installed for it: start the signal server on
+any machine of the bench and point every member at it, with its rig name.
+
+```bash
+# on bench PC "hub"
+python -m robot.flow server --port 8765            # --file signals.json keeps the state across restarts
+
+# on every machine of the run, with the run's own name in the URL
+export ROBOT_FLOW_SIGNALS=http://hub:8765/run42
+robot --parser robot.flow --variable FLOW_RIG:RIG_A plan_a.flow.json     # on PC A
+robot --parser robot.flow --variable FLOW_RIG:RIG_B plan_b.flow.json     # on PC B
+
+# from anywhere
+python -m robot.flow control http://hub:8765/run42 status
+python -m robot.flow control http://hub:8765/run42 pause --rig RIG_B
+```
+
+The server orders every write with one sequence number, so a command given
+before a member started is not for it however the clocks of the two
+machines differ. [Signal stores](signal-stores.md) has the server's HTTP
+interface, Redis, MQTT and RabbitMQ (through its MQTT plugin), and how to
+write and prove a store of your own.
 
 The library is for coordination -- cycle numbers, acknowledgements, "ready".
 The bench's own values (a supply voltage, a DUT temperature) stay in the
@@ -476,6 +623,47 @@ process started is not for that process and is ignored by it.
   test phases and waits for `resume` (or Enter, when the run has a console):
   a way to walk a new plan through the bench one step at a time.
 
+### Changing a running flow: `set` and `snapshot`
+
+```bash
+python -m robot.flow control results/run42/signals.json set VOLTS=14.2 MODE=EMC
+python -m robot.flow control results/run42/signals.json snapshot before the swap
+```
+
+`set` gives a running flow new values: at its next step boundary the flow
+sets them as suite variables and logs `Variable ${VOLTS} set to '14.2' by
+operator (suite scope).` on the console too. Keyword arguments and decision
+conditions use the new value from then on. A loop's `max_loops` /
+`max_seconds` are read when the loop starts, so a set changes the next loop,
+not the one running. `--rig` addresses one process, as for `pause`.
+
+`snapshot` writes the flow's state as `<flow>.snapshot-<name>.json` next to
+the checkpoint, at the next step boundary, and the flow goes on. The file is
+a checkpoint plus a `snapshot` section (when and where it was taken, and the
+JSON-safe variables in scope, for inspection), it is **kept** when the run
+ends, and a new run continues from it like from a checkpoint:
+
+```bash
+robot --parser robot.flow --variable FLOW_CHECKPOINT:results/run42/plan.snapshot-before_the_swap.json \
+      --variable VOLTS:13.5 --outputdir results/run42-replay plan.flow.json
+```
+
+A value given with `--variable` wins over the one the snapshot (or any
+checkpoint) saved for the same name, and the log says `Kept from the command
+line instead of the checkpoint: ${VOLTS}.` -- that is how a bad cycle is
+replayed with a changed value. The run writes its own `plan.checkpoint.json`
+next to the snapshot; the snapshot stays as it was. The flow report lists
+the snapshots of a run at their loop, linked into the log. From inside a
+plan, the keyword `Flow Snapshot    name` does the same, for example in a
+recovery region, so the state at a failure is kept.
+
+A snapshot is not a core dump: the bench is not in it. A restart from it
+re-establishes the bench with the setup phase and continues the plan after
+the last completed iteration, as after a stop. The variables it holds are
+the ones at the start of the iteration it was taken in, like a checkpoint's,
+so the run from it replays that iteration from its start: a counter at 3
+when the snapshot is taken in the third iteration resumes with 3, not 4.
+
 ### Stopping
 
 `stop` ends the run in an orderly way. The flow leaves at its next step
@@ -517,9 +705,13 @@ the variables the phase assigns:
   iteration (at most once a second, so fast loops are not slowed down; a
   crash can then cost up to a second of iterations), and on `stop`.
   `"checkpoint_every": 100` or `--variable FLOW_CHECKPOINT_EVERY:100` writes
-  every hundredth iteration instead, `1` every iteration.
-- **Written whole.** The file is replaced atomically; a reader never sees half
-  of it.
+  every hundredth iteration instead, `1` every iteration. Each write leaves a
+  line in the iteration (`Iteration 1200 of loop 'loop'; checkpoint
+  written.`), so the log shows the progress at that pace and nothing more:
+  counting an iteration costs no keyword call.
+- **Written whole, and to the disk.** The file is written to a temporary name,
+  flushed to the disk (`fsync`) and renamed into place: a reader never sees
+  half of it, and a power loss right after a write does not lose it.
 - **Kept or deleted.** A run that reaches its end deletes its checkpoint. A
   stopped or crashed run leaves it.
 - **Not wanted.** `"checkpoint": false` in the `flow` section builds the flow
@@ -548,10 +740,33 @@ robot --parser robot.flow --variable FLOW_CHECKPOINT:results/run42/plan.checkpoi
 
 The unit of a restart is the loop iteration: the interrupted one is done
 again, so **iterations must be safe to repeat**. Only loops directly in a
-test phase are tracked. A loop inside a decision, a `try`, another loop or a
-sub-flow starts from its beginning, like any other step. A flow file that
+test phase are tracked. A loop inside a decision, a `try`, another loop, a
+sub-flow or a branch of a parallel region starts from its beginning, like any
+other step; a parallel region itself is one step of its iteration and runs
+again as a whole. A flow file that
 changed since the checkpoint does not match it any more (the fingerprint is
 that of the main file; sub-flow files are not part of it).
 
 Reading the two outputs together gives the verdict of the plan; `rebot` merges
 them into one report.
+
+### After a crash
+
+A killed process, a bench PC that rebooted, a power cut: nothing orderly
+happened, so there is no `Stopped by operator` message and no teardown. What
+is left is the checkpoint, which is as recent as the last iteration boundary
+(or at most one second old; `checkpoint_every: 1` makes it exact), and the
+output file, cut wherever the process died. The restart is the same command
+as after a stop and behaves the same: the setup phase runs again, finished
+phases SKIP, the loop continues after its last *completed* iteration, so the
+interrupted one is done again.
+
+A cut `output.xml` cannot be read by `rebot`. For endurance runs, run with
+`--segmentoutput 1h` (or shorter): every sealed segment is a complete output
+of its hour and `python -m robot.output.segmentmerger` joins them, so the
+log of the crashed run is lost only for the last, unsealed interval. See
+[Segmented output](segmented-output.md).
+
+This path is tested: the unit test `utest/flow/test_crash_recovery.py` kills a
+running flow without warning and checks that the continued run covers the
+plan exactly once, except the interrupted iteration.

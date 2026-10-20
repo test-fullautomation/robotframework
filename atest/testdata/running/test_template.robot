@@ -238,7 +238,7 @@ Commented Rows With Test Template
     # And one final comment here
 
 Templates with Run Keyword
-    [Documentation]    UNKNOWN
+    [Documentation]    FAIL
     ...    Several failures occurred:
     ...
     ...    1) First failure
@@ -333,7 +333,7 @@ Templated test ends after syntax errors
     not run
 
 Templated test continues after non-syntax errors
-    [Documentation]    UNKNOWN
+    [Documentation]    FAIL
     ...    Several failures occurred:
     ...
     ...    1) Variable '\${this does not exist}' not found.

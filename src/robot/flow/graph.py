@@ -18,20 +18,23 @@
 The graph is walked from its ``start`` node and folded into phases and
 steps. Only *structured* graphs are accepted: an action node has one way
 out, both branches of a decision re-join, a loop or try body returns to its
-container with ``next``, a recovery region ends with ``continue`` or
-``abort``, and every node is reachable. Anything else is a state machine in
-disguise and is rejected with a message naming the node.
+container with ``next``, every branch of a parallel region returns to it
+with ``join``, a recovery region ends with ``continue`` or ``abort``, and
+every node is reachable. Anything else is a state machine in disguise and
+is rejected with a message naming the node.
 """
 
-from .schema import (ABORT, ACTION_KINDS, BODY, CONTAINER_KINDS, CONTINUE,
-                     DECISION, DONE, END, FLOW, FlowError, GATE, KEYWORD, LOOP, NEXT, NO,
-                     ON_FAILURE, PHASE, SETUP, SLEEP, START, TEARDOWN, TEST, THEN, YES)
+from .schema import (ABORT, ACTION_KINDS, BODY, BRANCH, CONTAINER_KINDS, CONTINUE,
+                     DECISION, DONE, END, FLOW, FlowError, GATE, JOIN, KEYWORD, LOOP, NEXT,
+                     NO, ON_FAILURE, PARALLEL, PHASE, SETUP, SLEEP, START, TEARDOWN, TEST,
+                     THEN, YES)
 
 
-# How a loop or try continues after its body: 'done' normally, or the label
-# an action node would carry when the container is the last node of an
-# enclosing body ('next') or recovery region ('continue', 'abort').
-EXIT_LABELS = frozenset((DONE, NEXT, CONTINUE, ABORT))
+# How a loop, try or parallel region continues after its body: 'done'
+# normally, or the label an action node would carry when the container is
+# the last node of an enclosing body ('next'), recovery region ('continue',
+# 'abort') or branch ('join').
+EXIT_LABELS = frozenset((DONE, NEXT, CONTINUE, ABORT, JOIN))
 
 
 class Step:
@@ -52,6 +55,8 @@ class KeywordStep(Step):
         self.keyword = node.keyword
         self.args = node.args
         self.assign = node.assign
+        self.retry = node.retry         # policy dict, or None
+        self.timeout = node.timeout     # time limit of one attempt, or None
 
 
 class GateStep(KeywordStep):
@@ -111,6 +116,28 @@ class Loop(Guarded):
         self.every = node.every
 
 
+class Branch:
+    """One branch of a parallel region: named after its first node."""
+
+    def __init__(self, id, steps):
+        self.id = id
+        self.steps = steps
+
+
+class Parallel(Guarded):
+    """Branches that run at the same time and join before the plan goes on.
+
+    ``body`` is ``None``: the steps are in ``branches``. The recovery, when
+    there is one, runs after the join like a try node's.
+    """
+
+    def __init__(self, node, branches, recovery=None, then=None):
+        super().__init__(node, None, recovery, then)
+        self.branches = branches        # list of Branch
+        self.timeout = node.timeout
+        self.stop_others = node.stop_others
+
+
 class Phase:
 
     def __init__(self, node, role, name, steps):
@@ -142,13 +169,23 @@ class _Structurer:
         self.data = data
         self.nodes = data.nodes
         self.out = {id: {} for id in self.nodes}
+        # 'branch' is the one label a node may carry several times: the
+        # branches of a parallel region, in file order.
+        self.branches = {id: [] for id in self.nodes}
         for edge in data.edges:
+            if edge.label == BRANCH:
+                if self.nodes[edge.source].kind != PARALLEL:
+                    raise FlowError("Only a parallel node has edges labelled 'branch'.",
+                                    edge.source)
+                self.branches[edge.source].append(edge.target)
+                continue
             if edge.label in self.out[edge.source]:
                 raise FlowError(f"Has two outgoing edges labelled "
                                 f"'{edge.label or 'then'}'.", edge.source)
             self.out[edge.source][edge.label] = edge.target
         self.seen = set()
         self._joining = set()
+        self._region = None         # the parallel node whose branch is being folded
 
     def structure(self):
         start = self._validate_degrees()
@@ -174,8 +211,8 @@ class _Structurer:
 
     def _phase_must_end_plainly(self, via, node_id):
         if via != THEN:
-            raise FlowError(f"Edge labelled '{via}' must lead to the enclosing loop "
-                            f"or try node, not to '{node_id}'.")
+            raise FlowError(f"Edge labelled '{via}' must lead to the enclosing loop, "
+                            f"try or parallel node, not to '{node_id}'.")
 
     def _validate_degrees(self):
         starts = [node for node in self.nodes.values() if node.kind == START]
@@ -198,10 +235,10 @@ class _Structurer:
                 self._expect(node, labels, exactly=set(),
                              hint='no outgoing edges')
             elif node.kind in ACTION_KINDS:
-                if len(labels) != 1 or not labels <= {THEN, NEXT, CONTINUE, ABORT}:
+                if len(labels) != 1 or not labels <= {THEN, NEXT, CONTINUE, ABORT, JOIN}:
                     self._degree_error(node, labels, "exactly one outgoing edge, "
-                                       "unlabelled or labelled 'next', 'continue' "
-                                       "or 'abort'")
+                                       "unlabelled or labelled 'next', 'continue', "
+                                       "'abort' or 'join'")
             elif node.kind == DECISION:
                 self._expect(node, labels, exactly={YES, NO},
                              hint="exactly two outgoing edges labelled 'yes' and 'no'")
@@ -212,6 +249,14 @@ class _Structurer:
                     self._degree_error(node, labels, "outgoing edges labelled 'body' "
                                        "and exactly one of 'done', 'next', 'continue' "
                                        "or 'abort', optionally 'on_failure'")
+            elif node.kind == PARALLEL:
+                exits = labels & EXIT_LABELS
+                if len(self.branches[node.id]) < 2 or len(exits) != 1 \
+                        or not labels <= {ON_FAILURE} | exits:
+                    have = [BRANCH] * len(self.branches[node.id]) + sorted(labels)
+                    self._degree_error(node, have, "two or more outgoing edges labelled "
+                                       "'branch' and exactly one of 'done', 'next', "
+                                       "'continue' or 'abort', optionally 'on_failure'")
         return starts[0]
 
     def _exit(self, node_id):
@@ -229,7 +274,8 @@ class _Structurer:
             self._degree_error(node, labels, hint)
 
     def _degree_error(self, node, labels, hint):
-        have = ', '.join(repr(label or 'then') for label in sorted(labels)) or 'none'
+        labels = labels if isinstance(labels, list) else sorted(labels)
+        have = ', '.join(repr(label or 'then') for label in labels) or 'none'
         raise FlowError(f"A {node.kind} node must have {hint}; it has {have}.",
                         node.id)
 
@@ -248,10 +294,10 @@ class _Structurer:
                 return steps, node_id, via
             if via != THEN:
                 raise FlowError(f"Edge labelled '{via}' must lead to the enclosing "
-                                f"loop or try node, not to '{node_id}'.")
+                                f"loop, try or parallel node, not to '{node_id}'.")
             if node_id in visited:
                 raise FlowError("Is reached twice in the same sequence. Only edges "
-                                "labelled 'next' or 'continue' may go backwards.",
+                                "labelled 'next', 'continue' or 'join' may go backwards.",
                                 node_id)
             visited.add(node_id)
             self.seen.add(node_id)
@@ -262,7 +308,10 @@ class _Structurer:
                 step, node_id, via = self._decision(node, stop, visited)
                 steps.append(step)
             else:
-                steps.append(self._container(node, stop, visited))
+                if node.kind == PARALLEL:
+                    steps.append(self._parallel(node, stop, visited))
+                else:
+                    steps.append(self._container(node, stop, visited))
                 label, node_id = self._exit(node.id)
                 via = THEN if label == DONE else label
 
@@ -309,7 +358,7 @@ class _Structurer:
                 (_, node_id), = self.out[node_id].items()
             elif node.kind == DECISION:
                 node_id = self._join(node)
-            elif node.kind in CONTAINER_KINDS:
+            elif node.kind in CONTAINER_KINDS or node.kind == PARALLEL:
                 _, node_id = self._exit(node_id)
             else:
                 node_id = None
@@ -322,23 +371,56 @@ class _Structurer:
             raise FlowError(f"The body of {node.kind} '{node.id}' must return to it "
                             f"with an edge labelled 'next'; it ends at '{exit}' via "
                             f"'{via or 'then'}'.", node.id)
-        recovery = then = None
-        if ON_FAILURE in out:
-            _, after = self._exit(node.id)
-            recovery, exit, via = self._sequence(out[ON_FAILURE],
-                                                 stop | {node.id, after}, visited)
-            if exit == node.id and via == CONTINUE:
-                then = CONTINUE
-            elif via == ABORT and (exit == after or self.nodes[exit].kind == END):
-                then = ABORT
-                self.seen.add(exit)
-            else:
-                raise FlowError(f"The recovery of '{node.id}' must end with an edge "
-                                f"labelled 'continue' back to '{node.id}', or "
-                                f"'abort' to the node after it or an end node; it "
-                                f"ends at '{exit}' via '{via or 'then'}'.", node.id)
+        recovery, then = self._recovery(node, stop, visited)
         cls = Loop if node.kind == LOOP else Try
         return cls(node, body, recovery, then)
+
+    def _parallel(self, node, stop, visited):
+        """A parallel region: every branch is a sequence that returns to the
+        node with 'join'; a node belongs to one branch; no region inside a
+        branch (the report, the stop ladder and the verdicts would need a
+        second level for a case no bench has asked for)."""
+        if self._region is not None:
+            raise FlowError(f"A parallel region cannot be inside a branch of another "
+                            f"parallel region ('{self._region}'); split the plan or "
+                            f"run the inner branches one after the other.", node.id)
+        self._region = node.id
+        branches = []
+        try:
+            for first in self.branches[node.id]:
+                steps, exit, via = self._sequence(first, stop | {node.id}, visited)
+                if exit != node.id or via != JOIN:
+                    raise FlowError(f"The branch of '{node.id}' starting at '{first}' "
+                                    f"must return to it with an edge labelled 'join'; "
+                                    f"it ends at '{exit}' via '{via or 'then'}'.",
+                                    node.id)
+                if not steps:
+                    raise FlowError(f"The branch starting at '{first}' is empty.",
+                                    node.id)
+                branches.append(Branch(first, steps))
+        finally:
+            self._region = None
+        recovery, then = self._recovery(node, stop, visited)
+        return Parallel(node, branches, recovery, then)
+
+    def _recovery(self, node, stop, visited):
+        """The recovery region of a loop, try or parallel node, and how it
+        ends: ``(steps, 'continue' | 'abort')``, or ``(None, None)``."""
+        out = self.out[node.id]
+        if ON_FAILURE not in out:
+            return None, None
+        _, after = self._exit(node.id)
+        recovery, exit, via = self._sequence(out[ON_FAILURE],
+                                             stop | {node.id, after}, visited)
+        if exit == node.id and via == CONTINUE:
+            return recovery, CONTINUE
+        if via == ABORT and (exit == after or self.nodes[exit].kind == END):
+            self.seen.add(exit)
+            return recovery, ABORT
+        raise FlowError(f"The recovery of '{node.id}' must end with an edge "
+                        f"labelled 'continue' back to '{node.id}', or "
+                        f"'abort' to the node after it or an end node; it "
+                        f"ends at '{exit}' via '{via or 'then'}'.", node.id)
 
     def _assemble(self, phases):
         setup = teardown = None

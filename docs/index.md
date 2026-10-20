@@ -14,7 +14,8 @@ existing suites run unchanged; everything below is opt-in.
 <p class="pain-line">"My test plan is a flowchart, but I maintain it as .robot by hand."</p>
 ### [Flow files](flow.md)
 Run the flowchart itself. Gates, bounded loops and recovery are built in — and
-two flows in two processes can meet and move in lockstep.
+two flows in two processes, or on two machines, can meet and move in lockstep
+through a [signal store](signal-stores.md).
 </div>
 
 <div class="card" markdown>
@@ -73,5 +74,6 @@ robot --timeline timeline.html my_suite.robot
 ```
 
 Then read [Getting started](getting-started.md), or open one of the runnable
-demos next to the repository: `demo/flow/`, `demo/statemachine/`,
-`demo/longrun/`.
+demos in the repository's `demo/` folder: `demo/flow/`, `demo/statemachine/`,
+`demo/longrun/`. Each has a `run.py` that finds the checkout's `src/` by
+itself and a README with its learning path.

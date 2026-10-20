@@ -148,7 +148,8 @@
               "decision",
               "loop",
               "try",
-              "flow"
+              "flow",
+              "parallel"
             ],
             "description": "What the node is."
           }
@@ -293,6 +294,21 @@
             "if": {
               "properties": {
                 "kind": {
+                  "const": "parallel"
+                }
+              },
+              "required": [
+                "kind"
+              ]
+            },
+            "then": {
+              "$ref": "#/definitions/parallel"
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "kind": {
                   "const": "flow"
                 }
               },
@@ -344,9 +360,11 @@
                   "abort",
                   "done",
                   "yes",
-                  "no"
+                  "no",
+                  "branch",
+                  "join"
                 ],
-                "description": "Needed only where a node has more than one way out."
+                "description": "Needed only where a node has more than one way out. 'branch' (several per parallel node) and 'join' belong to parallel regions."
               }
             }
           }
@@ -379,7 +397,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -414,7 +433,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -450,7 +470,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -510,7 +531,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -550,6 +572,72 @@
             }
           ],
           "description": "Variable(s) for the return value, e.g. '${VERSION}'."
+        },
+        "retry": {
+          "oneOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\s*\\$\\{[^{}$]+\\}\\s*$"
+                }
+              ],
+              "description": "How many times the keyword may run, or a '${variable}' holding the number."
+            },
+            {
+              "type": "object",
+              "required": [
+                "max_attempts"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "max_attempts": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^\\s*\\$\\{[^{}$]+\\}\\s*$"
+                    }
+                  ],
+                  "description": "How many times the keyword may run, or a '${variable}' holding the number."
+                },
+                "interval": {
+                  "type": [
+                    "string",
+                    "number"
+                  ],
+                  "description": "Wait before the next attempt; default 1s."
+                },
+                "backoff": {
+                  "type": "number",
+                  "minimum": 1,
+                  "description": "Factor the wait grows by after each attempt; default 1 (a constant wait)."
+                },
+                "on_exhausted": {
+                  "enum": [
+                    "fail",
+                    "unknown"
+                  ],
+                  "description": "Verdict when the last attempt fails too: 'fail' (the default: the keyword's own failure) or 'unknown' (the bench did not cooperate)."
+                }
+              }
+            }
+          ],
+          "description": "Run the keyword again when it fails: a number of attempts, or a policy object."
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "Time limit of one attempt; an attempt that exceeds it fails (and is retried under a retry policy)."
         }
       },
       "additionalProperties": false
@@ -580,7 +668,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -670,7 +759,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -713,7 +803,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -753,7 +844,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
@@ -827,13 +919,61 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },
         "label": {
           "type": "string",
           "description": "Text shown instead of the id."
+        }
+      },
+      "additionalProperties": false
+    },
+    "parallel": {
+      "description": "Branches that run at the same time: two or more 'branch' edges to their first nodes, a 'join' edge back from the last node of each, 'done' out, optional 'on_failure'.",
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "Unique id of the node; edges refer to it."
+        },
+        "kind": {
+          "enum": [
+            "start",
+            "end",
+            "phase",
+            "keyword",
+            "gate",
+            "sleep",
+            "decision",
+            "loop",
+            "try",
+            "flow",
+            "parallel"
+          ],
+          "description": "What the node is."
+        },
+        "label": {
+          "type": "string",
+          "description": "Text shown instead of the id."
+        },
+        "timeout": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "The branches must all have joined within this time (on the flow clock); none by default."
+        },
+        "stop_others": {
+          "type": "boolean",
+          "description": "When a branch fails, stop the other branches at their next step (true, the default) or let them run to their end (false)."
         }
       },
       "additionalProperties": false
@@ -863,7 +1003,8 @@
             "decision",
             "loop",
             "try",
-            "flow"
+            "flow",
+            "parallel"
           ],
           "description": "What the node is."
         },

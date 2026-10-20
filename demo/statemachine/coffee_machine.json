@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Example 3 - the coffee machine from example 2, defined as data.",
+    "enter/during/exit are a keyword name, or a list of keyword name",
+    "followed by its arguments (see PREHEAT). Transitions can be written",
+    "as readable strings or as mappings; they keep their file order.",
+    "A .yaml file with the same structure works identically when the",
+    "pyyaml module is installed."
+  ],
+  "states": {
+    "PREHEAT": {"enter": ["Set Power Level", "1200"], "during": "Heat Up"},
+    "BREWING": {"during": "Fill Cup", "exit": "Ding"},
+    "DONE":    {"final": true}
+  },
+  "transitions": [
+    "PREHEAT -> BREWING when $TEMP >= 90",
+    "BREWING -> DONE when $CUPS >= 2"
+  ]
+}

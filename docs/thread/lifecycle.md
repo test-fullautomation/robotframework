@@ -33,8 +33,19 @@ Example
     Log    main thread continues here immediately
 ```
 
-The name identifies the thread for synchronisation, merging and the timeline.
-The daemon flag selects the thread's **lifecycle scope**.
+The name is how you address the thread (`Wait For Thread`, `Stop Thread`,
+`Send Thread Notification`) and how it is labelled in the log and the timeline.
+It need not be unique: a `THREAD` inside a `FOR` loop, or the same name in two
+tests, gives several threads of that name, each with its own variables, its own
+log and its own place in the output. A keyword given the name addresses the
+newest of them still running. The daemon flag selects the thread's
+**lifecycle scope**.
+
+Each thread runs with runtime state of its own: a keyword timeout inside a
+worker ends that worker's keyword and nothing in the main thread, and a
+`robot:continue-on-failure` tag on a worker's keyword does not change what the
+main thread does after a failure. A `THREAD` may start another `THREAD`; the
+inner block appears inside the outer one in the log.
 
 ## Scopes
 
@@ -93,13 +104,52 @@ Stop Thread        SUITEWORKER    timeout=10 s    # request a stop and wait; fai
 Wait For Thread    SUITEWORKER    timeout=1 min   # join without stopping; fail if still running
 ```
 
-`Wait For Thread` followed by an assertion is the way to make a thread's result
-part of the test verdict.
+`Wait For Thread` is the way to make a thread's result part of the test
+verdict: a thread whose keyword failed only logs a warning while it runs (its
+`THREAD` block shows FAIL in the log), and `Wait For Thread` on it fails with
+that message, with the thread's own kind of failure (a thread that could not
+judge, a missing keyword say, gives UNKNOWN). `fail_on_error=False` only logs
+it, for a thread whose failure the test judges itself afterwards. The failure
+is reported once, for the thread that was waited for; the failure of a
+test-scoped thread nobody waited for is forgotten when its test ends.
 
-!!! warning "Timeouts inside a worker"
-    On Linux and macOS keyword and test timeouts rely on signals, which only
-    work in the thread executing the suite. Keywords run by a `THREAD` worker
-    there run without timeouts; on Windows timeouts apply as usual.
+!!! note "Changed behaviour"
+    Earlier versions let `Wait For Thread` pass whatever the thread did. A
+    suite that tolerated a failing thread on purpose now needs
+    `fail_on_error=False` on that `Wait For Thread`.
+
+## Variables set in a thread
+
+A worker starts with a copy of the variables in scope where the `THREAD`
+began, and what it sets with plain assignment stays its own. `Set Test
+Variable`, `Set Suite Variable` and `Set Global Variable` in a worker reach the
+main thread as well, which is how a worker hands a result back:
+
+```robotframework
+Measure In The Background
+    THREAD    METER    True
+        ${v}=    Read Voltage
+        Set Test Variable    ${VOLTAGE}    ${v}
+    END
+    Wait For Thread    METER
+    Should Be True    ${VOLTAGE} > 11.5
+```
+
+One guard keeps this honest: a `Set Test Variable` from a suite-scoped thread
+that outlives the test it started in is dropped, with a note at DEBUG level,
+instead of landing in whatever test runs next. Suite and global variables are
+always applied.
+
+!!! note "Timeouts inside a worker"
+    A keyword timeout inside a `THREAD` worker applies on every platform: the
+    worker runs it with a timer (the way Windows runs every timeout), since
+    the signal-based timeout of Linux and macOS reaches the main thread only.
+    The test timeout belongs to the main thread; a worker starts without it.
+    On an interpreter without CPython's C API a worker runs without timeouts.
+    A timer-based timeout interrupts Python code only, as on Windows: a
+    keyword blocked in C (`Sleep`, a lock, a socket read, `Wait Thread
+    Notification`) ends when that call returns, and the timeout is reported
+    then.
 
 ## Variable scoping
 

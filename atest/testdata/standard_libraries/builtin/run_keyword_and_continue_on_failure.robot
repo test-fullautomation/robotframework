@@ -68,14 +68,14 @@ Run Keyword And Continue On Failure With Timeout
     Fail    This Should Not Be Executed!
 
 Run Keyword And Continue On Failure With Nonexisting Variable
-    [Documentation]    UNKNOWN    Several failures occurred:\n\n
+    [Documentation]    FAIL    Several failures occurred:\n\n
     ...    1) Variable '${nonexisting}' not found.\n\n
     ...    2) Normal failure after continuable failure
     Run keyword And Continue On Failure    Log    ${nonexisting}
     Fail    Normal failure after continuable failure
 
 Run Keyword And Continue On Failure With Nonexisting Extended Variable
-    [Documentation]    UNKNOWN   GLOB: Several failures occurred:\n\n
+    [Documentation]    FAIL   GLOB: Several failures occurred:\n\n
     ...    1) Resolving variable '\${list.nonex}' failed: AttributeError:*\n\n
     ...    2) Normal failure after continuable failure
     ${list} =  Create list    1    2

@@ -21,6 +21,25 @@ from contextlib import contextmanager
 
 from robot.errors import DataError, ExecutionFailed
 from robot.utils import PriorityQueue, ThreadSafeDict
+from robot.utils.robotthread import get_execution_thread, thread_key
+
+
+class _ThreadFrame(threading.local):
+    """The runtime state of one thread: a THREAD worker starts with its own.
+
+    cuongnht add thread. Timeouts, the step stack and the keyword nesting
+    are per thread: a worker's keyword timeout must not fire in the main
+    thread, and a worker's `continue-on-failure` tag must not decide what
+    the main thread does after a failure.
+    """
+
+    def __init__(self):
+        self.timeouts = []
+        self.active_timeouts = []
+        self.in_keyword_teardown = 0
+        self.timeout_occurred = False
+        self.steps = []
+        self.user_keywords = []
 
 
 class Asynchronous:
@@ -85,8 +104,9 @@ class ExecutionContexts:
     def namespaces(self):
         return (context.namespace for context in self)
 
-    def start_suite(self, suite, namespace, output, dry_run=False):
-        ctx = _ExecutionContext(suite, namespace, output, dry_run, self._asynchronous)
+    def start_suite(self, suite, namespace, output, dry_run=False, prune_results=False):
+        ctx = _ExecutionContext(suite, namespace, output, dry_run, self._asynchronous,
+                                prune_results)
         self._contexts.append(ctx)
         return ctx
 
@@ -102,30 +122,81 @@ EXECUTION_CONTEXTS = ExecutionContexts()
 
 class _ExecutionContext:
 
-    def __init__(self, suite, namespace, output, dry_run=False, asynchronous=None):
+    def __init__(self, suite, namespace, output, dry_run=False, asynchronous=None,
+                 prune_results=False):
         self.suite = suite
         self.test = None
-        self.timeouts = []
-        self.active_timeouts = []
+        self._frame = _ThreadFrame()
         self.namespace = namespace
         self.output = output
         self.dry_run = dry_run
+        # cuongnht flat memory: finished FOR/WHILE iterations leave the result
+        # model once they are in the output file (--pruneresults; flow files).
+        self.prune_results = prune_results
         self.in_suite_teardown = False
         self.in_test_teardown = False
-        self.in_keyword_teardown = 0
-        self.timeout_occurred = False
-        self.steps = []
-        self.user_keywords = []
         self.asynchronous = asynchronous
         # cuongnht add thread: notification queues and locks shared by the
-        # `Send/Wait Thread Notification` and `Thread RLock` keywords.
+        # `Send/Wait Thread Notification` and `Thread RLock` keywords. The
+        # queues are keyed by the thread key (see robot.utils.robotthread).
         self.thread_message_queue_dict = ThreadSafeDict()
-        self.thread_message_queue_dict["MainThread"] = PriorityQueue(queue_type="FIFO")
+        self.thread_message_queue_dict[self._main_thread_key()] = PriorityQueue(
+            queue_type="FIFO"
+        )
         self.thread_rlock_dict = ThreadSafeDict()
         # cuongnht thread scope: registry of THREADs started in this context.
-        # name -> {'worker': Thread, 'stop_event': Event, 'daemon': bool,
-        #          'owner': name of the test that started it}
+        # key -> {'name': the THREAD's name, 'worker': Thread,
+        #         'stop_event': Event, 'daemon': bool,
+        #         'owner': name of the test that started it,
+        #         'abandoned': True once its scope ended without it}
         self.active_threads = ThreadSafeDict()
+        # key -> {'name', 'message', 'unknown', 'daemon'} of a thread that
+        # ended with a failure, until `Wait For Thread` reports it or the test
+        # it belonged to is over (a suite-scoped one: the suite).
+        self.thread_failures = ThreadSafeDict()
+
+    @staticmethod
+    def _main_thread_key():
+        # The thread executing the suite; `robot.run()` may be called from any thread.
+        return thread_key(get_execution_thread())
+
+    # cuongnht add thread: the per-thread runtime state -----------------------
+
+    @property
+    def timeouts(self):
+        return self._frame.timeouts
+
+    @timeouts.setter
+    def timeouts(self, value):
+        self._frame.timeouts = value
+
+    @property
+    def active_timeouts(self):
+        return self._frame.active_timeouts
+
+    @property
+    def in_keyword_teardown(self):
+        return self._frame.in_keyword_teardown
+
+    @in_keyword_teardown.setter
+    def in_keyword_teardown(self, value):
+        self._frame.in_keyword_teardown = value
+
+    @property
+    def timeout_occurred(self):
+        return self._frame.timeout_occurred
+
+    @timeout_occurred.setter
+    def timeout_occurred(self, value):
+        self._frame.timeout_occurred = value
+
+    @property
+    def steps(self):
+        return self._frame.steps
+
+    @property
+    def user_keywords(self):
+        return self._frame.user_keywords
 
     @property
     def languages(self):
@@ -282,9 +353,24 @@ class _ExecutionContext:
         self.variables.set_test("${TEST_DOCUMENTATION}", result.doc)
         self.variables.set_test("${TEST_METADATA}", result.metadata.copy())
         self.variables.set_test("@{TEST_TAGS}", list(result.tags))
-        # cuongnht add thread: notifications do not survive the test.
-        self.thread_message_queue_dict.clear()
-        self.thread_message_queue_dict["MainThread"] = PriorityQueue(queue_type="FIFO")
+        # cuongnht add thread: a test-scoped thread's notifications do not
+        # survive the test. A suite-scoped thread still running keeps its
+        # queue: the next test may well send to it.
+        keep = {
+            key
+            for key, entry in dict(self.active_threads).items()
+            if not entry["daemon"] and entry["worker"].is_alive()
+        }
+        main = self._main_thread_key()
+        for key in list(self.thread_message_queue_dict):
+            if key not in keep and key != main:
+                self.thread_message_queue_dict.pop(key, None)
+        self.thread_message_queue_dict[main] = PriorityQueue(queue_type="FIFO")
+        # A test-scoped thread's failure nobody waited for belongs to the
+        # test that is over, not to this one.
+        for key, failure in dict(self.thread_failures).items():
+            if failure["daemon"]:
+                self.thread_failures.pop(key, None)
         self.output.start_test(data, result)
 
     def _add_timeout(self, timeout):
@@ -401,20 +487,57 @@ class _ExecutionContext:
 
     # cuongnht thread scope -------------------------------------------------
 
-    def register_thread(self, name, worker, stop_event, daemon):
-        self.active_threads[name] = {
+    def thread_failed(self, key, message, unknown=False):
+        """The worker ``key`` ended with a failure: kept for `Wait For Thread`."""
+        entry = self.active_threads.get(key) or {}
+        self.thread_failures[key] = {
+            "name": entry.get("name", key),
+            "message": message,
+            "unknown": unknown,
+            "daemon": entry.get("daemon", True),
+        }
+
+    def take_thread_failure(self, key=None, name=None):
+        """The recorded failure of thread ``key``, or of the newest ended
+        thread named ``name``, removed from the record; None without one."""
+        if key is not None:
+            return self.thread_failures.pop(key, None)
+        keys = [k for k, f in dict(self.thread_failures).items() if f["name"] == name]
+        return self.thread_failures.pop(keys[-1], None) if keys else None
+
+    def register_thread(self, key, name, worker, stop_event, daemon):
+        self.active_threads[key] = {
+            "name": name,
             "worker": worker,
             "stop_event": stop_event,
             "daemon": daemon,
             "owner": self.test.name if self.test is not None else None,
         }
 
-    def unregister_thread(self, name):
-        self.active_threads.pop(name, None)
+    def unregister_thread(self, key):
+        self.active_threads.pop(key, None)
+
+    def thread_entry(self, name):
+        """The registry entry of the newest running thread named ``name``:
+        ``(key, entry)``, or ``(None, None)``. Keywords address threads by
+        their name; the registry by the key."""
+        found = (None, None)
+        for key, entry in dict(self.active_threads).items():
+            if entry["name"] != name or entry.get("abandoned"):
+                continue        # an abandoned thread is past addressing: it was told to stop
+            # A live thread wins; among equals the one registered later.
+            if found[1] is None or entry["worker"].is_alive() >= found[1]["worker"].is_alive():
+                found = (key, entry)
+        return found
 
     def thread_stop_requested(self):
         """True if the current worker thread has been asked to stop."""
-        entry = self.active_threads.get(threading.current_thread().name)
+        # The flag travels with the worker (set by ThreadRunner), so a thread
+        # abandoned by its scope, gone from the registry, still sees it.
+        event = getattr(threading.current_thread(), "robot_stop_event", None)
+        if event is not None:
+            return event.is_set()
+        entry = self.active_threads.get(thread_key())
         return bool(entry and entry["stop_event"].is_set())
 
     # -----------------------------------------------------------------------

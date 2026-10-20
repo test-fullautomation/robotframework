@@ -142,10 +142,28 @@
         "category": "Robot Flow"
       },
       {
+        "command": "robotFlow.setVariables",
+        "title": "Set Variables in the Running Flow\u2026",
+        "category": "Robot Flow",
+        "icon": "$(symbol-variable)"
+      },
+      {
+        "command": "robotFlow.snapshot",
+        "title": "Snapshot the Running Flow\u2026",
+        "category": "Robot Flow",
+        "icon": "$(save)"
+      },
+      {
         "command": "robotFlow.continue",
         "title": "Continue the Stopped Run from Its Checkpoint",
         "category": "Robot Flow",
         "icon": "$(debug-restart)"
+      },
+      {
+        "command": "robotFlow.addToGroup",
+        "title": "Add to Run Group…",
+        "category": "Robot Flow",
+        "icon": "$(type-hierarchy)"
       },
       {
         "command": "robotFlow.openGroup",
@@ -157,9 +175,192 @@
         "command": "robotFlow.showRobot",
         "title": "Show Which Robot Framework Is Used",
         "category": "Robot Flow"
+      },
+      {
+        "command": "robotFlow.runs.refresh",
+        "title": "Refresh Runs",
+        "category": "Robot Flow",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "robotFlow.runs.deleteOld",
+        "title": "Delete Old Runs…",
+        "category": "Robot Flow",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "robotFlow.runs.delete",
+        "title": "Delete the Results of This Run",
+        "category": "Robot Flow",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "robotFlow.runs.openTarget",
+        "title": "Open the Suite or Flow",
+        "category": "Robot Flow",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "robotFlow.runs.openFolder",
+        "title": "Open the Results Folder",
+        "category": "Robot Flow",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "robotFlow.runs.output",
+        "title": "Show the Output",
+        "category": "Robot Flow",
+        "icon": "$(output)"
+      },
+      {
+        "command": "robotFlow.runs.stop",
+        "title": "Stop",
+        "category": "Robot Flow",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "robotFlow.runs.pause",
+        "title": "Pause the Flow",
+        "category": "Robot Flow",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "robotFlow.runs.resume",
+        "title": "Resume the Flow",
+        "category": "Robot Flow",
+        "icon": "$(debug-continue)"
+      },
+      {
+        "command": "robotFlow.runs.snapshot",
+        "title": "Snapshot the Flow…",
+        "category": "Robot Flow",
+        "icon": "$(save)"
+      },
+      {
+        "command": "robotFlow.runs.continueFrom",
+        "title": "Continue from Here",
+        "category": "Robot Flow",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "robotFlow.runs.openFile",
+        "title": "Open",
+        "category": "Robot Flow"
+      },
+      {
+        "command": "robotFlow.runs.open",
+        "title": "Open Run Page",
+        "category": "Robot Flow",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "robotFlow.runs.flowReport",
+        "title": "Flow Report",
+        "category": "Robot Flow",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "robotFlow.runs",
+          "name": "Robot Runs",
+          "contextualTitle": "Robot Runs",
+          "icon": "$(beaker)",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "robotFlow.runs",
+        "contents": "No runs yet in the results folders of this workspace.\nRun a suite or a flow from its editor title (▶), the Explorer's context menu or the Diagram's toolbar; the runs are listed here with their phases, Log, Report and checkpoints.\n[Run the Active File](command:robotFlow.run)"
       }
     ],
     "menus": {
+      "commandPalette": [
+        { "command": "robotFlow.runs.delete", "when": "false" },
+        { "command": "robotFlow.runs.openTarget", "when": "false" },
+        { "command": "robotFlow.runs.openFolder", "when": "false" },
+        { "command": "robotFlow.runs.output", "when": "false" },
+        { "command": "robotFlow.runs.stop", "when": "false" },
+        { "command": "robotFlow.runs.pause", "when": "false" },
+        { "command": "robotFlow.runs.resume", "when": "false" },
+        { "command": "robotFlow.runs.snapshot", "when": "false" },
+        { "command": "robotFlow.runs.continueFrom", "when": "false" },
+        { "command": "robotFlow.runs.openFile", "when": "false" },
+        { "command": "robotFlow.runs.open", "when": "false" },
+        { "command": "robotFlow.runs.flowReport", "when": "false" }
+      ],
+      "view/title": [
+        {
+          "command": "robotFlow.runs.refresh",
+          "when": "view == robotFlow.runs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "robotFlow.runs.deleteOld",
+          "when": "view == robotFlow.runs",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "robotFlow.runs.pause",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.running\\.pausable\\.live/",
+          "group": "inline@1"
+        },
+        {
+          "command": "robotFlow.runs.resume",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.running\\.pausable\\.paused/",
+          "group": "inline@1"
+        },
+        {
+          "command": "robotFlow.runs.stop",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.(running|stopping)/",
+          "group": "inline@2"
+        },
+        {
+          "command": "robotFlow.runs.snapshot",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.running\\.pausable/",
+          "group": "1_run@1"
+        },
+        {
+          "command": "robotFlow.runs.output",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.(running|stopping)/",
+          "group": "1_run@2"
+        },
+        {
+          "command": "robotFlow.runs.continueFrom",
+          "when": "view == robotFlow.runs && viewItem == checkpoint.continue",
+          "group": "inline@1"
+        },
+        {
+          "command": "robotFlow.runs.open",
+          "when": "view == robotFlow.runs && viewItem =~ /^(run|member)\\./",
+          "group": "2_open@0"
+        },
+        {
+          "command": "robotFlow.runs.flowReport",
+          "when": "view == robotFlow.runs && viewItem =~ /^(run|member)\\.(passed|failed|stopped|error|incomplete|unknown)/ && viewItem =~ /\\.flow(\\.|$)/",
+          "group": "2_open@1"
+        },
+        {
+          "command": "robotFlow.runs.openTarget",
+          "when": "view == robotFlow.runs && viewItem =~ /^(run|member)\\..*\\.target/",
+          "group": "2_open@2"
+        },
+        {
+          "command": "robotFlow.runs.openFolder",
+          "when": "view == robotFlow.runs && viewItem =~ /^(run|member)\\./",
+          "group": "2_open@3"
+        },
+        {
+          "command": "robotFlow.runs.delete",
+          "when": "view == robotFlow.runs && viewItem =~ /^run\\.(passed|failed|stopped|error|incomplete|unknown)/",
+          "group": "3_delete@1"
+        }
+      ],
       "editor/title": [
         {
           "command": "robotFlow.run",
@@ -185,6 +386,11 @@
           "command": "robotFlow.continue",
           "when": "resourceFilename =~ /\\.flow\\.json$/",
           "group": "1_run@2"
+        },
+        {
+          "command": "robotFlow.addToGroup",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "1_run@3"
         },
         {
           "command": "robotFlow.openGrid",
@@ -214,6 +420,11 @@
           "group": "navigation@8"
         },
         {
+          "command": "robotFlow.addToGroup",
+          "when": "resourceFilename =~ /\\.flow\\.json$/",
+          "group": "navigation@9"
+        },
+        {
           "command": "robotFlow.openGroup",
           "when": "resourceFilename == testproject.json",
           "group": "navigation@9"
@@ -230,6 +441,16 @@
         }
       ]
     },
+    "jsonValidation": [
+      {
+        "fileMatch": "testproject.json",
+        "url": "./schemas/testproject.schema.json"
+      },
+      {
+        "fileMatch": "*.flow.json",
+        "url": "./schemas/flow.schema.json"
+      }
+    ],
     "configuration": {
       "title": "Robot Flow",
       "properties": {
@@ -372,8 +593,8 @@
     "sync": "node scripts/sync-vendor.mjs",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node --test test/backend.test.mjs test/run.test.mjs test/define.test.mjs test/debug.test.mjs test/control.test.mjs",
-    "test:webview": "npm run compile && node test/webview/render.mjs",
+    "test": "npm run compile && node --test test/backend.test.mjs test/run.test.mjs test/define.test.mjs test/complete.test.mjs test/debug.test.mjs test/control.test.mjs test/history.test.mjs",
+    "test:webview": "npm run compile && node test/webview/render.mjs && node test/webview/runpage.mjs",
     "test:vscode": "npm run compile && node test/integration/run.mjs",
     "package": "vsce package",
     "test:grammar": "node test/grammar.run.mjs",

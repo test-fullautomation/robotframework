@@ -1,0 +1,52 @@
+{
+  "flow": { "name": "Parallel Ramp", "version": 1 },
+  "imports": { "libraries": ["bench_keywords.py"] },
+  "variables": { "RIG": "RIG_A" },
+
+  "nodes": [
+    { "id": "start",    "kind": "start" },
+
+    { "id": "setup",    "kind": "phase", "role": "setup" },
+    { "id": "reset",    "kind": "keyword", "keyword": "Reset Bench" },
+
+    { "id": "ramp",     "kind": "phase", "role": "test", "name": "Ramp And Power Up" },
+    { "id": "both",     "kind": "parallel", "label": "Chamber and supply at once", "timeout": "30s" },
+    { "id": "chamber",  "kind": "keyword", "keyword": "Start Chamber", "args": ["1.5s"] },
+    { "id": "settled",  "kind": "gate",    "keyword": "Chamber Should Be Ready", "timeout": "10s", "interval": "0.5s" },
+    { "id": "supply",   "kind": "keyword", "keyword": "Power On DUT", "args": ["${RIG}"] },
+    { "id": "stable",   "kind": "sleep",   "duration": "0.5s" },
+    { "id": "measure",  "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}", 99] },
+
+    { "id": "guarded",  "kind": "phase", "role": "test", "name": "A Failed Branch Stops The Other" },
+    { "id": "campaign", "kind": "parallel", "label": "Flash while cycling" },
+    { "id": "flash",    "kind": "keyword", "keyword": "Flash Image", "args": ["fw-bad"] },
+    { "id": "cycles",   "kind": "loop",    "max_loops": 10, "every": "0.3s" },
+    { "id": "cycle",    "kind": "keyword", "keyword": "Run Cycle Tests", "args": ["${RIG}", 99] },
+    { "id": "fix",      "kind": "keyword", "keyword": "Restore Golden Image" },
+    { "id": "after",    "kind": "keyword", "keyword": "Log", "args": ["The flash failed, the cycling was stopped, the golden image is back."] },
+
+    { "id": "teardown", "kind": "phase", "role": "teardown" },
+    { "id": "release",  "kind": "keyword", "keyword": "Release Bench" },
+    { "id": "end",      "kind": "end" }
+  ],
+
+  "edges": [
+    ["start", "setup"], ["setup", "reset"], ["reset", "ramp"], ["ramp", "both"],
+    { "from": "both",    "to": "chamber", "label": "branch" }, ["chamber", "settled"],
+    { "from": "settled", "to": "both",    "label": "join" },
+    { "from": "both",    "to": "supply",  "label": "branch" }, ["supply", "stable"],
+    { "from": "stable",  "to": "both",    "label": "join" },
+    { "from": "both",    "to": "measure", "label": "done" },
+    ["measure", "guarded"], ["guarded", "campaign"],
+    { "from": "campaign", "to": "flash",    "label": "branch" },
+    { "from": "flash",    "to": "campaign", "label": "join" },
+    { "from": "campaign", "to": "cycles",   "label": "branch" },
+    { "from": "cycles",   "to": "cycle",    "label": "body" },
+    { "from": "cycle",    "to": "cycles",   "label": "next" },
+    { "from": "cycles",   "to": "campaign", "label": "join" },
+    { "from": "campaign", "to": "fix",      "label": "on_failure" },
+    { "from": "fix",      "to": "campaign", "label": "continue" },
+    { "from": "campaign", "to": "after",    "label": "done" },
+    ["after", "teardown"], ["teardown", "release"], ["release", "end"]
+  ]
+}

@@ -33,6 +33,7 @@ means the flow file must still be the one the run used.
     python -m robot.flow report results/output.xml [--output flow.html]
 """
 
+import glob
 import json
 import os
 import re
@@ -44,11 +45,15 @@ from pathlib import Path
 from robot.api import ExecutionResult
 from robot.errors import DataError
 
+from robot.running.bodyrunner import THREAD_STOP_MESSAGE
+
 from . import build_flow_suite
-from .builder import FLOW_LIBRARY, GATE_KEYWORD
+from .builder import BRANCH_KEYWORD, FLOW_LIBRARY, GATE_KEYWORD, JOIN_KEYWORD, RETRY_KEYWORD
+
+LEGACY_ITERATION_KEYWORD = 'Flow Iteration'
 from .control import checkpoint_name, fingerprint, read_checkpoint
-from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, SleepStep, Try,
-                    structure)
+from .graph import (Decision, FlowStep, GateStep, KeywordStep, Loop, Parallel, SleepStep,
+                    Try, structure)
 from .schema import PHASE, load_flow
 
 
@@ -181,6 +186,7 @@ class _Stats:
         self.edges = {}             # edge label -> count
         self.iterations = []        # loops: [{status, id, elapsed}]
         self.attempts = []          # gates: attempts per run
+        self.branches = []          # parallel: [{branch, status, elapsed, id, error}] per run
         self.limit = None           # loops: the iteration limit the run used
         self.roles = {}             # role -> count of items run
 
@@ -211,8 +217,8 @@ class _Stats:
             'elapsed': round(self.elapsed, 3), 'max': round(self.max, 3), 'max_id': self.max_id,
             'first_fail': self.first_fail, 'last_fail': self.last_fail, 'last': self.last,
             'last_error': self.last_error, 'edges': self.edges,
-            'iterations': self.iterations, 'attempts': self.attempts, 'roles': self.roles,
-            'limit': self.limit,
+            'iterations': self.iterations, 'attempts': self.attempts,
+            'branches': self.branches, 'roles': self.roles, 'limit': self.limit,
         }
 
 
@@ -260,6 +266,7 @@ class _FlowRun:
             'plan': self._plan(flow),
             'stats': {key: stats.to_dict() for key, stats in self.stats.items()},
             'checkpoint': self._checkpoint(),
+            'snapshots': self._snapshots(),
         }
 
     # ----------------------------------------------------------- matching
@@ -281,7 +288,11 @@ class _FlowRun:
 
     def _walk(self, built_body, result_body, parent_id):
         built_items = list(built_body)
-        result_items = _numbered(parent_id, result_body)
+        # Outputs of earlier versions have a 'Flow Iteration' marker first in
+        # every iteration; it takes its log number but is not a step of the plan.
+        result_items = [entry for entry in _numbered(parent_id, result_body)
+                        if not (entry[0].type == 'KEYWORD'
+                                and entry[0].name == LEGACY_ITERATION_KEYWORD)]
         for built, (item, item_id, branches) in zip(built_items, result_items):
             origin = self._origin(built)
             btype = getattr(built, 'type', None)
@@ -294,6 +305,8 @@ class _FlowRun:
                 self._decision(built, item, branches, origin)
             elif btype == 'TRY/EXCEPT ROOT' and rtype == 'TRY/EXCEPT ROOT':
                 self._guarded(built, item, branches, origin)
+            elif btype == 'THREAD' and rtype == 'THREAD':
+                self._thread(built, item, item_id, origin)
             else:
                 return          # the shapes differ: the flow file is not the run's
 
@@ -304,14 +317,48 @@ class _FlowRun:
             stats.roles[role] = stats.roles.get(role, 0) + 1
             if role == 'node':
                 stats.run(item, item_id)
-                if built.name == GATE_KEYWORD:
+                if built.name in (GATE_KEYWORD, RETRY_KEYWORD):
                     stats.attempts.append(len(_items(item.body)))
+                elif built.name == JOIN_KEYWORD:
+                    stats.edge('done', 1 if item.status == 'PASS' else 0)
             elif role == 'abort':
                 stats.edge('abort')
             elif role == 'loop-start':
                 stats.limit = _assigned_limit(item)
         if built.name in self.keywords:
             self._walk(self.keywords[built.name].body, item.body, item_id)
+        elif built.name == BRANCH_KEYWORD and len(built.args) > 1:
+            # The branch's steps are in the user keyword the call runs.
+            name = built.args[1]
+            inner = _numbered(item_id, item.body)
+            if name in self.keywords and inner and inner[0][1]:
+                self._walk(self.keywords[name].body, inner[0][0].body, inner[0][1])
+
+    def _thread(self, built, item, item_id, origin):
+        """A branch of a parallel region. Its verdict is that of the user
+        keyword holding its steps (the ``Flow Branch`` call's child); the
+        thread itself ends UNKNOWN only when it was abandoned."""
+        stats = self._stat(origin[0]) if origin else None
+        call = _numbered(item_id, item.body)
+        steps = _numbered(call[0][1], call[0][0].body) if call and call[0][1] else []
+        if stats:
+            branch = origin[1].partition(':')[2]
+            if call:
+                status, error = call[0][0].status, call[0][0].message or _error(call[0][0])
+            else:
+                status, error = item.status, item.message
+            if steps and status != 'PASS' and _error(steps[0][0]) == THREAD_STOP_MESSAGE:
+                status, error = 'STOPPED', ''
+            elif item.status == 'UNKNOWN' and not steps:
+                status = 'ABANDONED'
+            stats.branches.append({'branch': branch, 'name': item.name, 'status': status,
+                                   'elapsed': round(_seconds(item), 3), 'id': item_id,
+                                   'error': error})
+            stats.edge('branch')
+            if status in ('PASS', 'FAIL', 'UNKNOWN'):
+                stats.edge('join')
+        if call:
+            self._walk(built.body, item.body, item_id)
 
     def _loop(self, built, item, item_id, origin):
         stats = self._stat(origin[0]) if origin else None
@@ -373,6 +420,10 @@ class _FlowRun:
                              timeout=step.timeout, interval=step.interval, on_timeout=step.on_timeout)
             elif isinstance(step, KeywordStep):
                 entry.update(kind='keyword', detail=' '.join([step.keyword] + list(step.args)))
+                if step.retry is not None:
+                    entry['retry'] = dict(step.retry)
+                if step.timeout is not None:
+                    entry['timeout'] = step.timeout
             elif isinstance(step, SleepStep):
                 entry.update(kind='sleep', detail=step.duration)
             elif isinstance(step, FlowStep):
@@ -381,6 +432,11 @@ class _FlowRun:
             elif isinstance(step, Decision):
                 entry.update(kind='decision', detail=step.condition,
                              yes=self._steps(step.yes, prefix, base), no=self._steps(step.no, prefix, base))
+            elif isinstance(step, Parallel):
+                entry.update(kind='parallel', timeout=step.timeout, stop_others=step.stop_others,
+                             branches=[{'id': b.id, 'steps': self._steps(b.steps, prefix, base)} for b in step.branches],
+                             recovery=self._steps(step.recovery, prefix, base) if step.recovery is not None else None,
+                             then=step.then)
             elif isinstance(step, (Loop, Try)):
                 entry.update(kind='loop' if isinstance(step, Loop) else 'try',
                              body=self._steps(step.body, prefix, base),
@@ -402,7 +458,7 @@ class _FlowRun:
 
     # --------------------------------------------------------- checkpoint
 
-    def _checkpoint(self):
+    def _checkpoint_path(self):
         path = self.checkpoint or self._checkpoint_from_stop()
         if not path:
             stem = os.path.basename(self.source)
@@ -410,6 +466,27 @@ class _FlowRun:
                 if stem.lower().endswith(extension):
                     stem = stem[:-len(extension)]
             path = os.path.join(os.path.dirname(os.path.abspath(self.output)), checkpoint_name(stem))
+        return path
+
+    def _snapshots(self):
+        """The snapshots next to the checkpoint: `<stem>.snapshot-<name>.json`."""
+        path = self._checkpoint_path()
+        stem = path[:-len('.checkpoint.json')] if path.endswith('.checkpoint.json') else os.path.splitext(path)[0]
+        found = []
+        for candidate in sorted(glob.glob(glob.escape(stem) + '.snapshot-*.json')):
+            data, _ = read_checkpoint(candidate)
+            taken = (data or {}).get('snapshot')
+            if not taken:
+                continue
+            found.append({'name': taken.get('name'), 'taken': taken.get('taken'),
+                          'position': taken.get('position'), 'phase': taken.get('phase'),
+                          'loop': taken.get('loop'), 'iteration': taken.get('iteration'),
+                          'path': os.path.abspath(candidate),
+                          'matches': data.get('fingerprint') == fingerprint(self.source)})
+        return found
+
+    def _checkpoint(self):
+        path = self._checkpoint_path()
         data, _ = read_checkpoint(path)
         if not data:
             return None
@@ -450,7 +527,8 @@ def render(data, log='log.html'):
     title = ', '.join(flow['name'] for flow in data['flows'])
     return (TEMPLATE
             .replace('%TITLE%', escape(title))
-            .replace('%LOG%', escape(log or ''))
+            # A JS string, not HTML: a Windows path's backslashes stay as they are.
+            .replace('%LOG%', json.dumps(log or '').replace('</', '<\\/'))
             .replace('%DATA%', payload))
 
 
@@ -557,6 +635,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 .chip.idle rect { fill: var(--idle-soft); } .chip.idle text { fill: var(--muted); }
 .chip.unknown rect { fill: var(--unknown-soft); } .chip.unknown text { fill: var(--unknown); }
 .chip.skip rect { fill: var(--skip-soft); } .chip.skip text { fill: var(--skip); }
+.chip.tries rect { fill: var(--idle-soft); } .chip.tries text { fill: var(--fg); }
 .track { fill: var(--idle-soft); } .fill-a { fill: var(--accent); }
 .toggle { cursor: pointer; outline: none; }
 .toggle rect { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
@@ -565,6 +644,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 .tools { display: flex; gap: 6px; }
 .btn { font: 500 12px system-ui, sans-serif; color: var(--accent); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 3px 9px; cursor: pointer; }
 .btn:hover { border-color: var(--accent); }
+.snaps { margin: 4px 0 0 18px; padding: 0; font-size: 13px; } .snaps li { margin: 4px 0; } .snaps .hint { overflow-wrap: anywhere; }
 .join { fill: var(--muted); } .join.cold { fill: var(--idle); } .join.rec { fill: var(--skip); }
 .detail { position: sticky; top: 12px; }
 .detail .body { padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -594,7 +674,7 @@ svg.plan { display: block; width: 100%; height: auto; }  /* scales to the card; 
 <div class="page" id="page"></div>
 <script>
 var DATA = %DATA%;
-var LOG = "%LOG%";
+var LOG = %LOG%;
 (function () {
   var NS = 'http://www.w3.org/2000/svg';
   var NW = 236, NH = 52, GAP = 30, PAD = 14, COL = 48, LANE_W = 190, LANE_PAD = 16, DH = 64;
@@ -649,6 +729,13 @@ var LOG = "%LOG%";
       // A loop's head holds a bar per bound (cycles, time); one bar when it has none.
       var head = step.kind === 'loop' ? 82 + 13 * Math.max(0, (step.max_loops ? 1 : 0) + (step.max_seconds ? 1 : 0) - 1) : 44;
       m = { w: b.w + (r ? COL + r.w : 0) + 2 * PAD, h: head + Math.max(b.h, r ? r.h : 0) + 34 + PAD, body: b, rec: r, head: head };
+    } else if (step.kind === 'parallel') {
+      // One column per branch, side by side; the recovery column to the right.
+      var cols = step.branches.map(function (b) { return measureSeq(b.steps); });
+      var rr = step.recovery ? measureSeq(step.recovery) : null;
+      var bw = cols.reduce(function (a, c) { return a + c.w; }, 0) + COL * (cols.length - 1);
+      var bh = Math.max.apply(null, cols.map(function (c) { return c.h; }));
+      m = { w: bw + (rr ? COL + rr.w : 0) + 2 * PAD, h: 62 + bh + 34 + PAD, cols: cols, rec: rr, head: 62, bodyW: bw, bodyH: bh };
     } else if (step.kind === 'flow' && step._collapsed) {
       m = { w: NW, h: NH, body: null };
     } else if (step.kind === 'flow') {
@@ -795,6 +882,39 @@ var LOG = "%LOG%";
       }
       return;
     }
+    if (step.kind === 'parallel') {
+      var g5 = group(step, x, y, w, m.h, 'container');
+      el('text', { 'class': 'kind', x: x + 12, y: y + 17 }, g5, 'PARALLEL');
+      el('text', { 'class': 'label', x: x + 12, y: y + 35 }, g5, truncate(step.label, 30));
+      chips(g5, st, x + w - 8, y + 8);
+      var e5 = (st && st.edges) || {}, bx5 = x + PAD, top5 = y + m.head, n5 = runs(step);
+      var hub = bx5 + m.bodyW / 2, foot5 = y + m.h - PAD - 10, colX = bx5, cold5 = n5 ? '' : 'cold';
+      // Out of the head into every column at once; every column back into the foot.
+      step.branches.forEach(function (b, i) {
+        var c = m.cols[i], ccx = colX + c.w / 2;
+        edge([[hub, top5 - 16], [ccx, top5 - 16], [ccx, top5]], cold5, null, null);
+        drawSeq(b.steps, colX, top5, c.w);
+        edge([[ccx, top5 + c.h], [ccx, foot5], [hub, foot5]], cold5, i === step.branches.length - 1 ? 'join ×' + (e5.join || 0) : null, [hub + 8, foot5 - 6], true);
+        colX += c.w + COL;
+      });
+      el('circle', { 'class': 'join ' + cold5, cx: hub, cy: top5 - 16, r: 3.5 }, svg);
+      el('text', { 'class': 'edge-label ' + cold5, x: hub + 10, y: top5 - 21 }, svg, 'branch ×' + (e5.branch || 0));
+      if (m.rec) {
+        var rx5 = bx5 + m.bodyW + COL, f5 = e5.on_failure || 0, gx5 = bx5 + m.bodyW + COL / 2;
+        // The join's failure leaves through the foot, up the gap and into the recovery column from above.
+        edge([[hub + 20, foot5], [gx5, foot5], [gx5, top5 - 30], [rx5 + m.rec.w / 2, top5 - 30], [rx5 + m.rec.w / 2, top5]], f5 ? 'fail' : 'cold', 'on failure ×' + f5, [gx5 + 6, top5 - 34]);
+        drawSeq(step.recovery, rx5, top5, m.rec.w);
+        var then5 = step.then === 'abort' ? (e5.abort || 0) : (e5.continue || 0), rcx5 = rx5 + m.rec.w / 2;
+        if (step.then === 'abort') {
+          edge([[rcx5, top5 + m.rec.h], [rcx5, y + m.h]], then5 ? 'fail' : 'cold', 'abort ×' + then5, [rcx5 + 8, foot5 - 8]);
+        } else {
+          edge([[rcx5, top5 + m.rec.h], [rcx5, foot5 + 10], [hub, foot5 + 10]], then5 ? 'rec' : 'cold', 'continue ×' + then5, [rcx5 + 8, foot5 + 4], true);
+        }
+      }
+      var dn5 = e5.done || 0;
+      el('text', { 'class': 'edge-label ' + (dn5 ? '' : 'cold'), x: x + w - 8, y: y + m.h - 6, 'text-anchor': 'end' }, svg, 'done ×' + dn5);
+      return;
+    }
     if (step.kind === 'flow') {
       var g3 = group(step, x, y, w, m.h, 'container'), open = !step._collapsed;
       var tg = el('g', { 'class': 'toggle', role: 'button', tabindex: 0,
@@ -812,7 +932,10 @@ var LOG = "%LOG%";
     var g4 = group(step, x, y, w, NH, 'box');
     el('text', { 'class': 'kind', x: x + 12, y: y + 17 }, g4, step.kind.toUpperCase());
     el('text', { 'class': 'label', x: x + 12, y: y + 36 }, g4, truncate(step.label, 28));
-    chips(g4, st, x + w - 8, y + 8);
+    var right4 = chips(g4, st, x + w - 8, y + 8);
+    // A gate or a retried keyword that needed more than one attempt says so on the box.
+    var tries = st && st.attempts.length ? Math.max.apply(null, st.attempts) : 0;
+    if (tries > 1) chip(g4, 'tries', tries + ' tries', right4, y + 8);
   }
   function seconds(text) {
     var m = /^\s*([\d.]+)\s*([a-z]*)/i.exec(String(text));
@@ -838,7 +961,7 @@ var LOG = "%LOG%";
 
     var facts = h('div', 'facts');
     function fact(b, t) { var f = h('div', 'fact'); f.appendChild(h('b', null, b)); f.appendChild(h('span', null, t)); facts.appendChild(f); }
-    var loops = []; (function find(steps) { steps.forEach(function (st) { if (st.kind === 'loop') loops.push(st); ['body', 'recovery', 'yes', 'no', 'steps'].forEach(function (k) { if (st[k]) find(st[k]); }); }); })(flow.lanes.length ? [].concat.apply([], flow.plan.map(function (l) { return l.steps; })) : []);
+    var loops = []; (function find(steps) { steps.forEach(function (st) { if (st.kind === 'loop') loops.push(st); kids(st).forEach(find); }); })(flow.lanes.length ? [].concat.apply([], flow.plan.map(function (l) { return l.steps; })) : []);
     loops.forEach(function (loop) {
       var st = stats[loop.key]; if (!st) return;
       var lim = st.limit || (isFinite(+loop.max_loops) ? +loop.max_loops : loop.max_loops);
@@ -847,6 +970,7 @@ var LOG = "%LOG%";
       if (failed) fact(String(failed), 'cycles of ' + loop.label + ' did not pass');
     });
     fact(secs(s.elapsed), 'run time');
+    if (flow.snapshots && flow.snapshots.length) fact(String(flow.snapshots.length), 'snapshot' + (flow.snapshots.length > 1 ? 's' : '') + ' taken, kept next to the checkpoint');
     fact(s.tests.passed + ' · ' + s.tests.failed + ' · ' + s.tests.unknown, 'phases passed · failed · unknown');
     if (flow.checkpoint && flow.checkpoint.matches) {
       var r = flow.checkpoint.remaining || {};
@@ -924,7 +1048,9 @@ var LOG = "%LOG%";
     svg.setAttribute('width', width); svg.setAttribute('height', y + 2);
   }
   function allSteps() { return [].concat.apply([], flowData.plan.map(function (l) { return l.steps; })); }
-  function walkSteps(steps, fn) { steps.forEach(function (s) { fn(s); ['body', 'recovery', 'yes', 'no', 'steps'].forEach(function (k) { if (s[k]) walkSteps(s[k], fn); }); }); }
+  // The step lists nested in a step: a body, a recovery, the two sides of a decision, a sub-flow, the branches of a region.
+  function kids(s) { var out = []; ['body', 'recovery', 'yes', 'no', 'steps'].forEach(function (k) { if (s[k]) out.push(s[k]); }); (s.branches || []).forEach(function (b) { out.push(b.steps); }); return out; }
+  function walkSteps(steps, fn) { steps.forEach(function (s) { fn(s); kids(s).forEach(function (inner) { walkSteps(inner, fn); }); }); }
   function subflows() { var out = []; walkSteps(allSteps(), function (s) { if (s.kind === 'flow') out.push(s); }); return out; }
   function countSteps(steps) { var n = 0; walkSteps(steps, function (s) { if (s.kind !== 'flow') n++; }); return n; }
   function troubled(steps) { var t = false; walkSteps(steps, function (s) { var st = stats[s.key]; if (st && (st.status.FAIL || st.status.UNKNOWN)) t = true; }); return t; }
@@ -937,7 +1063,7 @@ var LOG = "%LOG%";
   }
   function findStep(key) {
     var found = null;
-    (function walk(steps) { steps.forEach(function (st) { if (st.key === key) found = st; ['body', 'recovery', 'yes', 'no', 'steps'].forEach(function (k) { if (st[k]) walk(st[k]); }); }); })([].concat.apply([], flowData.plan.map(function (l) { return l.steps; })));
+    walkSteps(allSteps(), function (st) { if (st.key === key) found = st; });
     return found;
   }
   function select(key, lane) {
@@ -977,10 +1103,39 @@ var LOG = "%LOG%";
       }
       if (step && step.kind === 'try') row('Recovered', (st.edges.continue || 0) + ' of ' + (st.edges.on_failure || 0) + ' failures');
       if (step && step.kind === 'decision') row('Branches', 'yes ' + (st.edges.yes || 0) + ', no ' + (st.edges.no || 0));
+      if (step && step.kind === 'parallel' && st.edges.on_failure) row('Recovered', (st.edges.continue || 0) + ' of ' + st.edges.on_failure + ' failures');
+    }
+    if (step && step.kind === 'parallel') {
+      row('Branches', step.branches.map(function (b) { return b.id; }).join(', '));
+      if (step.timeout) row('Timeout', step.timeout + ' for all branches to join');
+      row('On a failure', step.stop_others ? 'stop the other branches' : 'let the other branches finish');
     }
     if (step && step.kind === 'gate') { row('Timeout', step.timeout + ', poll every ' + step.interval); row('On timeout', step.on_timeout); }
+    if (step && step.kind === 'keyword') {
+      if (step.retry) {
+        var r = step.retry;
+        row('Retry', 'up to ' + r.max_attempts + ' attempts, ' + r.interval + ' apart' + (r.backoff > 1 ? ', growing ×' + r.backoff : ''));
+        row('On exhaustion', r.on_exhausted);
+      }
+      if (step.timeout) row('Timeout', step.timeout + ' per attempt');
+    }
     if (kv.children.length) body.appendChild(kv);
     if (st && st.last_error) { body.appendChild(h('span', 'eyebrow', 'Last error')); body.appendChild(h('div', 'err', st.last_error)); }
+    if (st && st.branches && st.branches.length && step && step.kind === 'parallel') {
+      // The branches of the last run: how each ended, how long it took, where it is in the log.
+      var lastRun = st.branches.slice(-step.branches.length);
+      body.appendChild(h('span', 'eyebrow', st.runs > 1 ? 'Branches of the last run' : 'Branches'));
+      var blist = h('ul', 'snaps');
+      lastRun.forEach(function (b) {
+        var li = h('li');
+        li.appendChild(h('span', 'mono', b.branch));
+        li.appendChild(document.createTextNode(' · ' + b.status.toLowerCase() + ' · ' + secs(b.elapsed) + ' '));
+        var blink = logLink(b.id); if (blink) { var ba = h('a', null, 'in the log'); ba.href = blink; li.appendChild(ba); }
+        if (b.error) li.appendChild(h('div', 'hint', truncate(b.error, 200)));
+        blist.appendChild(li);
+      });
+      body.appendChild(blist);
+    }
     if (st && st.iterations.length) {
       body.appendChild(h('span', 'eyebrow', 'Cycles, one cell each'));
       var strip = h('div', 'strip');
@@ -999,6 +1154,21 @@ var LOG = "%LOG%";
       if (st.max_id && st.runs > 1) jump('Slowest run', st.max_id);
       jump(st.runs > 1 ? 'Last run' : 'In the log', st.last);
       if (any) { body.appendChild(h('span', 'eyebrow', 'Open in log.html')); body.appendChild(jumps); }
+    }
+    var snaps = (flowData.snapshots || []).filter(function (s) { return step && step.kind === 'loop' && s.loop === step.id; });
+    if (snaps.length) {
+      body.appendChild(h('span', 'eyebrow', 'Snapshots taken here'));
+      var list = h('ul', 'snaps');
+      snaps.forEach(function (s) {
+        var li = h('li'), it = st && st.iterations ? st.iterations[s.iteration] : null;
+        li.appendChild(h('span', 'mono', s.name));
+        li.appendChild(document.createTextNode(' \u00b7 ' + s.taken + ' \u00b7 cycle ' + (s.iteration + 1) + ' '));
+        var link = it ? logLink(it.id) : null;
+        if (link) { var a = h('a', null, 'in the log'); a.href = link; li.appendChild(a); }
+        li.appendChild(h('div', 'hint', 'continue from it: --variable FLOW_CHECKPOINT:' + s.path + (s.matches ? '' : ' (another version of the flow file)')));
+        list.appendChild(li);
+      });
+      body.appendChild(list);
     }
     if (flowData.checkpoint && step && step.kind === 'loop' && flowData.checkpoint.position && flowData.checkpoint.position.loop === step.id) {
       var r = flowData.checkpoint.remaining || {};

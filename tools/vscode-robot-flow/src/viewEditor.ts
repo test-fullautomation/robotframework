@@ -7,7 +7,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import { anchors, runName, same, stepAt, stepOf, subflows } from './backend/flowMap';
+import { catalogKey, flowCatalog, variablesOf } from './backend/complete';
 import { Answer, RobotEnv, editView, readFlow, readGrid } from './backend/helpers';
+import { subflowFiles } from './completion';
 import { RobotInfo, diagramUnavailable, probeRobot } from './backend/robot';
 import { RunManager, fileKey } from './runs';
 import { refreshDelay, robotEnvFor } from './settings';
@@ -57,6 +59,7 @@ class Session implements vscode.Disposable {
   private ticker: NodeJS.Timeout | undefined;
   private reading = 0;            // the newest read; an older answer is dropped
   private ours = -1;              // document version of our own last edit
+  private applying = false;       // one of our edits is being applied: its change event is ours
   private undo: string[] = [];    // texts from before the view's edits, until the user types
   private lastGood: Answer | null = null;
   private base: Record<string, unknown> | null = null;   // the view's data without the live position
@@ -81,7 +84,8 @@ class Session implements vscode.Disposable {
     this.subs.push(
       vscode.workspace.onDidChangeTextDocument((e) => {
         if (e.document !== this.document || !e.contentChanges.length) return;
-        if (this.document.version !== this.ours) this.undo = [];   // the user changed the text
+        // The event of our own edit arrives before applyEdit resolves: not the user typing.
+        if (!this.applying && this.document.version !== this.ours) this.undo = [];
         this.schedule(refreshDelay(this.document.uri));
       }),
       panel.webview.onDidReceiveMessage((msg) => this.onMessage(msg)),
@@ -124,6 +128,21 @@ class Session implements vscode.Disposable {
     return robotEnvFor(this.document.uri, this.extension.extensionPath);
   }
 
+  /** What the Diagram's field editor may complete; read again when the imports or the file's variables change. */
+  private catalogSent = '';
+
+  private async sendCatalog(env: RobotEnv, text: string): Promise<void> {
+    const key = catalogKey(text) + '\n' + variablesOf(text).join(' ');
+    if (key === this.catalogSent) return;
+    this.catalogSent = key;
+    const [catalog, files] = await Promise.all([
+      flowCatalog(env, this.document.uri.fsPath, text), subflowFiles(this.document.uri),
+    ]);
+    if (this.catalogSent !== key) return;
+    const own = variablesOf(text).map((name) => ({ name, value: '', source: 'this file' }));
+    this.post({ type: 'catalog', keywords: catalog.keywords, variables: [...own, ...catalog.variables], files });
+  }
+
   private async refresh(): Promise<void> {
     const n = ++this.reading;
     const env = await this.env();
@@ -146,6 +165,7 @@ class Session implements vscode.Disposable {
     this.status = null;
     if (answer.ok) {
       this.lastGood = answer;
+      if (this.kind.id === 'diagram') void this.sendCatalog(env, text);
     } else {
       const where = answer.line ? ` (line ${answer.line})` : answer.node ? ` (step ${answer.node})` : '';
       this.status = { kind: 'error', text: `${answer.error || 'The file could not be read.'}${where}` +
@@ -293,6 +313,10 @@ class Session implements vscode.Disposable {
       await this.runs.continueRun(this.key);
     } else if (action === 'pause' || action === 'resume') {
       await this.runs.control(this.key, action);
+    } else if (action === 'set') {
+      await this.runs.setVariables(this.key);
+    } else if (action === 'snapshot') {
+      await this.runs.snapshot(this.key);
     } else if (action === 'log' || action === 'report' || action === 'flow') {
       await this.runs.open(this.key, `${action}.html`);
     } else if (action === 'output') {
@@ -301,6 +325,15 @@ class Session implements vscode.Disposable {
       setOption(this.live, name, value);
       this.send();
     }
+  }
+
+  /** How many of the view's edits can be undone (the user typing clears them). */
+  get undoDepth(): number {
+    return this.undo.length;
+  }
+
+  editFromView(change: { op?: string }): Promise<Answer> {
+    return this.edit(change);
   }
 
   private async edit(change: { op?: string }): Promise<Answer> {
@@ -312,10 +345,13 @@ class Session implements vscode.Disposable {
     }
     const env = await this.env();
     const text = this.document.getText();
+    const version = this.document.version;
     const answer = await editView(env, this.kind.id, this.document.uri.fsPath, text, change);
     if (!answer.ok || typeof answer.text !== 'string') {
       return { ok: false, error: answer.error || 'The change could not be made.', ...(answer.missing ? { missing: answer.missing } : {}) };
     }
+    // The helper worked on the text as it was: typing meanwhile must not be replaced.
+    if (this.document.version !== version) return { ok: false, error: 'The text changed while the change was made: try again.' };
     if (answer.text === text) return { ...answer, text: undefined, ok: true };
     this.undo.push(text);
     const applied = await this.replaceText(answer.text);
@@ -332,9 +368,14 @@ class Session implements vscode.Disposable {
     const all = new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, all, text);
-    const ok = await vscode.workspace.applyEdit(edit);
-    if (ok) this.ours = doc.version;
-    return ok;
+    this.applying = true;
+    try {
+      const ok = await vscode.workspace.applyEdit(edit);
+      if (ok) this.ours = doc.version;
+      return ok;
+    } finally {
+      this.applying = false;
+    }
   }
 }
 
@@ -367,5 +408,13 @@ export class ViewEditorProvider implements vscode.CustomTextEditorProvider {
   reportFor(file: string): Session['report'] {
     for (const s of this.sessions) if (s.file.toLowerCase() === file.toLowerCase() && s.report) return s.report;
     return null;
+  }
+
+  /** A change as the view would send it, applied to the open view of `file` (for tests). */
+  async editIn(file: string, change: { op?: string }): Promise<Answer & { undo?: number }> {
+    for (const s of this.sessions) {
+      if (s.file.toLowerCase() === file.toLowerCase()) return { ...(await s.editFromView(change)), undo: s.undoDepth };
+    }
+    return { ok: false, error: 'No open view of that file.' };
   }
 }

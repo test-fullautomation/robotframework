@@ -31,6 +31,16 @@ and what you type in the text redraws the view, unsaved changes included.
   toolbar, the title bar, the Explorer) asks for `NAME=value` pairs passed as
   `--variable`, the file's last ones offered again: the way to size a flow's
   `${variable}` bounds per run.
+- **Robot Runs** (a view in the Explorer) — what ran, what runs now, and
+  what each run left behind: one row per results folder with its status,
+  time and duration; a running run with where it is and Pause / Resume /
+  Stop inline; under a run its phases or tests with their verdicts, the Log,
+  Report and Flow report, its checkpoint and snapshots with *Continue from
+  here*, the Output and the folder. Read from the results folders, so it
+  survives a restart and lists command-line runs too. A click opens the
+  **Run page** in the editor area: the phases as a table with time bars and
+  the failure messages in full, the buttons, and for a flow run the **flow
+  report** itself on the page, written on demand when the run has none.
 - **Run groups** — the `groups` of a Manager GUI test project
   (`testproject.json`): the members' Diagrams side by side with the signals
   where one waits for another, and a Run that starts all members together on
@@ -47,6 +57,22 @@ and what you type in the text redraws the view, unsaved changes included.
   libraries (the Python source), BuiltIn. Robot's name matching applies
   (case, spaces, `Given`/`When`/`Then`). On an import or a sub-flow
   (`"file": "sub/x.flow.json"`) it opens that file. Unsaved text counts.
+- **Completion in flow files** (Ctrl+Space, or as you type `"`, `$`, `{`,
+  `/`) — the structure comes from the fork's JSON schema, registered here for
+  `*.flow.json`: keys, node kinds, enum values, with their descriptions. On
+  top of it: in `"from"` and `"to"` the node ids of the file (with the kind);
+  in `"label"` the labels the source node's kind allows (`body`, `done` and
+  `on_failure` after a loop, `yes` and `no` after a decision, `branch` and
+  `join` for a parallel region); in `"keyword"` every keyword of the file's
+  imports with its parameters, the flow library's `Flow Pause` / `Resume` /
+  `Stop` / `Snapshot`, and BuiltIn; after `${` the variables of the file and
+  of its resources; in `"file"` the other flow files of the workspace. The
+  keywords are read with the configured Robot, so what is offered is what
+  runs; the text may be half typed. The Diagram's step editor has the same
+  help: the *Keyword* field lists the keywords as you type (name, owner and
+  parameters; Enter or a click takes one), the *Arguments* field then shows
+  the parameters as its placeholder, every value field offers variables
+  after `${`, and the sub-flow *File* field the other flow files.
 - **Debug** — run a suite or a flow with breakpoints (see *Debug* below):
   stop at a flow step or a line, step into resource keywords and sub-flows,
   see variables, run keywords in the Debug Console. The Diagram shows the
@@ -76,8 +102,47 @@ or *Extensions → … → Install from VSIX…*. Build the `.vsix` with
   resume, stop and continue a flow*). Each run writes `output.xml`, `log.html` and `report.html`
   (and `flow.html`, the flow report, with `robotFlow.flowReport`) to its own folder under
   `robotFlow.resultsFolder`.
+- **Robot Runs**, a view at the bottom of the Explorer, lists the runs of
+  the results folders (`robotFlow.resultsFolder` of each workspace folder
+  and of each test project, plus the folders of runs started here): running
+  ones first, then newest first, each with its status icon, the time of day
+  (and the date when not today), the duration, and `1 of 4 failed` when
+  something did. Click a run for its **Run page**, a tab in the editor
+  area: the header (status, start, duration, variables, the target and the
+  folder as links), the buttons (Log, Report, Output, *Continue from* each
+  checkpoint and snapshot; Pause / Resume, Stop and Snapshot while it runs),
+  the phases or tests as a table with a time bar per row and the failure
+  messages in full, and for a flow run the **flow report** on the page
+  itself, the plan as drawn with what the run did on each node. When the
+  run wrote none (`robotFlow.flowReport` is off by default), *Write the flow
+  report* makes it from `output.xml` with the fork's `robot.flow report`,
+  a second or two. A group run has one tab per member. The page follows a
+  running run. Expand a run in the tree for its **Phases** (a flow) or
+  **Tests** (a suite) with their verdicts, elapsed times and failure
+  messages; the **Log**, **Report** and **Flow report** (opened in the
+  browser; a flow run without one gets *Flow report · written on demand*,
+  a click writes and opens it); its
+  **checkpoint** and **snapshots**, each with ↻ *Continue from here*, which
+  starts a new run of the flow from that file with the original run's
+  variables; the **Output** of a run of this window; and **Open folder**. A
+  running run shows where it is (phase, loop, iteration, or the step) with
+  Pause / Resume and Stop inline, and *Snapshot…* in its menu. A group run
+  lists its members. The folders are read as they are, so runs made from
+  the command line into the same folder appear too (their phases come from
+  `output.xml`; the time and name from the folder or the output). Right-click
+  a finished run to delete its results; 🗑 in the view's title deletes the
+  finished runs older than a day, a week or a month, or all of them. The
+  list follows the folders (a watcher) and the runs of this window.
 - **Robot Flow: Open Run Group Diagram…** (or right-click a
   `testproject.json`) picks a group of the workspace's test projects.
+- **Add to Run Group…** (a flow file's title-bar menu or Explorer context)
+  puts the flow into a group of its project, or into a new one: pick the
+  group, give the member its id (its rig name) and its variables. In a
+  group's panel, **＋ Member…** adds another flow of the project and
+  **✎ Group…** renames the group, changes a member's variables, removes a
+  member or the group. Only the `groups` value of `testproject.json`
+  changes; the rest of the file stays as the Manager GUI wrote it. The file
+  has a JSON schema here, so editing it by hand gets completion too.
 - A file inside a test project is read and run with the project's `run`
   settings (interpreter, `pythonpath`, `args`, `env`), the same way the
   Manager GUI runs it.
@@ -172,6 +237,16 @@ RobotFramework AIO fork with flow control (`robotFlow.robotSource`).
   run from that checkpoint: finished test phases are skipped and the
   interrupted loop goes on with what is left of it and with its saved
   variables. The setup phase runs again.
+- **Set…** (the toolbar, or *Robot Flow: Set Variables in the Running
+  Flow…*) sends `NAME=value` pairs to the running flow; it applies them at
+  its next step as suite variables and logs it. A loop's bounds are read when
+  the loop starts, so they change for the next loop, not the running one.
+- **Snapshot** (the toolbar, or *Robot Flow: Snapshot the Running Flow…*)
+  writes a named `<flow>.snapshot-<name>.json` next to the checkpoint at the
+  flow's next step. It is kept after the run; *Continue* from it with
+  `FLOW_CHECKPOINT` (*Run with Variables…* on top of it replays with changed
+  values: the values you give win over the saved ones). The flow report
+  lists the snapshots of a run at their loop.
 - **Step** (the toolbar, or *Robot Flow: Run in Step Mode*) runs the flow in
   step mode: it pauses before every step of its test phases, and **Next step**
   runs one more. The setup phase is not stepped.

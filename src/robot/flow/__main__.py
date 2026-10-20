@@ -19,6 +19,7 @@
     python -m robot.flow render   <file.flow.json>
     python -m robot.flow schema   [--output flow.schema.json]
     python -m robot.flow control  <signal store> pause|resume|stop|status [--rig NAME]
+    python -m robot.flow control  <signal store> set NAME=value ... | snapshot [name] [--rig NAME]
     python -m robot.flow report   <output.xml> [--output flow.html] [--log log.html]
 
 ``validate`` checks the file's shape and structure and prints the phases.
@@ -57,19 +58,33 @@ def main(argv=None):
     schema.add_argument('--output', '-o', help='write it to this file instead')
     control = commands.add_parser('control', help='pause, resume or stop running flows')
     control.add_argument('store', help="the run's signal store (ROBOT_FLOW_SIGNALS)")
-    control.add_argument('action', choices=['pause', 'resume', 'stop', 'status'])
+    control.add_argument('action', choices=['pause', 'resume', 'stop', 'status', 'set', 'snapshot'])
+    control.add_argument('args', nargs='*',
+                         help="'set': NAME=value pairs; 'snapshot': its name (optional)")
     control.add_argument('--rig', help='only the flow started with this FLOW_RIG / '
                                        'ROBOT_FLOW_RIG; default: all of them')
+    control.add_argument('--json', action='store_true',
+                         help="'status': print the store's entries as JSON")
+    # The server's options live with the server (robot.flow.server.main).
+    server = commands.add_parser('server', help='the signal server for flows on several '
+                                                'machines (ROBOT_FLOW_SIGNALS=http://host:port/<run>)',
+                                 add_help=False)
+    server.add_argument('args', nargs=argparse.REMAINDER)
     report = commands.add_parser('report', help='the flow report of a run', add_help=False)
     report.add_argument('args', nargs=argparse.REMAINDER)
-    args = parser.parse_args(argv)
+    arguments = sys.argv[1:] if argv is None else list(argv)
+    if arguments[:1] == ['server']:
+        # Its options begin with '--', which argparse would take for its own.
+        from .server import main as server_main
+        return server_main(arguments[1:])
+    args = parser.parse_args(arguments)
     if args.command == 'report':
         from .report import report_cli
         return report_cli(args.args)
     if args.command == 'schema':
         return _schema(args.output)
     if args.command == 'control':
-        return _control(args.store, args.action, args.rig)
+        return _control(args.store, args.action, args.rig, args.args, args.json)
     try:
         if args.command == 'validate':
             _validate(args.file)
@@ -95,11 +110,34 @@ def _schema(output):
     return 0
 
 
-def _control(store, action, rig=None):
-    from .control import CONTROL_SIGNAL, STATE_SIGNAL, STOP_SIGNAL
-    from .signals import FlowSignals
+def _control(store, action, rig=None, args=(), as_json=False):
+    from .control import (CONTROL_SIGNAL, SET_SIGNAL, SNAPSHOT_SIGNAL, STATE_SIGNAL,
+                          STOP_SIGNAL, VARIABLE_NAME)
+    from .signals import open_store
 
-    backend = FlowSignals(store=store)._store
+    try:
+        backend = open_store(store)
+    except (ValueError, ImportError, RuntimeError, OSError) as err:
+        sys.stderr.write(f'{err}\n')
+        return 1
+    target = 'rig ' + rig if rig else 'all flows'
+    if action == 'set':
+        pairs = [arg.partition('=') for arg in args]
+        bad = [arg for arg, (name, eq, _) in zip(args, pairs)
+               if not eq or not VARIABLE_NAME.match(name.strip())]
+        if not pairs or bad:
+            print(f"'set' takes NAME=value pairs; got: {' '.join(bad or ['nothing'])}")
+            return 1
+        for name, _, value in pairs:
+            backend.set(f'{SET_SIGNAL}.{rig or "*"}.{name.strip()}', value)
+            print(f"set ${{{name.strip()}}} = '{value}' -> {target} of '{store}' (applied at the next step).")
+        return 0
+    if action == 'snapshot':
+        label = ' '.join(args)
+        backend.set(f'{SNAPSHOT_SIGNAL}.{rig}' if rig else SNAPSHOT_SIGNAL, label)
+        print(f"snapshot{' ' + repr(label) if label else ''} -> {target} of '{store}' "
+              f"(written at the next step, next to the checkpoint).")
+        return 0
     name = f'{CONTROL_SIGNAL}.{rig}' if rig else CONTROL_SIGNAL
     if action != 'status':
         if action == 'stop':
@@ -107,9 +145,16 @@ def _control(store, action, rig=None):
             # otherwise replace the stop before the flow has read it.
             backend.set(f'{STOP_SIGNAL}.{rig}' if rig else STOP_SIGNAL, action)
         backend.set(name, action)
-        print(f"{action} -> {'rig ' + rig if rig else 'all flows'} of '{store}'.")
+        print(f"{action} -> {target} of '{store}'.")
         return 0
-    entries = backend._read() if hasattr(backend, '_read') else {}
+    try:
+        entries = backend.read() or {}
+    except Exception as err:
+        sys.stderr.write(f"Cannot read '{store}': {err}\n")
+        return 1
+    if as_json:
+        print(json.dumps(entries))
+        return 0
     commands = {key: entry for key, entry in entries.items()
                 if key == CONTROL_SIGNAL or key.startswith(CONTROL_SIGNAL + '.')}
     states = {key: entry for key, entry in entries.items()

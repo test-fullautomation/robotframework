@@ -64,20 +64,12 @@ class UnknownAssertionError(RobotError):
     # cuongnht - add unknown state
     ROBOT_SUPPRESS_NAME = True
 
-    def __init__(self, msg=None, details=""):
+    def __init__(self, msg="", details=""):
+        # `message` and `details` keep their upstream meaning (DataError is a
+        # subclass): the message is what the user sees, the details (a
+        # traceback) are logged separately at DEBUG level by the callers.
         self.msg = msg
-        self.details = details
-        RobotError.__init__(self, self._get_message(), self.msg)
-
-    def _get_message(self):
-        list_msg = []
-        if (not self.msg) and (not self.details):
-            list_msg.append("Exception occurred.")
-        if self.msg:
-            list_msg.append(f"{self.msg}")
-        if self.details:
-            list_msg.append(f"Details: {self.details}")
-        return "\n".join(list_msg)
+        RobotError.__init__(self, msg or ("" if details else "Exception occurred."), details)
 
 
 class DataError(UnknownAssertionError):
@@ -309,7 +301,9 @@ class ExecutionFailures(ExecutionFailed):
             "exit": any(e.exit for e in errors),
             "continue_on_failure": all(e.continue_on_failure for e in errors),
             "skip": any(e.skip for e in errors),
-            "unknown": any(e.unknown for e in errors),  # nhtcuong
+            # cuongnht - add unknown state: a FAIL among the failures is a
+            # verdict, so the whole is FAIL; UNKNOWN only when none was reached.
+            "unknown": all(e.unknown for e in errors),
         }
 
     def get_errors(self):

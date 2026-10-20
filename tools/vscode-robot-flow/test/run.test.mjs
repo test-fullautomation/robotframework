@@ -52,6 +52,10 @@ test('the plan: flow parser, live position and a clean console encoding for flow
   assert.equal(flow.env.ROBOT_FLOW_SIGNALS, path.join(out, 'signals.json'));
   const suite = planRun({ env: env(ROOT), target: path.join(ROOT, 'x.robot'), outDir: out });
   assert.ok(!suite.argv.includes('--parser') && !suite.argv.includes('--flowreport') && !suite.env.MM_FLOW_POSITION);
+  // the project's own options come first: Robot takes the last value, so the extension's output folder wins
+  const withArgs = planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, args: ['--outputdir', 'elsewhere', '--loglevel', 'DEBUG'] });
+  assert.ok(withArgs.argv.indexOf('elsewhere') < withArgs.argv.indexOf(out), 'the extension\'s --outputdir comes after the project\'s');
+  assert.equal(withArgs.argv[withArgs.argv.length - 1], COUNTDOWN, 'the target stays last');
   assert.throws(() => planRun({ env: env(ROOT), target: COUNTDOWN, outDir: out, variables: { 'a b': '1' } }), /Invalid variable/);
   delete process.env.PYTHONIOENCODING;
 });
@@ -60,6 +64,7 @@ test('variables typed for a run: NAME=value pairs, checked', () => {
   assert.deepEqual(parseVariables(' MAX_TIME=2h, CYCLES = 50 \n EMPTY= '), { MAX_TIME: '2h', CYCLES: '50', EMPTY: '' });
   assert.deepEqual(parseVariables(''), {});
   assert.deepEqual(parseVariables('A=b=c'), { A: 'b=c' });
+  assert.deepEqual(parseVariables('LIST=a,b, c, NEXT=1'), { LIST: 'a,b, c', NEXT: '1' }, 'a comma inside a value stays');
   assert.equal(formatVariables({ A: '1', B: 'x y' }), 'A=1, B=x y');
   assert.throws(() => parseVariables('MAX TIME=2h'), /Expected NAME=value/);
   assert.throws(() => parseVariables('justtext'), /Expected NAME=value/);

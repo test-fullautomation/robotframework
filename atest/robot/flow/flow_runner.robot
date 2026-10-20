@@ -14,19 +14,19 @@ Full example runs setup, cycles, recovery and teardown
     Should Be Equal    ${SUITE.setup.name}    Flow Setup
     Should Be Equal    ${SUITE.teardown.name}    Flow Teardown
     Check Log Message    ${SUITE.setup.body[1].messages[0]}    Power on for RIG_A.
-    # Flow Phase, Flow Loop, then the loop; Flow Iteration leads every iteration.
+    # Flow Phase, Flow Loop, then the loop; an iteration holds the node's TRY only.
     ${loop} =    Set Variable    ${SUITE.tests[0].body[2]}
     Should Be Equal    ${loop.type}    WHILE
     # Three iterations, then the INFO message about reaching the limit.
     ${iterations} =    Evaluate    [item for item in $loop.body if item.type == 'ITERATION']
     Length Should Be    ${iterations}    3
     # Iteration 1 passes: the EXCEPT branch is not run.
-    Should Be Equal    ${loop.body[0].body[1].body[1].status}    NOT RUN
+    Should Be Equal    ${loop.body[0].body[0].body[1].status}    NOT RUN
     # Iteration 2 fails on purpose and runs the recovery, then the loop continues.
-    ${recovery} =    Set Variable    ${loop.body[1].body[1].body[1]}
+    ${recovery} =    Set Variable    ${loop.body[1].body[0].body[1]}
     Should Be Equal    ${recovery.type}    EXCEPT
     Check Log Message    ${recovery.body[0].messages[0]}    Recovery 1 for RIG_A.
-    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
+    Check Log Message    ${loop.body[2].body[0].body[0].body[0].messages[0]}    Cycle 3 for RIG_A.
     Check Log Message    ${SUITE.teardown.body[0].messages[0]}    Bench released.
 
 Signals between flows: set, wait at a gate, read back
@@ -87,15 +87,121 @@ Loop bounds can be variables sized per run
     Run Tests    ${PARSER}    flow/variable_bounds.flow.json
     ${tc} =    Check Test Case    Variable Bounds    PASS
     Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 2
-    Run Tests    ${PARSER} --variable CYCLES:3 --variable MAX_TIME:1h    flow/variable_bounds.flow.json
+    Run Tests    ${PARSER} --variable CYCLES:3 --variable MAX_TIME:1h --variable FLOW_CHECKPOINT_EVERY:2    flow/variable_bounds.flow.json
     ${tc} =    Check Test Case    Variable Bounds    PASS
     Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 3
+    # No marker keyword in the iterations: the runner counts them, and an
+    # iteration that writes the checkpoint (every second one here) says so.
+    ${loop} =    Set Variable    ${tc.body[2]}
+    Should Be True    [i.type for i in $loop.body[0].body] == ['MESSAGE', 'KEYWORD', 'KEYWORD']
+    Should Be True    [m.message for m in $loop.body[0].body if m.type == 'MESSAGE'] == ["Iteration 1 of loop 'loop'; checkpoint written."]
+    Should Be True    [i.type for i in $loop.body[1].body] == ['KEYWORD', 'KEYWORD']
+    Should Be True    [m.message for m in $loop.body[2].body if m.type == 'MESSAGE'] == ["Iteration 3 of loop 'loop'; checkpoint written."]
     Run Tests    ${PARSER} --variable CYCLES:many    flow/variable_bounds.flow.json
     Check Test Case    Variable Bounds    UNKNOWN    'max_loops' of loop 'loop' must be a positive integer, got 'many'.
+
+Keyword nodes retry under a policy and time out per attempt
+    [Documentation]    'retry' runs a keyword node again when it fails (attempts, interval,
+    ...    backoff, the verdict when the last attempt fails too); 'timeout' is a keyword
+    ...    timeout on each attempt. The attempts are the Flow Retry call's children in the
+    ...    log; a timeout of the step itself is a plain failure the recovery can route.
+    Run Tests    ${PARSER}    flow/retry_timeout.flow.json
+    ${tc} =    Check Test Case    Passes After Retries    PASS
+    ${call} =    Set Variable    ${tc.body[0]}
+    Should Be Equal    ${call.name}    Flow Retry
+    Should Be True    [k.status for k in $call.body if k.type == 'KEYWORD'] == ['FAIL', 'FAIL', 'PASS']
+    Check Log Message    ${call.messages[0]}    Attempt 1 of 3 of 'Flaky Reading' failed, next attempt in 50 milliseconds: Reading 1 is noise.
+    Check Log Message    ${call.messages[1]}    Attempt 2 of 3 of 'Flaky Reading' failed, next attempt in 100 milliseconds: Reading 2 is noise.
+    Check Log Message    ${call.messages[2]}    'Flaky Reading' passed on attempt 3 of 3.
+    Check Log Message    ${tc.body[1].messages[0]}    Reading 3
+    Check Test Case    Exhausted Is Fail    FAIL    'Break Something' failed after 2 attempts. Last error: Still broken.
+    Check Test Case    Exhausted Is Unknown    UNKNOWN    'Break Something' failed after 2 attempts. Last error: No reply.
+    ${tc} =    Check Test Case    Timed Out Attempt Is Retried    PASS
+    Should Be True    [k.status for k in $tc.body[0].body if k.type == 'KEYWORD'] == ['FAIL', 'PASS']
+    Check Log Message    ${tc.body[0].messages[0]}    Attempt 1 of 2 of 'Slow Then Fast' timed out, next attempt in 10 milliseconds: Keyword timeout 300 milliseconds exceeded.
+    Check Test Case    Timeout Alone Fails The Step    FAIL    'Take Time' timed out after 300 milliseconds. Last error: Keyword timeout 300 milliseconds exceeded.
+    ${tc} =    Check Test Case    Timeout Is Routed To The Recovery    PASS
+    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for RIG_T.
+    Should Be Equal    ${SUITE.status}    UNKNOWN
+
+Parallel regions run their branches as threads and join before the plan goes on
+    [Documentation]    A 'parallel' node starts one THREAD per branch (named after the plan,
+    ...    numbered from the region's second run on) and joins them: the join fails naming
+    ...    each failed branch, with the worst status; a failed branch stops the others at
+    ...    their next step unless 'stop_others' is false; a region times out naming the
+    ...    branches still running; 'on_failure' recovers the join's failure; a flow stop
+    ...    stops the branches first. The join reports the branches: no thread warnings.
+    Run Tests    ${PARSER}    flow/parallel.flow.json
+    ${tc} =    Check Test Case    Two Branches Join    PASS
+    Should Be Equal    ${tc.body[0].name}    Flow Parallel Start
+    Should Be Equal    ${tc.body[1].type}    THREAD
+    Should Be Equal    ${tc.body[1].name}    flow.p1.a1
+    Should Be Equal    ${tc.body[2].name}    flow.p1.b1
+    Should Be Equal    ${tc.body[1].body[0].name}    Flow Branch
+    Should Be Equal    ${tc.body[1].body[0].body[0].name}    Flow Branch: p1/a1
+    Check Log Message    ${tc.body[1].body[0].body[0].body[2].messages[0]}    A ends
+    Check Log Message    ${tc.body[2].body[0].body[0].body[1].messages[0]}    B ends
+    Should Be Equal    ${tc.body[3].name}    Flow Join
+    Check Log Message    ${tc.body[3].messages[0]}    Region 'p1': 2 branches joined after * milliseconds.    pattern=True
+    Check Log Message    ${tc.body[4].messages[0]}    joined
+    ${tc} =    Check Test Case    Failed Branch Stops The Other    FAIL    Branch 'c1' of 'p2' failed: PSU tripped.
+    Should Be Equal    ${tc.body[1].body[0].status}    FAIL
+    Should Be Equal    ${tc.body[1].body[0].message}    PSU tripped.
+    # The other branch was stopped after its first step: the two after it did not run.
+    Should Be Equal    ${tc.body[2].body[0].status}    UNKNOWN
+    Should Be Equal    ${tc.body[2].body[0].message}    Branch 'd1' of 'p2' was stopped.
+    Length Should Be    ${tc.body[2].body[0].body[0].body}    1
+    Check Log Message    ${tc.body[3].messages[0]}    Branch 'c1' of 'p2' failed; stopping the other branch(es): d1.
+    ${tc} =    Check Test Case    Failed Branch Lets The Other Finish    FAIL    Branch 'e1' of 'p3' failed: E broke.
+    Check Log Message    ${tc.body[2].body[0].body[0].body[1].messages[0]}    F finished
+    Check Test Case    Gate Timeout In A Branch Is Unknown    UNKNOWN
+    ...    GLOB:Branch 'g1' of 'p4' is unknown: Gate 'Signal Should Be' did not pass within 200 milliseconds (* attempts, waited * milliseconds). Last error: bench.never is 0, expected != 0.
+    Check Test Case    Unknown Wins Over Fail    UNKNOWN
+    ...    GLOB:Branch 'g2' of 'p4b' failed: G2 failed.\nBranch 'h3' of 'p4b' is unknown: Gate 'Signal Should Be' did not pass within 100 milliseconds (*
+    ${tc} =    Check Test Case    Region Timeout    FAIL    Region 'p5' did not join within 300 milliseconds; still running: i1.
+    Should Be Equal    ${tc.body[1].body[0].message}    Branch 'i1' of 'p5' was stopped.
+    ${tc} =    Check Test Case    Recovery After A Failed Branch    PASS
+    Should Be Equal    ${tc.body[0].body[0].status}    FAIL
+    Check Log Message    ${tc.body[0].body[1].body[0].messages[0]}    Recovery 1 for RIG_P.
+    Check Log Message    ${tc.body[1].messages[0]}    after recovery
+    ${tc} =    Check Test Case    Region In A Loop    PASS
+    ${second} =    Set Variable    ${tc.body[0].body[1]}
+    Should Be Equal    ${second.body[1].name}    flow.p7.m1.2
+    Should Be Equal    ${second.body[2].name}    flow.p7.n1.2
+    Check Log Message    ${second.body[1].body[0].body[0].body[0].messages[0]}    Iteration 2.
+    ${tc} =    Check Test Case    Stop During A Region    UNKNOWN    Stopped by operator.
+    Should Be Equal    ${tc.body[2].body[0].message}    Branch 'q1' of 'p8' was stopped.
+    Should Be Equal    ${tc.body[4].status}    NOT RUN
+    Should Be Equal    ${SUITE.status}    UNKNOWN
+    Length Should Be    ${ERRORS}    0
+
+Finished loop iterations leave memory, the output keeps them
+    [Documentation]    A flow's loops run for hours: once an iteration is in output.xml its
+    ...    results are dropped from the model (only the last one stays). Suites keep
+    ...    everything unless --pruneresults says otherwise.
+    Run Tests    ${PARSER} --listener ${DATADIR}${/}flow${/}BodySizes.py --variable CYCLES:40    flow/variable_bounds.flow.json
+    Stdout Should Contain    BODY SIZE: WHILE in 'Variable Bounds' keeps 1 iteration(s)
+    ${tc} =    Check Test Case    Variable Bounds    PASS
+    Should Be True    len([i for i in $tc.body[2].body if i.type == 'ITERATION']) == 40
+    Run Tests    --listener ${DATADIR}${/}flow${/}BodySizes.py    flow/plain_loops.robot
+    Stdout Should Contain    BODY SIZE: WHILE in 'Plain Loops' keeps 31 iteration(s)
+    Stdout Should Contain    BODY SIZE: FOR in 'Plain Loops' keeps 30 iteration(s)
+    Run Tests    --pruneresults --listener ${DATADIR}${/}flow${/}BodySizes.py    flow/plain_loops.robot
+    Stdout Should Contain    BODY SIZE: WHILE in 'Plain Loops' keeps 1 iteration(s)
+    Stdout Should Contain    BODY SIZE: FOR in 'Plain Loops' keeps 1 iteration(s)
+    ${tc} =    Check Test Case    Plain Loops    PASS
+    Should Be True    len([i for i in $tc.body[0].body if i.type == 'ITERATION' and i.status == 'PASS']) == 30
+    Should Be True    len([i for i in $tc.body[1].body if i.type == 'ITERATION']) == 30
 
 Dry run validates keywords and gate arguments
     Run Tests    ${PARSER} --dryrun    flow/endurance_cycle.flow.json
     Check Test Case    Cycle    PASS
+    Run Tests    ${PARSER} --dryrun    flow/retry_timeout.flow.json
+    Check Test Case    Passes After Retries    PASS
+    Should Be Equal    ${SUITE.status}    PASS
+    Run Tests    ${PARSER} --dryrun    flow/parallel.flow.json
+    Check Test Case    Two Branches Join    PASS
+    Should Be Equal    ${SUITE.status}    PASS
     Run Tests    ${PARSER} --dryrun    flow/invalid_keyword.flow.json
     Check Test Case    Invalid Keyword    UNKNOWN
     ...    Several failures occurred:\n\n1) No keyword with name 'No Such Keyword' found.\n\n2) Keyword 'FlowStubs.Signal Should Be' expected 3 arguments, got 1.
@@ -106,6 +212,8 @@ Invalid flow files are rejected naming the node
     invalid_body_no_next       Node 'loop': The body of loop 'loop' must return to it with an edge labelled 'next'; it ends at 'loop' via 'then'.
     invalid_unreachable        Unreachable node(s): orphan.
     invalid_unbounded_loop     Node 'loop': A loop needs 'max_loops' and/or 'max_seconds'; unbounded loops are not allowed.
+    invalid_branch_no_join     Node 'region': The branch of 'region' starting at 'b' must return to it with an edge labelled 'join'; it ends at 'end' via 'then'.
+    invalid_nested_parallel    Node 'inner': A parallel region cannot be inside a branch of another parallel region ('outer'); split the plan or run the inner branches one after the other.
 
 Sub-flows run as one keyword each, with parameters, nesting and recovery
     Run Tests    ${PARSER}    flow/subflow.flow.json
@@ -157,8 +265,8 @@ Stop leaves a checkpoint and the next run continues from it
     ${loop} =    Set Variable    ${tc.body[3]}
     # Three iterations were left; the message about the limit follows them.
     Should Be True    len([item for item in $loop.body if item.type == 'ITERATION']) == 3
-    Check Log Message    ${loop.body[0].body[1].body[0].body[0].messages[0]}    Work 4.
-    Check Log Message    ${loop.body[2].body[1].body[0].body[0].messages[0]}    Work 6.
+    Check Log Message    ${loop.body[0].body[0].body[0].body[0].messages[0]}    Work 4.
+    Check Log Message    ${loop.body[2].body[0].body[0].body[0].messages[0]}    Work 6.
     Check Test Case    Report    PASS
     Should Be Equal    ${SUITE.status}    PASS
     File Should Not Exist    ${CHECKPOINT}

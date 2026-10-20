@@ -301,7 +301,9 @@ class Thread(BodyItem):
     type = BodyItem.THREAD
     body_class = Body
     repr_args = ("name", "daemon")
-    __slots__ = ("name", "daemon")
+    # `identity`: the key of the started thread (`<name>#<n>`), set by the
+    # runner; names are not unique, this is. Not part of the data.
+    __slots__ = ("name", "daemon", "identity")
 
     def __init__(
         self,
@@ -311,6 +313,7 @@ class Thread(BodyItem):
     ):
         self.name = name
         self.daemon = daemon
+        self.identity = None
         self.parent = parent
         self.body = ()
 

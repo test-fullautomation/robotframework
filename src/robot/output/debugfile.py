@@ -17,7 +17,9 @@ import threading
 from pathlib import Path
 
 from robot.errors import DataError
-from robot.utils import file_writer, in_worker_thread, seq2str2, ThreadSafeDict
+from robot.utils import (
+    file_writer, in_worker_thread, seq2str2, thread_key, ThreadSafeDict
+)
 
 from .logger import LOGGER
 from .loggerapi import LoggerApi
@@ -49,6 +51,7 @@ class _DebugFileWriter(LoggerApi):
 
     def __init__(self, outfile, log_level=None):
         self._indent = 0
+        self._suite_depth = 0
         self._kw_level = 0
         self._separator_written_last = False
         self._outfile = outfile
@@ -76,10 +79,10 @@ class _DebugFileWriter(LoggerApi):
         # Created lazily: with a log level above INFO start_thread does not
         # register the thread, but a keyword with a visible own level (e.g.
         # `Log msg USER` at --loglevel USER) still needs the bookkeeping.
-        name = threading.current_thread().name
-        if name not in self._thread_info:
-            self._thread_info[name] = {"level": 0, "indent": 0}
-        return self._thread_info[name]
+        key = thread_key()
+        if key not in self._thread_info:
+            self._thread_info[key] = {"level": 0, "indent": 0}
+        return self._thread_info[key]
 
     def _get_kw_level(self):
         return self._info()["level"] if self._in_worker_thread() else self._kw_level
@@ -93,51 +96,68 @@ class _DebugFileWriter(LoggerApi):
     # -----------------------------------------------------------------------
 
     def start_suite(self, data, result):
-        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        # The depth of suites is counted whether or not their lines are
+        # written: the file is closed when the top suite ends, not when the
+        # first child suite ends at a level above INFO.
+        self._suite_depth += 1
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("SUITE")
-            self._start("SUITE", data.full_name, result.start_time)
+        self._start("SUITE", data.full_name, result.start_time, visible=visible)
+        if visible:
             self._separator("SUITE")
 
     def end_suite(self, data, result):
-        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("SUITE")
-            self._end("SUITE", data.full_name, result.end_time, result.elapsed_time)
+        self._end("SUITE", data.full_name, result.end_time, result.elapsed_time, visible=visible)
+        if visible:
             self._separator("SUITE")
-        if self._indent == 0:
+        self._suite_depth -= 1
+        if self._suite_depth == 0:
             LOGGER.debug_file(Path(self._outfile.name))
             self.close()
 
     def start_test(self, data, result):
-        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("TEST")
-            self._start("TEST", result.name, result.start_time)
+        self._start("TEST", result.name, result.start_time, visible=visible)
+        if visible:
             self._separator("TEST")
 
     def end_test(self, data, result):
-        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("TEST")
-            self._end("TEST", result.name, result.end_time, result.elapsed_time)
+        self._end("TEST", result.name, result.end_time, result.elapsed_time, visible=visible)
+        if visible:
             self._separator("TEST")
 
     def start_thread(self, data, result):
         # cuongnht add thread: called on the spawning thread and on the worker.
-        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        if not self._in_worker_thread():
             return
-        if self._in_worker_thread():
-            self._info()
+        self._info()
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("THREAD")
-            self._start("THREAD", result.name, result.start_time)
+        self._start("THREAD", result.name, result.start_time, visible=visible)
+        if visible:
             self._separator("THREAD")
 
     def end_thread(self, data, result):
         if not self._in_worker_thread():
             return
-        if self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible:
             self._separator("THREAD")
-            self._end("THREAD", result.name, result.end_time, result.elapsed_time)
+        self._end("THREAD", result.name, result.end_time, result.elapsed_time, visible=visible)
+        if visible:
             self._separator("THREAD")
         # cuongnht memory cap: forget the worker's bookkeeping.
-        self._thread_info.pop(threading.current_thread().name, None)
+        self._thread_info.pop(thread_key(), None)
 
     def _keyword_level(self, result):
         # `BuiltIn.Log` has its own log level: its start/end lines follow the
@@ -148,34 +168,41 @@ class _DebugFileWriter(LoggerApi):
                 return level
         return LOG_LEVEL_DEBUG_FILE
 
+    # The nesting counters are always kept and only the writing follows the
+    # level: `Set Log Level` inside a keyword must not leave the START of the
+    # keyword with no END, or the indentation (and the suite depth) off by one.
+
     def start_keyword(self, data, result):
-        if not self._level_is_logged(self._keyword_level(result)):
-            return
-        if self._get_kw_level() == 0:
+        visible = self._level_is_logged(self._keyword_level(result))
+        if visible and self._get_kw_level() == 0:
             self._separator("KEYWORD")
         self._start(
-            result.type, result.full_name, result.start_time, seq2str2(result.args)
+            result.type, result.full_name, result.start_time, seq2str2(result.args),
+            visible=visible,
         )
         self._change_kw_level(1)
 
     def end_keyword(self, data, result):
-        if not self._level_is_logged(self._keyword_level(result)):
-            return
-        self._end(result.type, result.full_name, result.end_time, result.elapsed_time)
+        visible = self._level_is_logged(self._keyword_level(result))
+        self._end(
+            result.type, result.full_name, result.end_time, result.elapsed_time,
+            visible=visible,
+        )
         self._change_kw_level(-1)
 
     def start_body_item(self, data, result):
-        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
-            return
-        if self._get_kw_level() == 0:
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        if visible and self._get_kw_level() == 0:
             self._separator("KEYWORD")
-        self._start(result.type, result._log_name, result.start_time)
+        self._start(result.type, result._log_name, result.start_time, visible=visible)
         self._change_kw_level(1)
 
     def end_body_item(self, data, result):
-        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
-            return
-        self._end(result.type, result._log_name, result.end_time, result.elapsed_time)
+        visible = self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
+        self._end(
+            result.type, result._log_name, result.end_time, result.elapsed_time,
+            visible=visible,
+        )
         self._change_kw_level(-1)
 
     def log_message(self, msg):
@@ -186,13 +213,13 @@ class _DebugFileWriter(LoggerApi):
         if not self._outfile.closed:
             self._outfile.close()
 
-    def _start(self, type, name, timestamp, extra=""):
+    def _start(self, type, name, timestamp, extra="", visible=True):
         # cuongnht log level shortening: START/END lines are INFO output. A
         # `BuiltIn.Log` with an own visible level above the threshold still
         # gets its separator and message, but no START/END lines (matches the
-        # 6.1 fork and its log level reference files).
-        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
-            return
+        # 6.1 fork and its log level reference files). The indentation is
+        # counted either way, so a level change in between keeps it balanced.
+        visible = visible and self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
         if extra:
             extra = f" {extra}"
         if self._in_worker_thread():
@@ -206,26 +233,27 @@ class _DebugFileWriter(LoggerApi):
             indent = "-" * self._indent
             prefix = ""
             self._indent += 1
-        self._write(
-            f"{timestamp} - INFO - {prefix}+{indent} START {type}: {name}{extra}"
-        )
+        if visible:
+            self._write(
+                f"{timestamp} - INFO - {prefix}+{indent} START {type}: {name}{extra}"
+            )
 
-    def _end(self, type, name, timestamp, elapsed):
-        if not self._level_is_logged(LOG_LEVEL_DEBUG_FILE):
-            return
+    def _end(self, type, name, timestamp, elapsed, visible=True):
+        visible = visible and self._level_is_logged(LOG_LEVEL_DEBUG_FILE)
         if self._in_worker_thread():
             info = self._info()
             info["indent"] = max(info["indent"] - 1, 0)
             indent = "-" * info["indent"]
             prefix = f"{threading.current_thread().name}> "
         else:
-            self._indent -= 1
+            self._indent = max(self._indent - 1, 0)
             indent = "-" * self._indent
             prefix = ""
-        elapsed = elapsed.total_seconds()
-        self._write(
-            f"{timestamp} - INFO - {prefix}+{indent} END {type}: {name} ({elapsed} s)"
-        )
+        if visible:
+            elapsed = elapsed.total_seconds()
+            self._write(
+                f"{timestamp} - INFO - {prefix}+{indent} END {type}: {name} ({elapsed} s)"
+            )
 
     def _separator(self, type_):
         self._write(self._separators[type_] * 78, separator=True)

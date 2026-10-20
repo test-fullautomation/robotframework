@@ -46,7 +46,9 @@ nav:
       - Synchronisation: thread/synchronisation.md
   - Watchdog: watchdog.md
   - StateMachine: statemachine.md
-  - Flow files: flow.md
+  - Flow files:
+      - Flow files: flow.md
+      - Signal stores: signal-stores.md
   - Long-running tests:
       - Overview: long-running.md
       - Segmented output: segmented-output.md

@@ -159,6 +159,7 @@ function setMessageVisibility(level) {
     changeClassDisplay(".trace-message", level <= LEVELS.TRACE);
     changeClassDisplay(".debug-message", level <= LEVELS.DEBUG);
     changeClassDisplay(".info-message", level <= LEVELS.INFO);
+    changeClassDisplay(".user-message", level <= LEVELS.USER);
 }
 
 function closestVisibleParent(elem) {

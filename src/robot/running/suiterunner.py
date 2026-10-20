@@ -92,7 +92,10 @@ class SuiteRunner(SuiteVisitor):
         ns = Namespace(self.variables, result, data.resource, self.settings.languages)
         ns.start_suite()
         ns.variables.set_from_variable_section(data.resource.variables)
-        EXECUTION_CONTEXTS.start_suite(result, ns, self.output, self.settings.dry_run)
+        EXECUTION_CONTEXTS.start_suite(
+            result, ns, self.output, self.settings.dry_run,
+            prune_results=self.settings.prune_results,
+        )
         self.context.set_suite_variables(result)
         if not self.suite_status.failed:
             import_errors = ns.handle_imports()
@@ -275,16 +278,16 @@ class SuiteRunner(SuiteVisitor):
         if not threads:
             return
         entries = [
-            (name, entry)
-            for name, entry in dict(threads).items()
-            if suite_scope_too or entry["daemon"]
+            (key, entry)
+            for key, entry in dict(threads).items()
+            if (suite_scope_too or entry["daemon"]) and not entry.get("abandoned")
         ]
         if not entries:
             return
-        for name, entry in entries:
+        for key, entry in entries:
             entry["stop_event"].set()
         deadline = time.time() + self.thread_stop_grace
-        for name, entry in entries:
+        for key, entry in entries:
             worker = entry["worker"]
             worker.join(max(0.0, deadline - time.time()))
             if worker.is_alive():
@@ -293,13 +296,18 @@ class SuiteRunner(SuiteVisitor):
                 # and would write the message into the suite XML otherwise.
                 LOGGER.message(
                     Message(
-                        f"Thread '{name}' did not stop within "
+                        f"Thread '{entry['name']}' did not stop within "
                         f"{self.thread_stop_grace} seconds at the end of {where} "
                         f"and was abandoned.",
                         "WARN",
                     )
                 )
-            threads.pop(name, None)
+                # It stays listed, flagged: `Wait For Thread` and the "still
+                # running" note of later tests find it; the stop flag it
+                # reads is its own, so its next step boundary ends it.
+                entry["abandoned"] = True
+            else:
+                threads.pop(key, None)
 
     def _report_still_running_threads(self):
         # cuongnht thread scope: make suite-scoped threads from earlier tests
@@ -307,11 +315,11 @@ class SuiteRunner(SuiteVisitor):
         threads = getattr(self.context, "active_threads", None)
         if not threads:
             return
-        for name, entry in dict(threads).items():
+        for entry in dict(threads).values():
             if entry["worker"].is_alive():
                 owner = entry["owner"] or "an earlier test"
                 self.output.info(
-                    f"Thread '{name}' started in {owner!r} is still running."
+                    f"Thread '{entry['name']}' started in {owner!r} is still running."
                 )
 
     def _get_skipped_message(self, tags, rpa):

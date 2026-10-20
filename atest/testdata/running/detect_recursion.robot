@@ -23,7 +23,7 @@ Infinitely recursive for loop
     Infinitely recursive for loop
 
 Recursion below the recursion limit is ok
-    [Documentation]    UNKNOWN Still below recursion limit!${PSTD FAILED}
+    [Documentation]    FAIL Still below recursion limit!${PSTD FAILED}
     Limited recursion
     Recursive for loop    10
     Failing limited recursion

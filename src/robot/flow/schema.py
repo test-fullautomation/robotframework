@@ -41,23 +41,29 @@ FLOW_VERSION = 1
 VARIABLE_PATTERN = r'^\s*\$\{[^{}$]+\}\s*$'
 VARIABLE_RE = re.compile(VARIABLE_PATTERN)
 
-START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW = (
-    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow'
+START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW, PARALLEL = (
+    'start', 'end', 'phase', 'keyword', 'gate', 'sleep', 'decision', 'loop', 'try', 'flow',
+    'parallel'
 )
-NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW)
+NODE_KINDS = (START, END, PHASE, KEYWORD, GATE, SLEEP, DECISION, LOOP, TRY, FLOW, PARALLEL)
 ACTION_KINDS = (KEYWORD, GATE, SLEEP, FLOW)
 CONTAINER_KINDS = (LOOP, TRY)
 
 SETUP, TEST, TEARDOWN = 'setup', 'test', 'teardown'
 PHASE_ROLES = (SETUP, TEST, TEARDOWN)
 
-THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO = (
-    '', 'body', 'next', 'on_failure', 'continue', 'abort', 'done', 'yes', 'no'
+THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO, BRANCH, JOIN = (
+    '', 'body', 'next', 'on_failure', 'continue', 'abort', 'done', 'yes', 'no', 'branch',
+    'join'
 )
-EDGE_LABELS = (THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO)
+EDGE_LABELS = (THEN, BODY, NEXT, ON_FAILURE, CONTINUE, ABORT, DONE, YES, NO, BRANCH, JOIN)
 
 ON_TIMEOUT_UNKNOWN, ON_TIMEOUT_FAIL = 'unknown', 'fail'
 DEFAULT_GATE_INTERVAL = '2s'
+# A keyword node's retry policy: attempts, the wait between them growing by
+# 'backoff', and the verdict when the last attempt fails too.
+DEFAULT_RETRY_INTERVAL = '1s'
+RETRY_KEYS = ('max_attempts', 'interval', 'backoff', 'on_exhausted')
 
 
 class FlowError(DataError):
@@ -84,12 +90,14 @@ class Node:
         self.timeout = attrs.pop('timeout', None)
         self.interval = attrs.pop('interval', None)
         self.on_timeout = attrs.pop('on_timeout', None)
+        self.retry = attrs.pop('retry', None)
         self.duration = attrs.pop('duration', None)
         self.condition = attrs.pop('condition', None)
         self.max_loops = attrs.pop('max_loops', None)
         self.max_seconds = attrs.pop('max_seconds', None)
         self.every = attrs.pop('every', None)
         self.file = attrs.pop('file', None)
+        self.stop_others = attrs.pop('stop_others', None)
         self.extra = attrs
 
     def __repr__(self):
@@ -238,9 +246,9 @@ def _validate_node(raw):
     node = Node(id, kind, **attrs)
     validator = {
         START: _no_attributes, END: _no_attributes, PHASE: _validate_phase,
-        KEYWORD: _validate_keyword, GATE: _validate_gate, SLEEP: _validate_sleep,
+        KEYWORD: _validate_keyword_node, GATE: _validate_gate, SLEEP: _validate_sleep,
         DECISION: _validate_decision, LOOP: _validate_loop, TRY: _no_attributes,
-        FLOW: _validate_flow_call,
+        FLOW: _validate_flow_call, PARALLEL: _validate_parallel,
     }[kind]
     validator(node)
     return node
@@ -268,6 +276,48 @@ def _validate_keyword(node):
     node.assign = _validate_assign(node)
 
 
+def _validate_keyword_node(node):
+    """A keyword node: the call, plus its optional retry policy and timeout."""
+    _validate_keyword(node)
+    node.timeout = _validate_time(node, 'timeout')
+    node.retry = _validate_retry(node)
+
+
+def _validate_retry(node):
+    """``retry`` as a dict with every key, or ``None`` without a policy.
+
+    A number (or a ``${variable}``) is short for ``{"max_attempts": n}``.
+    """
+    retry = node.retry
+    if retry is None:
+        return None
+    if not isinstance(retry, dict):
+        retry = {'max_attempts': retry}
+    unknown = [key for key in retry if key not in RETRY_KEYS]
+    if unknown:
+        raise FlowError(f"'retry' has unknown key(s) {', '.join(unknown)}; the keys "
+                        f"are {', '.join(RETRY_KEYS)}.", node.id)
+    attempts = retry.get('max_attempts')
+    if attempts is None:
+        raise FlowError("'retry' needs 'max_attempts'.", node.id)
+    if not is_variable(attempts):
+        if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+            raise FlowError("'retry.max_attempts' must be a positive integer or a "
+                            "'${variable}'.", node.id)
+    backoff = retry.get('backoff', 1)
+    if isinstance(backoff, bool) or not isinstance(backoff, (int, float)) or backoff < 1:
+        raise FlowError("'retry.backoff' must be a number of at least 1 (the factor "
+                        "the interval grows by after each attempt).", node.id)
+    on_exhausted = retry.get('on_exhausted') or ON_TIMEOUT_FAIL
+    if on_exhausted not in (ON_TIMEOUT_UNKNOWN, ON_TIMEOUT_FAIL):
+        raise FlowError(f"'retry.on_exhausted' must be '{ON_TIMEOUT_FAIL}' or "
+                        f"'{ON_TIMEOUT_UNKNOWN}', got {on_exhausted!r}.", node.id)
+    interval = _check_time(node, 'retry.interval', retry.get('interval'),
+                           default=DEFAULT_RETRY_INTERVAL)
+    return {'max_attempts': attempts.strip() if is_variable(attempts) else attempts,
+            'interval': interval, 'backoff': backoff, 'on_exhausted': on_exhausted}
+
+
 def _validate_assign(node):
     assign = node.assign
     if assign is None:
@@ -291,6 +341,9 @@ def _validate_args(node):
 
 def _validate_gate(node):
     _validate_keyword(node)
+    if node.retry is not None:
+        raise FlowError("A gate polls until it passes already; 'retry' belongs to "
+                        "keyword nodes.", node.id)
     node.timeout = _validate_time(node, 'timeout', required=True)
     node.interval = _validate_time(node, 'interval', default=DEFAULT_GATE_INTERVAL)
     node.on_timeout = (node.on_timeout or ON_TIMEOUT_UNKNOWN)
@@ -349,8 +402,22 @@ def _validate_loop(node):
                         "unbounded loops are not allowed.", node.id)
 
 
+def _validate_parallel(node):
+    """A parallel region: branches run at the same time and join before the
+    plan goes on. ``timeout`` bounds the whole region; ``stop_others`` says
+    whether a failed branch stops the others (the default) or lets them end."""
+    node.timeout = _validate_time(node, 'timeout')
+    if node.stop_others is None:
+        node.stop_others = True
+    elif not isinstance(node.stop_others, bool):
+        raise FlowError("'stop_others' must be true or false.", node.id)
+
+
 def _validate_time(node, attr, required=False, default=None):
-    value = getattr(node, attr)
+    return _check_time(node, attr, getattr(node, attr), required, default)
+
+
+def _check_time(node, attr, value, required=False, default=None):
     if value is None:
         if required:
             raise FlowError(f"'{attr}' is required.", node.id)
@@ -440,6 +507,26 @@ def json_schema():
                    'description': "Variable(s) for the return value, e.g. '${VERSION}'."},
     }
 
+    attempts = {'anyOf': [{'type': 'integer', 'minimum': 1},
+                          {'type': 'string', 'pattern': VARIABLE_PATTERN}],
+                'description': "How many times the keyword may run, or a '${variable}' "
+                               'holding the number.'}
+    retry = {
+        'type': 'object', 'required': ['max_attempts'], 'additionalProperties': False,
+        'properties': {
+            'max_attempts': attempts,
+            'interval': dict(time, description=f'Wait before the next attempt; default '
+                                               f'{DEFAULT_RETRY_INTERVAL}.'),
+            'backoff': {'type': 'number', 'minimum': 1,
+                        'description': 'Factor the wait grows by after each attempt; '
+                                       'default 1 (a constant wait).'},
+            'on_exhausted': {'enum': [ON_TIMEOUT_FAIL, ON_TIMEOUT_UNKNOWN],
+                             'description': "Verdict when the last attempt fails too: 'fail' "
+                                            "(the default: the keyword's own failure) or "
+                                            "'unknown' (the bench did not cooperate)."},
+        },
+    }
+
     def kind(name, description, required=(), extra=None, **more):
         properties = dict(common, **(extra or {}))
         definition = {'description': description, 'type': 'object',
@@ -459,7 +546,15 @@ def json_schema():
                              'description': 'Test case name; required for a test phase.'}},
              **{'if': {'properties': {'role': {'const': TEST}}},
                 'then': {'required': ['name']}}),
-        kind(KEYWORD, 'Call a keyword.', required=('keyword',), extra=keyword),
+        kind(KEYWORD, 'Call a keyword.', required=('keyword',),
+             extra=dict(keyword,
+                        retry={'oneOf': [attempts, retry],
+                               'description': 'Run the keyword again when it fails: a '
+                                              'number of attempts, or a policy object.'},
+                        timeout=dict(time, description='Time limit of one attempt; an '
+                                                       'attempt that exceeds it fails '
+                                                       '(and is retried under a retry '
+                                                       'policy).'))),
         kind(GATE, "Wait until the keyword passes, at most 'timeout'.",
              required=('keyword', 'timeout'),
              extra=dict(keyword,
@@ -487,6 +582,17 @@ def json_schema():
                     'every': dict(time, description='Minimum time per round.')},
              anyOf=[{'required': ['max_loops']}, {'required': ['max_seconds']}]),
         kind(TRY, "Failure routing without a loop: 'body', 'on_failure', 'done'."),
+        kind(PARALLEL, "Branches that run at the same time: two or more 'branch' edges "
+                       "to their first nodes, a 'join' edge back from the last node of "
+                       "each, 'done' out, optional 'on_failure'.",
+             extra={'timeout': dict(time, description='The branches must all have joined '
+                                                      'within this time (on the flow '
+                                                      'clock); none by default.'),
+                    'stop_others': {'type': 'boolean',
+                                    'description': 'When a branch fails, stop the other '
+                                                   'branches at their next step (true, '
+                                                   'the default) or let them run to '
+                                                   'their end (false).'}}),
         kind(FLOW, 'Call another flow file (a sub-flow) as one step.', required=('file',),
              extra={'file': {'type': 'string', 'pattern': r'\S',
                              'description': 'The sub-flow file, relative to this file. '
@@ -509,7 +615,9 @@ def json_schema():
          'properties': {'from': {'type': 'string'}, 'to': {'type': 'string'},
                         'label': {'enum': list(EDGE_LABELS),
                                   'description': 'Needed only where a node has more '
-                                                 'than one way out.'}}},
+                                                 "than one way out. 'branch' (several "
+                                                 "per parallel node) and 'join' belong "
+                                                 'to parallel regions.'}}},
     ]}
     return {
         '$schema': 'http://json-schema.org/draft-07/schema#',

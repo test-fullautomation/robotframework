@@ -321,7 +321,7 @@ Files are not lists
     @{works not} =    Get open file
 
 Invalid count error is catchable
-    [Documentation]    UNKNOWN
+    [Documentation]    FAIL
     ...    Teardown failed:
     ...    Several failures occurred:
     ...
@@ -339,7 +339,7 @@ Invalid count error is catchable
     ...    Fail    Also this is executed!
 
 Invalid type error is catchable
-    [Documentation]    UNKNOWN
+    [Documentation]    FAIL
     ...    Teardown failed:
     ...    Several failures occurred:
     ...

@@ -20,8 +20,10 @@ would run, so what a reviewer reads is what executes. It is meant for
 review and debugging; the run itself never writes it to disk.
 """
 
+import re
+
 from robot.model import BodyItem
-from robot.running import For, If, Keyword, Try, While
+from robot.running import For, If, Keyword, Thread, Try, While
 from robot.running import Import
 
 
@@ -151,9 +153,30 @@ def _body(lines, body, indent):
             _row(lines, indent, 'FOR', *item.assign, item.flavor, *item.values)
             _body(lines, item.body, indent + 1)
             _row(lines, indent, 'END')
+        elif isinstance(item, Thread):
+            _row(lines, indent, 'THREAD', item.name, f'${{{item.daemon}}}')
+            _body(lines, item.body, indent + 1)
+            _row(lines, indent, 'END')
         else:
             _row(lines, indent, item.type, *getattr(item, 'values', ()))
 
 
 def _row(lines, indent, *cells):
-    lines.append(SEPARATOR * indent + SEPARATOR.join(cells))
+    lines.append(SEPARATOR * indent + SEPARATOR.join(_cell(c) for c in cells))
+
+
+def _cell(text):
+    """A value as a cell of the text: what is rendered is what executes.
+
+    An empty value, runs of spaces, a line break and a leading ``#`` would
+    otherwise read as a missing cell, a cell boundary, a new row or a
+    comment.
+    """
+    text = str(text)
+    if text == '':
+        return '${EMPTY}'
+    text = text.replace('\n', '\\n').replace('\t', '\\t')
+    text = re.sub(r' {2,}', lambda m: f"${{SPACE * {len(m.group())}}}", text)
+    if text.startswith('#'):
+        text = '\\' + text
+    return text

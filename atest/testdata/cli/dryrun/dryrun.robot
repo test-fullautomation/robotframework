@@ -47,7 +47,7 @@ Keywords that would fail
     This is validated
 
 Keywords with types that would fail
-    [Documentation]    UNKNOWN    Several failures occurred:
+    [Documentation]    FAIL    Several failures occurred:
     ...
     ...    1) Invalid variable '\${var: kala}': Unrecognized type 'kala'.
     ...

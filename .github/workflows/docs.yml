@@ -20,9 +20,9 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
+# The build job (which also runs for pull requests, with third-party code)
+# gets a read-only token; only the deploy job may write Pages.
 permissions:
-  pages: write
-  id-token: write
   contents: read
 
 concurrency:
@@ -44,18 +44,22 @@ jobs:
       - name: Install Java and Graphviz
         run: sudo apt-get update && sudo apt-get install -y default-jre graphviz
 
+      # The jar is checked against the hash of the release it names: it runs with Java here.
       - name: Fetch the PlantUML jar
         run: |
           mkdir -p tools
           curl -fsSL -o tools/plantuml.jar \
             https://github.com/plantuml/plantuml/releases/download/v1.2024.3/plantuml-1.2024.3.jar
+          echo "519a4a7284c6a0357c369e4bb0caf72c4bfbbde851b8c6d6bbdb7af3c01fc82f  tools/plantuml.jar" | sha256sum -c
 
       # plantuml-markdown imports requests and urllib3 at module level but
-      # declares no dependencies, so they must be installed explicitly.
+      # declares no dependencies, so they must be installed explicitly. Pinned
+      # to the versions the site is built with locally.
       - name: Install ProperDocs and plugins
         run: |
           python -m pip install --upgrade pip
-          python -m pip install properdocs properdocs-theme-readthedocs plantuml-markdown requests urllib3 mkdocs-glightbox
+          python -m pip install properdocs==1.6.7 properdocs-theme-readthedocs==1.6.5 plantuml-markdown==3.11.2 \
+            requests==2.32.3 urllib3==2.4.0 mkdocs-glightbox==0.5.2
 
       - name: Build the site
         run: python -m properdocs build --clean -f properdocs.yml
@@ -87,9 +91,6 @@ jobs:
           path: site
           retention-days: 7
 
-      - uses: actions/configure-pages@v5
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-
       - uses: actions/upload-pages-artifact@v3
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         with:
@@ -99,9 +100,14 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # Pages configuration needs the Pages permissions: here, not in build.
+      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4

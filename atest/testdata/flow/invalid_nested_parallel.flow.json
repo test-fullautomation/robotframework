@@ -1,0 +1,20 @@
+{
+  "flow": { "name": "Invalid Nested" },
+  "nodes": [
+    { "id": "start", "kind": "start" },
+    { "id": "outer", "kind": "parallel" },
+    { "id": "a", "kind": "keyword", "keyword": "Log", "args": ["a"] },
+    { "id": "inner", "kind": "parallel" },
+    { "id": "b", "kind": "keyword", "keyword": "Log", "args": ["b"] },
+    { "id": "c", "kind": "keyword", "keyword": "Log", "args": ["c"] },
+    { "id": "end", "kind": "end" }
+  ],
+  "edges": [
+    ["start", "outer"],
+    { "from": "outer", "to": "a", "label": "branch" }, { "from": "a", "to": "outer", "label": "join" },
+    { "from": "outer", "to": "inner", "label": "branch" }, { "from": "inner", "to": "outer", "label": "join" },
+    { "from": "inner", "to": "b", "label": "branch" }, { "from": "b", "to": "inner", "label": "join" },
+    { "from": "inner", "to": "c", "label": "branch" }, { "from": "c", "to": "inner", "label": "join" },
+    { "from": "outer", "to": "end", "label": "done" }
+  ]
+}

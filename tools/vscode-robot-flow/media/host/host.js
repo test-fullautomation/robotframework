@@ -2,9 +2,13 @@
 // get in the Manager GUI's sandboxed frame -- selection(), onSelection(fn),
 // reveal(target), edit(change) -> Promise -- over VS Code's postMessage.
 // The views are the Manager GUI's own files, unchanged.
+import { attach as attachCompletion } from './complete.js';
+
 const vscode = acquireVsCodeApi();
 
 let selection = null;
+// What the Diagram's field editor may complete: keywords of the imports, variables, flow files.
+let catalog = { keywords: [], variables: [], files: [] };
 const listeners = [];
 const pending = new Map();
 let seq = 0;
@@ -48,13 +52,17 @@ function showToolbar(t) {
   el.hidden = false;
   el.innerHTML =
     (t.canRun ? `<button type="button" class="tb-btn tb-run" data-act="run"${running ? ' disabled' : ''} title="${esc(t.runTitle || 'Run')}">▶ Run</button>` +
-                `<button type="button" class="tb-btn" data-act="runWith"${running ? ' disabled' : ''} title="Run with variables: NAME=value pairs passed as --variable, e.g. the bounds of a loop">▶ Run…</button>` : '') +
+                (t.isGroup ? '' : `<button type="button" class="tb-btn" data-act="runWith"${running ? ' disabled' : ''} title="Run with variables: NAME=value pairs passed as --variable, e.g. the bounds of a loop">▶ Run…</button>`) : '') +
     (t.canDebug ? `<button type="button" class="tb-btn" data-act="debug"${running ? ' disabled' : ''} title="Debug: stop at breakpoints (click a step's dot, or F9 in the text), step, see variables">⏵ Debug</button>` : '') +
     (t.canStep ? `<button type="button" class="tb-btn" data-act="step"${running ? ' disabled' : ''} title="Run in step mode: the flow pauses before every step of its test phases; Next step goes on">⏯ Step</button>` : '') +
     (t.canContinue ? '<button type="button" class="tb-btn tb-run" data-act="continue" title="A new run that continues from where this one stopped: finished test phases are skipped, the loop goes on with what is left">⟳ Continue</button>' : '') +
     (t.pausable ? (t.flowPaused
       ? `<button type="button" class="tb-btn tb-run" data-act="resume" title="${t.step ? 'Run the next step, then pause again' : 'Go on from where the flow paused'}">${t.step ? '⏭ Next step' : '▶ Resume'}</button>`
       : '<button type="button" class="tb-btn" data-act="pause" title="Pause at the next step: loop deadlines and gate timeouts wait too">⏸ Pause</button>') : '') +
+    (t.pausable ? '<button type="button" class="tb-btn" data-act="set" title="Set variables in the running flow (NAME=value), applied at its next step">Set\u2026</button>' +
+                  '<button type="button" class="tb-btn" data-act="snapshot" title="Write a named snapshot of the flow state next to its checkpoint, to continue from later">Snapshot</button>' : '') +
+    (t.isGroup && !running ? '<button type="button" class="tb-btn" data-act="addMember" title="Add a flow file of the project to this group (edits testproject.json)">\uff0b Member\u2026</button>' +
+                             '<button type="button" class="tb-btn" data-act="editGroup" title="Rename the group, change a member\'s variables, remove a member or the group">\u270e Group\u2026</button>' : '') +
     (running ? `<button type="button" class="tb-btn" data-act="stop" title="${t.status === 'stopping'
       ? 'Stopping: again stops through the stop file, a third time ends it at once'
       : t.flowStop ? 'Stop at the next step: the teardown runs and a checkpoint is written to continue from'
@@ -104,6 +112,8 @@ window.addEventListener('message', (event) => {
     showStatus(msg.status);
   } else if (msg.type === 'toolbar') {
     showToolbar(msg.toolbar);
+  } else if (msg.type === 'catalog') {
+    catalog = { keywords: msg.keywords || [], variables: msg.variables || [], files: msg.files || [] };
   } else if (msg.type === 'result') {
     const resolve = pending.get(msg.id);
     pending.delete(msg.id);
@@ -115,6 +125,7 @@ window.addEventListener('message', (event) => {
 export function start(mount) {
   try {
     mount(document.getElementById('view'), ctx);
+    attachCompletion(document.getElementById('view'), () => catalog);
   } catch (e) {
     showStatus({ kind: 'error', text: 'The view could not start: ' + e.message });
   }

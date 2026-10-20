@@ -104,6 +104,29 @@ test('pause holds the flow, resume lets it finish', { skip }, async () => {
   fs.rmSync(outDir, { recursive: true, force: true });
 });
 
+test('set reaches the running flow, snapshot leaves a file to continue from', { skip }, async () => {
+  const outDir = tmp();
+  const run = new RobotRun(planRun({ env: env(), target: LAPS, outDir }));
+  const end = finished(run);
+  run.start();
+  const store = run.plan.signalsFile;
+  await until(store, () => laps(run) >= 2);
+  assert.equal((await sendControl(env(), store, 'set', '', ['NOTE=from the test', 'OTHER=2'])).ok, true);
+  assert.equal((await sendControl(env(), store, 'snapshot', '', ['mid run'])).ok, true);
+  const { status } = await end;
+  assert.equal(status, 'passed');
+  const xml = fs.readFileSync(run.file('output.xml'), 'utf8');
+  assert.match(xml, /Variable \$\{NOTE\} set to 'from the test' by operator/, 'the set was applied');
+  assert.match(xml, /Variable \$\{OTHER\} set to '2' by operator/);
+  const snapshots = fs.readdirSync(outDir).filter((f) => f.includes('.snapshot-'));
+  assert.deepEqual(snapshots, ['laps.snapshot-mid_run.json']);
+  const data = JSON.parse(fs.readFileSync(path.join(outDir, snapshots[0]), 'utf8'));
+  assert.equal(data.snapshot.name, 'mid_run');
+  assert.ok(data.position.iteration >= 2 && data.position.iteration < 40, `taken at ${data.position.iteration}`);
+  assert.equal(findCheckpoint(outDir), null, 'a run that ends removes its checkpoint, not its snapshots');
+  fs.rmSync(outDir, { recursive: true, force: true });
+});
+
 test('stop leaves at the next step with a checkpoint; a new run continues from it', { skip }, async () => {
   const outDir = tmp();
   const run = new RobotRun(planRun({ env: env(), target: LAPS, outDir }));

@@ -8,6 +8,7 @@ import { ChildProcess, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 import { RobotEnv, pythonPathFor } from './helpers';
 
 export const FLOW_SUFFIX = '.flow.json';
@@ -62,10 +63,13 @@ export interface RunPlan {
 
 const VARIABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** `NAME=value, OTHER=value` typed for a run (commas or line breaks between pairs). */
+/**
+ * `NAME=value, OTHER=value` typed for a run: a comma or a line break before the
+ * next `NAME=` separates the pairs, so a value may hold commas (`LIST=a,b`).
+ */
 export function parseVariables(text: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const part of text.split(/[,\n]/)) {
+  for (const part of text.split(/\n|,(?=\s*[A-Za-z_][A-Za-z0-9_]*\s*=)/)) {
     const pair = part.trim();
     if (!pair) continue;
     const eq = pair.indexOf('=');
@@ -101,8 +105,10 @@ export function usesFlows(target: string): boolean {
 
 export function planRun(req: RunRequest): RunPlan {
   const flows = usesFlows(req.target);
-  const argv = [req.env.python, path.join(req.env.helpersDir, 'robot_boot.py'), '--outputdir', req.outDir,
-                '--consolecolors', 'off', '--consolemarkers', 'off', '--consolewidth', '100'];
+  // The project's and the user's own options come first: Robot takes the last value of an option,
+  // so the output folder, the console shape and the variables below stay the extension's.
+  const argv = [req.env.python, path.join(req.env.helpersDir, 'robot_boot.py'), ...(req.args || []),
+                '--outputdir', req.outDir, '--consolecolors', 'off', '--consolemarkers', 'off', '--consolewidth', '100'];
   if (flows) argv.push('--parser', 'robot.flow');
   // Opt-in: one more pass over output.xml at the end of the run.
   if (flows && req.flowReport) argv.push('--flowreport', 'flow.html');
@@ -116,7 +122,7 @@ export function planRun(req: RunRequest): RunPlan {
     // The fork's step mode: a pause before every step, resumed through the signal store.
     argv.push('--variable', 'FLOW_STEP:yes');
   }
-  argv.push(...(req.args || []), req.target);
+  argv.push(req.target);
 
   const runDir = req.runDir || req.outDir;
   const env: NodeJS.ProcessEnv = { ...process.env };
@@ -175,10 +181,15 @@ export class RobotRun extends EventEmitter {
       this.finish('error', null, `Could not start ${exe}: ${(e as Error).message}`);
       return this;
     }
-    this.child.stdout?.on('data', (d: Buffer) => this.emit('output', d.toString('utf8')));
-    this.child.stderr?.on('data', (d: Buffer) => this.emit('output', d.toString('utf8')));
+    // One decoder per stream: a multi-byte character may be cut between two chunks.
+    const out = new StringDecoder('utf8');
+    const err = new StringDecoder('utf8');
+    this.child.stdout?.on('data', (d: Buffer) => this.emit('output', out.write(d)));
+    this.child.stderr?.on('data', (d: Buffer) => this.emit('output', err.write(d)));
     this.child.on('error', (e) => this.finish('error', null, `Could not start ${exe}: ${e.message}`));
     this.child.on('close', (code) => {
+      const rest = out.end() + err.end();
+      if (rest) this.emit('output', rest);
       this.readPosition();
       const status: RunStatus = this.stopRequested ? 'stopped' : code === 0 ? 'passed' : 'failed';
       this.finish(status, code);
@@ -217,6 +228,11 @@ export class RobotRun extends EventEmitter {
 
   get running(): boolean {
     return this.status === 'running' || this.status === 'stopping';
+  }
+
+  /** The process id, once started. */
+  get pid(): number | null {
+    return this.child?.pid ?? null;
   }
 
   file(name: string): string | null {

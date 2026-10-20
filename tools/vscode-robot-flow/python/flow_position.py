@@ -123,12 +123,12 @@ _BOOKKEEPING = []
 
 def _bookkeeping():
     """Names of the keywords the fork adds for its checkpoint (``Flow Phase``,
-    ``Flow Loop``, ``Flow Iteration``); none with an older fork."""
+    ``Flow Loop``; older forks also ``Flow Iteration``); none with an older fork."""
     if not _BOOKKEEPING:
         names = set()
         try:
             from robot.flow import builder
-            names.update(getattr(builder, n) for n in ("PHASE_KEYWORD", "LOOP_KEYWORD", "ITERATION_KEYWORD")
+            names.update(getattr(builder, n) for n in ("PHASE_KEYWORD", "LOOP_KEYWORD", "LOOP_END_KEYWORD", "ITERATION_KEYWORD")
                          if isinstance(getattr(builder, n, None), str))
         except ImportError:
             pass

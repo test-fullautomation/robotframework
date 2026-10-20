@@ -7,7 +7,7 @@ FatalCatastrophyException: BANG!
 ==============================================================================
 Run suite 'Fatal Exception' with 6 tests in *.
 
-UNKNOWNED
+UNKNOWN
 6 tests, 0 passed, 1 failed, 5 unknown
 
 Output:  *.xml

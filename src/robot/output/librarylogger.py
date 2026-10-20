@@ -19,10 +19,9 @@ This is exposed via :py:mod:`robot.api.logger`. Implementation must reside
 here to avoid cyclic imports.
 """
 
-from threading import current_thread
 from typing import Literal
 
-from robot.utils import safe_str
+from robot.utils import safe_str, thread_key
 
 from .logger import LOGGER
 from .loggerhelper import Message, MessageLevel, PseudoLevel, write_to_console
@@ -32,16 +31,17 @@ from .loggerhelper import Message, MessageLevel, PseudoLevel, write_to_console
 LOGGING_THREADS = ["MainThread", "RobotFrameworkTimeoutThread"]
 
 
-def add_thread_logging(thread_name):
+def add_thread_logging(key):
     # cuongnht add thread: messages logged by THREAD workers must reach
-    # the output like messages from the main thread.
-    if thread_name not in LOGGING_THREADS:
-        LOGGING_THREADS.append(thread_name)
+    # the output like messages from the main thread. By the thread key
+    # (robot.utils.thread_key); the execution thread's key is its name.
+    if key not in LOGGING_THREADS:
+        LOGGING_THREADS.append(key)
 
 
-def remove_thread_logging(thread_name):
-    while thread_name in LOGGING_THREADS:
-        LOGGING_THREADS.remove(thread_name)
+def remove_thread_logging(key):
+    while key in LOGGING_THREADS:
+        LOGGING_THREADS.remove(key)
 
 
 def write(
@@ -54,7 +54,7 @@ def write(
         msg = safe_str(msg)
     if level == "FAIL":
         raise ValueError(f"Invalid log level '{level}'.")
-    if current_thread().name in LOGGING_THREADS:
+    if thread_key() in LOGGING_THREADS:
         LOGGER.log_message(Message(msg, level, html=html, console=console))
 
 
