@@ -180,10 +180,11 @@ test('a results root: runs newest first, groups by their members, checkpoints, t
     assert.equal(olderThan(runs, 0, Date.now() + 25 * 3600 * 1000).some((r) => r.name === died.name), true, 'stale a day later');
     assert.equal(olderThan(runs, 0, Date.now() + 25 * 3600 * 1000).length, runs.length, 'all of them then');
     // a run of the extension records its processes: gone processes mean a dead run, whatever the time
-    writeRunInfo(died.dir, { ...died.info, pids: { main: 999999999 } });
+    // (the pid is trusted for a week after the start, so this run starts now, not on the fixture's date)
+    writeRunInfo(died.dir, { ...died.info, started: Date.now(), pids: { main: 999999999 } });
     const [deadByPid] = scanRuns(root).filter((r) => r.name === died.name);
     assert.equal(maybeAlive(deadByPid), false, 'its process is gone');
-    writeRunInfo(died.dir, { ...died.info, pids: { main: process.pid } });
+    writeRunInfo(died.dir, { ...died.info, started: Date.now(), pids: { main: process.pid } });
     const [aliveByPid] = scanRuns(root).filter((r) => r.name === died.name);
     assert.equal(maybeAlive(aliveByPid, Date.now() + 48 * 3600 * 1000), true, 'its process lives: kept however long ago it wrote');
 
