@@ -94,7 +94,7 @@ Run Keyword And Return In Teardown
     [Teardown]    Run Keyword And Return In Teardown
 
 Run Keyword And Return In Teardown When Keyword Fails
-    [Documentation]    UNKNOWN    Teardown failed:
+    [Documentation]    FAIL    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Expected error

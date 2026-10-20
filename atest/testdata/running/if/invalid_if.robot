@@ -261,7 +261,7 @@ Invalid data causes syntax error
     END
 
 Invalid condition causes normal error
-    [Documentation]    UNKNOWN    Teardown failed:
+    [Documentation]    FAIL    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Invalid IF condition: Evaluating expression 'bad in teardown' failed: NameError: name 'bad' is not defined nor importable as module
@@ -277,7 +277,7 @@ Invalid condition causes normal error
     [Teardown]    Invalid condition
 
 Non-existing variable in condition causes normal error
-    [Documentation]    UNKNOWN    Teardown failed:
+    [Documentation]    FAIL    Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) Invalid IF condition: Evaluating expression '\${oops}' failed: Variable '\${oops}' not found.

@@ -73,7 +73,7 @@ Keywords names needing escaping as variable
 
 In test teardown with non-existing variable in keyword name
     [Documentation]
-    ...    UNKNOWN Teardown failed:
+    ...    FAIL Teardown failed:
     ...    Several failures occurred:
     ...
     ...    1) No keyword with name '\${bad}' found.

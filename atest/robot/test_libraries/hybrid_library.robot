@@ -28,11 +28,9 @@ Named Keyword Is Not Method
 
 Unexpected error getting attribute
     Check Test Case    ${TESTNAME}
-    # In this fork DataError messages include their details section.
     Adding keyword failed    2    Unexpected error getting attribute
     ...    Getting handler method failed:
-    ...    TypeError: Oooops!\nDetails: Traceback*
-    ...    pattern=True
+    ...    TypeError: Oooops!
 
 Name Set Using 'robot_name' Attribute
     Check Test Case    ${TESTNAME}

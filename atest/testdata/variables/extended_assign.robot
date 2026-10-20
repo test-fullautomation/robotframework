@@ -60,7 +60,7 @@ Trying to set un-settable attribute
     ${VAR.not_settable} =    Set Variable    whatever
 
 Un-settable attribute error is catchable
-    [Documentation]    UNKNOWN GLOB:
+    [Documentation]    FAIL GLOB:
     ...    Teardown failed:
     ...    Several failures occurred:
     ...
